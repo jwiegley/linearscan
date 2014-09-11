@@ -6,19 +6,20 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
+Require Import Coq.Arith.EqNat.
 Require Import Coq.Init.Datatypes.
 Require Import Coq.Lists.List.
 Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
-Require Import Coq.Arith.EqNat.
+Require Import Coq.Program.Equality.
+Require Import Coq.Vectors.Fin.
 Require Import Recdef.
-Require Import Setoid.
 
 Generalizable All Variables.
 
-Section Interval.
+(****************************************************************************)
 
-Variable a : Set.
+Section Interval.
 
 Record Range : Set := {
   rstart : nat;
@@ -35,9 +36,6 @@ Record Range : Set := {
   rangeExtent := rend - rstart
 }.
 
-Definition in_range (loc : nat) (r : Range) : Prop :=
-  rstart r <= loc /\ loc < rend r.
-
 (** A [RangeList] encodes both the total extent of the list of ranges (the
     total span of instructions covered by all th eranges), and also the fact
     that ranges must be ordered and disjoint (non-overlapping). *)
@@ -47,6 +45,33 @@ Inductive RangeList : nat -> list Range -> Set :=
   | RangeCons r s n rs :
     RangeList n (s :: rs) -> rend r <= rstart s
       -> RangeList (n + (rstart s - rstart r)) (cons r rs).
+
+Definition in_range (loc : nat) (r : Range) : Prop :=
+  rstart r <= loc /\ loc < rend r.
+
+Definition rangesIntersect (i j : Range) : bool :=
+  if rstart i <? rstart j
+  then rstart j <? rend i
+  else rstart i <? rend j.
+
+Definition anyRangeIntersects (is js : list Range) : bool :=
+  fold_right
+    (fun r b => orb b (existsb (rangesIntersect r) js))
+    false is.
+
+Definition rangeListStart `(rs : RangeList n xs) : nat :=
+  match rs with
+  | RangeSing r => rstart r
+  | RangeCons r _ _ _ _ _ => rstart r
+  end.
+
+Definition rangeListEnd `(rs : RangeList n xs) : nat :=
+  match rs with
+  | RangeSing r => rend r
+  | RangeCons r _ _ _ _ _ => rstart r + n
+  end.
+
+Definition rangeListExtent `(rs : RangeList n xs) : nat := n.
 
 Record UsePos `(RangeList extent ranges) : Set := {
   uloc   : nat;
@@ -61,9 +86,6 @@ Record UsePosList `(rs : RangeList extent ranges) : Set := {
 
   has_use_positions : length positions > 0
 }.
-
-Definition VirtReg := nat.
-Definition PhysReg := nat.
 
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
     a list of ranges "covered" by that variable in the low-level intermediate
@@ -92,11 +114,6 @@ Record Interval : Set := {
   usePositions : UsePosList lifetimes        (* list of use positions *)
 }.
 
-Record AssignedInterval : Set := {
-  interval : Interval;
-  assigned : PhysReg                         (* assigned register *)
-}.
-
 Definition Icompare (x y : Interval) := Eq.
 
 Infix "?=" := Icompare (at level 70, no associativity).
@@ -116,43 +133,7 @@ Definition I_eq_dec (x y : Interval) : { x = y } + { x <> y }.
 Proof.
 Admitted.
 
-Definition AI_eq_dec (x y : AssignedInterval) : { x = y } + { x <> y }.
-Proof.
-Admitted.
-
 End Interval.
-
-Definition rangeListStart `(rs : RangeList n xs) : nat :=
-  match rs with
-  | RangeSing r => rstart r
-  | RangeCons r _ _ _ _ _ => rstart r
-  end.
-
-Definition rangeListEnd `(rs : RangeList n xs) : nat :=
-  match rs with
-  | RangeSing r => rend r
-  | RangeCons r _ _ _ _ _ => rstart r + n
-  end.
-
-Definition rangeListExtent `(rs : RangeList n xs) : nat := n.
-
-Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
-Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
-Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
-
-Definition intervalRange (i : AssignedInterval) : Range.
-  apply Build_Range
-    with (rstart := intervalStart (interval i))
-         (rend   := intervalEnd (interval i));
-  destruct i.
-  - omega.
-  - unfold intervalStart, intervalEnd.
-    simpl. destruct interval0.
-    induction lifetimes0.
-      apply range_properly_bounded.
-    destruct r. destruct s.
-    simpl in *. omega.
-Qed.
 
 Module Interval_as_OT <: OrderedType.
 
@@ -181,42 +162,6 @@ End Interval_as_OT.
 Module S := MSetAVL.Make(Interval_as_OT).
 Module Import N := WPropertiesOn S.E S.
 
-Definition intSet : Type := S.t.  (* the type of a set of intervals *)
-
-Definition no_overlap (xs ys : list Interval) :=
-  forall (x : Interval), ~ (In x xs) \/ ~ (In x ys).
-
-Definition intSetExtent (is : intSet) : nat :=
-  S.fold (fun x n => n + intExtent x) is 0.
-
-(* Definition no_overlap (xs ys : intSet) : bool := *)
-(*   fold (fun x ret => andb ret (negb (mem x ys))) xs true. *)
-
-(* The ScanState is always relative to the current position (pos). *)
-Record ScanState := {
-    unhandled : intSet;                (* starts after pos *)
-    active    : list AssignedInterval; (* ranges over pos *)
-    inactive  : list AssignedInterval; (* falls within lifetime hole *)
-    handled   : list AssignedInterval; (* ends before pos *)
-
-    no_overlap_in_unhandled :
-      no_overlap (S.elements unhandled) (map interval active);
-    no_overlap_in_actives :
-      no_overlap (map interval active) (map interval inactive);
-    no_overlap_in_handled :
-      no_overlap (map interval active) (map interval handled)
-}.
-
-Program Definition newScanState (intervals : intSet) : ScanState :=
-  {| unhandled := intervals
-   ; active    := nil
-   ; inactive  := nil
-   ; handled   := nil
-   |}.
-Solve All Obligations using
-  (unfold no_overlap; intros;
-   right; unfold not; apply FM.empty_iff).
-
 Lemma elements_spec3 : forall s x, In x (S.elements s) <-> S.In x s.
 Proof.
   split; intros.
@@ -240,7 +185,161 @@ Proof.
   inversion H0. assumption.
 Qed.
 
+Definition intSet : Type := S.t.  (* the type of a set of intervals *)
+
+Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
+Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
+Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
+
+Definition no_overlap (xs ys : list Interval) :=
+  forall (x : Interval), ~ (In x xs) \/ ~ (In x ys).
+
+Definition intSetExtent (is : intSet) : nat :=
+  S.fold (fun x n => n + intExtent x) is 0.
+
+(****************************************************************************)
+
+Definition fin := Coq.Vectors.Fin.t.
+
+Definition fin_eq_dec {n} (x y : fin n) : { x = y } + { x <> y }.
+Proof.
+  induction x; dependent destruction y.
+  - left. reflexivity.
+  - right. unfold not. intros.
+    inversion H.
+  - right. unfold not. intros.
+    inversion H.
+  - destruct (IHx y).
+      left. congruence.
+    right. intuition.
+    apply n0. apply FS_inj.
+    assumption.
+Defined.
+
+Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
+
+Definition penultimate_Sn (n : nat) : fin (S n).
+Proof.
+  induction n.
+    apply F1.
+  apply FS. apply IHn.
+Defined.
+
+(** Return the last possible inhabitant of a [fin n]. *)
+Definition penultimate_from_nat (n : nat) (H : n > 0) : fin n.
+Proof.
+  induction n. omega.
+  apply penultimate_Sn.
+Qed.
+
+Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
+
+Definition pred_fin {n} (f : fin n) : option (fin n).
+  apply to_nat in f.
+  destruct f.
+  destruct x.
+    apply None.
+  apply Some.
+  assert (x < n). omega.
+  apply (from_nat x H).
+Defined.
+
+Lemma pred_fin_lt : forall n x y,
+  @pred_fin n x = Some y -> proj1_sig (to_nat y) < proj1_sig (to_nat x).
+Proof.
+  intros.
+Admitted.
+
+Definition _0_lt_20 : 0 < 20. omega. Qed.
+Definition _9_lt_20 : 9 < 20. omega. Qed.
+Definition _8_lt_20 : 8 < 20. omega. Qed.
+
+Example pred_fin_ex1 :
+  pred_fin (@from_nat 0 20 _0_lt_20) = None.
+Proof.
+  unfold pred_fin, from_nat. reflexivity.
+Qed.
+
+Example pred_fin_ex2 :
+  pred_fin (@from_nat 9 20 _9_lt_20) = Some (@from_nat 8 20 _8_lt_20).
+Proof.
+  unfold pred_fin, from_nat. reflexivity.
+Qed.
+
+Example pred_fin_ex3 : forall n m (H : S n < m),
+  pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
+Proof.
+  intros.
+  destruct (pred_fin (from_nat (S n) H)).
+  f_equal. unfold from_nat.
+Admitted.
+
+(****************************************************************************)
+
+Section Allocator.
+
+Variable maxReg : nat.          (* max number of registers *)
+
+Hypothesis registers_exist : maxReg > 0.
+
+Definition VirtReg := nat.
+Definition PhysReg := fin maxReg.
+
+Record AssignedInterval : Set := {
+  interval : Interval;
+  assigned : PhysReg            (* assigned register *)
+}.
+
+Definition AI_eq_dec (x y : AssignedInterval)
+  : { x = y } + { x <> y }.
+Proof.
+Admitted.
+
+Definition intervalRange (i : AssignedInterval) : Range.
+  apply Build_Range
+    with (rstart := intervalStart (interval i))
+         (rend   := intervalEnd (interval i));
+  destruct i.
+  - omega.
+  - unfold intervalStart, intervalEnd.
+    simpl. destruct interval0.
+    induction lifetimes0.
+      apply range_properly_bounded.
+    destruct r. destruct s.
+    simpl in *. omega.
+Qed.
+
+(* The ScanState is always relative to the current position (pos). *)
+Record ScanState := {
+    unhandled : intSet;                 (* starts after pos *)
+    active    : list AssignedInterval;  (* ranges over pos *)
+    inactive  : list AssignedInterval;  (* falls in lifetime hole *)
+    handled   : list AssignedInterval;  (* ends before pos *)
+
+    intervals := map interval;
+
+    no_overlap_in_unhandled :
+      no_overlap (S.elements unhandled) (intervals active);
+    no_overlap_in_actives :
+      no_overlap (intervals active) (intervals inactive);
+    no_overlap_in_handled :
+      no_overlap (intervals active) (intervals handled)
+}.
+
+Program Definition newScanState (intervals : intSet)
+  : ScanState := {| unhandled := intervals
+                  ; active    := nil
+                  ; inactive  := nil
+                  ; handled   := nil
+                  |}.
+Solve All Obligations using
+  (unfold no_overlap; intros; right; unfold not; intros; inversion H).
+
+Definition scanStateUnhandledExtent (st : ScanState) : nat :=
+  intSetExtent (unhandled st).
+
 Definition nextUnhandled (st : ScanState) : option (Interval * ScanState).
+Proof.
   pose (S.min_elt (unhandled st)).
   destruct o.
   - constructor.
@@ -264,7 +363,7 @@ Definition nextUnhandled (st : ScanState) : option (Interval * ScanState).
   - apply None.
 Defined.
 
-Definition moveFromActiveToHandled (x : AssignedInterval) (st : ScanState)
+Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
   : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
@@ -273,7 +372,7 @@ Definition moveFromActiveToHandled (x : AssignedInterval) (st : ScanState)
          (handled   := x :: handled st).
 Admitted.
 
-Definition moveFromActiveToInactive (x : AssignedInterval) (st : ScanState)
+Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
   : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
@@ -282,7 +381,7 @@ Definition moveFromActiveToInactive (x : AssignedInterval) (st : ScanState)
          (handled   := handled st).
 Admitted.
 
-Definition addToActive (x : AssignedInterval) (st : ScanState) : ScanState.
+Definition addToActive (st : ScanState) (x : AssignedInterval) : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := x :: active st)
@@ -290,24 +389,65 @@ Definition addToActive (x : AssignedInterval) (st : ScanState) : ScanState.
          (handled   := handled st).
 Admitted.
 
-Definition scanStateUnhandledExtent (st : ScanState) : nat :=
-  intSetExtent (unhandled st).
+Definition getRegisterIndex
+  (k : AssignedInterval -> nat) (z : PhysReg -> option nat)
+  (is : list AssignedInterval) : PhysReg -> option nat :=
+  fold_right
+    (fun x f => fun r =>
+         if fin_eq_dec (assigned x) r then Some (k x) else f r) z is.
 
-Definition tryAllocateFreeReg (current : Interval) (st : ScanState)
+Definition nextIntersectionWith (i : Interval) (x : AssignedInterval) : nat.
+Proof.
+Admitted.
+
+Function findRegister (freeUntilPos : PhysReg -> option nat)
+  (reg : PhysReg) {measure fin_to_nat reg} : (PhysReg * option nat)%type :=
+  match freeUntilPos reg with
+  | None => (reg, None)
+  | Some pos =>
+      match pred_fin reg with
+      | None => (reg, Some pos)
+      | Some nreg =>
+          match findRegister freeUntilPos nreg with
+          | (reg', None) => (reg', None)
+          | (reg', Some pos') =>
+              if pos <? pos'
+              then (reg', Some pos')
+              else (reg,  Some pos)
+          end
+      end
+  end.
+Proof.
+  intros. apply pred_fin_lt. assumption.
+Qed.
+
+(** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
+    left unchanged.  If it succeeds, or is forced to split [current], then a
+    register will have been assigned. *)
+
+Definition tryAllocateFreeReg (st : ScanState) (current : Interval)
   : option (AssignedInterval * ScanState) :=
+  (* jww: The first part of this algorithm has been modified to be functional:
+     instead of mutating an array called freeUntilPos and then selecting the
+     register with the highest value, we determine the register using a
+     fold. *)
+
   (* set freeUntilPos of all physical registers to maxInt
 
      for each interval it in active do
        freeUntilPos[it.reg] = 0 *)
   let freeUntilPos' :=
-      fold_right
-        (fun (x : AssignedInterval) (f : nat -> option nat) =>
-           fun r => if beq_nat (assigned x) r then Some 0 else f r)
-        (fun r => None)
-        (active st) in
+        getRegisterIndex (fun _ => 0) (fun r => None) (active st) in
 
   (* for each interval it in inactive intersecting with current do
        freeUntilPos[it.reg] = next intersection of it with current *)
+  let intersectingIntervals :=
+        filter (fun x =>
+                  anyRangeIntersects (ranges current) (ranges (interval x)))
+               (inactive st) in
+  let freeUntilPos :=
+        getRegisterIndex (nextIntersectionWith current)
+                         freeUntilPos' intersectingIntervals in
 
   (* reg = register with highest freeUntilPos
      if freeUntilPos[reg] = 0 then
@@ -320,10 +460,19 @@ Definition tryAllocateFreeReg (current : Interval) (st : ScanState)
        // register available for the first part of the interval
        current.reg = reg
        split current before freeUntilPos[reg] *)
+  let lastReg := penultimate_from_nat maxReg registers_exist in
+  let reg := findRegister freeUntilPos lastReg in
+
+  (* jww (2014-09-11): NYI *)
   None.
 
-Definition allocateBlockedReg (current : Interval) (st : ScanState)
-  : (AssignedInterval * ScanState).
+(** If [allocateBlockedReg] fails, it's possible no register was assigned and
+    that the only outcome was to split one or more intervals.  This is why the
+    type differs from [tryAllocateFreeReg], since in ever case the final state
+    will be changed. *)
+
+Definition allocateBlockedReg (st : ScanState) (current : Interval)
+  : (option AssignedInterval * ScanState).
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -363,9 +512,9 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
     match intervalRange x with
     | Build_Range s e Hp Hb =>
       if e <? position
-      then moveFromActiveToHandled x st
+      then moveActiveToHandled st x
       else if position <? s
-           then moveFromActiveToInactive x st
+           then moveActiveToInactive st x
            else st
     end in
   let st1 := fold_right go1 st0 (active st0) in
@@ -383,17 +532,18 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
-  let (current', st3) :=
-      match tryAllocateFreeReg current st2 with
-      | None => allocateBlockedReg current st2
-      | Some res => res
+  let (mres, st3) :=
+      match tryAllocateFreeReg st2 current with
+      | None => allocateBlockedReg st2 current
+      | Some (current', st') => (Some current', st')
       end in
 
   (* if current has a register assigned then
        add current to active *)
-  if assigned current'
-  then addToActive current' st3
-  else st3.
+  match mres with
+  | None => st3
+  | Some current' => addToActive st3 current'
+  end.
 
 Function linearScan (st : ScanState)
     {measure scanStateUnhandledExtent st} : ScanState :=
@@ -427,6 +577,8 @@ Proof.
   destruct p. subst.
   inversion teq0; subst.
 Admitted.
+
+End Allocator.
 
 (** Given a node graph of our low-level intermediate representation, where
     instructions are associated with virtual registers, compute the linear
