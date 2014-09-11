@@ -19,7 +19,101 @@ Generalizable All Variables.
 
 (****************************************************************************)
 
-Section Interval.
+(** * Library *)
+
+(** The following are extensions to the Coq standard library. *)
+
+Inductive NonEmpty (a : Set) : Set :=
+  | NE_Sing : a -> NonEmpty a
+  | NE_Cons : a -> NonEmpty a -> NonEmpty a.
+
+Definition no_overlap {a} (xs ys : list a) :=
+  forall (x : a), ~ (In x xs) \/ ~ (In x ys).
+
+Definition fin := Coq.Vectors.Fin.t.
+
+Definition fin_eq_dec {n} (x y : fin n) : { x = y } + { x <> y }.
+Proof.
+  induction x; dependent destruction y.
+  - left. reflexivity.
+  - right. unfold not. intros.
+    inversion H.
+  - right. unfold not. intros.
+    inversion H.
+  - destruct (IHx y).
+      left. congruence.
+    right. intuition.
+    apply n0. apply FS_inj.
+    assumption.
+Defined.
+
+Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
+
+Definition ultimate_Sn (n : nat) : fin (S n).
+Proof.
+  induction n.
+    apply F1.
+  apply FS. apply IHn.
+Defined.
+
+(** Return the last possible inhabitant of a [fin n]. *)
+Definition ultimate_from_nat (n : nat) (H : n > 0) : fin n.
+Proof.
+  induction n. omega.
+  apply ultimate_Sn.
+Qed.
+
+Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
+
+Definition pred_fin {n} (f : fin n) : option (fin n).
+  apply to_nat in f.
+  destruct f.
+  destruct x.
+    apply None.
+  apply Some.
+  assert (x < n). omega.
+  apply (from_nat x H).
+Defined.
+
+Lemma pred_fin_lt : forall n x y,
+  @pred_fin n x = Some y -> proj1_sig (to_nat y) < proj1_sig (to_nat x).
+Proof.
+  intros.
+Admitted.
+
+Definition _0_lt_20 : 0 < 20. omega. Qed.
+Definition _9_lt_20 : 9 < 20. omega. Qed.
+Definition _8_lt_20 : 8 < 20. omega. Qed.
+
+Example pred_fin_ex1 :
+  pred_fin (@from_nat 0 20 _0_lt_20) = None.
+Proof.
+  unfold pred_fin, from_nat. reflexivity.
+Qed.
+
+Example pred_fin_ex2 :
+  pred_fin (@from_nat 9 20 _9_lt_20) = Some (@from_nat 8 20 _8_lt_20).
+Proof.
+  unfold pred_fin, from_nat. reflexivity.
+Qed.
+
+Example pred_fin_ex3 : forall n m (H : S n < m),
+  pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
+Proof.
+  intros.
+  destruct (pred_fin (from_nat (S n) H)).
+  f_equal. unfold from_nat.
+Admitted.
+
+(****************************************************************************)
+
+(** * Range *)
+
+(** The extent of a [Range] is the set of locations it ranges over.  By
+    summing the extent of a list of ranges, we have an idea of how much ground
+    is left to cover, and this gives us a notion of well-founded recursion for
+    iterating over intervals that may split as we examine them -- i.e., whose
+    total extent must decrease after each pass. *)
 
 Record Range : Set := {
   rstart : nat;
@@ -28,23 +122,8 @@ Record Range : Set := {
   range_positive : rstart >= 0;
   range_properly_bounded : rstart < rend;
 
-  (** The extent of a [Range] is simply the set of locations it ranges over.
-      By summing the extent of a list of ranges, we have an idea of how much
-      ground is left to cover, and this gives us a notion of well-founded
-      recursion for iterating over intervals that may split as we examine them
-      -- i.e., whose total extent must decrease after each pass. *)
   rangeExtent := rend - rstart
 }.
-
-(** A [RangeList] encodes both the total extent of the list of ranges (the
-    total span of instructions covered by all th eranges), and also the fact
-    that ranges must be ordered and disjoint (non-overlapping). *)
-
-Inductive RangeList : nat -> list Range -> Set :=
-  | RangeSing r : RangeList (rangeExtent r) (r :: nil)
-  | RangeCons r s n rs :
-    RangeList n (s :: rs) -> rend r <= rstart s
-      -> RangeList (n + (rstart s - rstart r)) (cons r rs).
 
 Definition in_range (loc : nat) (r : Range) : Prop :=
   rstart r <= loc /\ loc < rend r.
@@ -58,6 +137,18 @@ Definition anyRangeIntersects (is js : list Range) : bool :=
   fold_right
     (fun r b => orb b (existsb (rangesIntersect r) js))
     false is.
+
+(** * RangeList *)
+
+(** A [RangeList] encodes both the total extent of the list of ranges (the
+    total span of instructions covered by all the ranges), and also the fact
+    that ranges must be ordered and disjoint (non-overlapping). *)
+
+Inductive RangeList : nat -> list Range -> Set :=
+  | RangeSing r : RangeList (rangeExtent r) (r :: nil)
+  | RangeCons r s n rs :
+    RangeList n (s :: rs) -> rend r <= rstart s
+      -> RangeList (n + (rstart s - rstart r)) (cons r rs).
 
 Definition rangeListStart `(rs : RangeList n xs) : nat :=
   match rs with
@@ -73,18 +164,19 @@ Definition rangeListEnd `(rs : RangeList n xs) : nat :=
 
 Definition rangeListExtent `(rs : RangeList n xs) : nat := n.
 
+(** * UsePos *)
+
+(** A "use position", or [UsePos], identifies an exact point in the
+    instruction stream where a particular variable is used.  If this usage
+    requires the use of a physical register, then [regReq] is [true] for that
+    use position. *)
+
 Record UsePos `(RangeList extent ranges) : Set := {
   uloc   : nat;
   regReq : bool;
 
   uloc_positive : uloc >= 0;
   within_range  : Exists (in_range uloc) ranges
-}.
-
-Record UsePosList `(rs : RangeList extent ranges) : Set := {
-  positions : list (UsePos rs);
-
-  has_use_positions : length positions > 0
 }.
 
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
@@ -111,8 +203,12 @@ Record Interval : Set := {
   ranges       : list Range;
   intExtent    : nat;
   lifetimes    : RangeList intExtent ranges; (* list of disjoint ranges *)
-  usePositions : UsePosList lifetimes        (* list of use positions *)
+  usePositions : NonEmpty (UsePos lifetimes) (* list of use positions *)
 }.
+
+Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
+Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
+Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
 
 Definition Icompare (x y : Interval) := Eq.
 
@@ -132,8 +228,6 @@ Admitted.
 Definition I_eq_dec (x y : Interval) : { x = y } + { x <> y }.
 Proof.
 Admitted.
-
-End Interval.
 
 Module Interval_as_OT <: OrderedType.
 
@@ -187,92 +281,8 @@ Qed.
 
 Definition intSet : Type := S.t.  (* the type of a set of intervals *)
 
-Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
-Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
-Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
-
-Definition no_overlap (xs ys : list Interval) :=
-  forall (x : Interval), ~ (In x xs) \/ ~ (In x ys).
-
 Definition intSetExtent (is : intSet) : nat :=
   S.fold (fun x n => n + intExtent x) is 0.
-
-(****************************************************************************)
-
-Definition fin := Coq.Vectors.Fin.t.
-
-Definition fin_eq_dec {n} (x y : fin n) : { x = y } + { x <> y }.
-Proof.
-  induction x; dependent destruction y.
-  - left. reflexivity.
-  - right. unfold not. intros.
-    inversion H.
-  - right. unfold not. intros.
-    inversion H.
-  - destruct (IHx y).
-      left. congruence.
-    right. intuition.
-    apply n0. apply FS_inj.
-    assumption.
-Defined.
-
-Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
-
-Definition penultimate_Sn (n : nat) : fin (S n).
-Proof.
-  induction n.
-    apply F1.
-  apply FS. apply IHn.
-Defined.
-
-(** Return the last possible inhabitant of a [fin n]. *)
-Definition penultimate_from_nat (n : nat) (H : n > 0) : fin n.
-Proof.
-  induction n. omega.
-  apply penultimate_Sn.
-Qed.
-
-Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
-
-Definition pred_fin {n} (f : fin n) : option (fin n).
-  apply to_nat in f.
-  destruct f.
-  destruct x.
-    apply None.
-  apply Some.
-  assert (x < n). omega.
-  apply (from_nat x H).
-Defined.
-
-Lemma pred_fin_lt : forall n x y,
-  @pred_fin n x = Some y -> proj1_sig (to_nat y) < proj1_sig (to_nat x).
-Proof.
-  intros.
-Admitted.
-
-Definition _0_lt_20 : 0 < 20. omega. Qed.
-Definition _9_lt_20 : 9 < 20. omega. Qed.
-Definition _8_lt_20 : 8 < 20. omega. Qed.
-
-Example pred_fin_ex1 :
-  pred_fin (@from_nat 0 20 _0_lt_20) = None.
-Proof.
-  unfold pred_fin, from_nat. reflexivity.
-Qed.
-
-Example pred_fin_ex2 :
-  pred_fin (@from_nat 9 20 _9_lt_20) = Some (@from_nat 8 20 _8_lt_20).
-Proof.
-  unfold pred_fin, from_nat. reflexivity.
-Qed.
-
-Example pred_fin_ex3 : forall n m (H : S n < m),
-  pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
-Proof.
-  intros.
-  destruct (pred_fin (from_nat (S n) H)).
-  f_equal. unfold from_nat.
-Admitted.
 
 (****************************************************************************)
 
@@ -284,6 +294,11 @@ Hypothesis registers_exist : maxReg > 0.
 
 Definition VirtReg := nat.
 Definition PhysReg := fin maxReg.
+
+(** * AssignedInterval *)
+
+(** [AssignedInterval] values are just a tuple of an interval and an assigned
+    physical register.  Once assigned, assignments are never changed. *)
 
 Record AssignedInterval : Set := {
   interval : Interval;
@@ -309,7 +324,12 @@ Definition intervalRange (i : AssignedInterval) : Range.
     simpl in *. omega.
 Qed.
 
-(* The ScanState is always relative to the current position (pos). *)
+(** * ScanState *)
+
+(** A [ScanState] is always relative to a current position (pos) as we move
+    through the sequentialized instruction stream over which registers are
+    allocated.. *)
+
 Record ScanState := {
     unhandled : intSet;                 (* starts after pos *)
     active    : list AssignedInterval;  (* ranges over pos *)
@@ -400,8 +420,8 @@ Definition nextIntersectionWith (i : Interval) (x : AssignedInterval) : nat.
 Proof.
 Admitted.
 
-Function findRegister (freeUntilPos : PhysReg -> option nat)
-  (reg : PhysReg) {measure fin_to_nat reg} : (PhysReg * option nat)%type :=
+Function findRegister (freeUntilPos : PhysReg -> option nat) (reg : PhysReg)
+  {measure fin_to_nat reg} : (PhysReg * option nat)%type :=
   match freeUntilPos reg with
   | None => (reg, None)
   | Some pos =>
@@ -460,7 +480,7 @@ Definition tryAllocateFreeReg (st : ScanState) (current : Interval)
        // register available for the first part of the interval
        current.reg = reg
        split current before freeUntilPos[reg] *)
-  let lastReg := penultimate_from_nat maxReg registers_exist in
+  let lastReg := ultimate_from_nat maxReg registers_exist in
   let reg := findRegister freeUntilPos lastReg in
 
   (* jww (2014-09-11): NYI *)
@@ -579,6 +599,8 @@ Proof.
 Admitted.
 
 End Allocator.
+
+(****************************************************************************)
 
 (** Given a node graph of our low-level intermediate representation, where
     instructions are associated with virtual registers, compute the linear
