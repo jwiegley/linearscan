@@ -264,15 +264,8 @@ Definition addToActive (x : Interval) (st : ScanState) : ScanState.
          (handled   := handled st).
 Admitted.
 
-Definition ScanStateUnhandledExtent (st : ScanState) : nat :=
+Definition scanStateUnhandledExtent (st : ScanState) : nat :=
   intSetExtent (unhandled st).
-
-(* Lemma NonEmptyScanStateScope : forall st unh x, *)
-(*   unh = unhandled st -> In x unh -> *)
-(*     (~ (Empty unh)) /\ (ScanStateUnhandledScope st > 0)%nat. *)
-(* Proof. *)
-(*   intros. *)
-(* Admitted. *)
 
 (* TRY_ALLOCATE_FREE_REG
 
@@ -388,14 +381,17 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
      HANDLE_INTERVAL (current)
 *)
 Function linearScan (st : ScanState)
-    {measure ScanStateUnhandledExtent st} : ScanState :=
+    {measure scanStateUnhandledExtent st} : ScanState :=
   match nextUnhandled st with
   | None => st
   | Some (current, st') => linearScan (handleInterval current st')
   end.
 Proof.
+  (* Our goal is to prove that after every call to handleInterval, the total
+     scope of the remaining unhandled intervals is less than it was before,
+     narrowing down to zero. *)
   intros.
-  unfold ScanStateUnhandledExtent.
+  unfold scanStateUnhandledExtent.
   unfold intSetExtent.
   unfold nextUnhandled in teq.
   revert teq.
@@ -407,17 +403,18 @@ Proof.
       specialize (H e).
       contradiction.
     inversion teq.
-  clear teq.
-  subst. clear H.
+  (* At this point, we know that the list of unhandled intervals is not Empty,
+     and we must show that the result of calling handleInterval reduces the
+     total scope length. *)
+  destruct p. subst.
+  inversion teq0; subst.
+Admitted.
 
 (*
 Proof.
   intros st current.
   remember (unhandled st) as unh.
   intros teq.
-  (* Our goal is to prove that after every call to handleInterval, the total
-     scope of the remaining unhandled intervals is less than it was before,
-     narrowing down to zero. *)
   pose proof teq as H.
   apply min_elt_spec1 in H.
   pose proof H as H0.
@@ -436,25 +433,17 @@ Proof.
     pattern unh.
     apply set_induction; intros.
     + contradiction.
-    + (* At this point, we know that the list of unhandled intervals is not
-         Empty, and we must show that the result of calling handleInterval
-         reduces the total scope length. *)
-      rewrite Hequnh. clear Hequnh.
+    + rewrite Hequnh. clear Hequnh.
       destruct st.
       subst. simpl in *.
-      
   - assumption.
-(*
+
     pattern unh'.
     apply set_induction; intros.
     + rewrite fold_1b. apply H3.
       assumption.
-
-    + 
-      remember (fold (fun (x0 : elt) (n : nat) =>
+    + remember (fold (fun (x0 : elt) (n : nat) =>
                         (n + intervalScope x0)%nat)) as f.
-*)
-Admitted.
 *)
 
 (** Given a node graph of our low-level intermediate representation, where
