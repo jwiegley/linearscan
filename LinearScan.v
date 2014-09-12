@@ -13,6 +13,8 @@ Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.Program.Equality.
 Require Import Coq.Vectors.Fin.
+Require Import Coq.Logic.ProofIrrelevance.
+(* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
 Generalizable All Variables.
@@ -71,39 +73,47 @@ Definition pred_fin {n} (f : fin n) : option (fin n).
   destruct x.
     apply None.
   apply Some.
-  assert (x < n). omega.
-  apply (from_nat x H).
+  apply Le.le_Sn_le in l.
+  apply (from_nat x l).
 Defined.
+
+Lemma fin_to_from_id : forall m n (H : n < m),
+  m > 0 -> @to_nat m (from_nat n H) = exist _ n H.
+Proof.
+  intros.
+  generalize dependent n.
+  induction m; intros. omega.
+  destruct n; simpl.
+    f_equal. apply proof_irrelevance.
+  rewrite IHm.
+    f_equal. apply proof_irrelevance.
+  omega.
+Qed.
 
 Lemma pred_fin_lt : forall n x y,
   @pred_fin n x = Some y -> proj1_sig (to_nat y) < proj1_sig (to_nat x).
 Proof.
-  intros.
-Admitted.
-
-Definition _0_lt_20 : 0 < 20. omega. Qed.
-Definition _9_lt_20 : 9 < 20. omega. Qed.
-Definition _8_lt_20 : 8 < 20. omega. Qed.
-
-Example pred_fin_ex1 :
-  pred_fin (@from_nat 0 20 _0_lt_20) = None.
-Proof.
-  unfold pred_fin, from_nat. reflexivity.
+  intro n.
+  destruct n; intros.
+    inversion x.
+  unfold pred_fin in H.
+  destruct (to_nat x).
+  destruct x0; inversion H.
+  subst. simpl. clear H.
+  destruct x0; simpl. omega.
+  unfold from_nat. clear x.
+  rewrite fin_to_from_id.
+  simpl. omega. omega.
 Qed.
 
-Example pred_fin_ex2 :
-  pred_fin (@from_nat 9 20 _9_lt_20) = Some (@from_nat 8 20 _8_lt_20).
-Proof.
-  unfold pred_fin, from_nat. reflexivity.
-Qed.
-
-Example pred_fin_ex3 : forall n m (H : S n < m),
+Lemma pred_fin_correct : forall n m (H : S n < m),
   pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
 Proof.
-  intros.
-  destruct (pred_fin (from_nat (S n) H)).
-  f_equal. unfold from_nat.
-Admitted.
+  intros. unfold pred_fin.
+  rewrite fin_to_from_id.
+    reflexivity.
+  omega.
+Qed.
 
 (****************************************************************************)
 
@@ -437,9 +447,7 @@ Function findRegister (freeUntilPos : PhysReg -> option nat) (reg : PhysReg)
           end
       end
   end.
-Proof.
-  intros. apply pred_fin_lt. assumption.
-Qed.
+Proof. intros. apply pred_fin_lt. assumption. Qed.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
