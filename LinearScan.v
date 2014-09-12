@@ -26,10 +26,12 @@ Generalizable All Variables.
 
 (** The following are extensions to the Coq standard library. *)
 
+(** ** Lists *)
+
 Definition no_overlap {a} (xs ys : list a) :=
   forall (x : a), ~ (In x xs) \/ ~ (In x ys).
 
-(** * Generalized comparisons *)
+(** ** Comparisons *)
 
 (** These definitions avoid boilerplate involved with setting up properly
     behaved comparisons between types. *)
@@ -73,7 +75,7 @@ Class CompareSpec (a : Set) := {
     mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
 
-Ltac reduce_comparisons H :=
+Ltac reduce_nat_comparisons H :=
   repeat (first
     [ match goal with
       | [ |- context f [match ?X with _ => _ end] ] =>
@@ -114,7 +116,7 @@ Ltac reduce_comparisons H :=
     | omega | inversion H; reflexivity | subst; auto
     ]).
 
-(** * NonEmpty lists *)
+(** ** NonEmpty lists *)
 
 Inductive NonEmpty (a : Set) : Set :=
   | NE_Sing : a -> NonEmpty a
@@ -141,7 +143,7 @@ Fixpoint NE_tl {a} (ne : NonEmpty a) : a :=
     | NE_Cons x xs => NE_tl xs
   end.
 
-(** * Finite sets *)
+(** ** Finite sets *)
 
 Definition fin := Coq.Vectors.Fin.t.
 
@@ -240,14 +242,14 @@ Proof.
   - f_equal. f_equal. assumption.
 Qed.
 
-(** ** Comparison of values of the same finite set type. *)
+(** *** Comparison of values from the same finite set. *)
 
 (** [fin] values may be compared.  It is simply a comparison of their
     underlying naturals, owing to proof irrelevance. *)
+
 Definition fin_compare {n} (x y : fin n) : comparison :=
   nat_compare (fin_to_nat x) (fin_to_nat y).
 
-(** A comparison between [fin] of [Eq] is equivalent to equality. *)
 Lemma fin_compare_eq_iff : forall n (x y : fin n),
   fin_compare x y = Eq <-> x = y.
 Proof.
@@ -274,7 +276,9 @@ Program Instance fin_CompareSpec {n} : CompareSpec (fin n) := {
 
 (****************************************************************************)
 
-(** * Range *)
+(** * Core data types *)
+
+(** ** Range *)
 
 (** The extent of a [Range] is the set of locations it ranges over.  By
     summing the extent of a list of ranges, we have an idea of how much ground
@@ -329,7 +333,7 @@ Proof.
   destruct x. destruct y.
   destruct (nat_compare rstart0 rstart1) eqn:Heqe;
   destruct (nat_compare rstart1 rstart0) eqn:Heqe2;
-  reduce_comparisons Heqe;
+  reduce_nat_comparisons Heqe;
   try auto; inversion H.
 Qed.
 
@@ -352,7 +356,7 @@ Definition anyRangeIntersects (is js : NonEmpty Range) : bool :=
     (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
     false (NE_to_list is).
 
-(** * RangeList *)
+(** ** RangeList *)
 
 (** A [RangeList] encodes both the total extent of the list of ranges (the
     total span of instructions covered by all the ranges), and also the fact
@@ -369,7 +373,7 @@ Definition rangeListEnd    `(RangeList xs) := rend (NE_tl xs).
 Definition rangeListExtent `(rs : RangeList xs) :=
   rangeListEnd rs - rangeListStart rs.
 
-(** * UsePos *)
+(** ** UsePos *)
 
 (** A "use position", or [UsePos], identifies an exact point in the
     instruction stream where a particular variable is used.  If this usage
@@ -382,6 +386,8 @@ Record UsePos `(RangeList ranges) : Set := {
 
   within_range : Exists (in_range uloc) (NE_to_list ranges)
 }.
+
+(** ** Interval *)
 
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
     a list of ranges "covered" by that variable in the low-level intermediate
@@ -405,12 +411,6 @@ Record UsePos `(RangeList ranges) : Set := {
 
 Record Interval : Set := {
   ranges       : NonEmpty Range;
-
-  (** The [intExtent] is a cached property.  It can be derived from [ranges],
-      but since we refer to it often it is easier to maintain it as we
-      generate new intervals. *)
-  (* intExtent :=  *)
-
   lifetimes    : RangeList ranges;
   usePositions : NonEmpty (UsePos lifetimes)
 }.
@@ -503,6 +503,8 @@ Definition intSetExtent (is : intSet) : nat :=
 
 (****************************************************************************)
 
+(** * Main algorithm *)
+
 Section Allocator.
 
 Variable maxReg : nat.          (* max number of registers *)
@@ -512,7 +514,7 @@ Hypothesis registers_exist : maxReg > 0.
 Definition VirtReg := nat.
 Definition PhysReg := fin maxReg.
 
-(** * AssignedInterval *)
+(** ** AssignedInterval *)
 
 (** [AssignedInterval] values are just a tuple of an interval and an assigned
     physical register.  Once assigned, assignments are never changed. *)
@@ -554,7 +556,7 @@ Definition intervalRange (i : AssignedInterval) : Range.
   destruct r; destruct r0; simpl in *; omega.
 Qed.
 
-(** * ScanState *)
+(** ** ScanState *)
 
 (** A [ScanState] is always relative to a current position (pos) as we move
     through the sequentialized instruction stream over which registers are
@@ -645,6 +647,8 @@ Definition getRegisterIndex
   fold_right
     (fun x f => fun r =>
          if cmp_eq_dec (assigned x) r then Some (k x) else f r) z is.
+
+(** ** Main functions *)
 
 Definition nextIntersectionWith (i : Interval) (x : AssignedInterval) : nat.
 Proof.
@@ -829,6 +833,8 @@ Admitted.
 End Allocator.
 
 (****************************************************************************)
+
+(** * Program graphs *)
 
 (** Given a node graph of our low-level intermediate representation, where
     instructions are associated with virtual registers, compute the linear
