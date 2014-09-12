@@ -36,10 +36,9 @@ Definition no_overlap {a} (xs ys : list a) :=
 
 Lemma mk_compare_spec : forall {a} (x y : a)
   (cmp         : a -> a -> comparison)
-  (cmp_eq      : a -> a -> Prop)
-  (cmp_eq_iff  : cmp x y = Eq <-> cmp_eq x y)
+  (cmp_eq_iff  : cmp x y = Eq <-> x = y)
   (cmp_gt_flip : cmp x y = Gt  -> cmp y x = Lt),
-  CompSpec cmp_eq (fun x y => cmp x y = Lt) x y (cmp x y).
+  CompSpec eq (fun x y => cmp x y = Lt) x y (cmp x y).
 Proof.
   intros.
   destruct (cmp x y) eqn:Heqe.
@@ -50,9 +49,8 @@ Qed.
 
 Lemma mk_cmp_eq_dec : forall {a} (x y : a)
   (cmp        : a -> a -> comparison)
-  (cmp_eq     : a -> a -> Prop)
-  (cmp_eq_iff : cmp x y = Eq <-> cmp_eq x y),
-  { cmp_eq x y } + { ~ cmp_eq x y }.
+  (cmp_eq_iff : cmp x y = Eq <-> x = y),
+  { x = y } + { x <> y }.
 Proof.
   intros.
   destruct (cmp x y) eqn:Heqe.
@@ -63,18 +61,58 @@ Qed.
 
 Class CompareSpec (a : Set) := {
   cmp         : a -> a -> comparison;
-  cmp_eq      : a -> a -> Prop;
-  cmp_eq_iff  : forall x y, cmp x y = Eq <-> cmp_eq x y;
+  cmp_eq_iff  : forall x y, cmp x y = Eq <-> x = y;
   cmp_lt x y  := cmp x y = Lt;
   cmp_gt x y  := cmp x y = Gt;
   cmp_gt_flip : forall x y, cmp_gt x y -> cmp_lt y x;
 
-  cmp_spec x y : CompSpec cmp_eq cmp_lt x y (cmp x y) :=
-    mk_compare_spec x y cmp cmp_eq (cmp_eq_iff x y) (cmp_gt_flip x y);
+  cmp_spec x y : CompSpec eq cmp_lt x y (cmp x y) :=
+    mk_compare_spec x y cmp (cmp_eq_iff x y) (cmp_gt_flip x y);
 
-  cmp_eq_dec x y : { cmp_eq x y } + { ~ cmp_eq x y } :=
-    mk_cmp_eq_dec x y cmp cmp_eq (cmp_eq_iff x y)
+  cmp_eq_dec x y : { x = y } + { x <> y } :=
+    mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
+
+Ltac reduce_comparisons H :=
+  repeat (first
+    [ match goal with
+      | [ |- context f [match ?X with _ => _ end] ] =>
+        destruct X
+      end
+    | match goal with
+      | [ H': context f [match ?X with _ => _ end] |- _ ] =>
+        destruct X
+      end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Eq |- _ ] =>
+        apply nat_compare_eq in H'
+      end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Eq ] =>
+        apply nat_compare_eq_iff
+      end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Lt |- _ ] =>
+        apply nat_compare_lt in H'
+      end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Lt ] =>
+        apply nat_compare_lt
+      end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Gt |- _ ] =>
+        apply nat_compare_gt in H'
+      end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Gt ] =>
+        apply nat_compare_gt
+      end
+
+    | omega | inversion H; reflexivity | subst; auto
+    ]).
 
 (** * NonEmpty lists *)
 
@@ -230,7 +268,6 @@ Qed.
 
 Program Instance fin_CompareSpec {n} : CompareSpec (fin n) := {
   cmp         := fin_compare;
-  cmp_eq      := eq;
   cmp_eq_iff  := fin_compare_eq_iff n;
   cmp_gt_flip := fin_compare_gt_flip n
 }.
@@ -268,31 +305,6 @@ Definition Rcompare (x y : Range) : comparison :=
       end
   end.
 
-Ltac reduce_comparisons H :=
-  repeat (first
-    [ match goal with
-      | [ |- context f [match ?X with _ => _ end] ] => destruct X end
-    | match goal with
-      | [ H': context f [match ?X with _ => _ end] |- _ ] => destruct X end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Eq |- _ ] => apply nat_compare_eq in H' end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Eq ] => apply nat_compare_eq_iff end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Lt |- _ ] => apply nat_compare_lt in H' end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Lt ] => apply nat_compare_lt end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Gt |- _ ] => apply nat_compare_gt in H' end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Gt ] => apply nat_compare_gt end
-
-    | omega | inversion H; reflexivity | subst; auto
-    ]).
-
 Lemma Rcompare_eq_iff : forall x y : Range, Rcompare x y = Eq <-> x = y.
 Proof.
   intros.
@@ -302,9 +314,9 @@ Proof.
   inversion H; subst;
   inversion Heqe;
   try (apply nat_compare_eq_iff; reflexivity).
-    reduce_comparisons H.
-    reduce_comparisons Heqe.
-    f_equal. apply proof_irrelevance.
+    apply nat_compare_eq_iff in H1.
+    apply nat_compare_eq_iff in H2.
+    subst. f_equal. apply proof_irrelevance.
   rewrite Heqe.
   apply nat_compare_eq_iff. reflexivity.
 Qed.
@@ -323,7 +335,6 @@ Qed.
 
 Program Instance Range_CompareSpec : CompareSpec Range := {
   cmp         := Rcompare;
-  cmp_eq      := eq;
   cmp_eq_iff  := Rcompare_eq_iff;
   cmp_gt_flip := Rcompare_gt_flip
 }.
@@ -426,7 +437,6 @@ Admitted.
 
 Program Instance Interval_CompareSpec : CompareSpec Interval := {
   cmp         := Icompare;
-  cmp_eq      := eq;
   cmp_eq_iff  := Icompare_eq_iff;
   cmp_gt_flip := Icompare_gt_flip
 }.
@@ -512,24 +522,25 @@ Record AssignedInterval : Set := {
   assigned : PhysReg            (* assigned register *)
 }.
 
-Definition AI_eq_dec (x y : AssignedInterval) : { x = y } + { x <> y }.
-Proof.
-  destruct x. destruct y.
-(*   destruct (Icompare (interval x) (interval y)) eqn:Heqe. *)
-(*   - apply Icompare_eq_iff in Heqe. *)
-(*     destruct x. destruct y. simpl in *. *)
-(*     rewrite Heqe. *)
-(*     destruct (nat_compare *)
-(*                 (proj1_sig (to_nat assigned0)) *)
-(*                 (proj1_sig (to_nat assigned1))) eqn:Heqa. *)
-(*     + apply nat_compare_eq in Heqa. *)
-(*       simpl in Heqa. *)
-(*       f_equal. apply fin_nat_eq in Heqa. subst. *)
-(*       left. reflexivity. *)
-(*     + apply nat_compare_lt in Heqa. *)
-(*       f_equal. apply fin_nat_eq in Heqa. subst. *)
-(* Admitted. *)
+Definition AIcompare (x y : AssignedInterval) : comparison.
 Admitted.
+
+Lemma AIcompare_eq_iff : forall x y : AssignedInterval,
+  AIcompare x y = Eq <-> x = y.
+Proof.
+Admitted.
+
+Lemma AIcompare_gt_flip : forall x y : AssignedInterval,
+  AIcompare x y = Gt -> AIcompare y x = Lt.
+Proof.
+Admitted.
+
+Program Instance AssignedInterval_CompareSpec
+  : CompareSpec AssignedInterval := {
+  cmp         := AIcompare;
+  cmp_eq_iff  := AIcompare_eq_iff;
+  cmp_gt_flip := AIcompare_gt_flip
+}.
 
 Definition intervalRange (i : AssignedInterval) : Range.
   apply Build_Range
@@ -606,7 +617,7 @@ Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
   : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
-         (active    := remove AI_eq_dec x (active st))
+         (active    := remove cmp_eq_dec x (active st))
          (inactive  := inactive st)
          (handled   := x :: handled st).
 Admitted.
@@ -615,7 +626,7 @@ Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
   : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
-         (active    := remove AI_eq_dec x (active st))
+         (active    := remove cmp_eq_dec x (active st))
          (inactive  := x :: inactive st)
          (handled   := handled st).
 Admitted.
