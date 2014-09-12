@@ -15,6 +15,7 @@ Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
+Require Import Coq.Sorting.Sorting.
 Require Import Coq.Vectors.Fin.
 (* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
@@ -31,6 +32,15 @@ Generalizable All Variables.
 
 Definition no_overlap {a} (xs ys : list a) :=
   forall (x : a), ~ (In x xs) \/ ~ (In x ys).
+
+Lemma locally_sorted_cons : forall a (R : a -> a -> Prop) (x : a) xs,
+  LocallySorted R (x :: xs) -> LocallySorted R xs.
+Proof.
+  intros.
+  inversion H; subst.
+    constructor.
+  assumption.
+Qed.
 
 (** ** Comparisons *)
 
@@ -64,9 +74,12 @@ Qed.
 
 Class CompareSpec (a : Set) := {
   cmp         : a -> a -> comparison;
+  cmp_eq x y  := cmp x y = Eq;
   cmp_eq_iff  : forall x y, cmp x y = Eq <-> x = y;
   cmp_lt x y  := cmp x y = Lt;
+  cmp_le x y  := cmp_lt x y \/ cmp_eq x y;
   cmp_gt x y  := cmp x y = Gt;
+  cmp_ge x y  := cmp_gt x y \/ cmp_eq x y;
   cmp_gt_flip : forall x y, cmp_gt x y -> cmp_lt y x;
 
   cmp_spec x y : CompSpec eq cmp_lt x y (cmp x y) :=
@@ -143,6 +156,12 @@ Fixpoint NE_tl {a} (ne : NonEmpty a) : a :=
     | NE_Sing x => x
     | NE_Cons x xs => NE_tl xs
   end.
+
+Inductive NonEmptySorted {a : Set} (R : a -> a -> Prop) : NonEmpty a -> Set :=
+  | NESort_Sing x : NonEmptySorted R (NE_Sing x)
+  | NESort_Cons x y xs :
+      NonEmptySorted R (NE_Cons y xs) -> R x y
+        -> NonEmptySorted R (NE_Cons x (NE_Cons y xs)).
 
 (** ** Finite sets *)
 
@@ -513,6 +532,47 @@ Definition intSet : Type := S.t.  (* the type of a set of intervals *)
 Definition intSetExtent (is : intSet) : nat :=
   S.fold (fun x n => n + intervalExtent x) is 0.
 
+Module IntervalOrder <: TotalLeBool.
+  Definition t := Interval.
+
+  Definition leb (x y : Interval) : bool.
+  Proof.
+    destruct (cmp x y) eqn:Heqe.
+    - apply true.
+    - apply true.
+    - apply false.
+  Defined.
+
+  Theorem leb_total : forall (a1 a2 : Interval),
+    leb a1 a2 = true \/ leb a2 a1 = true.
+  Proof.
+    intros. unfold leb.
+    destruct (cmp a1 a2) eqn:Heqe.
+    - left. reflexivity.
+    - left. reflexivity.
+    - right. apply cmp_gt_flip in Heqe.
+      rewrite Heqe. reflexivity.
+  Qed.
+End IntervalOrder.
+
+Definition leb_true x y := is_true (IntervalOrder.leb x y).
+
+Record IntervalsSortedByStart := {
+  isbs : list Interval;
+  isbs_ordered : LocallySorted leb_true isbs
+}.
+
+Definition extentOfIntervals (is : IntervalsSortedByStart) : nat :=
+  fold_left (fun n x => n + intervalExtent x) (isbs is) 0.
+
+Module Import MergeSort := Sort IntervalOrder.
+
+Definition sortIntervals (is : list Interval) : IntervalsSortedByStart.
+Proof.
+  apply Build_IntervalsSortedByStart with (isbs := sort is).
+  apply Sorted_sort.
+Defined.
+
 (****************************************************************************)
 
 (** * Main algorithm *)
@@ -578,23 +638,20 @@ Qed.
     allocated.. *)
 
 Record ScanState := {
-    unhandled : intSet;                 (* starts after pos *)
+    unhandled : IntervalsSortedByStart; (* starts after pos *)
     active    : list AssignedInterval;  (* ranges over pos *)
     inactive  : list AssignedInterval;  (* falls in lifetime hole *)
     handled   : list AssignedInterval;  (* ends before pos *)
 
     intervals := map interval;
 
-    no_overlap_in_unhandled :
-      no_overlap (S.elements unhandled) (intervals active);
-    no_overlap_in_actives :
-      no_overlap (intervals active) (intervals inactive);
-    no_overlap_in_handled :
-      no_overlap (intervals active) (intervals handled)
+    no_overlap_unhandled : no_overlap (isbs unhandled) (intervals active);
+    no_overlap_actives   : no_overlap (intervals active) (intervals inactive);
+    no_overlap_handled   : no_overlap (intervals active) (intervals handled)
 }.
 
-Program Definition newScanState (intervals : intSet)
-  : ScanState := {| unhandled := intervals
+Program Definition newScanState (xs : IntervalsSortedByStart)
+  : ScanState := {| unhandled := xs
                   ; active    := nil
                   ; inactive  := nil
                   ; handled   := nil
@@ -603,31 +660,33 @@ Solve All Obligations using
   (unfold no_overlap; intros; right; unfold not; intros; inversion H).
 
 Definition scanStateUnhandledExtent (st : ScanState) : nat :=
-  intSetExtent (unhandled st).
+  extentOfIntervals (unhandled st).
 
 Definition nextUnhandled (st : ScanState) : option (Interval * ScanState).
 Proof.
-  pose (S.min_elt (unhandled st)).
-  destruct o.
-  - constructor.
-    split.
-      apply e.
-    destruct st.
-    apply Build_ScanState
-      with (unhandled := S.remove e unhandled0)
-           (active    := active0)
-           (inactive  := inactive0)
-           (handled   := handled0).
-    + unfold no_overlap. intros.
-      specialize (no_overlap_in_unhandled0 x).
-      destruct no_overlap_in_unhandled0.
-        left. rewrite elements_spec3.
-        rewrite elements_spec3 in H.
-        apply remove_over_not. assumption.
-      right. assumption.
-    + apply no_overlap_in_actives0.
-    + apply no_overlap_in_handled0.
-  - apply None.
+  destruct st.
+  destruct unhandled0.
+  destruct isbs0.
+    apply None.
+  apply Some.
+  split.
+    apply i.
+  apply Build_ScanState
+    with (unhandled :=
+            {| isbs := isbs0
+             ; isbs_ordered :=
+                 locally_sorted_cons _ _ _ _ isbs_ordered0
+             |})
+         (active    := active0)
+         (inactive  := inactive0)
+         (handled   := handled0).
+  + unfold no_overlap. intros.
+    destruct (no_overlap_unhandled0 x).
+      left. unfold not in *. intros.
+      apply H. right. assumption.
+    right. assumption.
+  + apply no_overlap_actives0.
+  + apply no_overlap_handled0.
 Defined.
 
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
@@ -839,22 +898,20 @@ Proof.
      narrowing down to zero. *)
   intros.
   unfold scanStateUnhandledExtent.
-  unfold intSetExtent.
+  unfold extentOfIntervals.
   unfold nextUnhandled in teq.
-  revert teq.
   unfold handleInterval.
-  pattern (unhandled st).
-  apply set_induction; intros.
-    destruct (S.min_elt s) eqn:Heqe.
-      apply S.min_elt_spec1 in Heqe.
-      specialize (H e).
-      contradiction.
-    inversion teq.
-  (* At this point, we know that the list of unhandled intervals is not Empty,
-     and we must show that the result of calling handleInterval reduces the
-     total scope length. *)
-  destruct p. subst.
-  inversion teq0; subst.
+  (* induction (unhandled st); intros. *)
+  (*   destruct isbs0 eqn:Heqe; subst; simpl in *. *)
+  (*     apply S.min_elt_spec1 in Heqe. *)
+  (*     specialize (H e). *)
+  (*     contradiction. *)
+  (*   inversion teq. *)
+  (* (* At this point, we know that the list of unhandled intervals is not Empty, *)
+  (*    and we must show that the result of calling handleInterval reduces the *)
+  (*    total scope length. *) *)
+  (* destruct p. subst. *)
+  (* inversion teq0; subst. *)
 (* jww (2014-09-12): NYI *)
 Admitted.
 
@@ -870,11 +927,12 @@ End Allocator.
 
 Class Graph (a : Set) := {}.
 
-Definition determineIntervals (g : Graph VirtReg) : intSet.
+Definition determineIntervals (g : Graph VirtReg) : list Interval.
 (* jww (2014-09-12): NYI *)
 Admitted.
 
 Definition allocateRegisters (maxReg : nat) (H : maxReg > 0)
   (g : Graph VirtReg) : list (AssignedInterval maxReg) :=
-  let st := newScanState maxReg (determineIntervals g) in
+  let is := sortIntervals (determineIntervals g) in
+  let st := newScanState maxReg is in
   handled maxReg (linearScan maxReg H st).
