@@ -6,7 +6,7 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
-Require Import Coq.Arith.EqNat.
+Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Init.Datatypes.
 Require Import Coq.Lists.List.
 Require Import Coq.MSets.MSets.
@@ -15,6 +15,7 @@ Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Vectors.Fin.
 Require Import Coq.Logic.ProofIrrelevance.
+(* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
 Generalizable All Variables.
@@ -24,6 +25,58 @@ Generalizable All Variables.
 (** * Library *)
 
 (** The following are extensions to the Coq standard library. *)
+
+Definition no_overlap {a} (xs ys : list a) :=
+  forall (x : a), ~ (In x xs) \/ ~ (In x ys).
+
+(** * Generalized comparisons *)
+
+(** These definitions avoid boilerplate involved with setting up properly
+    behaved comparisons between types. *)
+
+Lemma mk_compare_spec : forall {a} (x y : a)
+  (cmp         : a -> a -> comparison)
+  (cmp_eq      : a -> a -> Prop)
+  (cmp_eq_iff  : cmp x y = Eq <-> cmp_eq x y)
+  (cmp_gt_flip : cmp x y = Gt  -> cmp y x = Lt),
+  CompSpec cmp_eq (fun x y => cmp x y = Lt) x y (cmp x y).
+Proof.
+  intros.
+  destruct (cmp x y) eqn:Heqe.
+  - apply CompEq. apply cmp_eq_iff. reflexivity.
+  - apply CompLt. assumption.
+  - apply CompGt. auto.
+Qed.
+
+Lemma mk_cmp_eq_dec : forall {a} (x y : a)
+  (cmp        : a -> a -> comparison)
+  (cmp_eq     : a -> a -> Prop)
+  (cmp_eq_iff : cmp x y = Eq <-> cmp_eq x y),
+  { cmp_eq x y } + { ~ cmp_eq x y }.
+Proof.
+  intros.
+  destruct (cmp x y) eqn:Heqe.
+  - left. apply cmp_eq_iff. reflexivity.
+  - right. intuition. inversion H2.
+  - right. intuition. inversion H2.
+Qed.
+
+Class CompareSpec (a : Set) := {
+  cmp         : a -> a -> comparison;
+  cmp_eq      : a -> a -> Prop;
+  cmp_eq_iff  : forall x y, cmp x y = Eq <-> cmp_eq x y;
+  cmp_lt x y  := cmp x y = Lt;
+  cmp_gt x y  := cmp x y = Gt;
+  cmp_gt_flip : forall x y, cmp_gt x y -> cmp_lt y x;
+
+  cmp_spec x y : CompSpec cmp_eq cmp_lt x y (cmp x y) :=
+    mk_compare_spec x y cmp cmp_eq (cmp_eq_iff x y) (cmp_gt_flip x y);
+
+  cmp_eq_dec x y : { cmp_eq x y } + { ~ cmp_eq x y } :=
+    mk_cmp_eq_dec x y cmp cmp_eq (cmp_eq_iff x y)
+}.
+
+(** * NonEmpty lists *)
 
 Inductive NonEmpty (a : Set) : Set :=
   | NE_Sing : a -> NonEmpty a
@@ -50,54 +103,34 @@ Fixpoint NE_tl {a} (ne : NonEmpty a) : a :=
     | NE_Cons x xs => NE_tl xs
   end.
 
-Definition no_overlap {a} (xs ys : list a) :=
-  forall (x : a), ~ (In x xs) \/ ~ (In x ys).
+(** * Finite sets *)
 
 Definition fin := Coq.Vectors.Fin.t.
 
-Definition fin_eq_dec {n} (x y : fin n) : { x = y } + { x <> y }.
-Proof.
-  induction x; dependent destruction y.
-  - left. reflexivity.
-  - right. unfold not. intros.
-    inversion H.
-  - right. unfold not. intros.
-    inversion H.
-  - destruct (IHx y).
-      left. congruence.
-    right. intuition.
-    apply n0. apply FS_inj.
-    assumption.
-Defined.
-
 Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
-
-Definition ultimate_Sn (n : nat) : fin (S n).
-Proof.
-  induction n.
-    apply F1.
-  apply FS. apply IHn.
-Defined.
-
-(** Return the last possible inhabitant of a [fin n]. *)
-Definition ultimate_from_nat (n : nat) (H : n > 0) : fin n.
-Proof.
-  induction n. omega.
-  apply ultimate_Sn.
-Qed.
 
 Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
 
+Definition ultimate_Sn (n : nat) : fin (S n).
+Proof. induction n; [ apply F1 | apply FS; apply IHn ]. Defined.
+
+(** Return the last possible inhabitant of a [fin n]. *)
+Definition ultimate_from_nat (n : nat) (H : n > 0) : fin n.
+Proof. induction n; [ omega | apply ultimate_Sn ]. Defined.
+
+(** Given a value [x] of type [fin n], possibly return the next lower
+    inhabitant of type [y], such that y < x. *)
 Definition pred_fin {n} (f : fin n) : option (fin n).
   apply to_nat in f.
   destruct f.
-  destruct x.
-    apply None.
+  destruct x. apply None.
   apply Some.
   apply Le.le_Sn_le in l.
   apply (from_nat x l).
 Defined.
 
+(** [to_nat] and [from_nat] compose to an identity module the hypothesis that
+    [n < m]. *)
 Lemma fin_to_from_id : forall m n (H : n < m),
   m > 0 -> @to_nat m (from_nat n H) = exist _ n H.
 Proof.
@@ -111,10 +144,23 @@ Proof.
   omega.
 Qed.
 
-Lemma pred_fin_lt : forall n x y,
-  @pred_fin n x = Some y -> proj1_sig (to_nat y) < proj1_sig (to_nat x).
+(** The behavior of [pred_fin] is specified as follows: the predecessor of a
+    successor, by way of [fin n], is a no-op. *)
+Lemma pred_fin_spec : forall (n m : nat) (H : S n < m),
+  pred_fin (@from_nat _ m H) = Some (from_nat n (Le.le_Sn_le _ _ H)).
 Proof.
-  intro n.
+  intros. unfold pred_fin.
+  rewrite fin_to_from_id.
+    reflexivity.
+  omega.
+Qed.
+
+(** If [pred_fin] produces a value, this value converted to [nat] is less than
+    the input converted to [nat]. *)
+Lemma pred_fin_lt : forall n (x y : fin n),
+  @pred_fin n x = Some y -> fin_to_nat y < fin_to_nat x.
+Proof.
+  unfold fin_to_nat.
   destruct n; intros.
     inversion x.
   unfold pred_fin in H.
@@ -127,14 +173,67 @@ Proof.
   simpl. omega. omega.
 Qed.
 
-Lemma pred_fin_spec : forall n m (H : S n < m),
-  pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
+(** The function [fin_to_nat] is bijective. *)
+Lemma fin_to_nat_bijective : forall n (x y : fin n),
+  fin_to_nat x = fin_to_nat y <-> x = y.
 Proof.
-  intros. unfold pred_fin.
-  rewrite fin_to_from_id.
-    reflexivity.
-  omega.
+  unfold fin_to_nat.
+  split; intros.
+  - destruct n. inversion x.
+    generalize dependent y.
+    induction x; intros.
+      dependent destruction y.
+        reflexivity.
+      simpl in H.
+      destruct (to_nat y).
+      simpl in H. inversion H.
+    dependent destruction y.
+      simpl in H.
+      destruct (to_nat x).
+      simpl in H. inversion H.
+    specialize (IHx y).
+    f_equal. apply IHx.
+    simpl in H.
+    destruct (to_nat x).
+    destruct (to_nat y).
+    simpl in H.
+    apply eq_add_S in H.
+    subst. reflexivity.
+  - f_equal. f_equal. assumption.
 Qed.
+
+(** ** Comparison of values of the same finite set type. *)
+
+(** [fin] values may be compared.  It is simply a comparison of their
+    underlying naturals, owing to proof irrelevance. *)
+Definition fin_compare {n} (x y : fin n) : comparison :=
+  nat_compare (fin_to_nat x) (fin_to_nat y).
+
+(** A comparison between [fin] of [Eq] is equivalent to equality. *)
+Lemma fin_compare_eq_iff : forall n (x y : fin n),
+  fin_compare x y = Eq <-> x = y.
+Proof.
+  unfold fin_compare.
+  split; intros;
+  first [ apply nat_compare_eq_iff
+        | apply nat_compare_eq in H ];
+  apply fin_to_nat_bijective; assumption.
+Qed.
+
+Lemma fin_compare_gt_flip : forall n (x y : fin n),
+  fin_compare x y = Gt -> fin_compare y x = Lt.
+Proof.
+  unfold fin_compare. intros.
+  apply nat_compare_gt in H.
+  apply nat_compare_lt. omega.
+Qed.
+
+Program Instance fin_CompareSpec {n} : CompareSpec (fin n) := {
+  cmp         := fin_compare;
+  cmp_eq      := eq;
+  cmp_eq_iff  := fin_compare_eq_iff n;
+  cmp_gt_flip := fin_compare_gt_flip n
+}.
 
 (****************************************************************************)
 
@@ -150,9 +249,7 @@ Record Range : Set := {
   rstart : nat;
   rend   : nat;
 
-  range_properly_bounded : rstart < rend;
-
-  rangeExtent := rend - rstart
+  range_properly_bounded : rstart < rend
 }.
 
 (** Two ranges are equal if they start at the same location and cover the same
@@ -163,17 +260,10 @@ Definition Rcompare (x y : Range) : comparison :=
   | {| rstart := rstart0; rend := rend0 |} =>
       match y with
       | {| rstart := rstart1; rend := rend1 |} =>
-          let s := Compare_dec.lt_eq_lt_dec rstart0 rstart1 in
-          match s with
-          | inleft (left _)  => Lt
-          | inright _        => Gt
-          | inleft (right _) =>
-              let u := Compare_dec.lt_eq_lt_dec rend0 rend1 in
-              match u with
-              | inleft (left _)  => Lt
-              | inleft (right _) => Eq
-              | inright _        => Gt
-              end
+          match nat_compare rstart0 rstart1 with
+          | Lt => Lt
+          | Gt => Gt
+          | Eq => nat_compare rend0 rend1
           end
       end
   end.
@@ -181,52 +271,62 @@ Definition Rcompare (x y : Range) : comparison :=
 Ltac reduce_comparisons H :=
   repeat (first
     [ match goal with
-      | [ |- context f [match ?X with _ => _ end] ] =>
-        destruct X
-      end
+      | [ |- context f [match ?X with _ => _ end] ] => destruct X end
     | match goal with
-      | [ H': context f [match ?X with _ => _ end] |- _ ] =>
-        destruct X
-      end
-    | omega | inversion H; reflexivity | auto
+      | [ H': context f [match ?X with _ => _ end] |- _ ] => destruct X end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Eq |- _ ] => apply nat_compare_eq in H' end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Eq ] => apply nat_compare_eq_iff end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Lt |- _ ] => apply nat_compare_lt in H' end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Lt ] => apply nat_compare_lt end
+
+    | match goal with
+      | [ H': nat_compare ?X ?Y = Gt |- _ ] => apply nat_compare_gt in H' end
+    | match goal with
+      | [ |- nat_compare ?X ?Y = Gt ] => apply nat_compare_gt end
+
+    | omega | inversion H; reflexivity | subst; auto
     ]).
 
 Lemma Rcompare_eq_iff : forall x y : Range, Rcompare x y = Eq <-> x = y.
 Proof.
-  split; generalize dependent y;
-  induction x; intros;
-  inversion H; destruct y.
-  - reduce_comparisons H1.
-    subst. f_equal. apply proof_irrelevance.
-  - simpl. reduce_comparisons H0.
+  intros.
+  destruct x. destruct y. simpl.
+  split; intros;
+  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
+  inversion H; subst;
+  inversion Heqe;
+  try (apply nat_compare_eq_iff; reflexivity).
+    reduce_comparisons H.
+    reduce_comparisons Heqe.
+    f_equal. apply proof_irrelevance.
+  rewrite Heqe.
+  apply nat_compare_eq_iff. reflexivity.
 Qed.
-
-Definition Rcompare_lt (x y : Range) := (Rcompare x y) = Lt.
-Definition Rcompare_gt (x y : Range) := (Rcompare x y) = Gt.
 
 Lemma Rcompare_gt_flip : forall x y : Range,
-  Rcompare_gt x y -> Rcompare_lt y x.
+  Rcompare x y = Gt -> Rcompare y x = Lt.
 Proof.
   intros.
-  unfold Rcompare_lt.
-  unfold Rcompare_gt in H.
   unfold Rcompare in *.
-  reduce_comparisons H.
+  destruct x. destruct y.
+  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
+  destruct (nat_compare rstart1 rstart0) eqn:Heqe2;
+  reduce_comparisons Heqe;
+  try auto; inversion H.
 Qed.
 
-Lemma Rcompare_spec : forall x y, CompSpec eq Rcompare_lt x y (Rcompare x y).
-Proof.
-  intros.
-  destruct (Rcompare x y) eqn:Heqe.
-  - apply CompEq.
-    apply Rcompare_eq_iff in Heqe.
-    assumption.
-  - apply CompLt.
-    unfold Rcompare_lt. assumption.
-  - apply CompGt.
-    apply Rcompare_gt_flip in Heqe.
-    assumption.
-Qed.
+Program Instance Range_CompareSpec : CompareSpec Range := {
+  cmp         := Rcompare;
+  cmp_eq      := eq;
+  cmp_eq_iff  := Rcompare_eq_iff;
+  cmp_gt_flip := Rcompare_gt_flip
+}.
 
 Definition in_range (loc : nat) (r : Range) : Prop :=
   rstart r <= loc /\ loc < rend r.
@@ -241,34 +341,22 @@ Definition anyRangeIntersects (is js : NonEmpty Range) : bool :=
     (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
     false (NE_to_list is).
 
-Definition extentOfRanges `(rs : NonEmpty Range) : nat :=
-  rend (NE_tl rs) - rstart (NE_hd rs).
-
 (** * RangeList *)
 
 (** A [RangeList] encodes both the total extent of the list of ranges (the
     total span of instructions covered by all the ranges), and also the fact
     that ranges must be ordered and disjoint (non-overlapping). *)
 
-Inductive RangeList : nat -> NonEmpty Range -> Set :=
-  | RangeSing r : RangeList (rangeExtent r) (NE_Sing r)
-  | RangeCons r s n rs :
-    RangeList n (NE_Cons s rs) -> rend r <= rstart s
-      -> RangeList (n + (rstart s - rstart r)) (NE_Cons r rs).
+Inductive RangeList : NonEmpty Range -> Set :=
+  | RangeSing r : RangeList (NE_Sing r)
+  | RangeCons r rs :
+    RangeList rs -> rend r <= rstart (NE_hd rs) -> RangeList (NE_Cons r rs).
 
-Definition rangeListStart `(rs : RangeList n xs) : nat :=
-  match rs with
-  | RangeSing r => rstart r
-  | RangeCons r _ _ _ _ _ => rstart r
-  end.
+Definition rangeListStart  `(RangeList xs) := rstart (NE_hd xs).
+Definition rangeListEnd    `(RangeList xs) := rend (NE_tl xs).
 
-Definition rangeListEnd `(rs : RangeList n xs) : nat :=
-  match rs with
-  | RangeSing r => rend r
-  | RangeCons r _ _ _ _ _ => rstart r + n
-  end.
-
-Definition rangeListExtent `(rs : RangeList n xs) : nat := n.
+Definition rangeListExtent `(rs : RangeList xs) :=
+  rangeListEnd rs - rangeListStart rs.
 
 (** * UsePos *)
 
@@ -277,7 +365,7 @@ Definition rangeListExtent `(rs : RangeList n xs) : nat := n.
     requires the use of a physical register, then [regReq] is [true] for that
     use position. *)
 
-Record UsePos `(RangeList extent ranges) : Set := {
+Record UsePos `(RangeList ranges) : Set := {
   uloc   : nat;
   regReq : bool;
 
@@ -312,13 +400,13 @@ Record Interval : Set := {
       generate new intervals. *)
   (* intExtent :=  *)
 
-  lifetimes    : RangeList (extentOfRanges ranges) ranges;
+  lifetimes    : RangeList ranges;
   usePositions : NonEmpty (UsePos lifetimes)
 }.
 
-Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
-Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
-Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
+Definition intervalStart  i := rangeListStart  (lifetimes i).
+Definition intervalEnd    i := rangeListEnd    (lifetimes i).
+Definition intervalExtent i := rangeListExtent (lifetimes i).
 
 Definition Icompare (x y : Interval) : comparison :=
   Rcompare (NE_hd (ranges x)) (NE_hd (ranges y)).
@@ -332,43 +420,16 @@ Proof.
   rewrite ?IHn; split; auto.
 Admitted.
 
-Definition Ilt (x y : Interval) := (x ?= y) = Lt.
-Definition Igt (x y : Interval) := (x ?= y) = Gt.
-Definition Ile (x y : Interval) := (x ?= y) <> Gt.
-Definition Ige (x y : Interval) := (x ?= y) <> Lt.
-Definition Ine (x y : Interval) :=  x <> y.
-
-Lemma Igt_flip : forall x y : Interval, Igt x y -> Ilt y x.
+Lemma Icompare_gt_flip : forall x y : Interval, x ?= y = Gt -> y ?= x = Lt.
 Proof.
 Admitted.
 
-Lemma Ilt_not : forall x y : Interval, Ilt x y -> Ine x y.
-Proof.
-Admitted.
-
-Lemma Igt_not : forall x y : Interval, Igt x y -> Ine x y.
-Proof.
-Admitted.
-
-Lemma Icompare_spec : forall x y, CompSpec eq Ilt x y (x ?= y).
-Proof.
-  intros.
-  destruct (Icompare x y) eqn:Heqe.
-  - apply Icompare_eq_iff in Heqe.
-    apply CompEq. assumption.
-  - apply CompLt. assumption.
-  - apply CompGt.
-    apply Igt_flip in Heqe.
-    assumption.
-Qed.
-
-Definition I_eq_dec (x y : Interval) : { x = y } + { x <> y }.
-Proof.
-  destruct (Icompare x y) eqn:Heqe.
-  - left.  apply Icompare_eq_iff in Heqe. assumption.
-  - right. apply Ilt_not in Heqe. assumption.
-  - right. apply Igt_not in Heqe. assumption.
-Defined.
+Program Instance Interval_CompareSpec : CompareSpec Interval := {
+  cmp         := Icompare;
+  cmp_eq      := eq;
+  cmp_eq_iff  := Icompare_eq_iff;
+  cmp_gt_flip := Icompare_gt_flip
+}.
 
 Module Interval_as_OT <: OrderedType.
 
@@ -376,21 +437,26 @@ Module Interval_as_OT <: OrderedType.
   Definition compare := Icompare.
 
   Definition eq := @eq Interval.
-  Definition lt := Ilt.
+  Definition lt := fun x y => x ?= y = Lt.
 
-  Instance eq_equiv : Equivalence eq.
-  Admitted.
+  Instance eq_equiv : Equivalence eq := eq_equivalence.
 
   Instance lt_strorder : StrictOrder lt.
+  Proof.
+    split.
+    - intro x. destruct x.
+      unfold complement. intros.
+      inversion H.
   Admitted.
 
   Instance lt_compat : Proper (eq==>eq==>iff) lt.
   Proof. intros x x' Hx y y' Hy; rewrite Hx, Hy; split; auto. Qed.
+
   Lemma compare_spec : forall x y, CompSpec eq lt x y (compare x y).
-  Proof. exact Icompare_spec. Qed.
+  Proof. exact cmp_spec. Qed.
 
   Definition eq_dec : forall x y, { eq x y } + { ~eq x y }.
-  Proof. exact I_eq_dec. Qed.
+  Proof. exact cmp_eq_dec. Qed.
 
 End Interval_as_OT.
 
@@ -446,27 +512,35 @@ Record AssignedInterval : Set := {
   assigned : PhysReg            (* assigned register *)
 }.
 
-Definition AI_eq_dec (x y : AssignedInterval)
-  : { x = y } + { x <> y }.
+Definition AI_eq_dec (x y : AssignedInterval) : { x = y } + { x <> y }.
 Proof.
+  destruct x. destruct y.
+(*   destruct (Icompare (interval x) (interval y)) eqn:Heqe. *)
+(*   - apply Icompare_eq_iff in Heqe. *)
+(*     destruct x. destruct y. simpl in *. *)
+(*     rewrite Heqe. *)
+(*     destruct (nat_compare *)
+(*                 (proj1_sig (to_nat assigned0)) *)
+(*                 (proj1_sig (to_nat assigned1))) eqn:Heqa. *)
+(*     + apply nat_compare_eq in Heqa. *)
+(*       simpl in Heqa. *)
+(*       f_equal. apply fin_nat_eq in Heqa. subst. *)
+(*       left. reflexivity. *)
+(*     + apply nat_compare_lt in Heqa. *)
+(*       f_equal. apply fin_nat_eq in Heqa. subst. *)
+(* Admitted. *)
 Admitted.
 
 Definition intervalRange (i : AssignedInterval) : Range.
   apply Build_Range
     with (rstart := intervalStart (interval i))
-         (rend   := intervalEnd (interval i));
-  destruct i.
+         (rend   := intervalEnd (interval i)).
   unfold intervalStart, intervalEnd.
-  destruct interval0.
-  dependent induction lifetimes0.
+  induction (lifetimes (interval i)).
     apply range_properly_bounded.
-  simpl in *.
-  apply range_properly_bounded.
-  apply IHlifetimes0.
-  destruct r. destruct s.
-  unfold extentOfRanges in *. simpl in *.
-  destruct rs; simpl in *.
-  unfold rangeListStart, rangeListEnd.
+  destruct r0;
+  unfold rangeListStart, rangeListEnd in *;
+  destruct r; destruct r0; simpl in *; omega.
 Qed.
 
 (** * ScanState *)
@@ -559,7 +633,7 @@ Definition getRegisterIndex
   (is : list AssignedInterval) : PhysReg -> option nat :=
   fold_right
     (fun x f => fun r =>
-         if fin_eq_dec (assigned x) r then Some (k x) else f r) z is.
+         if cmp_eq_dec (assigned x) r then Some (k x) else f r) z is.
 
 Definition nextIntersectionWith (i : Interval) (x : AssignedInterval) : nat.
 Proof.
@@ -673,7 +747,7 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
          move it from active to inactive *)
   let go1 x st :=
     match intervalRange x with
-    | Build_Range s e Hp Hb =>
+    | Build_Range s e Hb =>
       if e <? position
       then moveActiveToHandled st x
       else if position <? s
