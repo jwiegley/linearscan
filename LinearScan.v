@@ -12,9 +12,9 @@ Require Import Coq.Lists.List.
 Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.Program.Equality.
+Require Import Coq.Program.Tactics.
 Require Import Coq.Vectors.Fin.
 Require Import Coq.Logic.ProofIrrelevance.
-(* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
 Generalizable All Variables.
@@ -28,6 +28,27 @@ Generalizable All Variables.
 Inductive NonEmpty (a : Set) : Set :=
   | NE_Sing : a -> NonEmpty a
   | NE_Cons : a -> NonEmpty a -> NonEmpty a.
+
+Arguments NE_Sing [_] _.
+Arguments NE_Cons [_] _ _.
+
+Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
+  match ne with
+    | NE_Sing x => x :: nil
+    | NE_Cons x xs => x :: NE_to_list xs
+  end.
+
+Definition NE_hd {a} (ne : NonEmpty a) : a :=
+  match ne with
+    | NE_Sing x => x
+    | NE_Cons x _ => x
+  end.
+
+Fixpoint NE_tl {a} (ne : NonEmpty a) : a :=
+  match ne with
+    | NE_Sing x => x
+    | NE_Cons x xs => NE_tl xs
+  end.
 
 Definition no_overlap {a} (xs ys : list a) :=
   forall (x : a), ~ (In x xs) \/ ~ (In x ys).
@@ -106,7 +127,7 @@ Proof.
   simpl. omega. omega.
 Qed.
 
-Lemma pred_fin_correct : forall n m (H : S n < m),
+Lemma pred_fin_spec : forall n m (H : S n < m),
   pred_fin (@from_nat (S n) m H) = Some (@from_nat n m (Le.le_Sn_le _ _ H)).
 Proof.
   intros. unfold pred_fin.
@@ -129,11 +150,83 @@ Record Range : Set := {
   rstart : nat;
   rend   : nat;
 
-  range_positive : rstart >= 0;
   range_properly_bounded : rstart < rend;
 
   rangeExtent := rend - rstart
 }.
+
+(** Two ranges are equal if they start at the same location and cover the same
+    extent.  Otherwise, we compare first the start position, and then the
+    length of the extent. *)
+Definition Rcompare (x y : Range) : comparison :=
+  match x with
+  | {| rstart := rstart0; rend := rend0 |} =>
+      match y with
+      | {| rstart := rstart1; rend := rend1 |} =>
+          let s := Compare_dec.lt_eq_lt_dec rstart0 rstart1 in
+          match s with
+          | inleft (left _)  => Lt
+          | inright _        => Gt
+          | inleft (right _) =>
+              let u := Compare_dec.lt_eq_lt_dec rend0 rend1 in
+              match u with
+              | inleft (left _)  => Lt
+              | inleft (right _) => Eq
+              | inright _        => Gt
+              end
+          end
+      end
+  end.
+
+Ltac reduce_comparisons H :=
+  repeat (first
+    [ match goal with
+      | [ |- context f [match ?X with _ => _ end] ] =>
+        destruct X
+      end
+    | match goal with
+      | [ H': context f [match ?X with _ => _ end] |- _ ] =>
+        destruct X
+      end
+    | omega | inversion H; reflexivity | auto
+    ]).
+
+Lemma Rcompare_eq_iff : forall x y : Range, Rcompare x y = Eq <-> x = y.
+Proof.
+  split; generalize dependent y;
+  induction x; intros;
+  inversion H; destruct y.
+  - reduce_comparisons H1.
+    subst. f_equal. apply proof_irrelevance.
+  - simpl. reduce_comparisons H0.
+Qed.
+
+Definition Rcompare_lt (x y : Range) := (Rcompare x y) = Lt.
+Definition Rcompare_gt (x y : Range) := (Rcompare x y) = Gt.
+
+Lemma Rcompare_gt_flip : forall x y : Range,
+  Rcompare_gt x y -> Rcompare_lt y x.
+Proof.
+  intros.
+  unfold Rcompare_lt.
+  unfold Rcompare_gt in H.
+  unfold Rcompare in *.
+  reduce_comparisons H.
+Qed.
+
+Lemma Rcompare_spec : forall x y, CompSpec eq Rcompare_lt x y (Rcompare x y).
+Proof.
+  intros.
+  destruct (Rcompare x y) eqn:Heqe.
+  - apply CompEq.
+    apply Rcompare_eq_iff in Heqe.
+    assumption.
+  - apply CompLt.
+    unfold Rcompare_lt. assumption.
+  - apply CompGt.
+    apply Rcompare_gt_flip in Heqe.
+    assumption.
+Qed.
 
 Definition in_range (loc : nat) (r : Range) : Prop :=
   rstart r <= loc /\ loc < rend r.
@@ -143,10 +236,13 @@ Definition rangesIntersect (i j : Range) : bool :=
   then rstart j <? rend i
   else rstart i <? rend j.
 
-Definition anyRangeIntersects (is js : list Range) : bool :=
+Definition anyRangeIntersects (is js : NonEmpty Range) : bool :=
   fold_right
-    (fun r b => orb b (existsb (rangesIntersect r) js))
-    false is.
+    (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
+    false (NE_to_list is).
+
+Definition extentOfRanges `(rs : NonEmpty Range) : nat :=
+  rend (NE_tl rs) - rstart (NE_hd rs).
 
 (** * RangeList *)
 
@@ -154,11 +250,11 @@ Definition anyRangeIntersects (is js : list Range) : bool :=
     total span of instructions covered by all the ranges), and also the fact
     that ranges must be ordered and disjoint (non-overlapping). *)
 
-Inductive RangeList : nat -> list Range -> Set :=
-  | RangeSing r : RangeList (rangeExtent r) (r :: nil)
+Inductive RangeList : nat -> NonEmpty Range -> Set :=
+  | RangeSing r : RangeList (rangeExtent r) (NE_Sing r)
   | RangeCons r s n rs :
-    RangeList n (s :: rs) -> rend r <= rstart s
-      -> RangeList (n + (rstart s - rstart r)) (cons r rs).
+    RangeList n (NE_Cons s rs) -> rend r <= rstart s
+      -> RangeList (n + (rstart s - rstart r)) (NE_Cons r rs).
 
 Definition rangeListStart `(rs : RangeList n xs) : nat :=
   match rs with
@@ -185,8 +281,7 @@ Record UsePos `(RangeList extent ranges) : Set := {
   uloc   : nat;
   regReq : bool;
 
-  uloc_positive : uloc >= 0;
-  within_range  : Exists (in_range uloc) ranges
+  within_range : Exists (in_range uloc) (NE_to_list ranges)
 }.
 
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
@@ -210,19 +305,32 @@ Record UsePos `(RangeList extent ranges) : Set := {
     assigned its own register. *)
 
 Record Interval : Set := {
-  ranges       : list Range;
-  intExtent    : nat;
-  lifetimes    : RangeList intExtent ranges; (* list of disjoint ranges *)
-  usePositions : NonEmpty (UsePos lifetimes) (* list of use positions *)
+  ranges       : NonEmpty Range;
+
+  (** The [intExtent] is a cached property.  It can be derived from [ranges],
+      but since we refer to it often it is easier to maintain it as we
+      generate new intervals. *)
+  (* intExtent :=  *)
+
+  lifetimes    : RangeList (extentOfRanges ranges) ranges;
+  usePositions : NonEmpty (UsePos lifetimes)
 }.
 
 Definition intervalStart  (i : Interval) : nat := rangeListStart (lifetimes i).
 Definition intervalEnd    (i : Interval) : nat := rangeListEnd (lifetimes i).
 Definition intervalExtent (i : Interval) : nat := rangeListExtent (lifetimes i).
 
-Definition Icompare (x y : Interval) := Eq.
+Definition Icompare (x y : Interval) : comparison :=
+  Rcompare (NE_hd (ranges x)) (NE_hd (ranges y)).
 
 Infix "?=" := Icompare (at level 70, no associativity).
+
+Lemma Icompare_eq_iff : forall x y : Interval, x ?= y = Eq <-> x = y.
+Proof.
+  intros x.
+  induction x. destruct y.
+  rewrite ?IHn; split; auto.
+Admitted.
 
 Definition Ilt (x y : Interval) := (x ?= y) = Lt.
 Definition Igt (x y : Interval) := (x ?= y) = Gt.
@@ -230,14 +338,37 @@ Definition Ile (x y : Interval) := (x ?= y) <> Gt.
 Definition Ige (x y : Interval) := (x ?= y) <> Lt.
 Definition Ine (x y : Interval) :=  x <> y.
 
-Lemma Icompare_spec : forall n m, CompSpec eq Ilt n m (n ?= m).
+Lemma Igt_flip : forall x y : Interval, Igt x y -> Ilt y x.
+Proof.
+Admitted.
+
+Lemma Ilt_not : forall x y : Interval, Ilt x y -> Ine x y.
+Proof.
+Admitted.
+
+Lemma Igt_not : forall x y : Interval, Igt x y -> Ine x y.
+Proof.
+Admitted.
+
+Lemma Icompare_spec : forall x y, CompSpec eq Ilt x y (x ?= y).
 Proof.
   intros.
-Admitted.
+  destruct (Icompare x y) eqn:Heqe.
+  - apply Icompare_eq_iff in Heqe.
+    apply CompEq. assumption.
+  - apply CompLt. assumption.
+  - apply CompGt.
+    apply Igt_flip in Heqe.
+    assumption.
+Qed.
 
 Definition I_eq_dec (x y : Interval) : { x = y } + { x <> y }.
 Proof.
-Admitted.
+  destruct (Icompare x y) eqn:Heqe.
+  - left.  apply Icompare_eq_iff in Heqe. assumption.
+  - right. apply Ilt_not in Heqe. assumption.
+  - right. apply Igt_not in Heqe. assumption.
+Defined.
 
 Module Interval_as_OT <: OrderedType.
 
@@ -292,7 +423,7 @@ Qed.
 Definition intSet : Type := S.t.  (* the type of a set of intervals *)
 
 Definition intSetExtent (is : intSet) : nat :=
-  S.fold (fun x n => n + intExtent x) is 0.
+  S.fold (fun x n => n + intervalExtent x) is 0.
 
 (****************************************************************************)
 
@@ -325,13 +456,17 @@ Definition intervalRange (i : AssignedInterval) : Range.
     with (rstart := intervalStart (interval i))
          (rend   := intervalEnd (interval i));
   destruct i.
-  - omega.
-  - unfold intervalStart, intervalEnd.
-    simpl. destruct interval0.
-    induction lifetimes0.
-      apply range_properly_bounded.
-    destruct r. destruct s.
-    simpl in *. omega.
+  unfold intervalStart, intervalEnd.
+  destruct interval0.
+  dependent induction lifetimes0.
+    apply range_properly_bounded.
+  simpl in *.
+  apply range_properly_bounded.
+  apply IHlifetimes0.
+  destruct r. destruct s.
+  unfold extentOfRanges in *. simpl in *.
+  destruct rs; simpl in *.
+  unfold rangeListStart, rangeListEnd.
 Qed.
 
 (** * ScanState *)
