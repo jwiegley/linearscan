@@ -7,14 +7,15 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
 Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.EqNat.
 Require Import Coq.Init.Datatypes.
 Require Import Coq.Lists.List.
+Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Vectors.Fin.
-Require Import Coq.Logic.ProofIrrelevance.
 (* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
@@ -367,8 +368,8 @@ Inductive RangeList : NonEmpty Range -> Set :=
   | RangeCons r rs :
     RangeList rs -> rend r <= rstart (NE_hd rs) -> RangeList (NE_Cons r rs).
 
-Definition rangeListStart  `(RangeList xs) := rstart (NE_hd xs).
-Definition rangeListEnd    `(RangeList xs) := rend (NE_tl xs).
+Definition rangeListStart `(RangeList xs) := rstart (NE_hd xs).
+Definition rangeListEnd   `(RangeList xs) := rend (NE_tl xs).
 
 Definition rangeListExtent `(rs : RangeList xs) :=
   rangeListEnd rs - rangeListStart rs.
@@ -428,11 +429,21 @@ Lemma Icompare_eq_iff : forall x y : Interval, x ?= y = Eq <-> x = y.
 Proof.
   intros x.
   induction x. destruct y.
-  rewrite ?IHn; split; auto.
+  unfold Icompare.
+  split; intros.
+  - apply (@cmp_eq_iff _ Range_CompareSpec) in H.
+    simpl in H.
+    destruct ranges0.
+      destruct ranges1. simpl in H. subst.
+      destruct lifetimes0.
+      dependent destruction lifetimes1.
+      f_equal.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Lemma Icompare_gt_flip : forall x y : Interval, x ?= y = Gt -> y ?= x = Lt.
 Proof.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Program Instance Interval_CompareSpec : CompareSpec Interval := {
@@ -457,6 +468,7 @@ Module Interval_as_OT <: OrderedType.
     - intro x. destruct x.
       unfold complement. intros.
       inversion H.
+  (* jww (2014-09-12): NYI *)
   Admitted.
 
   Instance lt_compat : Proper (eq==>eq==>iff) lt.
@@ -525,16 +537,19 @@ Record AssignedInterval : Set := {
 }.
 
 Definition AIcompare (x y : AssignedInterval) : comparison.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Lemma AIcompare_eq_iff : forall x y : AssignedInterval,
   AIcompare x y = Eq <-> x = y.
 Proof.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Lemma AIcompare_gt_flip : forall x y : AssignedInterval,
   AIcompare x y = Gt -> AIcompare y x = Lt.
 Proof.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Program Instance AssignedInterval_CompareSpec
@@ -622,6 +637,7 @@ Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
          (active    := remove cmp_eq_dec x (active st))
          (inactive  := inactive st)
          (handled   := x :: handled st).
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
@@ -631,6 +647,7 @@ Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
          (active    := remove cmp_eq_dec x (active st))
          (inactive  := x :: inactive st)
          (handled   := handled st).
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Definition addToActive (st : ScanState) (x : AssignedInterval) : ScanState.
@@ -639,6 +656,7 @@ Definition addToActive (st : ScanState) (x : AssignedInterval) : ScanState.
          (active    := x :: active st)
          (inactive  := inactive st)
          (handled   := handled st).
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Definition getRegisterIndex
@@ -652,6 +670,7 @@ Definition getRegisterIndex
 
 Definition nextIntersectionWith (i : Interval) (x : AssignedInterval) : nat.
 Proof.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Function findRegister (freeUntilPos : PhysReg -> option nat) (reg : PhysReg)
@@ -679,13 +698,12 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
 
 Definition tryAllocateFreeReg (st : ScanState) (current : Interval)
   : option (AssignedInterval * ScanState) :=
-  (* jww: The first part of this algorithm has been modified to be functional:
-     instead of mutating an array called freeUntilPos and then selecting the
-     register with the highest value, we determine the register using a
-     fold. *)
+  (* The first part of this algorithm has been modified to be more functional:
+     instead of mutating an array called [freeUntilPos] and finding the
+     register with the highest value, we use a function produced by a fold,
+     and iterate over the register set. *)
 
   (* set freeUntilPos of all physical registers to maxInt
-
      for each interval it in active do
        freeUntilPos[it.reg] = 0 *)
   let freeUntilPos' :=
@@ -698,25 +716,33 @@ Definition tryAllocateFreeReg (st : ScanState) (current : Interval)
                   anyRangeIntersects (ranges current) (ranges (interval x)))
                (inactive st) in
   let freeUntilPos :=
-        getRegisterIndex (nextIntersectionWith current)
-                         freeUntilPos' intersectingIntervals in
+        getRegisterIndex (nextIntersectionWith current) freeUntilPos'
+                         intersectingIntervals in
 
-  (* reg = register with highest freeUntilPos
-     if freeUntilPos[reg] = 0 then
-       // no register available without spilling
-       allocation failed
-     else if current ends before freeUntilPos[reg] then
-       // register available for the whole interval
-       current.reg = reg
-     else
-       // register available for the first part of the interval
-       current.reg = reg
-       split current before freeUntilPos[reg] *)
+  (* reg = register with highest freeUntilPos *)
   let lastReg := ultimate_from_nat maxReg registers_exist in
-  let reg := findRegister freeUntilPos lastReg in
+  let (reg, mres) := findRegister freeUntilPos lastReg in
+  let useReg := ( {| interval := current; assigned := reg |}, st ) in
 
-  (* jww (2014-09-11): NYI *)
-  None.
+  match mres with
+  | None => Some useReg
+  | Some n =>
+      (* if freeUntilPos[reg] = 0 then
+           // no register available without spilling
+           allocation failed *)
+      if beq_nat n 0
+      then None
+      (* else if current ends before freeUntilPos[reg] then
+           // register available for the whole interval
+           current.reg = reg *)
+      else if ltb (intervalEnd current) n
+           then Some useReg
+      (* else
+           // register available for the first part of the interval
+           current.reg = reg
+           split current before freeUntilPos[reg] *)
+           else None            (* jww (2014-09-12): NYI *)
+  end.
 
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  This is why the
@@ -748,6 +774,7 @@ Definition allocateBlockedReg (st : ScanState) (current : Interval)
      // the fixed interval for reg
      if current intersects with the fixed interval for reg then
        splse current before this intersection *)
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
@@ -777,7 +804,7 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let go2 x st := st in
+  let go2 x st := st in         (* jww (2014-09-12): NYI *)
   let st2 := fold_right go2 st1 (inactive st1) in
 
   (* // find a register for current
@@ -828,6 +855,7 @@ Proof.
      total scope length. *)
   destruct p. subst.
   inversion teq0; subst.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
 End Allocator.
@@ -843,10 +871,10 @@ End Allocator.
 Class Graph (a : Set) := {}.
 
 Definition determineIntervals (g : Graph VirtReg) : intSet.
+(* jww (2014-09-12): NYI *)
 Admitted.
 
-(*
-Definition allocateRegisters (g : Graph VirtReg) : intSet :=
-  let st := newScanState (determineIntervals g) in
-  handled (linearScan st).
-*)
+Definition allocateRegisters (maxReg : nat) (H : maxReg > 0)
+  (g : Graph VirtReg) : list (AssignedInterval maxReg) :=
+  let st := newScanState maxReg (determineIntervals g) in
+  handled maxReg (linearScan maxReg H st).
