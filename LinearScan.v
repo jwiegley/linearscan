@@ -21,6 +21,8 @@ Require Import Coq.Vectors.Fin.
 (* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
+Module Import LN := ListNotations.
+
 Generalizable All Variables.
 
 (****************************************************************************)
@@ -34,14 +36,63 @@ Generalizable All Variables.
 Definition no_overlap {a} (xs ys : list a) :=
   forall (x : a), ~ (In x xs) \/ ~ (In x ys).
 
-Lemma locally_sorted_cons : forall a (R : a -> a -> Prop) (x : a) xs,
-  LocallySorted R (x :: xs) -> LocallySorted R xs.
+Section Elems.
+
+Variable a : Set.
+Variable cmp_eq_dec : forall x y : a, {x = y} + {x <> y}.
+
+Lemma not_in_list : forall x xs,
+  ~ In x xs -> count_occ cmp_eq_dec xs x = 0.
 Proof.
-  intros.
-  inversion H; subst.
+  intros. induction xs; simpl; auto.
+  destruct (cmp_eq_dec a0 x); subst.
+    contradiction H. constructor. reflexivity.
+  apply IHxs.
+  unfold not in *. intros.
+  apply H. right. assumption.
+Qed.
+
+Lemma In_spec : forall (x : a) y xs, In x xs -> ~ In y xs -> y <> x.
+Proof.
+  unfold not in *. intros. subst.
+  contradiction.
+Qed.
+
+Inductive Once : list a -> Set :=
+  | Once_nil       : Once []
+  | Once_sing x    : Once [x]
+  | Once_cons x xs : Once xs -> ~ In x xs -> Once (x :: xs).
+
+Function Once_upon_a_list (l : list a) {measure length l} : option (Once l) :=
+  match l with
+  | nil => Some Once_nil
+  | cons x nil => Some (Once_sing x)
+  | cons x xs =>
+      match in_dec cmp_eq_dec x xs with
+      | left H => None
+      | right H =>
+          match Once_upon_a_list xs with
+          | None => None
+          | Some l' => Some (Once_cons _ _ l' H)
+          end
+      end
+  end.
+Proof. auto. Qed.
+
+Lemma Once_uncons : forall x xs, Once (x :: xs) -> Once xs.
+Proof.
+  intros. inversion H; subst.
     constructor.
   assumption.
 Qed.
+
+End Elems.
+
+Arguments Once [a] _.
+
+Lemma locally_sorted_cons : forall a (R : a -> a -> Prop) (x : a) xs,
+  LocallySorted R (x :: xs) -> LocallySorted R xs.
+Proof. intros. inversion H; subst; [ constructor | assumption ]. Qed.
 
 (** ** Comparisons *)
 
@@ -537,6 +588,7 @@ End IntervalOrder.
 
 Record IntervalsSortedByStart := {
   isbs : list Interval;
+  isbs_unique : Once isbs;
   isbs_ordered : LocallySorted IntervalOrder.leb_true isbs
 }.
 
@@ -545,10 +597,35 @@ Definition extentOfIntervals (is : IntervalsSortedByStart) : nat :=
 
 Module Import MergeSort := Sort IntervalOrder.
 
-Definition sortIntervals (is : list Interval) : IntervalsSortedByStart.
+Lemma Once_sorted : forall x xs,
+  Once (sort xs) -> ~ In x xs -> Once (sort (x :: xs)).
 Proof.
-  apply Build_IntervalsSortedByStart with (isbs := sort is).
-  apply Sorted_sort.
+  intros.
+  induction (sort (x :: xs)).
+    apply Once_nil.
+  destruct l.
+    apply Once_sing.
+  subst.
+  apply Once_cons.
+  apply IHl.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
+Definition sortIntervals (xs : list Interval) : option IntervalsSortedByStart.
+Proof.
+  pose (Once_upon_a_list _ cmp_eq_dec xs).
+  destruct o.
+  - apply Some.
+    apply Build_IntervalsSortedByStart
+      with (isbs := sort xs).
+    + induction o.
+      * compute. apply Once_nil.
+      * compute. apply Once_sing.
+      * apply Once_sorted.
+        apply IHo. assumption.
+    + apply Sorted_LocallySorted_iff.
+      apply LocallySorted_sort.
+  - apply None.
 Defined.
 
 (****************************************************************************)
@@ -635,6 +712,7 @@ Definition intervalRange (i : AssignedInterval) : Range.
   destruct r; destruct r0; simpl in *; omega.
 Qed.
 
+(*
 Theorem AI_remove_In : forall (l : list AssignedInterval) x,
   ~ In (interval x) (map interval (remove cmp_eq_dec x l)).
 Proof.
@@ -650,6 +728,7 @@ Proof.
     admit.                      (* jww (2014-09-13): NYI *)
   apply (IHl y); assumption.
 Qed.
+*)
 
 (** ** ScanState *)
 
@@ -658,16 +737,16 @@ Qed.
     allocated.. *)
 
 Record ScanState := {
-    unhandled : IntervalsSortedByStart; (* starts after pos *)
-    active    : list AssignedInterval;  (* ranges over pos *)
-    inactive  : list AssignedInterval;  (* falls in lifetime hole *)
-    handled   : list AssignedInterval;  (* ends before pos *)
+    unhandled : IntervalsSortedByStart;  (* starts after pos *)
+    active    : list AssignedInterval;   (* ranges over pos *)
+    inactive  : list AssignedInterval;   (* falls in lifetime hole *)
+    handled   : list AssignedInterval;   (* ends before pos *)
 
     intervals := map interval;
 
-    no_overlap_unhandled : no_overlap (isbs unhandled) (intervals active);
-    no_overlap_actives   : no_overlap (intervals active) (intervals inactive);
-    no_overlap_handled   : no_overlap (intervals active) (intervals handled)
+    lists_are_unique :
+      Once ( isbs unhandled ++ intervals active ++ intervals inactive
+                            ++ intervals handled )
 }.
 
 Program Definition newScanState (xs : IntervalsSortedByStart)
@@ -676,8 +755,7 @@ Program Definition newScanState (xs : IntervalsSortedByStart)
                   ; inactive  := nil
                   ; handled   := nil
                   |}.
-Solve All Obligations using
-  (unfold no_overlap; intros; right; unfold not; intros; inversion H).
+Obligation 1. destruct xs. rewrite app_nil_r. assumption. Qed.
 
 Definition scanStateUnhandledExtent (st : ScanState) : nat :=
   extentOfIntervals (unhandled st).
@@ -689,65 +767,82 @@ Proof.
   destruct isbs0.
     apply None.
   apply Some.
-  split.
-    apply i.
+  split. apply i.
   apply Build_ScanState
     with (unhandled :=
             {| isbs := isbs0
+             ; isbs_unique := elems_unique_cons _ _ _ isbs_unique0
              ; isbs_ordered :=
                  locally_sorted_cons _ _ _ _ isbs_ordered0
              |})
          (active    := active0)
          (inactive  := inactive0)
          (handled   := handled0).
-  + unfold no_overlap. intros.
-    destruct (no_overlap_unhandled0 x).
-      left. unfold not in *. intros.
-      apply H. right. assumption.
-    right. assumption.
-  + apply no_overlap_actives0.
-  + apply no_overlap_handled0.
-Defined.
+  simpl in *.
+  apply elems_unique_cons in lists_are_unique0.
+  assumption.
+Qed.
+
+Lemma no_overlap_remove : forall x xs ys,
+  no_overlap (map interval (remove cmp_eq_dec x xs)) ys.
+Proof.
+Admitted.
+
+Lemma no_overlap_remove_r : forall x xs ys,
+  no_overlap xs (map interval (remove cmp_eq_dec x ys)).
+Proof.
+Admitted.
+
+Lemma no_overlap_interval_cons : forall x xs ys,
+  ~ In (interval x) ys -> no_overlap (interval x :: xs) ys.
+Proof.
+Admitted.
+
+Lemma no_overlap_interval_cons_r : forall x xs ys,
+  ~ In (interval x) xs -> no_overlap xs (interval x :: ys).
+Proof.
+Admitted.
+
+Lemma AI_remove_In : forall x y xs,
+  In y (map interval (remove cmp_eq_dec x xs)) -> In y (map interval xs).
+Proof.
+Admitted.
 
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
-  : ScanState.
+  (H : In x (active st)) : ScanState.
 Proof.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := remove cmp_eq_dec x (active st))
          (inactive  := inactive st)
-         (handled   := x :: handled st);
-  destruct st; destruct x; simpl in *;
-  unfold no_overlap in *; intros;
-  specialize (no_overlap_unhandled0 x);
-  specialize (no_overlap_actives0 x);
-  specialize (no_overlap_handled0 x).
-  - inversion no_overlap_unhandled0.
-      left. assumption.
-    right. unfold intervals0 in *.
-    admit.
-  - admit.
-  - admit.
-(* jww (2014-09-12): NYI *)
+         (handled   := x :: handled st).
+  destruct st; simpl in *.
+(* jww (2014-09-13): NYI *)
 Admitted.
 
 Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
-  : ScanState.
+  (H : ~ In x (inactive st)) : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := remove cmp_eq_dec x (active st))
          (inactive  := x :: inactive st)
-         (handled   := handled st).
-(* jww (2014-09-12): NYI *)
+         (handled   := handled st);
+  destruct st; simpl in *.
+(* jww (2014-09-13): NYI *)
 Admitted.
 
-Definition addToActive (st : ScanState) (x : AssignedInterval) : ScanState.
+Definition addToActive (st : ScanState) (x : AssignedInterval)
+  (HU : ~ In (interval x) (isbs (unhandled st)))
+  (HI : ~ In (interval x) (map interval (inactive st)))
+  (HH : ~ In (interval x) (map interval (handled st)))
+  : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := x :: active st)
          (inactive  := inactive st)
-         (handled   := handled st).
-(* jww (2014-09-12): NYI *)
+         (handled   := handled st);
+  destruct st; simpl in *.
+(* jww (2014-09-13): NYI *)
 Admitted.
 
 Definition getRegisterIndex
@@ -882,9 +977,9 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
     match intervalRange x with
     | Build_Range s e Hb =>
       if e <? position
-      then moveActiveToHandled st x
+      then moveActiveToHandled st x _
       else if position <? s
-           then moveActiveToInactive st x
+           then moveActiveToInactive st x _
            else st
     end in
   let st1 := fold_right go1 st0 (active st0) in
@@ -912,7 +1007,7 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
        add current to active *)
   match mres with
   | None => st3
-  | Some current' => addToActive st3 current'
+  | Some current' => addToActive st3 current' _ _ _
   end.
 
 Function linearScan (st : ScanState)
@@ -964,7 +1059,15 @@ Definition determineIntervals (g : Graph VirtReg) : list Interval.
 Admitted.
 
 Definition allocateRegisters (maxReg : nat) (H : maxReg > 0)
-  (g : Graph VirtReg) : list (AssignedInterval maxReg) :=
-  let is := sortIntervals (determineIntervals g) in
-  let st := newScanState maxReg is in
-  handled maxReg (linearScan maxReg H st).
+  (g : Graph VirtReg) : option (list (AssignedInterval maxReg)) :=
+  let is := sort (determineIntervals g) in
+  match once_upon_a_list is with
+  | None => None
+  | Some l =>
+      let xs := {| isbs := is
+                 ; isbs_unique := l
+                 ; isbs_ordered := l
+                 |} in
+      let st := newScanState maxReg is in
+      handled maxReg (linearScan maxReg H st).
+  end.
