@@ -76,6 +76,27 @@ Proof.
   assumption.
 Qed.
 
+Lemma NoDup_app : forall (xs ys : list a), NoDup ys -> NoDup (xs ++ ys).
+Proof.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
+Lemma NoDup_unapp : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup ys.
+Proof.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
+Lemma NoDup_swap : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup (ys ++ xs).
+Proof.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
+Lemma NoDup_juggle : forall x (xs ys : list a),
+  NoDup (xs ++ ys) -> NoDup (remove cmp_eq_dec x xs ++ x :: ys).
+Proof.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
 Definition find_in (n : a) (l : list a) : {In n l} + {~ In n l}.
 Proof.
   induction l as [| x xs].
@@ -93,6 +114,16 @@ Proof.
 Defined.
 
 End Elems.
+
+Definition all_in_list {A} (xs : list A) : list { x : A | In x xs }.
+Proof.
+  induction xs.
+    apply nil.
+  apply cons.
+    exists a. apply in_eq.
+  (* apply IHxs. *)
+(* jww (2014-09-13): NYI *)
+Admitted.
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
@@ -144,7 +175,7 @@ Proof.
   - apply CompEq. apply cmp_eq_iff. reflexivity.
   - apply CompLt. assumption.
   - apply CompGt. auto.
-Qed.
+Defined.
 
 Lemma mk_cmp_eq_dec : forall {a} (x y : a)
   (cmp        : a -> a -> comparison)
@@ -156,7 +187,7 @@ Proof.
   - left. apply cmp_eq_iff. reflexivity.
   - right. intuition. inversion H2.
   - right. intuition. inversion H2.
-Qed.
+Defined.
 
 Class CompareSpec (a : Set) := {
   cmp         : a -> a -> comparison;
@@ -759,6 +790,23 @@ Proof.
   assumption.
 Defined.
 
+Lemma map_interval_distributes : forall x xs,
+  map interval (remove cmp_eq_dec x xs) =
+    remove cmp_eq_dec (interval x) (map interval xs).
+Proof.
+  intros.
+  generalize dependent x.
+  induction xs; intros; simpl. reflexivity.
+  specialize (IHxs x).
+  destruct (cmp_eq_dec x a) eqn:Heqe; subst.
+    destruct (cmp_eq_dec (interval a) (interval a)) eqn:Heqe2; subst.
+      apply IHxs.
+    intuition.
+  destruct (cmp_eq_dec (interval x) (interval a)) eqn:Heqe2; subst.
+    simpl.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
   (* (H : In x (active st)) *) : ScanState.
 Proof.
@@ -768,8 +816,20 @@ Proof.
          (inactive  := inactive st)
          (handled   := x :: handled st).
   destruct st; simpl in *.
-(* jww (2014-09-13): NYI *)
-Admitted.
+  apply NoDup_app.
+  apply NoDup_unapp in lists_are_unique0.
+  apply NoDup_swap.
+  apply NoDup_swap in lists_are_unique0.
+  rewrite <- app_assoc.
+  rewrite <- app_assoc in lists_are_unique0.
+  apply NoDup_app.
+  apply NoDup_unapp in lists_are_unique0.
+  apply NoDup_swap.
+  apply NoDup_swap in lists_are_unique0.
+  rewrite map_interval_distributes.
+  apply NoDup_juggle.
+  assumption.
+Defined.
 
 Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
   (* (H : In x (active st)) *) : ScanState.
