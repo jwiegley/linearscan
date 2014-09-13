@@ -33,9 +33,6 @@ Generalizable All Variables.
 
 (** ** Lists *)
 
-Definition no_overlap {a} (xs ys : list a) :=
-  forall (x : a), ~ (In x xs) \/ ~ (In x ys).
-
 Section Elems.
 
 Variable a : Set.
@@ -58,39 +55,30 @@ Proof.
   contradiction.
 Qed.
 
-Inductive Once : list a -> Set :=
-  | Once_nil       : Once []
-  | Once_sing x    : Once [x]
-  | Once_cons x xs : Once xs -> ~ In x xs -> Once (x :: xs).
-
-Function Once_upon_a_list (l : list a) {measure length l} : option (Once l) :=
+Function NoDup_from_list (l : list a) {measure length l} : option (NoDup l) :=
   match l with
-  | nil => Some Once_nil
-  | cons x nil => Some (Once_sing x)
+  | nil => Some (NoDup_nil a)
   | cons x xs =>
       match in_dec cmp_eq_dec x xs with
       | left H => None
       | right H =>
-          match Once_upon_a_list xs with
+          match NoDup_from_list xs with
           | None => None
-          | Some l' => Some (Once_cons _ _ l' H)
+          | Some l' => Some (NoDup_cons _ H l')
           end
       end
   end.
 Proof. auto. Qed.
 
-Lemma Once_uncons : forall x xs, Once (x :: xs) -> Once xs.
+Lemma NoDup_uncons : forall (x : a) xs, NoDup (x :: xs) -> NoDup xs.
 Proof.
   intros. inversion H; subst.
-    constructor.
   assumption.
 Qed.
 
 End Elems.
 
-Arguments Once [a] _.
-
-Lemma locally_sorted_cons : forall a (R : a -> a -> Prop) (x : a) xs,
+Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
 Proof. intros. inversion H; subst; [ constructor | assumption ]. Qed.
 
@@ -588,7 +576,7 @@ End IntervalOrder.
 
 Record IntervalsSortedByStart := {
   isbs : list Interval;
-  isbs_unique : Once isbs;
+  isbs_unique : NoDup isbs;
   isbs_ordered : LocallySorted IntervalOrder.leb_true isbs
 }.
 
@@ -597,32 +585,22 @@ Definition extentOfIntervals (is : IntervalsSortedByStart) : nat :=
 
 Module Import MergeSort := Sort IntervalOrder.
 
-Lemma Once_sorted : forall x xs,
-  Once (sort xs) -> ~ In x xs -> Once (sort (x :: xs)).
+Lemma NoDup_sorted : forall xs, NoDup xs -> NoDup (sort xs).
 Proof.
-  intros.
-  induction (sort (x :: xs)).
-    apply Once_nil.
-  destruct l.
-    apply Once_sing.
-  subst.
-  apply Once_cons.
-  apply IHl.
 (* jww (2014-09-13): NYI *)
 Admitted.
 
 Definition sortIntervals (xs : list Interval) : option IntervalsSortedByStart.
 Proof.
-  pose (Once_upon_a_list _ cmp_eq_dec xs).
+  pose (NoDup_from_list _ cmp_eq_dec xs).
   destruct o.
   - apply Some.
     apply Build_IntervalsSortedByStart
       with (isbs := sort xs).
-    + induction o.
-      * compute. apply Once_nil.
-      * compute. apply Once_sing.
-      * apply Once_sorted.
-        apply IHo. assumption.
+    + induction n.
+      * compute. apply NoDup_nil.
+      * apply NoDup_sorted.
+        apply NoDup_cons; assumption.
     + apply Sorted_LocallySorted_iff.
       apply LocallySorted_sort.
   - apply None.
@@ -712,24 +690,6 @@ Definition intervalRange (i : AssignedInterval) : Range.
   destruct r; destruct r0; simpl in *; omega.
 Qed.
 
-(*
-Theorem AI_remove_In : forall (l : list AssignedInterval) x,
-  ~ In (interval x) (map interval (remove cmp_eq_dec x l)).
-Proof.
-  induction l as [|x l]; auto.
-  intro y; simpl;
-  destruct (cmp_eq_dec y x) as [yeqx | yneqx]; simpl.
-    apply IHl.
-  unfold not in *. intros.
-  destruct H.
-    destruct x. destruct y.
-    simpl in H. subst.
-    apply yneqx. f_equal.
-    admit.                      (* jww (2014-09-13): NYI *)
-  apply (IHl y); assumption.
-Qed.
-*)
-
 (** ** ScanState *)
 
 (** A [ScanState] is always relative to a current position (pos) as we move
@@ -745,8 +705,8 @@ Record ScanState := {
     intervals := map interval;
 
     lists_are_unique :
-      Once ( isbs unhandled ++ intervals active ++ intervals inactive
-                            ++ intervals handled )
+      NoDup ( isbs unhandled ++ intervals active ++ intervals inactive
+                             ++ intervals handled )
 }.
 
 Program Definition newScanState (xs : IntervalsSortedByStart)
@@ -771,42 +731,17 @@ Proof.
   apply Build_ScanState
     with (unhandled :=
             {| isbs := isbs0
-             ; isbs_unique := elems_unique_cons _ _ _ isbs_unique0
+             ; isbs_unique := NoDup_uncons _ _ _ isbs_unique0
              ; isbs_ordered :=
-                 locally_sorted_cons _ _ _ _ isbs_ordered0
+                 LocallySorted_uncons _ _ _ _ isbs_ordered0
              |})
          (active    := active0)
          (inactive  := inactive0)
          (handled   := handled0).
   simpl in *.
-  apply elems_unique_cons in lists_are_unique0.
+  apply NoDup_uncons in lists_are_unique0.
   assumption.
 Qed.
-
-Lemma no_overlap_remove : forall x xs ys,
-  no_overlap (map interval (remove cmp_eq_dec x xs)) ys.
-Proof.
-Admitted.
-
-Lemma no_overlap_remove_r : forall x xs ys,
-  no_overlap xs (map interval (remove cmp_eq_dec x ys)).
-Proof.
-Admitted.
-
-Lemma no_overlap_interval_cons : forall x xs ys,
-  ~ In (interval x) ys -> no_overlap (interval x :: xs) ys.
-Proof.
-Admitted.
-
-Lemma no_overlap_interval_cons_r : forall x xs ys,
-  ~ In (interval x) xs -> no_overlap xs (interval x :: ys).
-Proof.
-Admitted.
-
-Lemma AI_remove_In : forall x y xs,
-  In y (map interval (remove cmp_eq_dec x xs)) -> In y (map interval xs).
-Proof.
-Admitted.
 
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
   (H : In x (active st)) : ScanState.
@@ -1061,7 +996,7 @@ Admitted.
 Definition allocateRegisters (maxReg : nat) (H : maxReg > 0)
   (g : Graph VirtReg) : option (list (AssignedInterval maxReg)) :=
   let is := sort (determineIntervals g) in
-  match once_upon_a_list is with
+  match NoDup_from_list is with
   | None => None
   | Some l =>
       let xs := {| isbs := is
