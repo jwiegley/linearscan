@@ -18,7 +18,6 @@ Require Import Coq.Program.Tactics.
 Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
-(* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
 
 Module Import LN := ListNotations.
@@ -38,6 +37,7 @@ Section Elems.
 Variable a : Set.
 Variable cmp_eq_dec : forall x y : a, {x = y} + {x <> y}.
 
+(*
 Lemma not_in_list : forall x xs,
   ~ In x xs -> count_occ cmp_eq_dec xs x = 0.
 Proof.
@@ -48,12 +48,15 @@ Proof.
   unfold not in *. intros.
   apply H. right. assumption.
 Qed.
+*)
 
+(*
 Lemma In_spec : forall (x : a) y xs, In x xs -> ~ In y xs -> y <> x.
 Proof.
   unfold not in *. intros. subst.
   contradiction.
 Qed.
+*)
 
 Function NoDup_from_list (l : list a) {measure length l} : option (NoDup l) :=
   match l with
@@ -76,23 +79,47 @@ Proof.
   assumption.
 Qed.
 
-Lemma NoDup_app : forall (xs ys : list a), NoDup ys -> NoDup (xs ++ ys).
-Proof.
-(* jww (2014-09-13): NYI *)
-Admitted.
-
 Lemma NoDup_unapp : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup ys.
 Proof.
-(* jww (2014-09-13): NYI *)
-Admitted.
+  intros.
+  induction xs. auto.
+  apply IHxs.
+  rewrite <- app_comm_cons in H.
+  apply NoDup_uncons in H.
+  assumption.
+Defined.
 
 Lemma NoDup_swap : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup (ys ++ xs).
 Proof.
+  intros.
 (* jww (2014-09-13): NYI *)
 Admitted.
 
-Lemma NoDup_juggle : forall x (xs ys : list a),
-  NoDup (xs ++ ys) -> NoDup (remove cmp_eq_dec x xs ++ x :: ys).
+Lemma NoDup_swap2 : forall (xs ys zs : list a),
+  NoDup (xs ++ ys ++ zs) -> NoDup (xs ++ zs ++ ys).
+Proof.
+  intros.
+(* jww (2014-09-13): NYI *)
+Admitted.
+
+Lemma NoDup_swap_cons : forall x (xs ys : list a),
+  NoDup (x :: xs ++ ys) -> NoDup (x :: ys ++ xs).
+Proof.
+  intros.
+  constructor.
+    inversion H; subst.
+    unfold not in *. intros.
+    apply H2.
+    apply in_app_iff.
+    apply in_app_iff in H0.
+    intuition.
+  apply NoDup_uncons in H.
+  apply NoDup_swap.
+  assumption.
+Defined.
+
+Lemma NoDup_juggle : forall x (xs ys zs : list a),
+  NoDup (xs ++ ys ++ zs) -> NoDup (remove cmp_eq_dec x xs ++ (x :: ys) ++ zs).
 Proof.
 (* jww (2014-09-13): NYI *)
 Admitted.
@@ -114,16 +141,6 @@ Proof.
 Defined.
 
 End Elems.
-
-Definition all_in_list {A} (xs : list A) : list { x : A | In x xs }.
-Proof.
-  induction xs.
-    apply nil.
-  apply cons.
-    exists a. apply in_eq.
-  (* apply IHxs. *)
-(* jww (2014-09-13): NYI *)
-Admitted.
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
@@ -546,6 +563,8 @@ Record UsePos `(RangeList ranges) : Set := {
     the interval is split into two or more intervals, so each interval can be
     assigned its own register. *)
 
+Definition IntervalId := nat.
+
 Record Interval : Set := {
   ranges       : NonEmpty Range;
   lifetimes    : RangeList ranges;
@@ -745,15 +764,21 @@ Qed.
 
 Record ScanState := {
     unhandled : IntervalsSortedByStart;  (* starts after pos *)
+
     active    : list AssignedInterval;   (* ranges over pos *)
     inactive  : list AssignedInterval;   (* falls in lifetime hole *)
     handled   : list AssignedInterval;   (* ends before pos *)
 
+    assignments : IntervalId -> PhysReg;
+
     intervals := map interval;
 
-    lists_are_unique :
-      NoDup ( isbs unhandled ++ intervals active ++ intervals inactive
-                             ++ intervals handled )
+    all_state_lists := isbs unhandled
+                    ++ intervals active
+                    ++ intervals inactive
+                    ++ intervals handled;
+
+    lists_are_unique : NoDup all_state_lists
 }.
 
 Program Definition newScanState (xs : IntervalsSortedByStart)
@@ -767,26 +792,28 @@ Obligation 1. destruct xs. rewrite app_nil_r. assumption. Qed.
 Definition scanStateUnhandledExtent (st : ScanState) : nat :=
   extentOfIntervals (unhandled st).
 
-Definition nextUnhandled (st : ScanState) : option (Interval * ScanState).
+Definition nextUnhandled (st : ScanState)
+  : option ({ p : (Interval * ScanState) |
+              ~ In (fst p) (all_state_lists (snd p)) }).
 Proof.
   destruct st.
   destruct unhandled0.
   destruct isbs0.
     apply None.
   apply Some.
-  split. apply i.
-  apply Build_ScanState
-    with (unhandled :=
-            {| isbs := isbs0
-             ; isbs_unique := NoDup_uncons _ _ _ isbs_unique0
-             ; isbs_ordered :=
-                 LocallySorted_uncons _ _ _ _ isbs_ordered0
-             |})
-         (active    := active0)
-         (inactive  := inactive0)
-         (handled   := handled0).
-  simpl in *.
-  apply NoDup_uncons in lists_are_unique0.
+  exists
+    (i, {| unhandled :=
+           {| isbs         := isbs0
+            ; isbs_unique  := NoDup_uncons _ _ _ isbs_unique0
+            ; isbs_ordered :=
+                LocallySorted_uncons _ _ _ _ isbs_ordered0
+            |}
+         ; active           := active0
+         ; inactive         := inactive0
+         ; handled          := handled0
+         ; lists_are_unique := NoDup_uncons _ _ _ lists_are_unique0
+         |}).
+  inversion lists_are_unique0; subst.
   assumption.
 Defined.
 
@@ -796,14 +823,14 @@ Lemma map_interval_distributes : forall x xs,
 Proof.
   intros.
   generalize dependent x.
-  induction xs; intros; simpl. reflexivity.
-  specialize (IHxs x).
+  induction xs; intros; simpl.
+    reflexivity.
   destruct (cmp_eq_dec x a) eqn:Heqe; subst.
-    destruct (cmp_eq_dec (interval a) (interval a)) eqn:Heqe2; subst.
+    destruct (cmp_eq_dec (interval a) (interval a)); subst.
       apply IHxs.
     intuition.
-  destruct (cmp_eq_dec (interval x) (interval a)) eqn:Heqe2; subst.
-    simpl.
+  assert (x <> a -> interval x <> interval a).
+    intros. destruct x. destruct a. simpl.
 (* jww (2014-09-13): NYI *)
 Admitted.
 
@@ -816,18 +843,21 @@ Proof.
          (inactive  := inactive st)
          (handled   := x :: handled st).
   destruct st; simpl in *.
-  apply NoDup_app.
-  apply NoDup_unapp in lists_are_unique0.
   apply NoDup_swap.
-  apply NoDup_swap in lists_are_unique0.
   rewrite <- app_assoc.
-  rewrite <- app_assoc in lists_are_unique0.
-  apply NoDup_app.
-  apply NoDup_unapp in lists_are_unique0.
-  apply NoDup_swap.
-  apply NoDup_swap in lists_are_unique0.
+  rewrite <- app_assoc.
+  apply NoDup_swap2.
+  rewrite <- app_assoc.
   rewrite map_interval_distributes.
   apply NoDup_juggle.
+  rewrite app_assoc.
+  apply NoDup_swap2.
+  rewrite app_assoc.
+  apply NoDup_swap.
+  rewrite <- app_assoc.
+  rewrite app_assoc.
+  apply NoDup_swap2.
+  rewrite <- app_assoc.
   assumption.
 Defined.
 
@@ -839,22 +869,36 @@ Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
          (inactive  := x :: inactive st)
          (handled   := handled st);
   destruct st; simpl in *.
-(* jww (2014-09-13): NYI *)
-Admitted.
+  apply NoDup_swap.
+  rewrite app_comm_cons.
+  rewrite <- app_assoc.
+  rewrite <- app_assoc.
+  rewrite map_interval_distributes.
+  apply NoDup_juggle.
+  rewrite app_assoc.
+  rewrite app_assoc.
+  apply NoDup_swap.
+  rewrite <- app_assoc.
+  assumption.
+Defined.
 
 Definition addToActive (st : ScanState) (x : AssignedInterval)
-  (* (HU : ~ In (interval x) (isbs (unhandled st))) *)
-  (* (HI : ~ In (interval x) (map interval (inactive st))) *)
-  (* (HH : ~ In (interval x) (map interval (handled st))) *)
-  : ScanState.
+  (H : ~ In (interval x) (all_state_lists st)) : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := x :: active st)
          (inactive  := inactive st)
-         (handled   := handled st);
+         (handled   := handled st).
   destruct st; simpl in *.
-(* jww (2014-09-13): NYI *)
-Admitted.
+  unfold all_state_lists in *.
+  unfold all_state_lists0 in *.
+  unfold intervals in *. simpl in *.
+  apply NoDup_swap.
+  rewrite <- app_comm_cons.
+  apply NoDup_swap_cons.
+  apply NoDup_cons with (x := interval x).
+  assumption. assumption.
+Defined.
 
 Definition getRegisterIndex
   (k : AssignedInterval -> nat) (z : PhysReg -> option nat)
@@ -1028,7 +1072,7 @@ Function linearScan (st : ScanState)
        HANDLE_INTERVAL (current) *)
   match nextUnhandled st with
   | None => st
-  | Some (current, st') => linearScan (handleInterval current st')
+  | Some (current, p) => linearScan (handleInterval current p)
   end.
 Proof.
   (* Our goal is to prove that after every call to handleInterval, the total
