@@ -37,27 +37,6 @@ Section Elems.
 Variable a : Set.
 Variable cmp_eq_dec : forall x y : a, {x = y} + {x <> y}.
 
-(*
-Lemma not_in_list : forall x xs,
-  ~ In x xs -> count_occ cmp_eq_dec xs x = 0.
-Proof.
-  intros. induction xs; simpl; auto.
-  destruct (cmp_eq_dec a0 x); subst.
-    contradiction H. constructor. reflexivity.
-  apply IHxs.
-  unfold not in *. intros.
-  apply H. right. assumption.
-Qed.
-*)
-
-(*
-Lemma In_spec : forall (x : a) y xs, In x xs -> ~ In y xs -> y <> x.
-Proof.
-  unfold not in *. intros. subst.
-  contradiction.
-Qed.
-*)
-
 Function NoDup_from_list (l : list a) {measure length l} : option (NoDup l) :=
   match l with
   | nil => Some (NoDup_nil a)
@@ -1030,17 +1009,6 @@ Proof.
   unfold extentOfIntervals.
   unfold nextUnhandled in teq.
   unfold handleInterval.
-  (* induction (unhandled st); intros. *)
-  (*   destruct isbs0 eqn:Heqe; subst; simpl in *. *)
-  (*     apply S.min_elt_spec1 in Heqe. *)
-  (*     specialize (H e). *)
-  (*     contradiction. *)
-  (*   inversion teq. *)
-  (* (* At this point, we know that the list of unhandled intervals is not Empty, *)
-  (*    and we must show that the result of calling handleInterval reduces the *)
-  (*    total scope length. *) *)
-  (* destruct p. subst. *)
-  (* inversion teq0; subst. *)
 (* jww (2014-09-12): NYI *)
 Admitted.
 
