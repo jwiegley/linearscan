@@ -510,6 +510,12 @@ Definition anyRangeIntersects (is js : NonEmpty Range) : bool :=
     (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
     false (NE_to_list is).
 
+Definition rangeListStart (xs : NonEmpty Range) := rstart (NE_hd xs).
+Definition rangeListEnd   (xs : NonEmpty Range) := rend (NE_tl xs).
+
+Definition rangeListExtent (xs : NonEmpty Range) :=
+  rangeListEnd xs - rangeListStart xs.
+
 (** ** RangeList *)
 
 (** A [RangeList] encodes both the total extent of the list of ranges (the
@@ -521,12 +527,6 @@ Inductive RangeList : NonEmpty Range -> Set :=
   | RangeCons r rs :
     RangeList rs -> rend r <= rstart (NE_hd rs) -> RangeList (NE_Cons r rs).
 
-Definition rangeListStart `(RangeList xs) := rstart (NE_hd xs).
-Definition rangeListEnd   `(RangeList xs) := rend (NE_tl xs).
-
-Definition rangeListExtent `(rs : RangeList xs) :=
-  rangeListEnd rs - rangeListStart rs.
-
 (** ** UsePos *)
 
 (** A "use position", or [UsePos], identifies an exact point in the
@@ -534,11 +534,37 @@ Definition rangeListExtent `(rs : RangeList xs) :=
     requires the use of a physical register, then [regReq] is [true] for that
     use position. *)
 
-Record UsePos `(RangeList ranges) : Set := {
+Record UsePos : Set := {
   uloc   : nat;
-  regReq : bool;
+  regReq : bool
+}.
 
-  within_range : Exists (in_range uloc) (NE_to_list ranges)
+Definition UPcompare (x y : UsePos) : comparison :=
+  match nat_compare (uloc x) (uloc y) with
+  | Lt => Lt
+  | Gt => Gt
+  | Eq => if andb (regReq x) (regReq y)
+          then Eq
+          else if regReq y
+               then Lt
+               else Gt
+  end.
+
+Lemma UPcompare_eq_iff : forall (x y : UsePos), UPcompare x y = Eq <-> x = y.
+Proof.
+(* jww (2014-09-12): NYI *)
+Admitted.
+
+Lemma UPcompare_gt_flip : forall (x y : UsePos),
+  UPcompare x y = Gt -> UPcompare y x = Lt.
+Proof.
+(* jww (2014-09-12): NYI *)
+Admitted.
+
+Program Instance UsePos_CompareSpec : CompareSpec UsePos := {
+  cmp         := UPcompare;
+  cmp_eq_iff  := UPcompare_eq_iff;
+  cmp_gt_flip := UPcompare_gt_flip
 }.
 
 (** ** Interval *)
@@ -563,29 +589,20 @@ Record UsePos `(RangeList ranges) : Set := {
     the interval is split into two or more intervals, so each interval can be
     assigned its own register. *)
 
-Definition IntervalId := nat.
-
 Record Interval : Set := {
   ranges       : NonEmpty Range;
-  lifetimes    : RangeList ranges;
-  usePositions : NonEmpty (UsePos lifetimes)
+  usePositions : NonEmpty UsePos;
+
+  disjoint_lifetimes : RangeList ranges;
+
+  within_range :
+    Forall (fun u => Exists (in_range (uloc u)) (NE_to_list ranges))
+           (NE_to_list usePositions)
 }.
 
-Definition intervalStart  i := rangeListStart  (lifetimes i).
-Definition intervalEnd    i := rangeListEnd    (lifetimes i).
-Definition intervalExtent i := rangeListExtent (lifetimes i).
-
-Definition intervalRange (i : Interval) : Range.
-  apply Build_Range
-    with (rstart := intervalStart i)
-         (rend   := intervalEnd i).
-  unfold intervalStart, intervalEnd.
-  induction (lifetimes i).
-    apply range_properly_bounded.
-  destruct r0;
-  unfold rangeListStart, rangeListEnd in *;
-  destruct r; destruct r0; simpl in *; omega.
-Defined.
+Definition intervalStart  i := rangeListStart  (ranges i).
+Definition intervalEnd    i := rangeListEnd    (ranges i).
+Definition intervalExtent i := rangeListExtent (ranges i).
 
 Definition Icompare (x y : Interval) : comparison :=
   Rcompare (NE_hd (ranges x)) (NE_hd (ranges y)).
@@ -605,7 +622,8 @@ Qed.
 
 Lemma Icompare_eq_iff : forall x y : Interval, x ?= y = Eq <-> x = y.
 Proof.
-  split; intros.
+  split; intros. destruct x. destruct y.
+  unfold Icompare, Rcompare in *. simpl in *.
 (* jww (2014-09-12): NYI *)
 Admitted.
 
@@ -820,7 +838,10 @@ Proof.
   apply NoDup_swap_cons.
   apply NoDup_cons.
   admit. assumption.
-(* jww (2014-09-13): NYI *)
+(* jww (2014-09-13): NYI: We need to determine that [x] is not already a
+   member of the [ScanState].  We know it was removed from the [ScanState] by
+   [nextUnhandled], but it may have been split and the other parts added back
+   to the unhandled list, so we need to know that it's not going to recur. *)
 Admitted.
 
 Definition getRegisterIndex (st : ScanState) (k : Interval -> nat)
@@ -956,14 +977,13 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
        else if it does not cover position then
          move it from active to inactive *)
   let go1 x st :=
-    match intervalRange x with
-    | Build_Range s e Hb =>
-      if e <? position
-      then moveActiveToHandled st x
-      else if position <? s
-           then moveActiveToInactive st x
-           else st
-    end in
+    let s := intervalStart x in
+    let e := intervalEnd x in
+    if e <? position
+    then moveActiveToHandled st x
+    else if position <? s
+         then moveActiveToInactive st x
+         else st in
   let st1 := fold_right go1 st0 (active st0) in
 
   (* // check for intervals in inactive that are handled or active
