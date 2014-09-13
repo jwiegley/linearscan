@@ -11,11 +11,12 @@ Require Import Coq.Arith.EqNat.
 Require Import Coq.Init.Datatypes.
 Require Import Coq.Lists.List.
 Require Import Coq.Logic.ProofIrrelevance.
-Require Import Coq.MSets.MSets.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
+Require Import Coq.omega.Omega.
 Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Sorting.Sorting.
+Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
 (* Require Import FunctionalExtensionality. *)
 Require Import Recdef.
@@ -46,6 +47,36 @@ Qed.
 
 (** These definitions avoid boilerplate involved with setting up properly
     behaved comparisons between types. *)
+
+Definition is_eq (c : comparison) : bool :=
+  match c with
+    | Eq => true
+    | _  => false
+  end.
+
+Definition is_lt (c : comparison) : bool :=
+  match c with
+    | Lt => true
+    | _  => false
+  end.
+
+Definition is_le (c : comparison) : bool :=
+  match c with
+    | Gt => false
+    | _  => true
+  end.
+
+Definition is_gt (c : comparison) : bool :=
+  match c with
+    | Gt => true
+    | _  => false
+  end.
+
+Definition is_ge (c : comparison) : bool :=
+  match c with
+    | Lt => false
+    | _  => true
+  end.
 
 Lemma mk_compare_spec : forall {a} (x y : a)
   (cmp         : a -> a -> comparison)
@@ -127,8 +158,8 @@ Ltac reduce_nat_comparisons H :=
         apply nat_compare_gt
       end
 
-    | omega | inversion H; reflexivity | subst; auto
-    ]).
+    | omega | inversion H; reflexivity
+    ]); subst; auto.
 
 (** ** NonEmpty lists *)
 
@@ -444,21 +475,35 @@ Definition Icompare (x y : Interval) : comparison :=
 
 Infix "?=" := Icompare (at level 70, no associativity).
 
+Lemma Icompare_eq_refl : forall x, (x ?= x) = Eq.
+Proof.
+  intros. destruct x.
+  unfold Icompare, Rcompare. simpl.
+  induction ranges0; simpl; destruct a;
+  destruct (nat_compare rstart0 rstart0) eqn:Heqe;
+  try (apply nat_compare_eq_iff; reflexivity);
+  try (apply nat_compare_lt in Heqe; omega);
+  try (apply nat_compare_gt in Heqe; omega).
+Qed.
+
 Lemma Icompare_eq_iff : forall x y : Interval, x ?= y = Eq <-> x = y.
 Proof.
-  intros x.
-  induction x. destruct y.
-  unfold Icompare.
   split; intros.
-  - apply (@cmp_eq_iff _ Range_CompareSpec) in H.
-    simpl in H.
-    destruct ranges0.
-      destruct ranges1. simpl in H. subst.
-      destruct lifetimes0.
-      dependent destruction lifetimes1.
-      f_equal.
 (* jww (2014-09-12): NYI *)
 Admitted.
+
+Lemma Icompare_gt_contra : forall x y : Interval,
+  x ?= y = Gt -> y ?= x = Gt -> False.
+Proof.
+  intros. destruct x. destruct y.
+  unfold Icompare, Rcompare in *.
+  destruct ranges0 eqn:Heqr1; destruct r;
+  destruct ranges1 eqn:Heqr2; destruct r; simpl in *;
+  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
+  destruct (nat_compare rstart1 rstart0) eqn:Heqe2;
+  try solve [ reduce_nat_comparisons H ];
+  inversion H0.
+Qed.
 
 Lemma Icompare_gt_flip : forall x y : Interval, x ?= y = Gt -> y ?= x = Lt.
 Proof.
@@ -471,77 +516,11 @@ Program Instance Interval_CompareSpec : CompareSpec Interval := {
   cmp_gt_flip := Icompare_gt_flip
 }.
 
-Module Interval_as_OT <: OrderedType.
-
-  Definition t := Interval.
-  Definition compare := Icompare.
-
-  Definition eq := @eq Interval.
-  Definition lt := fun x y => x ?= y = Lt.
-
-  Instance eq_equiv : Equivalence eq := eq_equivalence.
-
-  Instance lt_strorder : StrictOrder lt.
-  Proof.
-    split.
-    - intro x. destruct x.
-      unfold complement. intros.
-      inversion H.
-  (* jww (2014-09-12): NYI *)
-  Admitted.
-
-  Instance lt_compat : Proper (eq==>eq==>iff) lt.
-  Proof. intros x x' Hx y y' Hy; rewrite Hx, Hy; split; auto. Qed.
-
-  Lemma compare_spec : forall x y, CompSpec eq lt x y (compare x y).
-  Proof. exact cmp_spec. Qed.
-
-  Definition eq_dec : forall x y, { eq x y } + { ~eq x y }.
-  Proof. exact cmp_eq_dec. Qed.
-
-End Interval_as_OT.
-
-Module S := MSetAVL.Make(Interval_as_OT).
-Module Import N := WPropertiesOn S.E S.
-
-Lemma elements_spec3 : forall s x, In x (S.elements s) <-> S.In x s.
-Proof.
-  split; intros.
-  - apply S.elements_spec1.
-    apply InA_alt.
-    exists x.
-    split. reflexivity.
-    assumption.
-  - apply S.elements_spec1 in H.
-    apply InA_alt in H.
-    destruct H.
-    inversion H.
-    rewrite H0.
-    assumption.
-Qed.
-
-Lemma remove_over_not : forall x e s, ~ S.In x s -> ~ S.In x (S.remove e s).
-Proof.
-  intros. unfold not in *. intros.
-  apply H. apply S.remove_spec in H0.
-  inversion H0. assumption.
-Qed.
-
-Definition intSet : Type := S.t.  (* the type of a set of intervals *)
-
-Definition intSetExtent (is : intSet) : nat :=
-  S.fold (fun x n => n + intervalExtent x) is 0.
-
 Module IntervalOrder <: TotalLeBool.
   Definition t := Interval.
 
-  Definition leb (x y : Interval) : bool.
-  Proof.
-    destruct (cmp x y) eqn:Heqe.
-    - apply true.
-    - apply true.
-    - apply false.
-  Defined.
+  Definition leb (x y : Interval) : bool := is_le (cmp x y).
+  Definition leb_true x y := is_true (leb x y).
 
   Theorem leb_total : forall (a1 a2 : Interval),
     leb a1 a2 = true \/ leb a2 a1 = true.
@@ -555,11 +534,10 @@ Module IntervalOrder <: TotalLeBool.
   Qed.
 End IntervalOrder.
 
-Definition leb_true x y := is_true (IntervalOrder.leb x y).
 
 Record IntervalsSortedByStart := {
   isbs : list Interval;
-  isbs_ordered : LocallySorted leb_true isbs
+  isbs_ordered : LocallySorted IntervalOrder.leb_true isbs
 }.
 
 Definition extentOfIntervals (is : IntervalsSortedByStart) : nat :=
@@ -596,21 +574,47 @@ Record AssignedInterval : Set := {
   assigned : PhysReg            (* assigned register *)
 }.
 
-Definition AIcompare (x y : AssignedInterval) : comparison.
-(* jww (2014-09-12): NYI *)
-Admitted.
+Definition AIcompare (x y : AssignedInterval) : comparison :=
+  match interval x ?= interval y with
+    | Eq => fin_compare (assigned x) (assigned y)
+    | Lt => Lt
+    | Gt => Gt
+  end.
 
 Lemma AIcompare_eq_iff : forall x y : AssignedInterval,
   AIcompare x y = Eq <-> x = y.
 Proof.
-(* jww (2014-09-12): NYI *)
-Admitted.
+  split; intros;
+  unfold AIcompare in *;
+  destruct (interval x ?= interval y) eqn:Heqe;
+  destruct x; destruct y; inversion H; subst;
+    try (inversion Heqe;
+         apply Icompare_eq_iff; reflexivity).
+  - apply fin_compare_eq_iff in H.
+    apply Icompare_eq_iff in Heqe.
+    simpl in *. subst. reflexivity.
+  - apply fin_compare_eq_iff. reflexivity.
+Qed.
 
 Lemma AIcompare_gt_flip : forall x y : AssignedInterval,
   AIcompare x y = Gt -> AIcompare y x = Lt.
 Proof.
-(* jww (2014-09-12): NYI *)
-Admitted.
+  intros.
+  unfold AIcompare in *.
+  destruct x. destruct y. simpl in *.
+  destruct (interval0 ?= interval1) eqn:Heqe;
+  destruct (interval1 ?= interval0) eqn:Heqe2; auto.
+  - apply fin_compare_gt_flip. assumption.
+  - apply Icompare_eq_iff in Heqe. subst.
+    rewrite Icompare_eq_refl in Heqe2.
+    inversion Heqe2.
+  - inversion H.
+  - apply Icompare_eq_iff in Heqe2. subst.
+    rewrite Icompare_eq_refl in Heqe.
+    inversion Heqe.
+  - pose (Icompare_gt_contra _ _ Heqe Heqe2).
+    exfalso. apply f.
+Qed.
 
 Program Instance AssignedInterval_CompareSpec
   : CompareSpec AssignedInterval := {
@@ -629,6 +633,22 @@ Definition intervalRange (i : AssignedInterval) : Range.
   destruct r0;
   unfold rangeListStart, rangeListEnd in *;
   destruct r; destruct r0; simpl in *; omega.
+Qed.
+
+Theorem AI_remove_In : forall (l : list AssignedInterval) x,
+  ~ In (interval x) (map interval (remove cmp_eq_dec x l)).
+Proof.
+  induction l as [|x l]; auto.
+  intro y; simpl;
+  destruct (cmp_eq_dec y x) as [yeqx | yneqx]; simpl.
+    apply IHl.
+  unfold not in *. intros.
+  destruct H.
+    destruct x. destruct y.
+    simpl in H. subst.
+    apply yneqx. f_equal.
+    admit.                      (* jww (2014-09-13): NYI *)
+  apply (IHl y); assumption.
 Qed.
 
 (** ** ScanState *)
@@ -691,11 +711,23 @@ Defined.
 
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
   : ScanState.
+Proof.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := remove cmp_eq_dec x (active st))
          (inactive  := inactive st)
-         (handled   := x :: handled st).
+         (handled   := x :: handled st);
+  destruct st; destruct x; simpl in *;
+  unfold no_overlap in *; intros;
+  specialize (no_overlap_unhandled0 x);
+  specialize (no_overlap_actives0 x);
+  specialize (no_overlap_handled0 x).
+  - inversion no_overlap_unhandled0.
+      left. assumption.
+    right. unfold intervals0 in *.
+    admit.
+  - admit.
+  - admit.
 (* jww (2014-09-12): NYI *)
 Admitted.
 
