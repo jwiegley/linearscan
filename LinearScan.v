@@ -76,6 +76,22 @@ Proof.
   assumption.
 Qed.
 
+Definition find_in (n : a) (l : list a) : {In n l} + {~ In n l}.
+Proof.
+  induction l as [| x xs].
+    right. auto.
+  destruct (cmp_eq_dec n x).
+    subst. left. apply in_eq.
+  inversion IHxs.
+    left. apply in_cons.
+    assumption.
+  right. unfold not in *.
+  intros. apply in_inv in H0.
+  inversion H0.
+     symmetry in H1. contradiction.
+  contradiction.
+Defined.
+
 End Elems.
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
@@ -741,10 +757,10 @@ Proof.
   simpl in *.
   apply NoDup_uncons in lists_are_unique0.
   assumption.
-Qed.
+Defined.
 
 Definition moveActiveToHandled (st : ScanState) (x : AssignedInterval)
-  (H : In x (active st)) : ScanState.
+  (* (H : In x (active st)) *) : ScanState.
 Proof.
   apply Build_ScanState
     with (unhandled := unhandled st)
@@ -756,7 +772,7 @@ Proof.
 Admitted.
 
 Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
-  (H : ~ In x (inactive st)) : ScanState.
+  (* (H : In x (active st)) *) : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
          (active    := remove cmp_eq_dec x (active st))
@@ -767,9 +783,9 @@ Definition moveActiveToInactive (st : ScanState) (x : AssignedInterval)
 Admitted.
 
 Definition addToActive (st : ScanState) (x : AssignedInterval)
-  (HU : ~ In (interval x) (isbs (unhandled st)))
-  (HI : ~ In (interval x) (map interval (inactive st)))
-  (HH : ~ In (interval x) (map interval (handled st)))
+  (* (HU : ~ In (interval x) (isbs (unhandled st))) *)
+  (* (HI : ~ In (interval x) (map interval (inactive st))) *)
+  (* (HH : ~ In (interval x) (map interval (handled st))) *)
   : ScanState.
   apply Build_ScanState
     with (unhandled := unhandled st)
@@ -912,9 +928,9 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
     match intervalRange x with
     | Build_Range s e Hb =>
       if e <? position
-      then moveActiveToHandled st x _
+      then moveActiveToHandled st x
       else if position <? s
-           then moveActiveToInactive st x _
+           then moveActiveToInactive st x
            else st
     end in
   let st1 := fold_right go1 st0 (active st0) in
@@ -942,7 +958,7 @@ Definition handleInterval (current : Interval) (st0 : ScanState) : ScanState :=
        add current to active *)
   match mres with
   | None => st3
-  | Some current' => addToActive st3 current' _ _ _
+  | Some current' => addToActive st3 current'
   end.
 
 Function linearScan (st : ScanState)
@@ -995,14 +1011,10 @@ Admitted.
 
 Definition allocateRegisters (maxReg : nat) (H : maxReg > 0)
   (g : Graph VirtReg) : option (list (AssignedInterval maxReg)) :=
-  let is := sort (determineIntervals g) in
-  match NoDup_from_list is with
+  let mres := sortIntervals (determineIntervals g) in
+  match mres with
   | None => None
-  | Some l =>
-      let xs := {| isbs := is
-                 ; isbs_unique := l
-                 ; isbs_ordered := l
-                 |} in
+  | Some is =>
       let st := newScanState maxReg is in
-      handled maxReg (linearScan maxReg H st).
+      Some (handled maxReg (linearScan maxReg H st))
   end.
