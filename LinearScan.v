@@ -15,6 +15,7 @@ Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.omega.Omega.
 Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
+Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
@@ -147,6 +148,57 @@ Proof.
 Qed.
 
 End Elems.
+
+Theorem Permutation_not_in : forall {A} {l l' : list A} (x : A),
+ Permutation l l' -> ~ In x l -> ~ In x l'.
+Proof.
+  intros A l l' x Hperm; induction Hperm; simpl; tauto.
+Qed.
+
+Lemma not_in_uncons : forall {A} x y (l : list A), ~ In y (x :: l) -> ~ In y l.
+Proof.
+  unfold not. intros.
+  apply H.
+  apply in_cons. assumption.
+Qed.
+
+Lemma NoDup_perm : forall (a : Set) (xs ys : list a),
+  Permutation xs ys -> NoDup xs -> NoDup ys.
+Proof.
+  intros.
+  induction H; intros.
+  - constructor.
+  - apply (Permutation_not_in x) in H.
+      apply NoDup_cons. assumption.
+      apply NoDup_uncons in H0.
+      apply IHPermutation.
+      assumption.
+    inversion H0. assumption.
+  - inversion H0; subst.
+    inversion H3; subst.
+    apply NoDup_cons.
+      unfold not in *. intros.
+      apply in_inv in H.
+      destruct H.
+        subst. apply H2.
+        constructor. reflexivity.
+      apply H4. assumption.
+    apply not_in_uncons in H2.
+    apply NoDup_cons; assumption.
+  - auto.
+Qed.
+
+(*
+Module Import MergeSort := Sort NatOrder.
+
+Lemma NoDup_sorted : forall xs, NoDup xs -> NoDup (sort xs).
+Proof.
+  intros.
+  apply (NoDup_perm _ xs).
+  apply Permuted_sort.
+  assumption.
+Qed.
+*)
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
@@ -628,100 +680,6 @@ Definition intervalEnd   `(i : Interval rs) : nat := rend (NE_tl rs).
 Definition intervalExtent `(i : Interval rs) :=
   intervalEnd i - intervalStart i.
 
-(*
-Definition Icompare (x y : Interval) : comparison :=
-  Rcompare (NE_hd (ranges x)) (NE_hd (ranges y)).
-
-Infix "?=" := Icompare (at level 70, no associativity).
-
-Lemma Icompare_eq_refl : forall x, (x ?= x) = Eq.
-Proof.
-  intros. destruct x.
-  unfold Icompare, Rcompare. simpl.
-  induction ranges0; simpl; destruct a;
-  destruct (nat_compare rstart0 rstart0) eqn:Heqe;
-  try (apply nat_compare_eq_iff; reflexivity);
-  try (apply nat_compare_lt in Heqe; omega);
-  try (apply nat_compare_gt in Heqe; omega).
-Qed.
-
-Lemma Icompare_eq_iff : forall x y : Interval, x ?= y = Eq <-> x = y.
-Proof.
-  split; intros. destruct x. destruct y.
-  unfold Icompare, Rcompare in *. simpl in *.
-Admitted.
-
-Lemma Icompare_gt_contra : forall x y : Interval,
-  x ?= y = Gt -> y ?= x = Gt -> False.
-Proof.
-  intros. destruct x. destruct y.
-  unfold Icompare, Rcompare in *.
-  destruct ranges0 eqn:Heqr1; destruct r;
-  destruct ranges1 eqn:Heqr2; destruct r; simpl in *;
-  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
-  destruct (nat_compare rstart1 rstart0) eqn:Heqe2;
-  try solve [ reduce_nat_comparisons H ];
-  inversion H0.
-Qed.
-
-Lemma Icompare_gt_flip : forall x y : Interval, x ?= y = Gt -> y ?= x = Lt.
-Proof.
-Admitted.
-
-Program Instance Interval_CompareSpec : CompareSpec Interval := {
-  cmp         := Icompare;
-  cmp_eq_iff  := Icompare_eq_iff;
-  cmp_gt_flip := Icompare_gt_flip
-}.
-
-Module IntervalOrder <: TotalLeBool.
-  Definition t := Interval.
-
-  Definition leb (x y : Interval) : bool := is_le (cmp x y).
-  Definition leb_true x y := is_true (leb x y).
-
-  Theorem leb_total : forall (a1 a2 : Interval),
-    leb a1 a2 = true \/ leb a2 a1 = true.
-  Proof.
-    intros. unfold leb.
-    destruct (cmp a1 a2) eqn:Heqe.
-    - left. reflexivity.
-    - left. reflexivity.
-    - right. apply cmp_gt_flip in Heqe.
-      rewrite Heqe. reflexivity.
-  Qed.
-End IntervalOrder.
-
-
-Record IntervalsSortedByStart := {
-  isbs : list Interval;
-  isbs_unique : NoDup isbs;
-  isbs_ordered : LocallySorted IntervalOrder.leb_true isbs
-}.
-
-Module Import MergeSort := Sort IntervalOrder.
-
-Lemma NoDup_sorted : forall xs, NoDup xs -> NoDup (sort xs).
-Proof.
-Admitted.
-
-Definition sortIntervals (xs : list Interval) : option IntervalsSortedByStart.
-Proof.
-  pose (NoDup_from_list _ cmp_eq_dec xs).
-  destruct o.
-  - apply Some.
-    apply Build_IntervalsSortedByStart
-      with (isbs := sort xs).
-    + induction n.
-      * compute. apply NoDup_nil.
-      * apply NoDup_sorted.
-        apply NoDup_cons; assumption.
-    + apply Sorted_LocallySorted_iff.
-      apply LocallySorted_sort.
-  - apply None.
-Defined.
-*)
-
 (****************************************************************************)
 
 (** * Main algorithm *)
@@ -795,18 +753,16 @@ Defined.
    move and merely an insertion in [handled st].  However, attempts to do so
    have proved complicated. The real problem is that [remove] is fine with
    being requested to remove a non-member. *)
-Definition moveActiveToHandled `(x : IntervalId st)
-  : { st0 : ScanState | nextInterval st = nextInterval st0 }.
+Definition moveActiveToHandled `(x : IntervalId st) : ScanState.
 Proof.
   destruct st.
-  eexists {| unhandled   := unhandled0
-           ; active      := remove cmp_eq_dec x active0
-           ; inactive    := inactive0
-           ; handled     := x :: handled0
-           ; getInterval := getInterval0
-           ; assignments := assignments0
-           |}.
-    reflexivity.
+  eapply {| unhandled   := unhandled0
+          ; active      := remove cmp_eq_dec x active0
+          ; inactive    := inactive0
+          ; handled     := x :: handled0
+          ; getInterval := getInterval0
+          ; assignments := assignments0
+          |}.
     Grab Existential Variables.
   apply NoDup_swap.
   rewrite <- app_assoc.
@@ -825,18 +781,16 @@ Proof.
   assumption.
 Defined.
 
-Definition moveActiveToInactive `(x : IntervalId st)
-  : { st0 : ScanState | nextInterval st = nextInterval st0 }.
+Definition moveActiveToInactive `(x : IntervalId st) : ScanState.
 Proof.
   destruct st.
-  eexists {| unhandled   := unhandled0
-           ; active      := remove cmp_eq_dec x active0
-           ; inactive    := x :: inactive0
-           ; handled     := handled0
-           ; getInterval := getInterval0
-           ; assignments := assignments0
-           |}.
-    reflexivity.
+  eapply {| unhandled   := unhandled0
+          ; active      := remove cmp_eq_dec x active0
+          ; inactive    := x :: inactive0
+          ; handled     := handled0
+          ; getInterval := getInterval0
+          ; assignments := assignments0
+          |}.
     Grab Existential Variables.
   apply NoDup_swap.
   rewrite <- app_assoc.
@@ -849,7 +803,7 @@ Proof.
   assumption.
 Defined.
 
-Record AllocateResult := {
+Record IntervalDesc := {
     resultState       : ScanState;
     currentRanges     : NonEmpty RangeDesc;
     currentIntervalId : IntervalId resultState;
@@ -860,7 +814,7 @@ Record AllocateResult := {
    know it was removed from the [ScanState] by [nextUnhandled], but it may
    have been split and the other parts added back to the unhandled list, so we
    need to know that it's not going to recur. *)
-Definition addToActive (result : AllocateResult) (reg : PhysReg)
+Definition addToActive (result : IntervalDesc) (reg : PhysReg)
    (H : ~ In (currentIntervalId result)
              (all_state_lists (resultState result))) : ScanState.
 Proof.
@@ -928,7 +882,7 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
 
 Definition tryAllocateFreeReg (st : ScanState)
   (currentId : IntervalId st) `(current : Interval rs)
-  : option (PhysReg * AllocateResult) :=
+  : option (PhysReg * IntervalDesc) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -984,7 +938,7 @@ Definition tryAllocateFreeReg (st : ScanState)
     type differs from [tryAllocateFreeReg], since in all cases the final state
     is changed. *)
 Definition allocateBlockedReg (st : ScanState) `(current : Interval rs)
-  : option PhysReg * AllocateResult.
+  : option PhysReg * IntervalDesc.
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -1023,24 +977,62 @@ Defined.
 (* Given a starting ScanState (at which point, st = st0), walk through the
    list of active intervals and mutate st0 until it reflects the desired end
    state. *)
-Fixpoint checkActiveIntervals st (is : list (IntervalId st)) pos
-  : { st' : ScanState | nextInterval st = nextInterval st' } :=
-  let fix go st st0 (H : nextInterval st = nextInterval st0)
-             (is : list (IntervalId st)) (pos : nat) :=
+Fixpoint checkActiveIntervals st pos : ScanState :=
+  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
     match is with
-    | nil => exist _ st0 H
+    | nil => st0
     | x :: xs =>
         let i := projT2 (getInterval st x) in
-        let x0 := transportId (Nat.eq_le_incl _ _ H) x in
-        let s := if intervalEnd i <? pos
-                 then moveActiveToHandled x0
-                 else if pos <? intervalStart i
-                      then moveActiveToInactive x0
-                      else exist _ st0 eq_refl in
-        go st (proj1_sig s)
-          (eq_trans H (proj2_sig s)) xs pos
+        let x0 := transportId (Nat.eq_le_incl _ _ eq_refl) x in
+        let st1 := if intervalEnd i <? pos
+                   then moveActiveToHandled x0
+                   else if pos <? intervalStart i
+                        then moveActiveToInactive x0
+                        else st0 in
+        go st st1 xs pos
     end in
-  go st st eq_refl is pos.
+  go st st (active st) pos.
+
+Theorem fin_list_cons : forall n (x : fin n) (l : list (fin n)),
+  ~ In x l -> NoDup l -> length l < n.
+Proof.
+  intros.
+  induction H0.
+    destruct n. inversion x.
+    simpl. omega.
+Admitted.
+
+Theorem fin_list : forall n (l : list (fin n)), NoDup l <-> length l <= n.
+Proof.
+Admitted.
+
+Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
+Proof.
+  destruct st. simpl.
+  unfold all_state_lists0 in *.
+  inversion lists_are_unique0.
+    symmetry in H0.
+    repeat (apply app_eq_nil in H0; destruct H0).
+    subst. destruct nextInterval0; simpl; omega.
+  
+
+Lemma checkActiveIntervals_spec : forall st st0 pos,
+  st0 = checkActiveIntervals st pos -> nextInterval st = nextInterval st0.
+Proof.
+  intros.
+  destruct st.
+  destruct st0.
+  rewrite H. simpl.
+  destruct active0 eqn:Heqe.
+    inversion H; simpl; auto.
+(*
+  unfold moveActiveToHandled.
+  unfold moveActiveToInactive.
+  unfold checkActiveIntervals. simpl.
+  f_equal. intros. simpl.
+  reflexivity.
+*)
+Admitted.
 
 Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
   (* position = start position of current *)
@@ -1053,7 +1045,7 @@ Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
          move it from active to handled
        else if it does not cover position then
          move it from active to inactive *)
-  let st1S := checkActiveIntervals st0 (active st0) position in
+  let st1 := checkActiveIntervals st0 position in
 
   (* // check for intervals in inactive that are handled or active
      for each interval it in inactive do
@@ -1062,17 +1054,17 @@ Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
        else if it covers position then
          move it from inactive to active *)
   let go2 x st := st in         (* jww (2014-09-12): NYI *)
-  let st2S := fold_right go2 st1S (inactive (projT1 st1S)) in
+  let st2 := fold_right go2 st1 (inactive st1) in
 
   (* // find a register for current
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
-  let cid2 := transportId (Nat.eq_le_incl _ _ (projT2 st2S)) currentId in
+  let cid2 := transportId (Nat.eq_le_incl _ _ (eq_trans (checkActiveIntervals_spec st0 st1 position eq_refl) eq_refl)) currentId in
   let (mreg, result) :=
-      match tryAllocateFreeReg (projT1 st2S) cid2 current with
+      match tryAllocateFreeReg st2 cid2 current with
       | Some (reg, st') => (Some reg, st')
-      | None => allocateBlockedReg (projT1 st2S) current
+      | None => allocateBlockedReg st2 current
       end in
 
   (* if current has a register assigned then
