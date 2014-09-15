@@ -24,6 +24,8 @@ Require Import Recdef.
 
 Module Import LN := ListNotations.
 
+Infix "$" := apply (at level 90, right associativity) : program_scope.
+
 Open Scope program_scope.
 
 Generalizable All Variables.
@@ -514,7 +516,7 @@ Definition fin_Sn_inv {n:nat} (P : fin (S n) -> Type)
   fun x =>
     match x in (t Sn) return
       (match Sn return (fin Sn -> Type) with
-       | 0 => fun _ => unit
+       | 0 => const unit
        | S n' => fun x => forall (P : fin (S n') -> Type),
          P F1 -> (forall y : fin n', P (FS y)) ->
          P x
@@ -524,7 +526,7 @@ Definition fin_Sn_inv {n:nat} (P : fin (S n) -> Type)
     end P PO PS.
 
 Definition FS_inv {n} (x : fin (S n)) : option (fin n) :=
-  fin_Sn_inv (fun _ => option (fin n)) None (@Some _) x.
+  fin_Sn_inv (const (option (fin n))) None (@Some _) x.
 
 Definition map_FS_inv {n:nat} (l : list (fin (S n))) : list (fin n) :=
   catMaybes (map FS_inv l).
@@ -850,7 +852,7 @@ Program Definition newScanState
                   ; active       := nil
                   ; inactive     := nil
                   ; handled      := nil
-                  ; assignments  := fun _ => None
+                  ; assignments  := const None
                   |}.
 Obligation 1. inversion H. Defined.
 Obligation 2. constructor. Defined.
@@ -1045,7 +1047,7 @@ Definition tryAllocateFreeReg (st : ScanState)
      for each interval it in active do
        freeUntilPos[it.reg] = 0 *)
   let freeUntilPos' :=
-        getRegisterIndex st (fun _ => 0) (fun r => None) (active st) in
+        getRegisterIndex st (const 0) (const None) (active st) in
 
   (* for each interval it in inactive intersecting with current do
        freeUntilPos[it.reg] = next intersection of it with current *)
