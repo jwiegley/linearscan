@@ -993,28 +993,24 @@ Fixpoint checkActiveIntervals st pos : ScanState :=
     end in
   go st st (active st) pos.
 
-Theorem fin_list_cons : forall n (x : fin n) (l : list (fin n)),
-  ~ In x l -> NoDup l -> length l < n.
+Theorem fin_list : forall n (l : list (fin n)), NoDup l -> length l <= n.
 Proof.
   intros.
-  induction H0.
-    destruct n. inversion x.
-    simpl. omega.
-Admitted.
-
-Theorem fin_list : forall n (l : list (fin n)), NoDup l <-> length l <= n.
-Proof.
+  induction H; simpl. omega.
+  
 Admitted.
 
 Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
 Proof.
   destruct st. simpl.
-  unfold all_state_lists0 in *.
-  inversion lists_are_unique0.
-    symmetry in H0.
-    repeat (apply app_eq_nil in H0; destruct H0).
-    subst. destruct nextInterval0; simpl; omega.
-  
+  unfold all_state_lists0 in lists_are_unique0.
+  compute.
+  apply NoDup_unapp in lists_are_unique0.
+  apply NoDup_swap in lists_are_unique0.
+  apply NoDup_unapp in lists_are_unique0.
+  apply fin_list in lists_are_unique0.
+  auto.
+Qed.
 
 Lemma checkActiveIntervals_spec : forall st st0 pos,
   st0 = checkActiveIntervals st pos -> nextInterval st = nextInterval st0.
