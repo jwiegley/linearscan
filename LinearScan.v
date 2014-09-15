@@ -260,11 +260,13 @@ Defined.
 (** These definitions avoid boilerplate involved with setting up properly
     behaved comparisons between types. *)
 
+(*
 Definition is_le (c : comparison) : bool :=
   match c with
     | Gt => false
     | _  => true
   end.
+*)
 
 Lemma mk_compare_spec : forall {a} (x y : a)
   (cmp         : a -> a -> comparison)
@@ -308,6 +310,7 @@ Class CompareSpec (a : Set) := {
     mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
 
+(*
 Ltac reduce_nat_comparisons H :=
   repeat (first
     [ match goal with
@@ -348,6 +351,7 @@ Ltac reduce_nat_comparisons H :=
 
     | omega | inversion H; reflexivity
     ]); subst; auto.
+*)
 
 (** ** NonEmpty lists *)
 
@@ -618,6 +622,7 @@ Record UsePos : Set := {
   regReq : bool
 }.
 
+(*
 Definition UPcompare (x y : UsePos) : comparison :=
   match nat_compare (uloc x) (uloc y) with
   | Lt => Lt
@@ -640,6 +645,7 @@ Program Instance UsePos_CompareSpec : CompareSpec UsePos := {
   cmp_eq_iff  := UPcompare_eq_iff;
   cmp_gt_flip := UPcompare_gt_flip
 }.
+*)
 
 (** ** Range *)
 
