@@ -13,6 +13,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 Require Import Coq.omega.Omega.
+Require Import Coq.Program.Basics.
 Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Sorting.Permutation.
@@ -22,6 +23,8 @@ Require Import Coq.Vectors.Fin.
 Require Import Recdef.
 
 Module Import LN := ListNotations.
+
+Open Scope program_scope.
 
 Generalizable All Variables.
 
@@ -1149,28 +1152,6 @@ Fixpoint checkActiveIntervals st pos : ScanState :=
     end in
   go st st (active st) pos.
 
-Fixpoint checkInactiveIntervals st pos : ScanState :=
-  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
-    match is with
-    | nil => st0
-    | x :: xs =>
-        (* // check for intervals in inactive that are handled or active
-           for each interval it in inactive do
-             if it ends before position then
-               move it from inactive to handled
-             else if it covers position then
-               move it from inactive to active *)
-        let i := projT2 (getInterval st x) in
-        let x0 := transportId (Nat.eq_le_incl _ _ eq_refl) x in
-        let st1 := if intervalEnd i <? pos
-                   then moveInactiveToHandled x0
-                   else if intervalCoversPos i pos
-                        then moveInactiveToActive x0
-                        else st0 in
-        go st st1 xs pos
-    end in
-  go st st (inactive st) pos.
-
 Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
 Proof.
   destruct st. simpl.
@@ -1200,6 +1181,28 @@ Proof.
   reflexivity.
 *)
 Admitted.
+
+Fixpoint checkInactiveIntervals st pos : ScanState :=
+  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
+    match is with
+    | nil => st0
+    | x :: xs =>
+        (* // check for intervals in inactive that are handled or active
+           for each interval it in inactive do
+             if it ends before position then
+               move it from inactive to handled
+             else if it covers position then
+               move it from inactive to active *)
+        let i := projT2 (getInterval st x) in
+        let x0 := transportId (Nat.eq_le_incl _ _ eq_refl) x in
+        let st1 := if intervalEnd i <? pos
+                   then moveInactiveToHandled x0
+                   else if intervalCoversPos i pos
+                        then moveInactiveToActive x0
+                        else st0 in
+        go st st1 xs pos
+    end in
+  go st st (inactive st) pos.
 
 Lemma checkInactiveIntervals_spec : forall st st0 pos,
   st0 = checkInactiveIntervals st pos -> nextInterval st = nextInterval st0.
@@ -1278,9 +1281,8 @@ Function linearScan (st : ScanState) {measure unhandledExtent st}
   | Some p => linearScan (handleInterval (projT2 p))
   end.
 Proof.
-  (* Our goal is to prove that after every call to handleInterval, the total
-     scope of the remaining unhandled intervals is less than it was before,
-     narrowing down to zero. *)
+  (* We must prove that after every call to handleInterval, the total extent
+     of the remaining unhandled intervals is less than it was before. *)
   intros.
   unfold unhandledExtent.
   unfold intervalExtent.
@@ -1313,7 +1315,7 @@ Class Graph (a : Set) := {}.
 Definition determineIntervals (g : Graph VirtReg) : ScanState.
 Admitted.
 
-Definition allocateRegisters (g : Graph VirtReg) : ScanState :=
-  linearScan (determineIntervals g).
+Definition allocateRegisters : Graph VirtReg -> ScanState :=
+  linearScan ∘ determineIntervals.
 
 End Allocator.
