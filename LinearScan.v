@@ -728,8 +728,10 @@ Program Instance Range_CompareSpec : CompareSpec Range := {
 }.
 *)
 
+(*
 Definition in_range (loc : nat) `(r : Range d) : Prop :=
   rbeg d <= loc /\ loc < rend d.
+*)
 
 Definition rangesIntersect `(x : RangeDesc) `(y : RangeDesc) : bool :=
   if rbeg x <? rbeg y then rbeg y <? rend x else rbeg x <? rend y.
@@ -793,6 +795,9 @@ Inductive Interval : NonEmpty RangeDesc -> Set :=
 
 Definition intervalStart `(i : Interval rs) : nat := rbeg (NE_hd rs).
 Definition intervalEnd   `(i : Interval rs) : nat := rend (NE_tl rs).
+
+Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
+  andb (intervalStart i <=? pos) (pos <? intervalEnd i).
 
 Definition intervalExtent `(i : Interval rs) :=
   intervalEnd i - intervalStart i.
@@ -921,6 +926,32 @@ Proof.
   rewrite <- app_assoc.
   assumption.
 Defined.
+
+Definition moveInactiveToHandled `(x : IntervalId st) : ScanState.
+Proof.
+  destruct st.
+  eapply {| unhandled   := unhandled0
+          ; active      := active0
+          ; inactive    := remove cmp_eq_dec x inactive0
+          ; handled     := x :: handled0
+          ; getInterval := getInterval0
+          ; assignments := assignments0
+          |}.
+    Grab Existential Variables.
+Admitted.
+
+Definition moveInactiveToActive `(x : IntervalId st) : ScanState.
+Proof.
+  destruct st.
+  eapply {| unhandled   := unhandled0
+          ; active      := x :: active0
+          ; inactive    := remove cmp_eq_dec x inactive0
+          ; handled     := handled0
+          ; getInterval := getInterval0
+          ; assignments := assignments0
+          |}.
+    Grab Existential Variables.
+Admitted.
 
 Record IntervalDesc := {
     resultState       : ScanState;
@@ -1101,16 +1132,44 @@ Fixpoint checkActiveIntervals st pos : ScanState :=
     match is with
     | nil => st0
     | x :: xs =>
+        (* // check for intervals in active that are handled or inactive
+           for each interval it in active do
+             if it ends before position then
+               move it from active to handled
+             else if it does not cover position then
+               move it from active to inactive *)
         let i := projT2 (getInterval st x) in
         let x0 := transportId (Nat.eq_le_incl _ _ eq_refl) x in
         let st1 := if intervalEnd i <? pos
                    then moveActiveToHandled x0
-                   else if pos <? intervalStart i
+                   else if negb (intervalCoversPos i pos)
                         then moveActiveToInactive x0
                         else st0 in
         go st st1 xs pos
     end in
   go st st (active st) pos.
+
+Fixpoint checkInactiveIntervals st pos : ScanState :=
+  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
+    match is with
+    | nil => st0
+    | x :: xs =>
+        (* // check for intervals in inactive that are handled or active
+           for each interval it in inactive do
+             if it ends before position then
+               move it from inactive to handled
+             else if it covers position then
+               move it from inactive to active *)
+        let i := projT2 (getInterval st x) in
+        let x0 := transportId (Nat.eq_le_incl _ _ eq_refl) x in
+        let st1 := if intervalEnd i <? pos
+                   then moveInactiveToHandled x0
+                   else if intervalCoversPos i pos
+                        then moveInactiveToActive x0
+                        else st0 in
+        go st st1 xs pos
+    end in
+  go st st (inactive st) pos.
 
 Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
 Proof.
@@ -1142,6 +1201,24 @@ Proof.
 *)
 Admitted.
 
+Lemma checkInactiveIntervals_spec : forall st st0 pos,
+  st0 = checkInactiveIntervals st pos -> nextInterval st = nextInterval st0.
+Proof.
+  intros.
+  destruct st.
+  destruct st0.
+  rewrite H. simpl.
+  destruct active0 eqn:Heqe.
+    inversion H; simpl; auto.
+(*
+  unfold moveActiveToHandled.
+  unfold moveActiveToInactive.
+  unfold checkActiveIntervals. simpl.
+  f_equal. intros. simpl.
+  reflexivity.
+*)
+Admitted.
+
 Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
   (* position = start position of current *)
   let current  := projT2 (getInterval st0 currentId) in
@@ -1154,6 +1231,7 @@ Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
        else if it does not cover position then
          move it from active to inactive *)
   let st1 := checkActiveIntervals st0 position in
+  let Heq := checkActiveIntervals_spec st0 st1 position eq_refl in
 
   (* // check for intervals in inactive that are handled or active
      for each interval it in inactive do
@@ -1161,14 +1239,15 @@ Definition handleInterval `(currentId : IntervalId st0) : ScanState :=
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let go2 x st := st in         (* jww (2014-09-12): NYI *)
-  let st2 := fold_right go2 st1 (inactive st1) in
+  let st2 := checkInactiveIntervals st1 position in
+  let Heq2 := checkInactiveIntervals_spec st1 st2 position eq_refl in
 
   (* // find a register for current
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
-  let cid2 := transportId (Nat.eq_le_incl _ _ (eq_trans (checkActiveIntervals_spec st0 st1 position eq_refl) eq_refl)) currentId in
+  let cid2 := transportId (Nat.eq_le_incl _ _ (eq_trans Heq Heq2))
+                          currentId in
   let (mreg, result) :=
       match tryAllocateFreeReg st2 cid2 current with
       | Some (reg, st') => (Some reg, st')
@@ -1212,7 +1291,8 @@ Proof.
   unfold IntervalId0 in *.
   unfold all_state_lists0 in *.
   destruct p. simpl.
-  specialize (IHunhandled0 (NoDup_uncons _ _ _ lists_are_unique0)).
+  inversion lists_are_unique0.
+  specialize (IHunhandled0 H2).
   destruct x. inversion teq.
   unfold IntervalId1 in *.
   destruct a; simpl in *.
