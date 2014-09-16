@@ -70,47 +70,169 @@ Function NoDup_from_list (l : list a) {measure length l} : option (NoDup l) :=
   end.
 Proof. auto. Qed.
 
-Lemma NoDup_swap : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup (ys ++ xs).
+Lemma NoDup_unapp : forall (xs ys : list a),
+  NoDup (xs ++ ys) -> NoDup xs /\ NoDup ys.
+Proof.
+  intros. induction xs.
+    split; [ constructor | auto ].
+  simpl in H. inversion H.
+  apply IHxs in H3.
+  inversion H3. subst.
+  split.
+    apply NoDup_cons.
+      unfold not in *. intros.
+      apply H2. apply in_or_app.
+      left. assumption.
+    assumption.
+  assumption.
+Defined.
+
+Lemma NoDup_swap : forall (xs ys : list a),
+  NoDup (xs ++ ys) -> NoDup (ys ++ xs).
 Proof.
   intros.
-Admitted.
+  generalize dependent xs.
+  induction ys; intros.
+    rewrite app_nil_r in H. auto.
+  simpl. pose proof H.
+  apply NoDup_remove_1 in H.
+  apply NoDup_remove_2 in H0.
+  apply NoDup_cons.
+    unfold not in *. intros.
+    apply H0.
+    apply in_app_iff.
+    apply in_app_iff in H1.
+    destruct H1. right. assumption.
+    left. assumption.
+  apply IHys. assumption.
+Qed.
 
 Lemma NoDup_swap2 : forall (xs ys zs : list a),
   NoDup (xs ++ ys ++ zs) -> NoDup (xs ++ zs ++ ys).
 Proof.
-  intros.
-Admitted.
-
-Lemma NoDup_swap_cons : forall x (xs ys : list a),
-  NoDup (x :: xs ++ ys) -> NoDup (x :: ys ++ xs).
-Proof.
-  intros.
-  constructor.
+  intros. induction xs; simpl in *.
+    apply NoDup_swap.
+    assumption.
+  apply NoDup_cons.
     inversion H; subst.
     unfold not in *. intros.
     apply H2.
     apply in_app_iff.
     apply in_app_iff in H0.
-    intuition.
-  inversion H.
-  apply NoDup_swap.
-  assumption.
-Defined.
-
-Lemma NoDup_juggle : forall x (xs ys zs : list a),
-  NoDup (xs ++ ys ++ zs) -> NoDup (remove cmp_eq_dec x xs ++ (x :: ys) ++ zs).
-Proof.
-Admitted.
-
-Lemma NoDup_unapp : forall (xs ys : list a), NoDup (xs ++ ys) -> NoDup ys.
-Proof.
-  intros.
-  induction xs. auto.
+    destruct H0.
+      left. assumption.
+    right.
+    apply in_app_iff.
+    apply in_app_iff in H0.
+    destruct H0.
+      right. assumption.
+    left. assumption.
   apply IHxs.
-  rewrite <- app_comm_cons in H.
-  inversion H.
+  inversion H. assumption.
+Qed.
+
+Lemma NoDup_app_cons : forall x (xs ys : list a),
+  NoDup (xs ++ x :: ys) <-> NoDup (x :: xs ++ ys).
+Proof.
+  induction xs; simpl; split; intros; auto.
+    rewrite app_comm_cons in H.
+    pose proof H.
+    apply NoDup_remove_1 in H. simpl in H.
+    apply NoDup_remove_2 in H0. simpl in H0.
+    apply NoDup_cons.
+      unfold not in *. intros.
+      apply H0. right.
+      apply in_inv in H1. contradiction.
+    assumption.
+  rewrite app_comm_cons.
+  apply NoDup_swap. simpl.
+  inversion H; subst.
+  apply NoDup_cons.
+    unfold not in *. intros.
+    apply H2. simpl.
+    right.
+    apply in_app_iff in H0.
+    apply in_app_iff.
+    destruct H0. right. assumption.
+    left. apply in_inv in H0.
+    destruct H0. subst.
+      contradiction H2.
+      constructor. reflexivity.
+    assumption.
+  apply NoDup_swap. simpl.
+  inversion H. assumption.
+Qed.
+
+Lemma In_remove_spec : forall x y l,
+  x <> y -> In y (remove cmp_eq_dec x l) -> In y l.
+Proof.
+  induction l; intros; simpl in *.
+    apply H0.
+  destruct (cmp_eq_dec x a0); subst.
+    right. apply IHl; assumption.
+  apply in_inv in H0.
+  destruct H0.
+    left. assumption.
+  right. apply IHl; assumption.
+Qed.
+
+Lemma remove_spec3 : forall x l, ~ In x l -> remove cmp_eq_dec x l = l.
+Proof.
+  induction l; intros; simpl.
+    reflexivity.
+  destruct (cmp_eq_dec x a0).
+    subst. contradiction H.
+    constructor. reflexivity.
+  f_equal. apply IHl.
+  unfold not in *. intros.
+  apply H. apply in_cons.
   assumption.
-Defined.
+Qed.
+
+Lemma not_in_app : forall x (l l' : list a), ~ In x (l ++ l') -> ~ In x l.
+Proof.
+  intros. unfold not in *. intros.
+  apply H. apply in_app_iff.
+  left. assumption.
+Qed.
+
+Lemma NoDup_juggle : forall (xs ys zs : list a),
+  NoDup (xs ++ ys ++ zs) -> forall x, In x xs
+    -> NoDup (remove cmp_eq_dec x xs ++ (x :: ys) ++ zs).
+Proof.
+  induction xs as [| x xs']; intros; simpl in *.
+    inversion H0.
+  destruct (cmp_eq_dec x0 x).
+    inversion H; subst.
+    apply not_in_app in H3.
+    rewrite remove_spec3.
+      apply NoDup_app_cons.
+      assumption.
+    assumption.
+  simpl. constructor.
+    inversion H; subst.
+    unfold not. intros.
+    contradiction H3.
+    apply in_app_iff.
+    apply in_app_iff in H1.
+    destruct H1.
+      left. apply (In_remove_spec x0 x xs') in H1;
+        assumption.
+    right.
+    apply in_app_iff.
+    rewrite app_comm_cons in H1.
+    apply in_app_iff in H1.
+    destruct H1.
+      left. apply in_inv in H1.
+        destruct H1. contradiction.
+      assumption.
+    right. assumption.
+  apply IHxs'. inversion H. assumption.
+  destruct H0.
+    symmetry in H0.
+    contradiction.
+  assumption.
+Qed.
 
 Definition find_in (n : a) (l : list a) : {In n l} + {~ In n l}.
 Proof.
@@ -201,6 +323,7 @@ Proof.
   - auto.
 Qed.
 
+(* This function is found in FinFun in the standard library. *)
 Lemma NoDup_map : forall {a b : Set} (l : list a)
   (f : a -> b) (f_inj : forall x y, f x = f y -> x = y),
   NoDup l -> NoDup (map f l).
@@ -1182,9 +1305,11 @@ Proof.
   unfold all_state_lists0 in lists_are_unique0.
   compute.
   apply NoDup_unapp in lists_are_unique0.
-  apply NoDup_swap in lists_are_unique0.
-  apply NoDup_unapp in lists_are_unique0.
-  apply fin_list in lists_are_unique0.
+  inversion lists_are_unique0.
+  apply NoDup_swap in H0.
+  apply NoDup_unapp in H0.
+  inversion H0.
+  apply fin_list in H2.
   auto.
 Qed.
 
