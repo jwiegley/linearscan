@@ -373,14 +373,6 @@ Defined.
 (** These definitions avoid boilerplate involved with setting up properly
     behaved comparisons between types. *)
 
-(*
-Definition is_le (c : comparison) : bool :=
-  match c with
-    | Gt => false
-    | _  => true
-  end.
-*)
-
 Lemma mk_compare_spec : forall {a} (x y : a)
   (cmp         : a -> a -> comparison)
   (cmp_eq_iff  : cmp x y = Eq <-> x = y)
@@ -422,49 +414,6 @@ Class CompareSpec (a : Set) := {
   cmp_eq_dec x y : { x = y } + { x <> y } :=
     mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
-
-(*
-Ltac reduce_nat_comparisons H :=
-  repeat (first
-    [ match goal with
-      | [ |- context f [match ?X with _ => _ end] ] =>
-        destruct X
-      end
-    | match goal with
-      | [ H': context f [match ?X with _ => _ end] |- _ ] =>
-        destruct X
-      end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Eq |- _ ] =>
-        apply nat_compare_eq in H'
-      end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Eq ] =>
-        apply nat_compare_eq_iff
-      end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Lt |- _ ] =>
-        apply nat_compare_lt in H'
-      end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Lt ] =>
-        apply nat_compare_lt
-      end
-
-    | match goal with
-      | [ H': nat_compare ?X ?Y = Gt |- _ ] =>
-        apply nat_compare_gt in H'
-      end
-    | match goal with
-      | [ |- nat_compare ?X ?Y = Gt ] =>
-        apply nat_compare_gt
-      end
-
-    | omega | inversion H; reflexivity
-    ]); subst; auto.
-*)
 
 (** ** NonEmpty lists *)
 
@@ -539,11 +488,6 @@ Definition fin_reduce {n : nat} (x : fin (S n)) : option (fin n) :=
   | right H => Some (from_nat n' H)
   | left _  => None
   end.
-
-(* Lemma fin_reduce_inj : forall n (x y : fin (S n)), *)
-(*   fin_reduce x = fin_reduce y -> x = y. *)
-(* Proof. *)
-(*   intros. *)
 
 (** [to_nat] and [from_nat] compose to an identity module the hypothesis that
     [n < m]. *)
@@ -735,31 +679,6 @@ Record UsePos : Set := {
   regReq : bool
 }.
 
-(*
-Definition UPcompare (x y : UsePos) : comparison :=
-  match nat_compare (uloc x) (uloc y) with
-  | Lt => Lt
-  | Gt => Gt
-  | Eq => if andb (regReq x) (regReq y) then Eq
-          else if regReq y then Lt else Gt
-  end.
-
-Lemma UPcompare_eq_iff : forall (x y : UsePos), UPcompare x y = Eq <-> x = y.
-Proof.
-Admitted.
-
-Lemma UPcompare_gt_flip : forall (x y : UsePos),
-  UPcompare x y = Gt -> UPcompare y x = Lt.
-Proof.
-Admitted.
-
-Program Instance UsePos_CompareSpec : CompareSpec UsePos := {
-  cmp         := UPcompare;
-  cmp_eq_iff  := UPcompare_eq_iff;
-  cmp_gt_flip := UPcompare_gt_flip
-}.
-*)
-
 (** ** Range *)
 
 (** The extent of a [Range] is the set of locations it ranges over.  By
@@ -797,55 +716,6 @@ Inductive Range : RangeDesc -> Set :=
                 ; ups  := ups x
                 |}.
 
-(*
-(** Two ranges are equal if they start at the same location and cover the same
-    extent.  Otherwise, we compare first the start position, and then the
-    length of the extent. *)
-Definition Rcompare `(x : Range xs xb xe) `(y : Range ys yb ye) : comparison.
-Admitted.
-
-Lemma Rcompare_eq_iff `(x : Range xs xb xe) `(y : Range ys yb ye)
-  : Rcompare x y = Eq <-> x = y.
-Admitted.
-Proof.
-  intros.
-  destruct x. destruct y. simpl.
-  split; intros;
-  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
-  inversion H; subst;
-  inversion Heqe;
-  try (apply nat_compare_eq_iff; reflexivity).
-    apply nat_compare_eq_iff in H1.
-    apply nat_compare_eq_iff in H2.
-    subst. f_equal. apply proof_irrelevance.
-  rewrite Heqe.
-  apply nat_compare_eq_iff. reflexivity.
-Qed.
-
-Lemma Rcompare_gt_flip : forall x y : Range,
-  Rcompare x y = Gt -> Rcompare y x = Lt.
-Proof.
-  intros.
-  unfold Rcompare in *.
-  destruct x. destruct y.
-  destruct (nat_compare rstart0 rstart1) eqn:Heqe;
-  destruct (nat_compare rstart1 rstart0) eqn:Heqe2;
-  reduce_nat_comparisons Heqe;
-  try auto; inversion H.
-Qed.
-
-Program Instance Range_CompareSpec : CompareSpec Range := {
-  cmp         := Rcompare;
-  cmp_eq_iff  := Rcompare_eq_iff;
-  cmp_gt_flip := Rcompare_gt_flip
-}.
-*)
-
-(*
-Definition in_range (loc : nat) `(r : Range d) : Prop :=
-  rbeg d <= loc /\ loc < rend d.
-*)
-
 Definition rangesIntersect `(x : RangeDesc) `(y : RangeDesc) : bool :=
   if rbeg x <? rbeg y then rbeg y <? rend x else rbeg x <? rend y.
 
@@ -853,27 +723,6 @@ Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
   fold_right
     (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
     false (NE_to_list is).
-
-(*
-Definition rangeListStart (xs : NonEmpty Range) := rstart (NE_hd xs).
-Definition rangeListEnd   (xs : NonEmpty Range) := rend (NE_tl xs).
-
-Definition rangeListExtent (xs : NonEmpty Range) :=
-  rangeListEnd xs - rangeListStart xs.
-*)
-
-(** ** RangeList *)
-
-(** A [RangeList] encodes both the total extent of the list of ranges (the
-    total span of instructions covered by all the ranges), and also the fact
-    that ranges must be ordered and disjoint (non-overlapping). *)
-
-(*
-Inductive RangeList : NonEmpty Range -> Set :=
-  | RangeSing r : RangeList (NE_Sing r)
-  | RangeCons r rs :
-    RangeList rs -> rend r <= rstart (NE_hd rs) -> RangeList (NE_Cons r rs).
-*)
 
 (** ** Interval *)
 
