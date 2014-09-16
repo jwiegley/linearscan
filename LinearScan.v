@@ -131,6 +131,22 @@ Proof.
   inversion H. assumption.
 Qed.
 
+Lemma NoDup_swap_cons : forall x (xs ys : list a),
+  NoDup (x :: xs ++ ys) -> NoDup (x :: ys ++ xs).
+Proof.
+  intros.
+  constructor.
+    inversion H; subst.
+    unfold not in *. intros.
+    apply H2.
+    apply in_app_iff.
+    apply in_app_iff in H0.
+    intuition.
+  inversion H.
+  apply NoDup_swap.
+  assumption.
+Defined.
+
 Lemma NoDup_app_cons : forall x (xs ys : list a),
   NoDup (xs ++ x :: ys) <-> NoDup (x :: xs ++ ys).
 Proof.
@@ -322,39 +338,6 @@ Proof.
     apply NoDup_cons; assumption.
   - auto.
 Qed.
-
-(* This function is found in FinFun in the standard library. *)
-Lemma NoDup_map : forall {a b : Set} (l : list a)
-  (f : a -> b) (f_inj : forall x y, f x = f y -> x = y),
-  NoDup l -> NoDup (map f l).
-Proof.
-  intros. induction l; simpl. constructor.
-  inversion H; subst.
-  apply IHl in H3.
-  inversion H3.
-    constructor. auto.
-    constructor.
-  apply NoDup_cons.
-    rewrite H0.
-    unfold not in *. intros H5.
-    apply in_map_iff in H5.
-    destruct H5. destruct H5.
-    apply f_inj in H5. subst.
-    contradiction.
-  rewrite H0. assumption.
-Qed.
-
-(*
-Module Import MergeSort := Sort NatOrder.
-
-Lemma NoDup_sorted : forall xs, NoDup xs -> NoDup (sort xs).
-Proof.
-  intros.
-  apply (NoDup_perm _ xs).
-  apply Permuted_sort.
-  assumption.
-Qed.
-*)
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
@@ -1022,7 +1005,8 @@ Defined.
    move and merely an insertion in [handled st].  However, attempts to do so
    have proved complicated. The real problem is that [remove] is fine with
    being requested to remove a non-member. *)
-Definition moveActiveToHandled `(x : IntervalId st) : ScanState.
+Definition moveActiveToHandled `(x : IntervalId st)
+  (H : In x (active st)) : ScanState.
 Proof.
   destruct st.
   eapply {| unhandled   := unhandled0
@@ -1048,9 +1032,11 @@ Proof.
   apply NoDup_swap2.
   rewrite <- app_assoc.
   assumption.
+  apply H.
 Defined.
 
-Definition moveActiveToInactive `(x : IntervalId st) : ScanState.
+Definition moveActiveToInactive `(x : IntervalId st)
+  (H : In x (active st)) : ScanState.
 Proof.
   destruct st.
   eapply {| unhandled   := unhandled0
@@ -1070,6 +1056,7 @@ Proof.
   apply NoDup_swap.
   rewrite <- app_assoc.
   assumption.
+  apply H.
 Defined.
 
 Definition moveInactiveToHandled `(x : IntervalId st) : ScanState.
@@ -1274,11 +1261,15 @@ Definition transportId `(H : nextInterval st = nextInterval st')
   (x : IntervalId st) : IntervalId st' :=
   transportId_le (Nat.eq_le_incl _ _ H) x.
 
-(* Given a starting ScanState (at which point, st = st0), walk through the
-   list of active intervals and mutate st0 until it reflects the desired end
+Definition activeIntervals (st : ScanState)
+  : list { i : IntervalId st & In i (active st) }.
+Admitted.
+
+(* Given a starting [ScanState] (at which point, [st = st0]), walk through the
+   list of active intervals and mutate [st0] until it reflects the desired end
    state. *)
 Fixpoint checkActiveIntervals st pos : ScanState :=
-  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
+  let fix go st st0 is pos :=
     match is with
     | nil => st0
     | x :: xs =>
@@ -1288,16 +1279,15 @@ Fixpoint checkActiveIntervals st pos : ScanState :=
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
-        let i := projT2 (getInterval st x) in
-        let x0 := transportId eq_refl x in
+        let i := projT2 (getInterval st (projT1 x)) in
         let st1 := if intervalEnd i <? pos
-                   then moveActiveToHandled x0
+                   then moveActiveToHandled (projT1 x) (projT2 x)
                    else if negb (intervalCoversPos i pos)
-                        then moveActiveToInactive x0
+                        then moveActiveToInactive (projT1 x) (projT2 x)
                         else st0 in
         go st st1 xs pos
     end in
-  go st st (active st) pos.
+  go st st (activeIntervals st) pos.
 
 Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
 Proof.
