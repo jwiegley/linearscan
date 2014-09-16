@@ -173,7 +173,7 @@ Proof.
     left. apply in_inv in H0.
     destruct H0. subst.
       contradiction H2.
-      constructor. reflexivity.
+      apply in_eq.
     assumption.
   apply NoDup_swap. simpl.
   inversion H. assumption.
@@ -198,7 +198,7 @@ Proof.
     reflexivity.
   destruct (cmp_eq_dec x a0).
     subst. contradiction H.
-    constructor. reflexivity.
+    apply in_eq.
   f_equal. apply IHl.
   unfold not in *. intros.
   apply H. apply in_cons.
@@ -271,7 +271,7 @@ Lemma not_in_list : forall x xs,
 Proof.
   intros. induction xs; simpl; auto.
   destruct (cmp_eq_dec a0 x); subst.
-    contradiction H. constructor. reflexivity.
+    contradiction H. apply in_eq.
   apply IHxs.
   unfold not in *. intros.
   apply H. right. assumption.
@@ -332,7 +332,7 @@ Proof.
       apply in_inv in H.
       destruct H.
         subst. apply H2.
-        constructor. reflexivity.
+        apply in_eq.
       apply H4. assumption.
     apply not_in_uncons in H2.
     apply NoDup_cons; assumption.
@@ -1110,9 +1110,27 @@ Definition transportId `(H : nextInterval st = nextInterval st')
   (x : IntervalId st) : IntervalId st' :=
   transportId_le (Nat.eq_le_incl _ _ H) x.
 
+Lemma existT_in_cons : forall {A a} {l : list A},
+  {x : A & In x l} -> {x : A & In x (a :: l)}.
+Proof.
+  destruct l; intros; simpl.
+    destruct X. inversion i.
+  destruct X. exists x.
+  apply in_inv in i.
+  destruct i.
+    right. left. assumption.
+  right. right. assumption.
+Qed.
+
 Definition activeIntervals (st : ScanState)
-  : list { i : IntervalId st & In i (active st) }.
-Admitted.
+  : list { i : IntervalId st & In i (active st) } :=
+  let fix go l :=
+      match l with
+      | nil => nil
+      | cons x xs =>
+          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
+      end in
+  go (active st).
 
 (* Given a starting [ScanState] (at which point, [st = st0]), walk through the
    list of active intervals and mutate [st0] until it reflects the desired end
