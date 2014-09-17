@@ -32,8 +32,6 @@ Generalizable All Variables.
 
 (****************************************************************************)
 
-(****************************************************************************)
-
 (** * Core data types *)
 
 (** ** UsePos *)
@@ -183,7 +181,8 @@ Program Definition newScanState
 Obligation 1. inversion H. Defined.
 Obligation 2. constructor. Defined.
 
-Lemma ScanState_active_bounded : forall st, length (active st) <= nextInterval st.
+Lemma ScanState_active_bounded : forall st,
+  length (active st) <= nextInterval st.
 Proof.
   destruct st. simpl.
   unfold all_state_lists0 in lists_are_unique0.
@@ -196,41 +195,6 @@ Proof.
   apply fin_list in H2.
   auto.
 Qed.
-
-Record CurrentInterval := {
-    resultState       : ScanState;
-    currentRanges     : NonEmpty RangeDesc;
-    currentIntervalId : IntervalId resultState;
-    currentInterval   : Interval currentRanges;
-
-    not_present : ~ In currentIntervalId (all_state_lists resultState)
-}.
-
-Definition nextUnhandled (st : ScanState) : option CurrentInterval.
-Proof.
-  destruct st.
-  destruct unhandled0.
-    apply None.
-  apply Some.
-  pose (getInterval0 i).
-  destruct s as [rs int].
-  eapply {| resultState :=
-            {| unhandled   := unhandled0
-             ; active      := active0
-             ; inactive    := inactive0
-             ; handled     := handled0
-             ; getInterval := getInterval0
-             ; assignments := assignments0
-             |}
-          ; currentRanges     := rs
-          ; currentIntervalId := i
-          ; currentInterval   := int
-          |}.
-  Grab Existential Variables.
-  unfold all_state_lists; simpl.
-  inversion lists_are_unique0; assumption.
-  inversion lists_are_unique0; assumption.
-Defined.
 
 Definition moveActiveToHandled `(x : IntervalId st)
   (H : In x (active st)) : ScanState.
@@ -320,6 +284,47 @@ Proof.
     Grab Existential Variables.
 Admitted.
 
+(** ** SST *)
+
+Definition SST (a : Set) := IxState ScanState a.
+
+(** ** CurrentInterval *)
+
+Record CurrentInterval := {
+    resultState       : ScanState;
+    currentRanges     : NonEmpty RangeDesc;
+    currentIntervalId : IntervalId resultState;
+    currentInterval   : Interval currentRanges;
+
+    not_present : ~ In currentIntervalId (all_state_lists resultState)
+}.
+
+Definition nextUnhandled (st : ScanState) : option CurrentInterval.
+Proof.
+  destruct st.
+  destruct unhandled0.
+    apply None.
+  apply Some.
+  pose (getInterval0 i).
+  destruct s as [rs int].
+  eapply {| resultState :=
+            {| unhandled   := unhandled0
+             ; active      := active0
+             ; inactive    := inactive0
+             ; handled     := handled0
+             ; getInterval := getInterval0
+             ; assignments := assignments0
+             |}
+          ; currentRanges     := rs
+          ; currentIntervalId := i
+          ; currentInterval   := int
+          |}.
+  Grab Existential Variables.
+  unfold all_state_lists; simpl.
+  inversion lists_are_unique0; assumption.
+  inversion lists_are_unique0; assumption.
+Defined.
+
 (* We need to know that [x] is not already a member of the [ScanState].  We
    know it was removed from the [ScanState] by [nextUnhandled], but it may
    have been split and the other parts added back to the unhandled list, so we
@@ -348,6 +353,8 @@ Proof.
   apply NoDup_cons; assumption.
 Defined.
 
+(** ** Main functions *)
+
 Definition getRegisterIndex (st : ScanState) (k : IntervalId st -> nat)
   (z : PhysReg -> option nat) (is : list (IntervalId st))
   : PhysReg -> option nat :=
@@ -357,8 +364,6 @@ Definition getRegisterIndex (st : ScanState) (k : IntervalId st -> nat)
        | None => f r
        | Some a => if cmp_eq_dec a r then Some (k x) else f r
        end) z is.
-
-(** ** Main functions *)
 
 Definition nextIntersectionWith (st : ScanState)
   `(x : Interval xd) (yid : IntervalId st) : nat.
