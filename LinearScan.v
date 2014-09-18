@@ -297,7 +297,8 @@ Admitted.
 
 Record ScanStateMorph (s : ScanState) (s' : ScanState) := {
     next_interval_only_increases : nextInterval s     <= nextInterval s';
-    total_extent_only_decreases  : unhandledExtent s' <= unhandledExtent s
+    total_extent_only_decreases  : unhandledExtent s' <= unhandledExtent s;
+    handled_count_only_increases : length (handled s) <= length (handled s')
 }.
 
 Program Instance ScanStateMorph_PO : PreOrder ScanStateMorph.
