@@ -14,8 +14,6 @@ Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
 Require Import Recdef.
 
-Require Export IxState.
-
 Module Import LN := ListNotations.
 
 Infix "$" := apply (at level 90, right associativity) : program_scope.
