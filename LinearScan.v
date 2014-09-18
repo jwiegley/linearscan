@@ -27,6 +27,7 @@ Require Import RState.
 
 Module Import LN := ListNotations.
 
+Open Scope nat_scope.
 Open Scope program_scope.
 
 Generalizable All Variables.
@@ -170,9 +171,8 @@ Record ScanState := {
     currentId : option { i : IntervalId & ~ In i all_state_lists }
 }.
 
-Definition unhandledExtent (st : ScanState) : nat :=
-  fold_left (fun n x => n + intervalExtent (projT2 (getInterval st x)))
-            (unhandled st) 0.
+Definition totalExtent `(xs : list (IntervalId st)) : nat :=
+  fold_left (fun n x => n + intervalExtent (projT2 (getInterval st x))) xs 0.
 
 Program Definition newScanState
   : ScanState := {| nextInterval := 0
@@ -202,18 +202,125 @@ Proof.
   auto.
 Qed.
 
+(** ** SSMorph *)
+
+(** A [SSMorph] is a relation describe a lawful transition between two
+    states.  It is a [PreOrder] relation. *)
+
+Record SSMorph (s : ScanState) (s' : ScanState) := {
+    next_interval_only_increases : nextInterval s     <= nextInterval s';
+    total_extent_only_decreases  :
+      totalExtent (unhandled s') <= totalExtent (unhandled s);
+    handled_count_only_increases : length (handled s) <= length (handled s')
+}.
+
+Program Instance SSMorph_PO : PreOrder SSMorph.
+Obligation 1. constructor; auto. Defined.
+Obligation 2.
+  constructor; destruct H; destruct H0.
+  transitivity (nextInterval y); auto.
+  transitivity (totalExtent (unhandled y)); auto.
+  transitivity (length (handled y)); auto.
+Defined.
+
+(** ** CurrentInterval *)
+
+Record CurrentInterval (st : ScanState) := {
+    currentIntervalId : IntervalId st;
+    currentRanges     : NonEmpty RangeDesc;
+    currentInterval   : Interval currentRanges;
+
+    not_present : ~ In currentIntervalId (all_state_lists st)
+}.
+
+Definition SST (a : Type) := RState ScanState SSMorph a.
+
+Definition return_ {a : Type} :=
+  @pure SST (RState_Applicative ScanState SSMorph SSMorph_PO) a.
+
+Lemma fold_left_0_r : forall a (f : a -> nat) xs (y : a),
+   fold_left (fun (n : nat) (x : a) => n + f x) xs (f y) =
+   fold_left (fun (n : nat) (x : a) => n + f x) xs 0 + (f y).
+Proof.
+Admitted.
+
+Lemma totalExtent_cons : forall st x (xs : list (IntervalId st)),
+  totalExtent (x :: xs) = totalExtent [x] + totalExtent xs.
+Proof.
+  intros.
+  assert (x :: xs = [x] ++ xs) by auto.
+  rewrite H. clear H.
+  unfold totalExtent.
+  rewrite fold_left_app.
+  rewrite Plus.plus_comm. simpl.
+  induction xs. reflexivity.
+  apply (fold_left_0_r (IntervalId st)
+           (fun (x : IntervalId st) =>
+              intervalExtent (projT2 (getInterval st x)))).
+Qed.
+
+Lemma unhandled_extent_cons : forall (st : ScanState) x xs,
+  x :: xs = unhandled st -> totalExtent xs <= totalExtent (x :: xs).
+Proof.
+  intros.
+  rewrite totalExtent_cons.
+  apply Plus.le_plus_r.
+Qed.
+
+Definition nextUnhandled (st : ScanState)
+  : option { st' : ScanState & CurrentInterval st' & SSMorph st st' }.
+Proof.
+  pose (unhandled_extent_cons st).
+  destruct st.
+  destruct unhandled0.
+    apply None.
+  apply Some.
+  destruct (getInterval0 i) as [rs int].
+  eexists {| unhandled   := unhandled0
+           ; active      := active0
+           ; inactive    := inactive0
+           ; handled     := handled0
+           ; getInterval := getInterval0
+           ; assignments := assignments0
+           |}.
+  rapply Build_CurrentInterval.
+  (**) apply int.
+  (**) unfold all_state_lists. simpl.
+       unfold all_state_lists0 in lists_are_unique0.
+       inversion lists_are_unique0. apply H1.
+  rapply Build_SSMorph.
+  (**) reflexivity.
+  (**) simpl. apply l. reflexivity.
+  (**) reflexivity.
+  Grab Existential Variables.
+  apply Some. exists i.
+  inversion lists_are_unique0. assumption.
+  apply Some. exists rs. assumption.
+  inversion lists_are_unique0; assumption.
+Defined.
+
 Definition moveActiveToHandled `(x : IntervalId st)
   (H : In x (active st)) : ScanState.
 Proof.
+  constructor. intros.
+  destruct H0.
   destruct st.
-  eapply {| unhandled   := unhandled0
-          ; active      := remove cmp_eq_dec x active0
-          ; inactive    := inactive0
-          ; handled     := x :: handled0
-          ; getInterval := getInterval0
-          ; assignments := assignments0
+  destruct st0.
+  eapply {| after :=
+            {| unhandled   := unhandled0
+             ; active      := remove cmp_eq_dec x active0
+             ; inactive    := inactive0
+             ; handled     := x :: handled0
+             ; getInterval := getInterval0
+             ; assignments := assignments0
+             |}
           |}.
-    Grab Existential Variables.
+  Grab Existential Variables.
+  (* 1 *)
+    constructor; simpl in *.
+    - admit.
+    - 
+  inversion H0.
   apply NoDup_swap.
   rewrite <- app_assoc.
   rewrite <- app_assoc.
@@ -289,70 +396,6 @@ Proof.
           |}.
     Grab Existential Variables.
 Admitted.
-
-(** ** ScanStateMorph *)
-
-(** A [ScanStateMorph] is a relation describe a lawful transition between two
-    states.  It is a [PreOrder] relation. *)
-
-Record ScanStateMorph (s : ScanState) (s' : ScanState) := {
-    next_interval_only_increases : nextInterval s     <= nextInterval s';
-    total_extent_only_decreases  : unhandledExtent s' <= unhandledExtent s;
-    handled_count_only_increases : length (handled s) <= length (handled s')
-}.
-
-Program Instance ScanStateMorph_PO : PreOrder ScanStateMorph.
-Obligation 1. constructor; auto. Defined.
-Obligation 2.
-  constructor; destruct H; destruct H0.
-  transitivity (nextInterval y); auto.
-  transitivity (unhandledExtent y); auto.
-Defined.
-
-(** ** CurrentInterval *)
-
-Record CurrentInterval := {
-    resultState       : ScanState;
-    currentIntervalId : IntervalId resultState;
-    currentRanges     : NonEmpty RangeDesc;
-    currentInterval   : Interval currentRanges;
-
-    not_present : ~ In currentIntervalId (all_state_lists resultState)
-}.
-
-Definition SST (a : Type) := RState ScanState ScanStateMorph a.
-
-Definition return_ {a : Type} :=
-  @pure SST (RState_Monad ScanState ScanStateMorph ScanStateMorph_PO) a.
-
-Definition nextUnhandled : SST (option CurrentInterval).
-Proof.
-  constructor. intros.
-  destruct st.
-  destruct unhandled0.
-    apply (return_ None).
-  rapply Build_StateP.
-  - apply Some.
-    destruct (getInterval0 i) as [rs int].
-    eapply {| resultState :=
-              {| unhandled   := unhandled0
-               ; active      := active0
-               ; inactive    := inactive0
-               ; handled     := handled0
-               ; getInterval := getInterval0
-               ; assignments := assignments0
-               |}
-            ; currentIntervalId := i
-            ; currentRanges     := rs
-            ; currentInterval   := int
-            |}.
-  - constructor; auto.
-  Grab Existential Variables.
-  unfold all_state_lists. simpl.
-  unfold all_state_lists0 in lists_are_unique0.
-  inversion lists_are_unique0; assumption.
-  inversion lists_are_unique0; assumption.
-Defined.
 
 (* We need to know that [x] is not already a member of the [ScanState].  We
    know it was removed from the [ScanState] by [nextUnhandled], but it may
@@ -785,3 +828,4 @@ Definition allocateRegisters : Graph VirtReg -> ScanState :=
   linearScan ∘ determineIntervals.
 
 End Allocator.
+
