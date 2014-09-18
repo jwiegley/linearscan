@@ -5,9 +5,9 @@ Require Import Coq.Program.Equality.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
 Require Import FunctionalExtensionality.
-Require Import Endo.
-Require Import Applicative.
-Require Import Monad.
+Require Export Endo.
+Require Export Applicative.
+Require Export Monad.
 Require Import Recdef.
 
 Open Scope program_scope.
@@ -75,7 +75,7 @@ Ltac RState_auto :=
         f_equal
     end; simpl).
 
-Program Instance RState_Functor : Functor RState := {
+Global Program Instance RState_Functor : Functor RState := {
     fmap := RState_fmap
 }.
 Solve All Obligations using RState_auto.
@@ -102,7 +102,7 @@ Definition RState_ap (a b : Type) (f : RState (a -> b)) (x : RState a)
 
 Hint Unfold RState_ap.
 
-Program Instance RState_Applicative : Applicative RState := {
+Global Program Instance RState_Applicative : Applicative RState := {
     pure := RState_pure;
     ap   := RState_ap
 }.
@@ -160,7 +160,7 @@ Definition RState_join (a : Type) (x : RState (RState a)) : RState a :=
 
 Hint Unfold RState_join.
 
-Program Instance RState_Monad : Monad RState := {
+Global Program Instance RState_Monad : Monad RState := {
     join := RState_join
 }.
 Obligation 1.
