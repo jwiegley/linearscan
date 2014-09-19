@@ -208,7 +208,7 @@ Qed.
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (s : ScanState) (s' : ScanState) := {
-    next_interval_only_increases : nextInterval s     <= nextInterval s';
+    next_interval_only_increases : nextInterval s <= nextInterval s';
     total_extent_only_decreases  :
       totalExtent (unhandled s') <= totalExtent (unhandled s);
     handled_count_only_increases : length (handled s) <= length (handled s')
@@ -233,16 +233,24 @@ Record CurrentInterval (st : ScanState) := {
     not_present : ~ In currentIntervalId (all_state_lists st)
 }.
 
-Definition SST (a : Type) := RState ScanState SSMorph a.
+Definition SST (a : ScanState -> Type) := RState ScanState SSMorph a.
 
 Definition return_ {a : Type} :=
-  @pure SST (RState_Applicative ScanState SSMorph SSMorph_PO) a.
+  @dep_pure _ SST (RState_Applicative ScanState SSMorph SSMorph_PO) a.
 
-Lemma fold_left_0_r : forall a (f : a -> nat) xs (y : a),
-   fold_left (fun (n : nat) (x : a) => n + f x) xs (f y) =
-   fold_left (fun (n : nat) (x : a) => n + f x) xs 0 + (f y).
+Lemma fold_left_plus : forall a f xs n,
+   fold_left (fun (n : nat) (x : a) => n + f x) xs n =
+   fold_left (fun (n : nat) (x : a) => n + f x) xs 0 + n.
 Proof.
-Admitted.
+  intros a f xs.
+  induction xs. reflexivity.
+  intros. simpl.
+  rewrite IHxs. simpl.
+  symmetry.
+  rewrite IHxs. simpl.
+  rewrite <- Plus.plus_assoc.
+  rewrite (Plus.plus_comm n) at 1. reflexivity.
+Qed.
 
 Lemma totalExtent_cons : forall st x (xs : list (IntervalId st)),
   totalExtent (x :: xs) = totalExtent [x] + totalExtent xs.
@@ -254,7 +262,7 @@ Proof.
   rewrite fold_left_app.
   rewrite Plus.plus_comm. simpl.
   induction xs. reflexivity.
-  apply (fold_left_0_r (IntervalId st)
+  apply (fold_left_plus (IntervalId st)
            (fun (x : IntervalId st) =>
               intervalExtent (projT2 (getInterval st x)))).
 Qed.
@@ -267,40 +275,53 @@ Proof.
   apply Plus.le_plus_r.
 Qed.
 
-Definition nextUnhandled (st : ScanState)
-  : option { st' : ScanState & CurrentInterval st' & SSMorph st st' }.
+Definition nextUnhandled : SST (fun st' => option (CurrentInterval st')).
 Proof.
+  constructor. intros.
   pose (unhandled_extent_cons st).
   destruct st.
   destruct unhandled0.
-    apply None.
-  apply Some.
-  destruct (getInterval0 i) as [rs int].
-  eexists {| unhandled   := unhandled0
-           ; active      := active0
-           ; inactive    := inactive0
-           ; handled     := handled0
-           ; getInterval := getInterval0
-           ; assignments := assignments0
+    eapply {| after :=
+              {| unhandled   := []
+               ; active      := active0
+               ; inactive    := inactive0
+               ; handled     := handled0
+               ; getInterval := getInterval0
+               ; assignments := assignments0
+               |}
+           ; result := None
            |}.
-  rapply Build_CurrentInterval.
-  (**) apply int.
-  (**) unfold all_state_lists. simpl.
-       unfold all_state_lists0 in lists_are_unique0.
-       inversion lists_are_unique0. apply H1.
-  rapply Build_SSMorph.
-  (**) reflexivity.
-  (**) simpl. apply l. reflexivity.
-  (**) reflexivity.
+  destruct (getInterval0 i) as [rs int].
+  eapply {| after :=
+            {| unhandled   := unhandled0
+             ; active      := active0
+             ; inactive    := inactive0
+             ; handled     := handled0
+             ; getInterval := getInterval0
+             ; assignments := assignments0
+             |}
+         |}.
+
   Grab Existential Variables.
+
+  rapply Build_SSMorph; try (simpl; apply l); reflexivity.
+
+  simpl. apply Some.
+  rapply Build_CurrentInterval;
+    [ apply int
+    | inversion lists_are_unique0; apply H1 ].
+
   apply Some. exists i.
+
   inversion lists_are_unique0. assumption.
-  apply Some. exists rs. assumption.
+  assumption.
   inversion lists_are_unique0; assumption.
+
+  rapply Build_SSMorph; reflexivity.
 Defined.
 
 Definition moveActiveToHandled `(x : IntervalId st)
-  (H : In x (active st)) : ScanState.
+  (H : In x (active st)) : SST .
 Proof.
   constructor. intros.
   destruct H0.
