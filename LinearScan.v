@@ -65,28 +65,42 @@ Record UsePos : Set := {
 Record RangeDesc := {
     rbeg : nat;
     rend : nat;
-    ups  : NonEmpty UsePos
+    ups  : NonEmpty UsePos;
+
+    range_nonempty : rbeg < rend
 }.
+
+Lemma min_lt_max : forall n m b e, n < m -> min b n < Peano.max e m.
+Proof.
+  induction n; intros; simpl;
+  apply Nat.max_lt_iff; right;
+  apply Nat.min_lt_iff; right; assumption.
+Qed.
 
 Inductive Range : RangeDesc -> Set :=
   | R_Sing u :
       Range {| rbeg := uloc u
-             ; rend := uloc u
+             ; rend := S (uloc u)
              ; ups  := NE_Sing u
+             ; range_nonempty := le_n (S (uloc u))
              |}
-  | R_Cons u x : Range x -> uloc u < rbeg x
-      -> Range {| rbeg := rbeg x
-                ; rend := rend x
-                ; ups  := NE_Cons u (ups x)
-                |}
+  | R_Cons u x : Range x -> forall (H : uloc u < rbeg x),
+      Range {| rbeg := uloc u
+             ; rend := rend x
+             ; ups  := NE_Cons u (ups x)
+             ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
+             |}
   | R_Extend x b' e' : Range x
       -> Range {| rbeg := min b' (rbeg x)
                 ; rend := Peano.max e' (rend x)
                 ; ups  := ups x
+                ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
                 |}.
 
 Definition rangesIntersect `(x : RangeDesc) `(y : RangeDesc) : bool :=
-  if rbeg x <? rbeg y then rbeg y <? rend x else rbeg x <? rend y.
+  if rbeg x <? rbeg y
+  then rbeg y <? rend x
+  else rbeg x <? rend y.
 
 Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
   fold_right
@@ -118,14 +132,41 @@ Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
 Inductive Interval : NonEmpty RangeDesc -> Set :=
   | I_Sing : forall x, Range x -> Interval (NE_Sing x)
   | I_Cons1 : forall x y,
-      Range x -> Interval (NE_Sing y) -> rend y <= rbeg y
+      Range x -> Interval (NE_Sing y) -> rend x <= rbeg y
         -> Interval (NE_Cons x (NE_Sing y))
   | I_Consn : forall x y xs,
-      Range x -> Interval (NE_Cons y xs) -> rend y <= rbeg y
+      Range x -> Interval (NE_Cons y xs) -> rend x <= rbeg y
         -> Interval (NE_Cons x (NE_Cons y xs)).
 
 Definition intervalStart `(i : Interval rs) : nat := rbeg (NE_hd rs).
 Definition intervalEnd   `(i : Interval rs) : nat := rend (NE_tl rs).
+
+Lemma minus_lt : forall n m, n - m > 0 -> n > m.
+Proof. intros; omega. Qed.
+
+Lemma lt_minus : forall n m, n > m -> n - m > 0.
+Proof. intros; omega. Qed.
+
+Lemma min_max_minus : forall n m b e, n - m > 0 -> Peano.max e n - min b m > 0.
+Proof.
+  induction n; intros; simpl; try omega.
+  apply lt_minus.
+  apply minus_lt in H.
+  unfold gt in *.
+  apply Nat.max_lt_iff.
+  right.
+  apply Nat.min_lt_iff.
+  right. assumption.
+Qed.
+
+Lemma Interval_nonempty : forall `(i : Interval rs),
+  intervalStart i < intervalEnd i.
+Proof.
+  intros.
+  unfold intervalStart, intervalEnd.
+  induction i; simpl in *;
+  destruct x; simpl in *; omega.
+Qed.
 
 Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
   andb (intervalStart i <=? pos) (pos <? intervalEnd i).
@@ -165,10 +206,7 @@ Record ScanState := {
     assignments  : IntervalId -> option PhysReg;
 
     all_state_lists  := unhandled ++ active ++ inactive ++ handled;
-    lists_are_unique : NoDup all_state_lists;
-
-    current   : option { rs : NonEmpty RangeDesc & Interval rs };
-    currentId : option { i : IntervalId & ~ In i all_state_lists }
+    lists_are_unique : NoDup all_state_lists
 }.
 
 Definition totalExtent `(xs : list (IntervalId st)) : nat :=
@@ -184,8 +222,6 @@ Program Definition newScanState
                   |}.
 Obligation 1. inversion H. Defined.
 Obligation 2. constructor. Defined.
-Obligation 3. apply None. Defined.
-Obligation 4. apply None. Defined.
 
 Lemma ScanState_active_bounded : forall st,
   length (active st) <= nextInterval st.
@@ -208,11 +244,18 @@ Qed.
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (s : ScanState) (s' : ScanState) := {
-    next_interval_only_increases : nextInterval s <= nextInterval s';
-    total_extent_only_decreases  :
+    next_interval_increases : nextInterval s <= nextInterval s';
+    total_extent_decreases :
       totalExtent (unhandled s') <= totalExtent (unhandled s);
-    handled_count_only_increases : length (handled s) <= length (handled s')
+    handled_count_increases : length (handled s) <= length (handled s')
 }.
+
+Arguments next_interval_increases [s s'] _.
+Arguments total_extent_decreases  [s s'] _.
+Arguments handled_count_increases [s s'] _.
+
+Definition newSSMorph (s : ScanState) : SSMorph s s.
+Proof. constructor; auto. Defined.
 
 Program Instance SSMorph_PO : PreOrder SSMorph.
 Obligation 1. constructor; auto. Defined.
@@ -232,6 +275,11 @@ Record CurrentInterval (st : ScanState) := {
 
     not_present : ~ In currentIntervalId (all_state_lists st)
 }.
+
+Arguments currentIntervalId [st] _.
+Arguments currentRanges     [st] _.
+Arguments currentInterval   [st] _.
+Arguments not_present       [st] _ _.
 
 Definition SST (a : ScanState -> Type) := RState ScanState SSMorph a.
 
@@ -268,80 +316,63 @@ Proof.
 Qed.
 
 Lemma unhandled_extent_cons : forall (st : ScanState) x xs,
-  x :: xs = unhandled st -> totalExtent xs <= totalExtent (x :: xs).
+  x :: xs = unhandled st -> totalExtent xs < totalExtent (x :: xs).
 Proof.
   intros.
   rewrite totalExtent_cons.
-  apply Plus.le_plus_r.
+  unfold totalExtent at 2. simpl.
+  remember (projT2 (getInterval st x)) as i.
+  assert (intervalExtent i > 0).
+    unfold intervalExtent.
+    apply lt_minus.
+    apply Interval_nonempty.
+  omega.
 Qed.
 
-Definition nextUnhandled : SST (fun st' => option (CurrentInterval st')).
+Definition unhandledExtent st := totalExtent (unhandled st).
+
+Definition smaller_extent (st st' : ScanState) : Prop :=
+  unhandledExtent st' < unhandledExtent st.
+
+Definition nextUnhandled (st : ScanState)
+  : option { st' : ScanState & CurrentInterval st' & smaller_extent st st' }.
 Proof.
-  constructor. intros.
   pose (unhandled_extent_cons st).
   destruct st.
   destruct unhandled0.
-    eapply {| after :=
-              {| unhandled   := []
-               ; active      := active0
-               ; inactive    := inactive0
-               ; handled     := handled0
-               ; getInterval := getInterval0
-               ; assignments := assignments0
-               |}
-           ; result := None
+    apply None.
+  apply Some.
+  eexists {| unhandled   := unhandled0
+           ; active      := active0
+           ; inactive    := inactive0
+           ; handled     := handled0
+           ; getInterval := getInterval0
+           ; assignments := assignments0
            |}.
   destruct (getInterval0 i) as [rs int].
-  eapply {| after :=
-            {| unhandled   := unhandled0
-             ; active      := active0
-             ; inactive    := inactive0
-             ; handled     := handled0
-             ; getInterval := getInterval0
-             ; assignments := assignments0
-             |}
-         |}.
-
-  Grab Existential Variables.
-
-  rapply Build_SSMorph; try (simpl; apply l); reflexivity.
-
-  simpl. apply Some.
   rapply Build_CurrentInterval;
     [ apply int
     | inversion lists_are_unique0; apply H1 ].
-
-  apply Some. exists i.
-
+  unfold smaller_extent.
+  unfold unhandledExtent. simpl in *.
+  apply l. reflexivity.
+  Grab Existential Variables.
   inversion lists_are_unique0. assumption.
-  assumption.
-  inversion lists_are_unique0; assumption.
-
-  rapply Build_SSMorph; reflexivity.
 Defined.
 
 Definition moveActiveToHandled `(x : IntervalId st)
-  (H : In x (active st)) : SST .
+  (H : In x (active st)) : { st' : ScanState & SSMorph st st' }.
 Proof.
-  constructor. intros.
-  destruct H0.
   destruct st.
-  destruct st0.
-  eapply {| after :=
-            {| unhandled   := unhandled0
-             ; active      := remove cmp_eq_dec x active0
-             ; inactive    := inactive0
-             ; handled     := x :: handled0
-             ; getInterval := getInterval0
-             ; assignments := assignments0
-             |}
-          |}.
+  eexists {| unhandled   := unhandled0
+           ; active      := remove cmp_eq_dec x active0
+           ; inactive    := inactive0
+           ; handled     := x :: handled0
+           ; getInterval := getInterval0
+           ; assignments := assignments0
+           |}.
+  rapply Build_SSMorph; simpl; auto.
   Grab Existential Variables.
-  (* 1 *)
-    constructor; simpl in *.
-    - admit.
-    - 
-  inversion H0.
   apply NoDup_swap.
   rewrite <- app_assoc.
   rewrite <- app_assoc.
@@ -360,22 +391,25 @@ Proof.
   apply H.
 Defined.
 
+(*
 Lemma moveActiveToHandled_spec1 : forall st st' (x : IntervalId st) H,
   st' = moveActiveToHandled x H -> nextInterval st' = nextInterval st.
 Proof. intros. subst. destruct st. reflexivity. Qed.
+*)
 
 Definition moveActiveToInactive `(x : IntervalId st)
-  (H : In x (active st)) : ScanState.
+  (H : In x (active st)) : { st' : ScanState & SSMorph st st' }.
 Proof.
   destruct st.
-  eapply {| unhandled   := unhandled0
-          ; active      := remove cmp_eq_dec x active0
-          ; inactive    := x :: inactive0
-          ; handled     := handled0
-          ; getInterval := getInterval0
-          ; assignments := assignments0
-          |}.
-    Grab Existential Variables.
+  eexists {| unhandled   := unhandled0
+           ; active      := remove cmp_eq_dec x active0
+           ; inactive    := x :: inactive0
+           ; handled     := handled0
+           ; getInterval := getInterval0
+           ; assignments := assignments0
+           |}.
+  rapply Build_SSMorph; simpl; auto.
+  Grab Existential Variables.
   apply NoDup_swap.
   rewrite <- app_assoc.
   rewrite <- app_assoc.
@@ -388,63 +422,62 @@ Proof.
   apply H.
 Defined.
 
+(*
 Lemma moveActiveToInactive_spec1 : forall st st' (x : IntervalId st) H,
   st' = moveActiveToInactive x H -> nextInterval st' = nextInterval st.
 Proof. intros. subst. destruct st. reflexivity. Qed.
+*)
 
-Definition moveInactiveToHandled `(x : IntervalId st) : ScanState.
+Definition moveInactiveToHandled `(x : IntervalId st)
+  (H : In x (inactive st)) : { st' : ScanState & SSMorph st st' }.
 Proof.
-  destruct st.
-  eapply {| unhandled   := unhandled0
-          ; active      := active0
-          ; inactive    := remove cmp_eq_dec x inactive0
-          ; handled     := x :: handled0
-          ; getInterval := getInterval0
-          ; assignments := assignments0
-          |}.
-    Grab Existential Variables.
+  (* destruct st. *)
+  (* eapply {| unhandled   := unhandled0 *)
+  (*         ; active      := active0 *)
+  (*         ; inactive    := remove cmp_eq_dec x inactive0 *)
+  (*         ; handled     := x :: handled0 *)
+  (*         ; getInterval := getInterval0 *)
+  (*         ; assignments := assignments0 *)
+  (*         |}. *)
+  (*   Grab Existential Variables. *)
 Admitted.
 
-Definition moveInactiveToActive `(x : IntervalId st) : ScanState.
+Definition moveInactiveToActive `(x : IntervalId st)
+  (H : In x (inactive st)) : { st' : ScanState & SSMorph st st' }.
 Proof.
-  destruct st.
-  eapply {| unhandled   := unhandled0
-          ; active      := x :: active0
-          ; inactive    := remove cmp_eq_dec x inactive0
-          ; handled     := handled0
-          ; getInterval := getInterval0
-          ; assignments := assignments0
-          |}.
-    Grab Existential Variables.
+  (* destruct st. *)
+  (* eapply {| unhandled   := unhandled0 *)
+  (*         ; active      := x :: active0 *)
+  (*         ; inactive    := remove cmp_eq_dec x inactive0 *)
+  (*         ; handled     := handled0 *)
+  (*         ; getInterval := getInterval0 *)
+  (*         ; assignments := assignments0 *)
+  (*         |}. *)
+  (*   Grab Existential Variables. *)
 Admitted.
 
 (* We need to know that [x] is not already a member of the [ScanState].  We
    know it was removed from the [ScanState] by [nextUnhandled], but it may
    have been split and the other parts added back to the unhandled list, so we
    need to know that it's not going to recur. *)
-Definition addToActive (result : CurrentInterval) (reg : PhysReg) : SST unit.
+Definition addToActive `(result : CurrentInterval st) (reg : PhysReg)
+  : { st' : ScanState & SSMorph st st' }.
 Proof.
-  constructor. intros.
+  destruct st.
   destruct result.
-  destruct resultState0.
-  eexists
-    (tt, {| nextInterval := nextInterval0
-          ; unhandled    := unhandled0
-          ; active       := currentIntervalId0 :: active0
-          ; inactive     := inactive0
-          ; handled      := handled0
-          ; getInterval  := getInterval0
-          ; assignments  := fun i =>
-              if cmp_eq_dec i currentIntervalId0
-              then Some reg
-              else assignments0 i
-          |}).
-  constructor.
-  destruct x. simpl.
+  eexists {| nextInterval := nextInterval0
+           ; unhandled    := unhandled0
+           ; active       := currentIntervalId0 :: active0
+           ; inactive     := inactive0
+           ; handled      := handled0
+           ; getInterval  := getInterval0
+           ; assignments  := fun i =>
+               if cmp_eq_dec i currentIntervalId0
+               then Some reg
+               else assignments0 i
+           |}.
+  rapply Build_SSMorph; simpl; auto.
   Grab Existential Variables.
-  unfold all_state_lists in *.
-  unfold all_state_lists0 in *.
-  unfold IntervalId, IntervalId0 in *. simpl in *.
   apply NoDup_swap.
   rewrite <- app_comm_cons.
   apply NoDup_swap_cons.
@@ -490,13 +523,13 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
-Definition tryAllocateFreeReg (i : CurrentInterval)
-  : option (PhysReg * CurrentInterval) :=
+Definition tryAllocateFreeReg `(i : CurrentInterval st)
+  : option (PhysReg *
+            { st' : ScanState & CurrentInterval st' & SSMorph st st' }) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
      and iterate over the register set. *)
-  let st        := resultState i in
   let currentId := currentIntervalId i in
   let rs        := currentRanges i in
   let current   := currentInterval i in
@@ -520,12 +553,15 @@ Definition tryAllocateFreeReg (i : CurrentInterval)
   (* reg = register with highest freeUntilPos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
   let (reg, mres) := findRegister freeUntilPos lastReg in
-  let useReg      := (reg, {| resultState       := st
-                            ; currentRanges     := rs
-                            ; currentIntervalId := currentId
-                            ; currentInterval   := current
-                            ; not_present       := not_present i
-                           |}) in
+
+  let current' :=
+      {| currentRanges     := rs
+       ; currentIntervalId := currentId
+       ; currentInterval   := current
+       ; not_present       := not_present i
+       |} in
+  let result := existT2 _ _ st current' (newSSMorph st) in
+  let useReg := (reg, result) in
 
   (* [mres] indicates the highest use position of the indicated register,
      which is the furthest available. *)
@@ -553,9 +589,9 @@ Definition tryAllocateFreeReg (i : CurrentInterval)
     that the only outcome was to split one or more intervals.  This is why the
     type differs from [tryAllocateFreeReg], since in all cases the final state
     is changed. *)
-Definition allocateBlockedReg (i : CurrentInterval)
-  : option PhysReg * CurrentInterval :=
-  let st        := resultState i in
+Definition allocateBlockedReg `(i : CurrentInterval st)
+  : option PhysReg *
+    { st' : ScanState & CurrentInterval st' & SSMorph st st' } :=
   let currentId := currentIntervalId i in
   let rs        := currentRanges i in
   let current   := currentInterval i in
@@ -582,10 +618,12 @@ Definition allocateBlockedReg (i : CurrentInterval)
   (* // make sure that current does not intersect with
      // the fixed interval for reg
      if current intersects with the fixed interval for reg then
-       splse current before this intersection *)
-  (None, i).
+       split current before this intersection *)
 
-Definition transportId_le `(H : nextInterval st <= nextInterval st')
+  let result := existT2 _ _ st i (newSSMorph st) in
+  (None, result).
+
+Definition transportId `(H : nextInterval st <= nextInterval st')
   (x : IntervalId st) : IntervalId st'.
 Proof.
   destruct st. destruct st'.
@@ -595,9 +633,11 @@ Proof.
   assumption.
 Defined.
 
+(*
 Definition transportId `(H : nextInterval st = nextInterval st')
   (x : IntervalId st) : IntervalId st' :=
   transportId_le (Nat.eq_le_incl _ _ H) x.
+*)
 
 Definition existT_in_cons : forall {A a} {l : list A},
   {x : A & In x l} -> {x : A & In x (a :: l)}.
@@ -621,13 +661,23 @@ Definition activeIntervals (st : ScanState)
       end in
   go (active st).
 
+Definition inactiveIntervals (st : ScanState)
+  : list { i : IntervalId st & In i (inactive st) } :=
+  let fix go l :=
+      match l with
+      | nil => nil
+      | cons x xs =>
+          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
+      end in
+  go (inactive st).
+
 (* Given a starting [ScanState] (at which point, [st = st0]), walk through the
    list of active intervals and mutate [st0] until it reflects the desired end
    state. *)
-Fixpoint checkActiveIntervals st pos : ScanState :=
-  let fix go st st0 is pos :=
+Fixpoint checkActiveIntervals st pos : { st' : ScanState & SSMorph st st' } :=
+  let fix go st ss is pos :=
     match is with
-    | nil => st0
+    | nil => ss
     | x :: xs =>
         (* // check for intervals in active that are handled or inactive
            for each interval it in active do
@@ -639,11 +689,11 @@ Fixpoint checkActiveIntervals st pos : ScanState :=
         let st1 := if intervalEnd i <? pos
                    then moveActiveToHandled (projT1 x) (projT2 x)
                    else if negb (intervalCoversPos i pos)
-                        then moveActiveToInactive (projT1 x) (projT2 x).
-                        else st0 in
+                        then moveActiveToInactive (projT1 x) (projT2 x)
+                        else ss in
         go st st1 xs pos
     end in
-  go st st (activeIntervals st) pos.
+  go st (existT _ st (newSSMorph st)) (activeIntervals st) pos.
 
 (*
 Lemma checkActiveIntervals_spec1 : forall st st' pos,
@@ -659,11 +709,13 @@ Proof.
   subst. apply NoDup_swap in H3.
   specialize (IHactive0 H3).
 Admitted.
+*)
 
 (* Given a starting [ScanState] (at which point, [st = st0]), walk through the
    list of active intervals and mutate [st0] until it arrives at the desired
    end state. *)
 
+(*
 Fixpoint checkActiveIntervals st pos
   : { st' : ScanState & nextInterval st' = nextInterval st } :=
   let fix go st st0 H is pos :=
@@ -693,6 +745,7 @@ Fixpoint checkActiveIntervals st pos
   go st st eq_refl (activeIntervals st) pos.
 *)
 
+(*
 Lemma checkActiveIntervals_spec1 : forall st st' pos,
   st' = checkActiveIntervals st pos -> nextInterval st = nextInterval st'.
 Proof.
@@ -714,15 +767,26 @@ Proof.
   apply (IHactive0 H2).
 *)
 Admitted.
+*)
 
-Lemma checkActiveIntervals_spec2 : forall st st' i pos
-  (H : st' = checkActiveIntervals st pos),
+Lemma checkActiveIntervals_spec2 : forall st ss i pos
+  (H : ss = checkActiveIntervals st pos),
   ~ In i (all_state_lists st)
-    -> ~ In (transportId (checkActiveIntervals_spec1 st st' pos H) i)
-            (all_state_lists st').
+    -> ~ In (transportId (next_interval_increases (projT2 ss)) i)
+            (all_state_lists (projT1 ss)).
 Proof.
+  intros.
+  destruct ss. simpl.
+  destruct s. simpl.
+  unfold all_state_lists in *.
+  simpl in H0.
+  destruct x. simpl.
+  destruct H.
+  unfold not in *. intros.
+  apply H0.
 Admitted.
 
+(*
 Fixpoint checkInactiveIntervals st pos : ScanState :=
   let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
     match is with
@@ -757,10 +821,40 @@ Lemma checkInactiveIntervals_spec2 : forall st st' i pos
             (all_state_lists st').
 Proof.
 Admitted.
+*)
 
-Definition handleInterval (i : CurrentInterval) : ScanState :=
+Fixpoint checkInactiveIntervals st pos : { st' : ScanState & SSMorph st st' } :=
+  let fix go st ss is pos :=
+    match is with
+    | nil => ss
+    | x :: xs =>
+        (* // check for intervals in active that are handled or inactive
+           for each interval it in active do
+             if it ends before position then
+               move it from active to handled
+             else if it covers position then
+               move it from active to inactive *)
+        let i := projT2 (getInterval st (projT1 x)) in
+        let st1 := if intervalEnd i <? pos
+                   then moveInactiveToHandled (projT1 x) (projT2 x)
+                   else if intervalCoversPos i pos
+                        then moveInactiveToActive (projT1 x) (projT2 x)
+                        else ss in
+        go st st1 xs pos
+    end in
+  go st (existT _ st (newSSMorph st)) (inactiveIntervals st) pos.
+
+Lemma checkInactiveIntervals_spec2 : forall st ss i pos
+  (H : ss = checkInactiveIntervals st pos),
+  ~ In i (all_state_lists st)
+    -> ~ In (transportId (next_interval_increases (projT2 ss)) i)
+            (all_state_lists (projT1 ss)).
+Proof.
+Admitted.
+
+Definition handleInterval `(i : CurrentInterval st0)
+  : { st' : ScanState & smaller_extent st0 st' } :=
   (* position = start position of current *)
-  let st0       := resultState i in
   let currentId := currentIntervalId i in
   let rs        := currentRanges i in
   let current   := currentInterval i in
@@ -772,11 +866,10 @@ Definition handleInterval (i : CurrentInterval) : ScanState :=
          move it from active to handled
        else if it does not cover position then
          move it from active to inactive *)
-  let st1 := checkActiveIntervals st0 position in
-  let Heq1 := checkActiveIntervals_spec1 st0 st1 position eq_refl in
-  let cid1 := transportId (eq_trans Heq1 eq_refl) currentId in
-  let Hnp1 := checkActiveIntervals_spec2 st0 st1 currentId position
+  let sp1 := checkActiveIntervals st0 position in
+  let Hnp1 := checkActiveIntervals_spec2 st0 sp1 currentId position
                                          eq_refl (not_present i) in
+  let cid1 := transportId (next_interval_increases (projT2 sp1)) currentId in
 
   (* // check for intervals in inactive that are handled or active
      for each interval it in inactive do
@@ -784,22 +877,21 @@ Definition handleInterval (i : CurrentInterval) : ScanState :=
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let st2  := checkInactiveIntervals st1 position in
-  let Heq2 := checkInactiveIntervals_spec1 st1 st2 position eq_refl in
-  let cid2 := transportId (eq_trans Heq2 eq_refl) cid1 in
-  let Hnp2 := checkInactiveIntervals_spec2 st1 st2 cid1 position
+  let sp2 := checkInactiveIntervals (projT1 sp1) position in
+  let Hnp2 := checkInactiveIntervals_spec2 (projT1 sp1) sp2 cid1 position
                                            eq_refl Hnp1 in
+  let cid2 := transportId (next_interval_increases (projT2 sp2)) cid1 in
 
   (* // find a register for current
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
-  let newDesc := {| resultState       := st2
-                  ; currentRanges     := currentRanges i
-                  ; currentIntervalId := cid2
-                  ; currentInterval   := currentInterval i
-                  ; not_present       := Hnp2
-                  |} in
+  let current' :=
+      {| currentRanges     := currentRanges i
+       ; currentIntervalId := cid2
+       ; currentInterval   := currentInterval i
+       ; not_present       := Hnp2
+       |} in
   let (mreg, result) :=
       match tryAllocateFreeReg i with
       | Some (reg, result) => (Some reg, result)
@@ -808,28 +900,36 @@ Definition handleInterval (i : CurrentInterval) : ScanState :=
 
   (* if current has a register assigned then
        add current to active *)
-  match mreg with
-  | Some reg => addToActive result reg
-  | None => resultState result
+  match result with
+  | existT2 st3 current' ss3 =>
+      match mreg with
+      | Some reg =>
+          let (st4,ss4) := addToActive current' reg in
+          existT _ st4 (transitivity ss3 ss4)
+      | None => existT _ st3 ss3
+      end
   end.
 
-Function linearScan (st : ScanState) {measure unhandledExtent st}
-  : ScanState :=
+Function linearScan (st : ScanState) {measure unhandledExtent st} : ScanState :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
   match nextUnhandled st with
   | None => st
-  | Some i => linearScan (handleInterval i)
+  | Some (existT2 st' i ss) => linearScan (projT1 (handleInterval i))
   end.
 Proof.
   (* We must prove that after every call to handleInterval, the total extent
      of the remaining unhandled intervals is less than it was before. *)
-  intros.
+  intros. subst.
+  destruct st. destruct st'.
   unfold unhandledExtent.
-  unfold intervalExtent.
-  unfold intervalStart, intervalEnd.
-  induction st.
+  unfold totalExtent. simpl.
+  destruct (nextUnhandled st).
+    destruct s. inversion teq; subst.
+    destruct c. destruct i.
+    inversion teq. subst.
+    inversion H3; subst.
 Admitted.
 
 (****************************************************************************)
