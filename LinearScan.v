@@ -178,6 +178,16 @@ Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
 Definition intervalExtent `(i : Interval rs) :=
   intervalEnd i - intervalStart i.
 
+Lemma Interval_extent_nonempty : forall `(i : Interval rs),
+  intervalExtent i > 0.
+Proof.
+  intros.
+  unfold intervalExtent.
+  pose (Interval_nonempty i).
+  apply lt_minus in l.
+  assumption.
+Qed.
+
 (****************************************************************************)
 
 (** * Main algorithm *)
@@ -226,15 +236,6 @@ Proof.
   apply (fin_transport nextInterval0 nextInterval1 H).
   assumption.
 Defined.
-
-Lemma NoDup_cons_fin : forall n x (xs : list (fin n)),
-  x = ultimate_Sn n -> NoDup xs -> NoDup (x :: map (fin_bump n) xs).
-Proof.
-  induction n; intros; subst.
-    inversion H0. constructor. auto.
-    constructor.
-    inversion x.
-Admitted.
 
 Lemma NoDup_wip : forall n x unh act inact hnd,
   NoDup (unh ++ act ++ inact ++ hnd) ->
@@ -351,7 +352,8 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; lists_are_unique := NoDup_nil _
        |}
 
-  | ScanState_newUnhandled ni ue unh unhsort act inact hnd geti assgn lau newi :
+  | ScanState_newUnhandled
+      ni ue unh unhsort act inact hnd geti assgn lau :
     forall `(i : Interval d),
     ScanState
       {| nextInterval     := ni
@@ -365,7 +367,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; unhandled_sorted := unhsort
        ; lists_are_unique := lau
        |} ->
-    forall (H : newi = ultimate_Sn ni),
+    forall newi (H : newi = ultimate_Sn ni),
     ScanState
       {| nextInterval     := S ni
        ; unhandledExtent  := ue + intervalExtent i
@@ -387,7 +389,8 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; lists_are_unique := NoDup_wip ni newi unh _ _ _ lau
        |}
 
-  | ScanState_dropUnhandled ni ue x unh unhsort act inact hnd geti assgn lau :
+  | ScanState_dropUnhandled
+      ni ue x unh unhsort act inact hnd geti assgn lau :
     ScanState
       {| nextInterval     := ni
        ; unhandledExtent  := ue
@@ -400,9 +403,12 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; unhandled_sorted := unhsort
        ; lists_are_unique := lau
        |} ->
+    forall newe,
+    newe = intervalExtent (projT2 (geti x)) ->
+    (IF unh = [] then newe = ue else newe < ue) ->
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := ue - intervalExtent (projT2 (geti x))
+       ; unhandledExtent  := ue - newe
        ; unhandled        := unh
        ; active           := act
        ; inactive         := inact
@@ -623,19 +629,103 @@ Qed.
 Definition unhandledExtent st := totalExtent (unhandled st).
 *)
 
-Definition smaller_extent `(sd : ScanStateDesc) `(sd' : ScanStateDesc) : Prop :=
-  unhandledExtent sd' = 0 \/ unhandledExtent sd' < unhandledExtent sd.
+Record SSMorphSt (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) : Prop := {
+    is_SSMorph :> SSMorph sd1 sd2;
+
+    total_extent_measurably_decreases :
+      unhandledExtent sd2 < unhandledExtent sd1
+}.
+
+Program Instance SSMorphSt_Trans : Transitive SSMorphSt.
+Obligation 1.
+  constructor.
+    destruct H. destruct H0.
+    transitivity y; assumption.
+  inversion H. inversion H0.
+  destruct total_extent_measurably_decreases1. omega.
+  destruct total_extent_measurably_decreases0. omega.
+  right. omega.
+Qed.
+
+Theorem compose_ssmorph_with_ssmorphst : forall (sd1 sd2 sd3 : ScanStateDesc),
+  SSMorphSt sd1 sd2 -> SSMorph sd2 sd3 -> SSMorphSt sd1 sd3.
+Proof.
+  intros.
+  constructor.
+  inversion H.
+  transitivity sd2; assumption.
+  inversion H. inversion H0. omega.
+Qed.
+
+Theorem ssmorphst_proj_unhandledExtent : forall (sd1 sd3 : ScanStateDesc),
+  SSMorphSt sd1 sd3 -> unhandledExtent sd3 < unhandledExtent sd1.
+Proof.
+  intros. inversion H. assumption.
+Qed.
+
+Lemma ScanState_unhandledExtent_nonzero `(st : ScanState sd) :
+  length (unhandled sd) > 0 <-> unhandledExtent sd > 0.
+Proof.
+  intros.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil".
+    split; intros; inversion H.
+  - Case "ScanState_newUnhandled".
+    pose (Interval_extent_nonempty i); omega.
+  - Case "ScanState_dropUnhandled".
+    destruct (geti x). simpl.
+    pose (Interval_extent_nonempty i0).
+    split; intros.
+      destruct unh. inversion H.
+      inversion i.
+        inversion H0. inversion H1.
+      omega.
+    destruct unh.
+      inversion i. inversion H0.
+        subst. simpl in *.
+        rewrite H2 in H.
+        rewrite Minus.minus_diag in H.
+        inversion H.
+      inversion H0.
+      contradiction H1. reflexivity.
+    simpl. apply Gt.gt_Sn_O.
+  - Case "ScanState_moveActiveToInactive".
+    apply IHst.
+  - Case "ScanState_moveActiveToHandled".
+    apply IHst.
+  - Case "ScanState_moveInactiveToActive".
+    apply IHst.
+  - Case "ScanState_moveInactiveToHandled".
+    apply IHst.
+Qed.
 
 Definition nextUnhandled `(st : ScanState sd)
   : option { sd' : ScanStateDesc &
              { st' : ScanState sd' &
-               CurrentInterval st' & smaller_extent sd sd' } }.
+               CurrentInterval st' & SSMorphSt sd sd' } }.
 Proof.
   destruct sd.
   destruct unhandled0.
     apply None.
   apply Some.
-  destruct (getInterval0 i) as [id int].
+
+  assert (unhandledExtent0 > 0) as Hu.
+    apply (@ScanState_unhandledExtent_nonzero
+           {| nextInterval := nextInterval0
+            ; unhandledExtent := unhandledExtent0
+            ; unhandled := i :: unhandled0
+            ; active := active0
+            ; inactive := inactive0
+            ; handled := handled0
+            ; getInterval := getInterval0
+            ; assignments := assignments0
+            ; unhandled_sorted := unhandled_sorted0
+            ; lists_are_unique := lists_are_unique0 |}); simpl.
+      apply st.
+    omega.
+
+  destruct (getInterval0 i) as [? int].
+
   pose (ScanState_dropUnhandled
         nextInterval0
         unhandledExtent0
@@ -647,23 +737,46 @@ Proof.
         getInterval0
         assignments0
         lists_are_unique0 st).
+
   eexists.
-  exists s.
+  pose (intervalExtent (projT2 (getInterval0 i))).
+  eexists (s n eq_refl _).
+
   rapply Build_CurrentInterval.
     apply i.
     apply int.
 
   (* Prove that a call to [nextUnhandled] must always reduce the unhandled
      extent. *)
-  unfold smaller_extent. simpl.
-  unfold intervalExtent.
-  unfold intervalStart, intervalEnd.
   clear s.
-  remember (getInterval0 i) as v. destruct v.
-  destruct unhandledExtent0; simpl. auto. right.
-  assert (ibeg x < iend x) by (apply (interval_nonempty x)).
-  apply lt_minus in H.
-  destruct (iend x - ibeg x); inversion H; omega.
+  constructor.
+    constructor; auto.
+    simpl. unfold intervalExtent.
+    unfold intervalStart, intervalEnd.
+    remember (getInterval0 i) as v.
+    destruct v. simpl.
+    destruct unhandledExtent0; simpl. auto.
+    right.
+    assert (ibeg x0 < iend x0)
+      by (apply (interval_nonempty x0)).
+    apply lt_minus in H.
+    destruct (iend x0 - ibeg x0);
+      inversion H; omega.
+
+  (* jww (2014-09-19): How can I remove this duplication? *)
+  simpl. unfold intervalExtent.
+  unfold intervalStart, intervalEnd.
+  remember (getInterval0 i) as v.
+  destruct v. simpl.
+  assert (ibeg x0 < iend x0)
+    by (apply (interval_nonempty x0)).
+  apply lt_minus in H. omega.
+
+  Grab Existential Variables.
+  destruct unhandled0.
+    left. split. reflexivity.
+    admit.
+  admit.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
@@ -790,7 +903,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   : option (PhysReg *
             { sd' : ScanStateDesc &
               { st' : ScanState sd' &
-                CurrentInterval st' & smaller_extent sd sd' } }) :=
+                CurrentInterval st' & SSMorph sd sd' } }) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -851,7 +964,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
 Definition allocateBlockedReg `(st : ScanState sd) `(i : CurrentInterval st)
   : option PhysReg *
     { sd' : ScanStateDesc &
-      { st' : ScanState sd' & CurrentInterval st' & smaller_extent sd sd' } } :=
+      { st' : ScanState sd' & CurrentInterval st' & SSMorph sd sd' } } :=
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -1119,7 +1232,7 @@ Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
   : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
 
 Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
-  : { sd' : ScanStateDesc & ScanState sd' & smaller_extent sd0 sd' } :=
+  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd0 sd' } :=
   (* position = start position of current *)
   let currentId := currentIntervalId i in
   let cd        := currentDesc i in
@@ -1185,51 +1298,18 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
        HANDLE_INTERVAL (current) *)
   match nextUnhandled st with
   | None => existT _ sd st
-  | Some p =>
-    let res := handleInterval (projT1 (projT2 p)) (projT2 (projT2 p)) in
-    linearScan (projTT1 res) (projTT2 res)
+  | Some (existT sd1 (existT2 st1 i smorph1)) =>
+    match handleInterval st1 i with
+    | existT2 sd2 st2 smorph2 => linearScan sd2 st2
+    end
   end.
 Proof.
   (* We must prove that after every call to handleInterval, the total extent
      of the remaining unhandled intervals is less than it was before. *)
   intros.
-  destruct p as [sd' [st' i]]; subst; simpl.
-  ScanState_cases (induction st) Case; simpl in *.
-  Case "ScanState_nil".
-    inversion teq.
-  Case "ScanState_newUnhandled".
-    admit.
-  Case "ScanState_dropUnhandled".
-    ScanState_cases (destruct st') SCase; simpl in *.
-    SCase "ScanState_nil".
-      admit.
-    SCase "ScanState_newUnhandled".
-      admit.
-    SCase "ScanState_dropUnhandled".
-      admit.
-    SCase "ScanState_moveActiveToInactive".
-      admit.
-    SCase "ScanState_moveActiveToHandled".
-      admit.
-    SCase "ScanState_moveInactiveToActive".
-      admit.
-    SCase "ScanState_moveInactiveToHandled".
-      admit.
-  Case "ScanState_moveActiveToInactive".
-    apply IHst.
-    unfold nextUnhandled in *.
-    destruct sd.
-    destruct unhandled0; simpl in *.
-      inversion teq.
-    rewrite <- teq.
-    admit.
-  Case "ScanState_moveActiveToHandled".
-    admit.
-  Case "ScanState_moveInactiveToActive".
-    admit.
-  Case "ScanState_moveInactiveToHandled".
-    admit.
-Admitted.
+  apply ssmorphst_proj_unhandledExtent.
+  apply compose_ssmorph_with_ssmorphst with (sd2 := sd1); assumption.
+Defined.
 
 (****************************************************************************)
 
