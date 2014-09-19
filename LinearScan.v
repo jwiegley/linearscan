@@ -525,7 +525,8 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
     register will have been assigned. *)
 Definition tryAllocateFreeReg `(i : CurrentInterval st)
   : option (PhysReg *
-            { st' : ScanState & CurrentInterval st' & SSMorph st st' }) :=
+            { st' : ScanState & CurrentInterval st' &
+              SSMorph st st' \/ smaller_extent st st' }) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -560,7 +561,7 @@ Definition tryAllocateFreeReg `(i : CurrentInterval st)
        ; currentInterval   := current
        ; not_present       := not_present i
        |} in
-  let result := existT2 _ _ st current' (newSSMorph st) in
+  let result := existT2 _ _ st current' (or_introl (newSSMorph st)) in
   let useReg := (reg, result) in
 
   (* [mres] indicates the highest use position of the indicated register,
@@ -591,7 +592,7 @@ Definition tryAllocateFreeReg `(i : CurrentInterval st)
     is changed. *)
 Definition allocateBlockedReg `(i : CurrentInterval st)
   : option PhysReg *
-    { st' : ScanState & CurrentInterval st' & SSMorph st st' } :=
+    { st' : ScanState & CurrentInterval st' & smaller_extent st st' } :=
   let currentId := currentIntervalId i in
   let rs        := currentRanges i in
   let current   := currentInterval i in
