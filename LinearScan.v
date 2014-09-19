@@ -65,7 +65,9 @@ Record UsePos : Set := {
 Record RangeDesc := {
     rbeg : nat;
     rend : nat;
-    ups  : NonEmpty UsePos
+    ups  : NonEmpty UsePos;
+
+    range_nonempty : rbeg < rend         (* this comes in handy *)
 }.
 
 Inductive Range : RangeDesc -> Set :=
@@ -73,16 +75,19 @@ Inductive Range : RangeDesc -> Set :=
       Range {| rbeg := uloc u
              ; rend := S (uloc u)
              ; ups  := NE_Sing u
+             ; range_nonempty := le_n (S (uloc u))
              |}
   | R_Cons u x : Range x -> forall (H : uloc u < rbeg x),
       Range {| rbeg := uloc u
              ; rend := rend x
              ; ups  := NE_Cons u (ups x)
+             ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
              |}
   | R_Extend x b' e' : Range x ->
       Range {| rbeg := min b' (rbeg x)
              ; rend := Peano.max e' (rend x)
              ; ups  := ups x
+             ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
              |}.
 
 Definition rangeExtent (x : RangeDesc) := rend x - rbeg x.
@@ -122,28 +127,38 @@ Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
 Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
-    rds  : NonEmpty RangeDesc
+    rds  : NonEmpty RangeDesc;
+
+    interval_nonempty : ibeg < iend         (* comes in handy *)
 }.
+
+Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
+Proof. intros. omega. Qed.
 
 Inductive Interval : IntervalDesc -> Set :=
   | I_Sing : forall x, Range x ->
       Interval {| ibeg := rbeg x
                 ; iend := rend x
                 ; rds  := NE_Sing x
+                ; interval_nonempty := range_nonempty x
                 |}
-  | I_Cons1 : forall x y ib ie,
-      Interval {| ibeg := ib; iend := ie; rds := NE_Sing y |}
-        -> Range x -> rend x <= ib ->
+  | I_Cons1 : forall x y ib ie ne,
+      Interval {| ibeg := ib; iend := ie; rds := NE_Sing y;
+                  interval_nonempty := ne |}
+        -> Range x -> forall (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons x (NE_Sing y)
+                ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}
-  | I_Consn : forall x y xs ib ie,
-      Interval {| ibeg := ib; iend := ie; rds := NE_Cons y xs |}
-        -> Range x -> rend x <= ib ->
+  | I_Consn : forall x y xs ib ie ne,
+      Interval {| ibeg := ib; iend := ie; rds := NE_Cons y xs;
+                  interval_nonempty := ne |}
+        -> Range x -> forall (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons x (NE_Cons y xs)
+                ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}.
 
 Definition intervalStart `(i : Interval d) : nat := ibeg d.
@@ -608,19 +623,20 @@ Qed.
 Definition unhandledExtent st := totalExtent (unhandled st).
 *)
 
-Definition smaller_extent `(st : ScanState sd) `(st' : ScanState sd') : Prop :=
-  unhandledExtent sd' < unhandledExtent sd.
+Definition smaller_extent `(sd : ScanStateDesc) `(sd' : ScanStateDesc) : Prop :=
+  unhandledExtent sd' = 0 \/ unhandledExtent sd' < unhandledExtent sd.
 
 Definition nextUnhandled `(st : ScanState sd)
   : option { sd' : ScanStateDesc &
-             { st' : ScanState sd' & CurrentInterval st' } }.
+             { st' : ScanState sd' &
+               CurrentInterval st' & smaller_extent sd sd' } }.
 Proof.
   destruct sd.
   destruct unhandled0.
     apply None.
   apply Some.
   destruct (getInterval0 i) as [id int].
-  pose (@ScanState_dropUnhandled
+  pose (ScanState_dropUnhandled
         nextInterval0
         unhandledExtent0
         i unhandled0
@@ -636,8 +652,18 @@ Proof.
   rapply Build_CurrentInterval.
     apply i.
     apply int.
-  (* inversion lists_are_unique0. *)
-  (* unfold all_state_lists. apply H1. *)
+
+  (* Prove that a call to [nextUnhandled] must always reduce the unhandled
+     extent. *)
+  unfold smaller_extent. simpl.
+  unfold intervalExtent.
+  unfold intervalStart, intervalEnd.
+  clear s.
+  remember (getInterval0 i) as v. destruct v.
+  destruct unhandledExtent0; simpl. auto. right.
+  assert (ibeg x < iend x) by (apply (interval_nonempty x)).
+  apply lt_minus in H.
+  destruct (iend x - ibeg x); inversion H; omega.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
@@ -764,7 +790,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   : option (PhysReg *
             { sd' : ScanStateDesc &
               { st' : ScanState sd' &
-                CurrentInterval st' & SSMorph sd sd' } }) :=
+                CurrentInterval st' & smaller_extent sd sd' } }) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -825,7 +851,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
 Definition allocateBlockedReg `(st : ScanState sd) `(i : CurrentInterval st)
   : option PhysReg *
     { sd' : ScanStateDesc &
-      { st' : ScanState sd' & CurrentInterval st' & SSMorph sd sd' } } :=
+      { st' : ScanState sd' & CurrentInterval st' & smaller_extent sd sd' } } :=
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -1093,7 +1119,7 @@ Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
   : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
 
 Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd0 sd' } :=
+  : { sd' : ScanStateDesc & ScanState sd' & smaller_extent sd0 sd' } :=
   (* position = start position of current *)
   let currentId := currentIntervalId i in
   let cd        := currentDesc i in
