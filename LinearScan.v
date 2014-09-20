@@ -228,6 +228,7 @@ Proof.
   assumption.
 Defined.
 
+(*
 Lemma NoDup_wip : forall n x unh act inact hnd,
   NoDup (unh ++ act ++ inact ++ hnd) ->
   NoDup ((x :: map (fin_bump n) unh) ++
@@ -240,6 +241,7 @@ Proof.
   (* apply NoDup_unapp in H1. inversion H1. clear H1. *)
   (* apply NoDup_unapp in H2. inversion H2. clear H2. *)
 Admitted.
+*)
 
 Lemma move_active_to_inactive : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
