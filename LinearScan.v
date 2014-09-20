@@ -210,12 +210,12 @@ Record ScanStateDesc := {
     handled   : list IntervalId;   (* ends before pos *)
 
     getInterval  : IntervalId -> { d : IntervalDesc & Interval d };
-    assignments  : IntervalId -> option PhysReg;
+    assignments  : IntervalId -> option PhysReg
 
     (* unhandled_sorted : StronglySorted cmp_le unhandled; *)
 
-    all_state_lists  := unhandled ++ active ++ inactive ++ handled;
-    lists_are_unique : NoDup all_state_lists
+    (* all_state_lists  := unhandled ++ active ++ inactive ++ handled; *)
+    (* lists_are_unique : NoDup all_state_lists *)
 }.
 
 Definition transportId `(H : nextInterval st <= nextInterval st')
@@ -234,6 +234,11 @@ Lemma NoDup_wip : forall n x unh act inact hnd,
          map (fin_bump n) act ++ map (fin_bump n) inact ++
          map (fin_bump n) hnd).
 Proof.
+  intros.
+  rewrite <- app_comm_cons.
+  apply NoDup_cons.
+  (* apply NoDup_unapp in H1. inversion H1. clear H1. *)
+  (* apply NoDup_unapp in H2. inversion H2. clear H2. *)
 Admitted.
 
 Lemma move_active_to_inactive : forall sd x,
@@ -328,11 +333,11 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := fin_contra
        ; assignments      := fin_contra
        (* ; unhandled_sorted := LSorted_nil _ *)
-       ; lists_are_unique := NoDup_nil _
+       (* ; lists_are_unique := NoDup_nil _ *)
        |}
 
   | ScanState_newUnhandled
-      ni unh (* unhsort *) act inact hnd geti assgn lau :
+      ni unh (* unhsort *) act inact hnd geti assgn (* lau *) :
     forall `(i : Interval d),
     ScanState
       {| nextInterval     := ni
@@ -343,7 +348,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := geti
        ; assignments      := assgn
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := lau
+       (* ; lists_are_unique := lau *)
        |} ->
     forall newi (H : newi = ultimate_Sn ni),
     ScanState
@@ -363,11 +368,11 @@ Inductive ScanState : ScanStateDesc -> Set :=
                   | right Hn => assgn (fin_safe_reduce n (rew_in_not_eq H Hn))
                   end
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := NoDup_wip ni newi unh _ _ _ lau
+       (* ; lists_are_unique := lau *)
        |}
 
   | ScanState_dropUnhandled
-      ni x unh (* unhsort *) act inact hnd geti assgn lau :
+      ni x unh (* unhsort *) act inact hnd geti assgn (* lau *) :
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh
@@ -377,7 +382,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := geti
        ; assignments      := assgn
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := lau
+       (* ; lists_are_unique := lau *)
        |} ->
     ScanState
       {| nextInterval     := ni
@@ -388,7 +393,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := geti
        ; assignments      := assgn
        (* ; unhandled_sorted := LocallySorted_uncons _ _ _ _ unhsort *)
-       ; lists_are_unique := NoDup_uncons _ _ _ _ lau
+       (* ; lists_are_unique := NoDup_uncons _ _ _ _ lau *)
        |}
 
   | ScanState_moveActiveToInactive sd x :
@@ -402,7 +407,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := getInterval sd
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := move_active_to_inactive sd x (lists_are_unique sd) H
+       (* ; lists_are_unique := move_active_to_inactive sd x (lists_are_unique sd) H *)
        |}
 
   | ScanState_moveActiveToHandled sd x :
@@ -416,7 +421,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := getInterval sd
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := move_active_to_handled sd x (lists_are_unique sd) H
+       (* ; lists_are_unique := move_active_to_handled sd x (lists_are_unique sd) H *)
        |}
 
   | ScanState_moveInactiveToActive sd x :
@@ -430,7 +435,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := getInterval sd
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := move_inactive_to_active sd x (lists_are_unique sd) H
+       (* ; lists_are_unique := move_inactive_to_active sd x (lists_are_unique sd) H *)
        |}
 
   | ScanState_moveInactiveToHandled sd x :
@@ -444,7 +449,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := getInterval sd
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H
+       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
@@ -458,6 +463,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
+(*
 Theorem ScanState_active_bounded : forall st,
   length (active st) <= nextInterval st.
 Proof.
@@ -472,6 +478,7 @@ Proof.
   apply fin_list in H2.
   auto.
 Qed.
+*)
 
 Ltac cmp_reflexive :=
   match goal with
@@ -546,6 +553,7 @@ Record CurrentInterval `(st : ScanState sd) := {
     currentDesc       : IntervalDesc;
     currentInterval   : Interval currentDesc
 
+    (* jww (2014-09-20): Not sure if I need this *)
     (* not_present : ~ In currentIntervalId (all_state_lists sd) *)
 }.
 
@@ -732,7 +740,7 @@ Proof.
         handled0
         getInterval0
         assignments0
-        lists_are_unique0 st).
+        (* lists_are_unique0 *) st).
 
   eexists.
   pose (intervalExtent (projT2 (getInterval0 i))).
