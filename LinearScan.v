@@ -489,6 +489,16 @@ Proof.
   auto.
 Qed.
 
+Ltac cmp_reflexive :=
+  match goal with
+    [ |- context [match cmp_eq_dec ?X ?X with _ => _ end] ] =>
+      assert (cmp_eq_dec X X = left eq_refl) as Hrcmp
+        by (intros; destruct (cmp_eq_dec X X);
+              [ f_equal; apply proof_irrelevance
+              | intuition ]);
+      rewrite Hrcmp in *; clear Hrcmp; simpl in *
+  end.
+
 Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let unh := unhandled sd in
   let ue := unhandledExtent sd in
@@ -498,6 +508,60 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
         let ie := intervalExtent (projT2 (getInterval sd i)) in
         IF unh = [i] then ue = ie else ue > ie).
 Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". left. auto.
+  - Case "ScanState_newUnhandled".
+    right. split.
+      apply not_eq_sym.
+      apply nil_cons.
+    intros. intuition.
+    destruct unh eqn:Heqe; simpl.
+      destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
+                            i0 newi) eqn:Heqe2.
+        left. split. rewrite e. reflexivity.
+        inversion IHst; inversion H0.
+          simpl. omega.
+        contradiction H1. reflexivity.
+      admit.
+    right. split.
+      intuition. inversion H0.
+    destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
+                          i0 newi) eqn:Heqe2.
+      inversion IHst; inversion H0. inversion H1.
+      simpl in *.
+      specialize (H2 i0).
+      contradiction H1. reflexivity.
+    
+    inversion IHst.
+      destruct unh eqn:Heqe; simpl.
+        right. split.
+          unfold not. intros.
+          inversion H1.
+        intros.
+        destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
+                              i0 newi) eqn:Heqe2.
+          left. split. rewrite e. reflexivity.
+          inversion H0. simpl. omega.
+        right. split.
+          unfold not in *. intros.
+          apply n. congruence.
+        
+    destruct unh eqn:Heqe; simpl.
+      right. split.
+        unfold not. intros. inversion H0.
+      intros. simpl in *.
+      right. split.
+        unfold not in *. intros.
+        apply n. congruence.
+      inversion IHst; inversion H0.
+        rewrite H2 in *. simpl in *.
+      rewrite Heqe2.
+    admit.
+  - Case "ScanState_dropUnhandled". admit.
+  - Case "ScanState_moveActiveToInactive". admit.
+  - Case "ScanState_moveActiveToHandled". admit.
+  - Case "ScanState_moveInactiveToActive". admit.
+  - Case "ScanState_moveInactiveToHandled". admit.
 Admitted.
 
 (** ** SSMorph *)
@@ -642,11 +706,7 @@ Proof.
   - Case "ScanState_nil". inversion H.
   - Case "ScanState_newUnhandled".
     clear IHst.
-    assert (cmp_eq_dec newi newi = left eq_refl).
-      intros. destruct (cmp_eq_dec newi newi).
-        f_equal. apply proof_irrelevance.
-      intuition.
-    rewrite H1. clear H1. simpl.
+    cmp_reflexive.
     inversion H.
     rewrite map_length in H2.
     pose (ScanState_no_unhandledExtent st). simpl in e.
@@ -680,11 +740,7 @@ Proof.
     clear IHst.
     apply ScanState_unhandledExtent in st.
     rename st into Hi.
-    assert (cmp_eq_dec newi newi = left eq_refl).
-      intros. destruct (cmp_eq_dec newi newi).
-        f_equal. apply proof_irrelevance.
-      intuition.
-    rewrite H1 in *. clear H1. simpl in *.
+    cmp_reflexive.
     destruct unh eqn:Heqe. inversion H. inversion H2.
     inversion Hi; inversion H1. inversion H2.
     simpl in *.
