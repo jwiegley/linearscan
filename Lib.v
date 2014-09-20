@@ -511,6 +511,10 @@ Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
 Proof. intros. inversion H; subst; [ constructor | assumption ]. Qed.
 
+Lemma StronglySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
+  StronglySorted R (x :: xs) -> StronglySorted R xs.
+Proof. intros. inversion H; subst. assumption. Qed.
+
 Definition safe_hd {a} (xs : list a) (H : (length xs > 0)%nat) : a.
 Proof.
   destruct xs.
@@ -835,6 +839,31 @@ Program Instance fin_CompareSpec {n} : CompareSpec (fin n) := {
   cmp_eq_iff  := fin_compare_eq_iff n;
   cmp_gt_flip := fin_compare_gt_flip n
 }.
+
+Definition is_le (c : comparison) : bool :=
+  match c with
+    | Gt => false
+    | _  => true
+  end.
+
+Module FinOrder <: TotalLeBool.
+  Parameter n : nat.
+  Definition t := fin n.
+
+  Definition leb (x y : fin n) : bool := is_le (cmp x y).
+  Definition leb_true x y := is_true (leb x y).
+
+  Theorem leb_total : forall (a1 a2 : fin n),
+    leb a1 a2 = true \/ leb a2 a1 = true.
+  Proof.
+    intros. unfold leb.
+    destruct (cmp a1 a2) eqn:Heqe.
+    - left. reflexivity.
+    - left. reflexivity.
+    - right. apply cmp_gt_flip in Heqe.
+      rewrite Heqe. reflexivity.
+  Qed.
+End FinOrder.
 
 Definition fin_safe_reduce {n : nat} (x : fin (S n))
   (H : x <> ultimate_Sn n) : fin n.
