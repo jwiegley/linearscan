@@ -355,12 +355,6 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; lists_are_unique := lau
        |} ->
     forall newi (H : newi = ultimate_Sn ni),
-    (IF unh = []
-     then ue = 0
-     else (forall f,
-           IF unh = [f]
-           then ue = intervalExtent (projT2 (geti f))
-           else ue > intervalExtent (projT2 (geti f)))) ->
     ScanState
       {| nextInterval     := S ni
        ; unhandledExtent  := ue + intervalExtent i
@@ -396,12 +390,6 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; unhandled_sorted := unhsort
        ; lists_are_unique := lau
        |} ->
-    (IF unh = []
-     then ue = 0
-     else (forall f,
-           IF unh = [f]
-           then ue = intervalExtent (projT2 (geti f))
-           else ue > intervalExtent (projT2 (geti f)))) ->
     ScanState
       {| nextInterval     := ni
        ; unhandledExtent  := ue
@@ -501,15 +489,25 @@ Proof.
   auto.
 Qed.
 
+Theorem ScanState_unhandledExtent `(st : ScanState sd) :
+  let unh := unhandled sd in
+  let ue := unhandledExtent sd in
+  IF unh = []
+  then ue = 0
+  else (forall i,
+        let ie := intervalExtent (projT2 (getInterval sd i)) in
+        IF unh = [i] then ue = ie else ue > ie).
+Proof.
+Admitted.
+
 (** ** SSMorph *)
 
 (** A [SSMorph] is a relation describe a lawful transition between two
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) := {
-    next_interval_increases : nextInterval sd1 <= nextInterval sd2;
-    total_extent_decreases :
-      unhandledExtent sd2 <= unhandledExtent sd1;
+    next_interval_increases : nextInterval sd1     <= nextInterval sd2;
+    total_extent_decreases  : unhandledExtent sd2  <= unhandledExtent sd1;
     handled_count_increases : length (handled sd1) <= length (handled sd2)
 }.
 
@@ -585,20 +583,24 @@ Proof.
   - Case "ScanState_newUnhandled".
     pose (Interval_extent_nonempty i); omega.
   - Case "ScanState_dropUnhandled".
+    apply ScanState_unhandledExtent in st.
+    rename st into i. simpl in *.
     destruct unh eqn:Heqe.
       split; intros. inversion H.
       inversion i; inversion H0.
-        subst. inversion H.
-      contradiction H1. reflexivity.
-    inversion i.
-      inversion H. inversion H0.
-    inversion H. specialize (H1 f).
-    inversion H1.
-      inversion H2. split; intros.
-        pose (Interval_extent_nonempty (projT2 (geti f))); omega.
-      simpl. apply Gt.gt_Sn_O.
+        inversion H1.
+      specialize (H2 x).
+      inversion H2; inversion H3.
+        apply plus_eq_zero in H5. omega.
+      contradiction H4. reflexivity.
+    inversion i; inversion H.
+      inversion H0.
+    specialize (H1 x).
+    inversion H1; inversion H2.
+      split; intros; inversion H3.
     split; intros.
-      inversion H2. omega.
+      apply plus_gt_zero in H4.
+      assumption.
     simpl. apply Gt.gt_Sn_O.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
@@ -613,8 +615,15 @@ Proof.
   - Case "ScanState_nil". apply H.
   - Case "ScanState_newUnhandled". inversion H.
   - Case "ScanState_dropUnhandled".
-    subst. inversion i; inversion H0. omega.
-    apply nil_list_0 in H. contradiction.
+    apply ScanState_unhandledExtent in st.
+    rename st into Hi. simpl in *.
+    destruct unh eqn:Heqe.
+      subst. inversion Hi; inversion H0. omega.
+      apply nil_list_0 in H.
+      specialize (H2 x).
+      inversion H2; inversion H3. omega.
+      contradiction H4. reflexivity.
+    inversion H.
   - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
   - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
   - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
@@ -627,9 +636,12 @@ Lemma ScanState_sole_unhandledExtent `(st : ScanState sd)
                   (safe_hd (unhandled sd) (one_gt_zero _ H)))) =
   unhandledExtent sd.
 Proof.
+  pose proof st as Hi.
+  apply ScanState_unhandledExtent in Hi.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". inversion H.
   - Case "ScanState_newUnhandled".
+    clear IHst.
     assert (cmp_eq_dec newi newi = left eq_refl).
       intros. destruct (cmp_eq_dec newi newi).
         f_equal. apply proof_irrelevance.
@@ -640,19 +652,18 @@ Proof.
     pose (ScanState_no_unhandledExtent st). simpl in e.
     rewrite e; auto.
   - Case "ScanState_dropUnhandled".
-    inversion i; inversion H0.
-      subst. inversion H.
+    clear IHst.
     destruct unh eqn:Heqe. inversion H.
-    subst. simpl in *.
+    assert (l = []). apply nil_list_0. auto.
+    simpl in *. subst.
+    inversion Hi; inversion H0. inversion H1.
     specialize (H2 f).
-    inversion H2. inversion H3. inversion H4. auto.
-    inversion H3.
-    assert (l = []). apply nil_list_0. auto. subst.
+    inversion H2; inversion H3. auto.
     contradiction H4. reflexivity.
-  - Case "ScanState_moveActiveToInactive".  apply IHst.
-  - Case "ScanState_moveActiveToHandled".   apply IHst.
-  - Case "ScanState_moveInactiveToActive".  apply IHst.
-  - Case "ScanState_moveInactiveToHandled". apply IHst.
+  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
+  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
+  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
+  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
 Defined.
 
 Lemma ScanState_more_unhandledExtent `(st : ScanState sd)
@@ -661,16 +672,22 @@ Lemma ScanState_more_unhandledExtent `(st : ScanState sd)
                   (safe_hd (unhandled sd) (gt_one_gt_zero _ H)))) <
   unhandledExtent sd.
 Proof.
-  ScanState_cases (induction st) Case; intros; simpl in *.
+  pose proof st as Hi0.
+  apply ScanState_unhandledExtent in Hi0.
+  ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". inversion H.
   - Case "ScanState_newUnhandled".
+    clear IHst.
+    apply ScanState_unhandledExtent in st.
+    rename st into Hi.
     assert (cmp_eq_dec newi newi = left eq_refl).
       intros. destruct (cmp_eq_dec newi newi).
         f_equal. apply proof_irrelevance.
       intuition.
     rewrite H1 in *. clear H1. simpl in *.
     destruct unh eqn:Heqe. inversion H. inversion H2.
-    inversion i0; inversion H1. inversion H2.
+    inversion Hi; inversion H1. inversion H2.
+    simpl in *.
     specialize (H3 f).
     assert (forall n m, m > 0 -> n < m + n).
       intros. omega. apply H4. clear H4.
@@ -678,18 +695,21 @@ Proof.
       pose (Interval_extent_nonempty (projT2 (geti f))). omega.
     omega.
   - Case "ScanState_dropUnhandled".
+    clear IHst.
+    apply ScanState_unhandledExtent in st.
+    rename st into Hi.
     destruct unh eqn:Heqe. inversion H.
     subst. simpl in *.
     destruct l. inversion H. inversion H1.
-    inversion i; inversion H0.
+    inversion Hi0; inversion H0.
       inversion H1.
     specialize (H2 f).
     inversion H2. inversion H3. inversion H4.
     inversion H3. omega.
-  - Case "ScanState_moveActiveToInactive".  apply IHst.
-  - Case "ScanState_moveActiveToHandled".   apply IHst.
-  - Case "ScanState_moveInactiveToActive".  apply IHst.
-  - Case "ScanState_moveInactiveToHandled". apply IHst.
+  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
+  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
+  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
+  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
 Defined.
 
 Definition nextUnhandled `(st : ScanState sd)
@@ -743,7 +763,7 @@ Proof.
 
   eexists.
   pose (intervalExtent (projT2 (getInterval0 i))).
-  eexists (s _).
+  exists s.
 
   rapply Build_CurrentInterval.
     apply i.
@@ -767,34 +787,6 @@ Proof.
   assert (ibeg x0 < iend x0)
     by (apply (interval_nonempty x0)).
   apply lt_minus in H. omega.
-
-  Grab Existential Variables.
-
-  simpl in *.
-  destruct unhandled0 eqn:Heqe.
-    left. split. reflexivity.
-    simpl in *. unfold n.
-    assert (forall n m, n = n + m -> m = 0). intros. omega.
-    apply H in e. apply e. reflexivity.
-    right. split.
-    unfold not. intros. inversion H.
-
-  admit.
-  (*
-  destruct l0 eqn:Heqe2; intros.
-    simpl in *. unfold n. intros.
-    destruct (cmp_eq_dec i0 f).
-      left. split. rewrite e0. reflexivity.
-    right. split.
-    assert (forall a (x y : a), x <> y -> [x] <> [y]).
-      intros. intros. unfold not in *. intros.
-      apply H. inversion H0. reflexivity.
-    apply H. assumption.
-    admit.
-  right. split.
-    unfold not in *. intros. inversion H.
-  admit.
-  *)
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
@@ -805,6 +797,13 @@ Proof.
   destruct sd. simpl.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
+Defined.
+
+Definition moveActiveToHandled' `(st : ScanState sd) `(x : IntervalId sd)
+  (H : In x (active sd))
+  : { sd' : ScanStateDesc & ScanState sd' }.
+Proof.
+  pose (ScanState_moveActiveToHandled sd x st H). eexists. apply s.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) `(x : IntervalId sd)

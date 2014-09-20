@@ -90,6 +90,12 @@ Proof. intros. omega. Qed.
 Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
 Proof. intros. omega. Qed.
 
+Lemma plus_eq_zero : forall n m, n + m = n -> m = 0.
+Proof. intros. omega. Qed.
+
+Lemma plus_gt_zero : forall n m, n + m > n -> m > 0.
+Proof. intros. omega. Qed.
+
 (** ** option *)
 
 Fixpoint catMaybes {a : Set} (l : list (option a)) : list a :=
