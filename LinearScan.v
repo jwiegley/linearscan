@@ -202,7 +202,7 @@ Record ScanStateDesc := {
     nextInterval : nat;
     IntervalId   := fin nextInterval;
 
-    unhandledExtent : nat;
+    (* unhandledExtent : nat; *)
 
     unhandled : list IntervalId;   (* starts after pos *)
     active    : list IntervalId;   (* ranges over pos *)
@@ -328,7 +328,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
   | ScanState_nil :
     ScanState
       {| nextInterval     := 0
-       ; unhandledExtent  := 0
+       (* ; unhandledExtent  := 0 *)
        ; unhandled        := nil
        ; active           := nil
        ; inactive         := nil
@@ -344,7 +344,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     forall `(i : Interval d),
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := ue
+       (* ; unhandledExtent  := ue *)
        ; unhandled        := unh
        ; active           := act
        ; inactive         := inact
@@ -357,7 +357,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     forall newi (H : newi = ultimate_Sn ni),
     ScanState
       {| nextInterval     := S ni
-       ; unhandledExtent  := ue + intervalExtent i
+       (* ; unhandledExtent  := ue + intervalExtent i *)
        ; unhandled        := newi :: map (fin_bump ni) unh
        ; active           := map (fin_bump ni) act
        ; inactive         := map (fin_bump ni) inact
@@ -380,7 +380,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
       ni ue x unh unhsort act inact hnd geti assgn lau :
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := intervalExtent (projT2 (geti x)) + ue
+       (* ; unhandledExtent  := intervalExtent (projT2 (geti x)) + ue *)
        ; unhandled        := x :: unh
        ; active           := act
        ; inactive         := inact
@@ -392,7 +392,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        |} ->
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := ue
+       (* ; unhandledExtent  := ue *)
        ; unhandled        := unh
        ; active           := act
        ; inactive         := inact
@@ -407,7 +407,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     ScanState sd -> forall (H : In x (active sd)),
     ScanState
       {| nextInterval     := nextInterval sd
-       ; unhandledExtent  := unhandledExtent sd
+       (* ; unhandledExtent  := unhandledExtent sd *)
        ; unhandled        := unhandled sd
        ; active           := remove cmp_eq_dec x (active sd)
        ; inactive         := x :: inactive sd
@@ -422,7 +422,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     ScanState sd -> forall (H : In x (active sd)),
     ScanState
       {| nextInterval     := nextInterval sd
-       ; unhandledExtent  := unhandledExtent sd
+       (* ; unhandledExtent  := unhandledExtent sd *)
        ; unhandled        := unhandled sd
        ; active           := remove cmp_eq_dec x (active sd)
        ; inactive         := inactive sd
@@ -437,7 +437,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     ScanState sd -> forall (H : In x (inactive sd)),
     ScanState
       {| nextInterval     := nextInterval sd
-       ; unhandledExtent  := unhandledExtent sd
+       (* ; unhandledExtent  := unhandledExtent sd *)
        ; unhandled        := unhandled sd
        ; active           := x :: active sd
        ; inactive         := remove cmp_eq_dec x (inactive sd)
@@ -452,7 +452,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
     ScanState sd -> forall (H : In x (inactive sd)),
     ScanState
       {| nextInterval     := nextInterval sd
-       ; unhandledExtent  := unhandledExtent sd
+       (* ; unhandledExtent  := unhandledExtent sd *)
        ; unhandled        := unhandled sd
        ; active           := active sd
        ; inactive         := remove cmp_eq_dec x (inactive sd)
@@ -499,18 +499,86 @@ Ltac cmp_reflexive :=
       rewrite Hrcmp in *; clear Hrcmp; simpl in *
   end.
 
+Definition unhandledExtent `(st : ScanState sd) : nat :=
+  match unhandled sd with
+  | nil => 0
+  | [i] => intervalExtent (projT2 (getInterval sd i))
+  | xs  =>
+    let f n x := n + intervalExtent (projT2 (getInterval sd x)) in
+    fold_left f xs 0
+  end.
+
 Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let unh := unhandled sd in
-  let ue := unhandledExtent sd in
-  IF unh = []
-  then ue = 0
-  else (forall i,
-        let ie := intervalExtent (projT2 (getInterval sd i)) in
-        IF unh = [i] then ue = ie else ue > ie).
+  let ue  := unhandledExtent sd in
+  match unh with
+  | nil    => ue = 0
+  | [i]    => ue = intervalExtent (projT2 (getInterval sd i))
+  | i :: _ => ue > intervalExtent (projT2 (getInterval sd i))
+  end.
 Proof.
+  induction unh eqn:Heqe; simpl.
+    ScanState_cases (induction st) Case; simpl in *.
+    Case "ScanState_nil". reflexivity.
+    Case "ScanState_newUnhandled".
+      subst. inversion Heqe.
+    Case "ScanState_dropUnhandled".
+      pose (Interval_extent_nonempty (projT2 (geti x))).
+      destruct (geti x). simpl in *. subst.
+      destruct unh0.
+        admit.
+      inversion Heqe.
+    Case "ScanState_moveActiveToInactive". auto.
+    Case "ScanState_moveActiveToHandled". auto.
+    Case "ScanState_moveInactiveToActive". auto.
+    Case "ScanState_moveInactiveToHandled". auto.
+  simpl in *.
+  induction l eqn:Heqe2; simpl.
+    ScanState_cases (induction st) Case; simpl in *.
+    Case "ScanState_nil".
+      subst. inversion Heqe.
+    Case "ScanState_newUnhandled".
+      destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
+                            a newi) eqn:Heqe3; simpl in *.
+        simpl.
+          left. split.
+    Case "ScanState_dropUnhandled".
+      admit.
+    Case "ScanState_moveActiveToInactive". auto.
+    Case "ScanState_moveActiveToHandled". auto.
+    Case "ScanState_moveInactiveToActive". auto.
+    Case "ScanState_moveInactiveToHandled". auto.
+  simpl in *.
+  ScanState_cases (induction st) Case; simpl in *.
+  Case "ScanState_nil".
+    subst. inversion Heqe.
+  Case "ScanState_newUnhandled".
+    right. split.
+      apply not_eq_sym.
+      apply nil_cons.
+    intros.
+    induction l eqn:Heqe3.
+    destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
+                          i0 newi) eqn:Heqe2.
+        left. split.
+  Case "ScanState_dropUnhandled".
+    admit.
+  Case "ScanState_moveActiveToInactive". auto.
+  Case "ScanState_moveActiveToHandled". auto.
+  Case "ScanState_moveInactiveToActive". auto.
+  Case "ScanState_moveInactiveToHandled". auto.
+Qed.
+
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". left. auto.
   - Case "ScanState_newUnhandled".
+    inversion IHst.
+      right. split.
+        apply not_eq_sym.
+        apply nil_cons.
+      eexists.
+      left. split.
+        inversion H0.
     right. split.
       apply not_eq_sym.
       apply nil_cons.
