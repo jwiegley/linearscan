@@ -127,9 +127,6 @@ Record IntervalDesc := {
     interval_nonempty : ibeg < iend         (* comes in handy *)
 }.
 
-Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
-Proof. intros. omega. Qed.
-
 Inductive Interval : IntervalDesc -> Set :=
   | I_Sing : forall x, Range x ->
       Interval {| ibeg := rbeg x
@@ -358,6 +355,12 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; lists_are_unique := lau
        |} ->
     forall newi (H : newi = ultimate_Sn ni),
+    (IF unh = []
+     then ue = 0
+     else (forall f,
+           IF unh = [f]
+           then ue = intervalExtent (projT2 (geti f))
+           else ue > intervalExtent (projT2 (geti f)))) ->
     ScanState
       {| nextInterval     := S ni
        ; unhandledExtent  := ue + intervalExtent i
@@ -383,7 +386,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
       ni ue x unh unhsort act inact hnd geti assgn lau :
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := ue
+       ; unhandledExtent  := intervalExtent (projT2 (geti x)) + ue
        ; unhandled        := x :: unh
        ; active           := act
        ; inactive         := inact
@@ -393,12 +396,15 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; unhandled_sorted := unhsort
        ; lists_are_unique := lau
        |} ->
-    forall newe,
-    newe = intervalExtent (projT2 (geti x)) ->
-    (IF unh = [] then newe = ue else newe < ue) ->
+    (IF unh = []
+     then ue = 0
+     else (forall f,
+           IF unh = [f]
+           then ue = intervalExtent (projT2 (geti f))
+           else ue > intervalExtent (projT2 (geti f)))) ->
     ScanState
       {| nextInterval     := ni
-       ; unhandledExtent  := ue - newe
+       ; unhandledExtent  := ue
        ; unhandled        := unh
        ; active           := act
        ; inactive         := inact
@@ -579,37 +585,25 @@ Proof.
   - Case "ScanState_newUnhandled".
     pose (Interval_extent_nonempty i); omega.
   - Case "ScanState_dropUnhandled".
-    destruct (geti x). simpl.
-    pose (Interval_extent_nonempty i0).
-    split; intros.
-      destruct unh. inversion H.
-      inversion i.
-        inversion H0. inversion H1.
-      omega.
-    destruct unh.
-      inversion i. inversion H0.
-        subst. simpl in *.
-        rewrite H2 in H.
-        rewrite Minus.minus_diag in H.
-        inversion H.
-      inversion H0.
+    destruct unh eqn:Heqe.
+      split; intros. inversion H.
+      inversion i; inversion H0.
+        subst. inversion H.
       contradiction H1. reflexivity.
+    inversion i.
+      inversion H. inversion H0.
+    inversion H. specialize (H1 f).
+    inversion H1.
+      inversion H2. split; intros.
+        pose (Interval_extent_nonempty (projT2 (geti f))); omega.
+      simpl. apply Gt.gt_Sn_O.
+    split; intros.
+      inversion H2. omega.
     simpl. apply Gt.gt_Sn_O.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
-Qed.
-
-Lemma one_gt_zero : forall n, n = 1 -> n > 0.
-Proof. intros. omega. Qed.
-
-Lemma nil_list_0 : forall a (xs : list a), length xs = 0 <-> xs = [].
-Proof.
-  split; intros.
-    induction xs. reflexivity.
-    inversion H.
-  rewrite H. auto.
 Qed.
 
 Lemma ScanState_no_unhandledExtent `(st : ScanState sd)
@@ -650,17 +644,16 @@ Proof.
       subst. inversion H.
     destruct unh eqn:Heqe. inversion H.
     subst. simpl in *.
-    destruct (geti x).
-    destruct (geti f). simpl in *.
-    admit.
+    specialize (H2 f).
+    inversion H2. inversion H3. inversion H4. auto.
+    inversion H3.
+    assert (l = []). apply nil_list_0. auto. subst.
+    contradiction H4. reflexivity.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
 Defined.
-
-Lemma gt_one_gt_zero : forall n, n > 1 -> n > 0.
-Proof. intros. omega. Qed.
 
 Lemma ScanState_more_unhandledExtent `(st : ScanState sd)
   (H : length (unhandled sd) > 1) :
@@ -676,13 +669,23 @@ Proof.
         f_equal. apply proof_irrelevance.
       intuition.
     rewrite H1 in *. clear H1. simpl in *.
+    destruct unh eqn:Heqe. inversion H. inversion H2.
+    inversion i0; inversion H1. inversion H2.
+    specialize (H3 f).
     assert (forall n m, m > 0 -> n < m + n).
-      intros. omega. apply H1. clear H1.
-    admit.
+      intros. omega. apply H4. clear H4.
+    inversion H3; inversion H4.
+      pose (Interval_extent_nonempty (projT2 (geti f))). omega.
+    omega.
   - Case "ScanState_dropUnhandled".
+    destruct unh eqn:Heqe. inversion H.
+    subst. simpl in *.
+    destruct l. inversion H. inversion H1.
     inversion i; inversion H0.
-      subst. inversion H.
-    admit.
+      inversion H1.
+    specialize (H2 f).
+    inversion H2. inversion H3. inversion H4.
+    inversion H3. omega.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
@@ -702,6 +705,15 @@ Proof.
     apply None.
   apply Some.
 
+  assert { xe : nat & unhandledExtent0 =
+                      intervalExtent (projT2 (getInterval0 i)) + xe } as Hxe.
+    exists (unhandledExtent0 - intervalExtent (projT2 (getInterval0 i))).
+    apply Minus.le_plus_minus. subst. simpl in *.
+    apply Lt.le_lt_or_eq_iff.
+    destruct unhandled0.
+      right. apply e. auto.
+    left. apply l. simpl. omega.
+
   assert (unhandledExtent0 > 0) as Hu.
     apply (@ScanState_unhandledExtent_nonzero
            {| nextInterval := nextInterval0
@@ -717,12 +729,10 @@ Proof.
       apply st.
     omega.
 
-  destruct (getInterval0 i) as [? int].
-
+  destruct Hxe. subst.
   pose (ScanState_dropUnhandled
         nextInterval0
-        unhandledExtent0
-        i unhandled0
+        x i unhandled0
         unhandled_sorted0
         active0
         inactive0
@@ -733,12 +743,11 @@ Proof.
 
   eexists.
   pose (intervalExtent (projT2 (getInterval0 i))).
-  specialize (s n eq_refl).
   eexists (s _).
 
   rapply Build_CurrentInterval.
     apply i.
-    apply int.
+    apply (projT2 (getInterval0 i)).
 
   (* Prove that a call to [nextUnhandled] must always reduce the unhandled
      extent. *)
@@ -748,14 +757,7 @@ Proof.
     simpl. unfold intervalExtent.
     unfold intervalStart, intervalEnd.
     remember (getInterval0 i) as v.
-    destruct v. simpl.
-    destruct unhandledExtent0; simpl. auto.
-    right.
-    assert (ibeg x0 < iend x0)
-      by (apply (interval_nonempty x0)).
-    apply lt_minus in H.
-    destruct (iend x0 - ibeg x0);
-      inversion H; omega.
+    destruct v. simpl. omega.
 
   (* jww (2014-09-19): How can I remove this duplication? *)
   simpl. unfold intervalExtent.
@@ -767,14 +769,32 @@ Proof.
   apply lt_minus in H. omega.
 
   Grab Existential Variables.
-  destruct unhandled0.
+
+  simpl in *.
+  destruct unhandled0 eqn:Heqe.
     left. split. reflexivity.
     simpl in *. unfold n.
-    apply e. reflexivity.
-  right. split.
+    assert (forall n m, n = n + m -> m = 0). intros. omega.
+    apply H in e. apply e. reflexivity.
+    right. split.
     unfold not. intros. inversion H.
-  simpl in *. unfold n.
-  apply l. omega.
+
+  admit.
+  (*
+  destruct l0 eqn:Heqe2; intros.
+    simpl in *. unfold n. intros.
+    destruct (cmp_eq_dec i0 f).
+      left. split. rewrite e0. reflexivity.
+    right. split.
+    assert (forall a (x y : a), x <> y -> [x] <> [y]).
+      intros. intros. unfold not in *. intros.
+      apply H. inversion H0. reflexivity.
+    apply H. assumption.
+    admit.
+  right. split.
+    unfold not in *. intros. inversion H.
+  admit.
+  *)
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
@@ -889,7 +909,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   : option (PhysReg *
             { sd' : ScanStateDesc &
               { st' : ScanState sd' &
-                CurrentInterval st' & SSMorph sd sd' } }) :=
+                      CurrentInterval st' & SSMorph sd sd' } }) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -907,8 +927,8 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   (* for each interval it in inactive intersecting with current do
        freeUntilPos[it.reg] = next intersection of it with current *)
   let intersectingIntervals :=
-        filter (fun x =>
-                  anyRangeIntersects (rds cd) (rds (projT1 (getInterval sd x))))
+        filter (fun x => anyRangeIntersects
+                           (rds cd) (rds (projT1 (getInterval sd x))))
                (inactive sd) in
   let freeUntilPos :=
         getRegisterIndex st (nextIntersectionWith st current) freeUntilPos'
@@ -917,9 +937,8 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   (* reg = register with highest freeUntilPos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
   let (reg, mres) := findRegister freeUntilPos lastReg in
-
-  let result := existT _ sd (existT2 _ _ st i (newSSMorph sd)) in
-  let useReg := (reg, result) in
+  let result      := existT _ sd (existT2 _ _ st i (newSSMorph sd)) in
+  let useReg      := (reg, result) in
 
   (* [mres] indicates the highest use position of the indicated register,
      which is the furthest available. *)
@@ -988,16 +1007,6 @@ Definition activeIntervals `(st : ScanState sd)
       end in
   go (active sd).
 
-Definition inactiveIntervals `(st : ScanState sd)
-  : list { i : IntervalId sd & In i (inactive sd) } :=
-  let fix go l :=
-      match l with
-      | nil => nil
-      | cons x xs =>
-          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
-      end in
-  go (inactive sd).
-
 (* Given a starting [ScanState] (at which point, [st = st0]), walk through the
    list of active intervals and mutate [st0] until it reflects the desired end
    state. *)
@@ -1023,6 +1032,16 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
     end in
   go sd st (existT2 _ _ sd st (newSSMorph sd)) (activeIntervals st) pos.
 
+Definition inactiveIntervals `(st : ScanState sd)
+  : list { i : IntervalId sd & In i (inactive sd) } :=
+  let fix go l :=
+      match l with
+      | nil => nil
+      | cons x xs =>
+          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
+      end in
+  go (inactive sd).
+
 Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' } :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
@@ -1045,22 +1064,11 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
     end in
   go sd st (existT2 _ _ sd st (newSSMorph sd)) (inactiveIntervals st) pos.
 
-Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
-  let (x,_,_) := e in x.
-
-Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
-  : P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p.
-
-Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
-  : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
-
 Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
   : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd0 sd' } :=
   (* position = start position of current *)
   let currentId := currentIntervalId i in
-  let cd        := currentDesc i in
-  let current   := currentInterval i in
-  let position  := intervalStart current in
+  let position  := intervalStart (currentInterval i) in
 
   (* // check for intervals in active that are handled or inactive
      for each interval it in active do
@@ -1084,9 +1092,6 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
-  let current' :=
-      Build_CurrentInterval (projTT1 sp2) (projTT2 sp2)
-                            cid2 (currentDesc i) (currentInterval i) in
   let (mreg, result) :=
       match tryAllocateFreeReg st0 i with
       | Some (reg, result) => (Some reg, result)

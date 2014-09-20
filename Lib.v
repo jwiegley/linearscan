@@ -64,6 +64,32 @@ Proof.
   right. right. assumption.
 Defined.
 
+Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
+  let (x,_,_) := e in x.
+
+Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
+  : P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p.
+
+Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
+  : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
+
+Lemma one_gt_zero : forall n, n = 1 -> n > 0.
+Proof. intros. omega. Qed.
+
+Lemma nil_list_0 : forall a (xs : list a), length xs = 0 <-> xs = [].
+Proof.
+  split; intros.
+    induction xs. reflexivity.
+    inversion H.
+  rewrite H. auto.
+Qed.
+
+Lemma gt_one_gt_zero : forall n, n > 1 -> n > 0.
+Proof. intros. omega. Qed.
+
+Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
+Proof. intros. omega. Qed.
+
 (** ** option *)
 
 Fixpoint catMaybes {a : Set} (l : list (option a)) : list a :=
