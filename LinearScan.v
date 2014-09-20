@@ -6,27 +6,22 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
-(* Require Import Coq.Arith.Compare_dec. *)
 Require Import Coq.Arith.EqNat.
-(* Require Import Coq.Init.Datatypes. *)
 Require Import Coq.Lists.List.
-(* Require Import Coq.Logic.ProofIrrelevance. *)
 Require Import Coq.Numbers.Natural.Peano.NPeano.
-(* Require Import Coq.omega.Omega. *)
 Require Import Coq.Program.Basics.
-(* Require Import Coq.Program.Equality. *)
 Require Import Coq.Program.Tactics.
-(* Require Import Coq.Sorting.Permutation. *)
+Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
-(* Require Import Coq.Vectors.Fin. *)
-(* Require Import Recdef. *)
 Require Import Recdef.
 Require Import Lib.
 Require Import RState.
+Require String.
 
 Module Import LN := ListNotations.
 
+Open Scope string_scope.
 Open Scope nat_scope.
 Open Scope program_scope.
 
@@ -184,8 +179,7 @@ Proof.
   intros.
   unfold intervalExtent.
   pose (Interval_nonempty i).
-  apply lt_minus in l.
-  assumption.
+  apply lt_minus in l. assumption.
 Qed.
 
 (****************************************************************************)
@@ -240,19 +234,15 @@ Defined.
 Lemma NoDup_wip : forall n x unh act inact hnd,
   NoDup (unh ++ act ++ inact ++ hnd) ->
   NoDup ((x :: map (fin_bump n) unh) ++
-         map (fin_bump n) act ++ map (fin_bump n) inact ++ map (fin_bump n) hnd).
-Proof.
-Admitted.
-
-Lemma LocallySorted_uncons : forall a (f : relation a) (x : a) (xs : list a),
-  LocallySorted f (x :: xs) -> LocallySorted f xs.
+         map (fin_bump n) act ++ map (fin_bump n) inact ++
+         map (fin_bump n) hnd).
 Proof.
 Admitted.
 
 Lemma LocallySorted_fin_bump : forall n (x : fin (S n)) (xs : list (fin n)),
-  LocallySorted cmp_le xs ->
-    x = ultimate_Sn n ->
-    LocallySorted cmp_le (x :: map (fin_bump n) xs).
+  LocallySorted cmp_le xs
+    -> x = ultimate_Sn n
+    -> LocallySorted cmp_le (x :: map (fin_bump n) xs).
 Proof.
 Admitted.
 
@@ -479,34 +469,6 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H
        |}.
 
-Ltac move_to_top x :=
-  match reverse goal with
-  | H : _ |- _ => try move x after H
-  end.
-
-Tactic Notation "assert_eq" ident(x) constr(v) :=
-  let H := fresh in
-  assert (x = v) as H by reflexivity;
-  clear H.
-
-Tactic Notation "Case_aux" ident(x) constr(name) :=
-  first [
-    set (x := name); move_to_top x
-  | assert_eq x name; move_to_top x
-  | fail 1 "because we are working on a different case" ].
-
-Tactic Notation "Case" constr(name) := Case_aux Case name.
-Tactic Notation "SCase" constr(name) := Case_aux SCase name.
-Tactic Notation "SSCase" constr(name) := Case_aux SSCase name.
-Tactic Notation "SSSCase" constr(name) := Case_aux SSSCase name.
-Tactic Notation "SSSSCase" constr(name) := Case_aux SSSSCase name.
-Tactic Notation "SSSSSCase" constr(name) := Case_aux SSSSSCase name.
-Tactic Notation "SSSSSSCase" constr(name) := Case_aux SSSSSSCase name.
-Tactic Notation "SSSSSSSCase" constr(name) := Case_aux SSSSSSSCase name.
-
-Require String.
-Open Scope string_scope.
-
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
@@ -518,27 +480,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
-Theorem ScanState_only_grows `(st : ScanState sd)
-  : { sd' : ScanStateDesc & nextInterval sd <= nextInterval sd' }.
-Proof.
-  inversion st; simpl in *.
-  - eexists. apply Le.le_0_n.
-  - exists sd.
-    rewrite <- H1. simpl.
-    reflexivity.
-Admitted.
-
-Definition transportIntervalId `(st : ScanState sd) (i : IntervalId sd)
-  : { sd' : ScanStateDesc & IntervalId sd' }.
-Proof.
-  pose (ScanState_only_grows st).
-  destruct s.
-  exists x.
-  apply (transportId l).
-  assumption.
-Defined.
-
-Lemma ScanState_active_bounded : forall st,
+Theorem ScanState_active_bounded : forall st,
   length (active st) <= nextInterval st.
 Proof.
   destruct st. simpl.
@@ -594,40 +536,6 @@ Record CurrentInterval `(st : ScanState sd) := {
 Arguments currentIntervalId [sd st] _.
 Arguments currentDesc       [sd st] _.
 Arguments currentInterval   [sd st] _.
-(* Arguments not_present       [sd st] _ _. *)
-
-(*
-Lemma totalExtent_cons : forall st x (xs : list (IntervalId st)),
-  totalExtent (x :: xs) = totalExtent [x] + totalExtent xs.
-Proof.
-  intros.
-  assert (x :: xs = [x] ++ xs) by auto.
-  rewrite H. clear H.
-  unfold totalExtent.
-  rewrite fold_left_app.
-  rewrite Plus.plus_comm. simpl.
-  induction xs. reflexivity.
-  apply (fold_left_plus (IntervalId st)
-           (fun (x : IntervalId st) =>
-              intervalExtent (projT2 (getInterval st x)))).
-Qed.
-
-Lemma unhandled_extent_cons : forall (st : ScanState) x xs,
-  x :: xs = unhandled st -> totalExtent xs < totalExtent (x :: xs).
-Proof.
-  intros.
-  rewrite totalExtent_cons.
-  unfold totalExtent at 2. simpl.
-  remember (projT2 (getInterval st x)) as i.
-  assert (intervalExtent i > 0).
-    unfold intervalExtent.
-    apply lt_minus.
-    apply Interval_nonempty.
-  omega.
-Qed.
-
-Definition unhandledExtent st := totalExtent (unhandled st).
-*)
 
 Record SSMorphSt (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) : Prop := {
     is_SSMorph :> SSMorph sd1 sd2;
@@ -647,7 +555,7 @@ Obligation 1.
   right. omega.
 Qed.
 
-Theorem compose_ssmorph_with_ssmorphst : forall (sd1 sd2 sd3 : ScanStateDesc),
+Theorem compose_SSMorph_with_SSMorphSt : forall (sd1 sd2 sd3 : ScanStateDesc),
   SSMorphSt sd1 sd2 -> SSMorph sd2 sd3 -> SSMorphSt sd1 sd3.
 Proof.
   intros.
@@ -657,11 +565,9 @@ Proof.
   inversion H. inversion H0. omega.
 Qed.
 
-Theorem ssmorphst_proj_unhandledExtent : forall (sd1 sd3 : ScanStateDesc),
+Theorem SSMorphSt_proj_unhandledExtent : forall (sd1 sd3 : ScanStateDesc),
   SSMorphSt sd1 sd3 -> unhandledExtent sd3 < unhandledExtent sd1.
-Proof.
-  intros. inversion H. assumption.
-Qed.
+Proof. intros. inversion H. assumption. Qed.
 
 Lemma ScanState_unhandledExtent_nonzero `(st : ScanState sd) :
   length (unhandled sd) > 0 <-> unhandledExtent sd > 0.
@@ -689,21 +595,108 @@ Proof.
       inversion H0.
       contradiction H1. reflexivity.
     simpl. apply Gt.gt_Sn_O.
-  - Case "ScanState_moveActiveToInactive".
-    apply IHst.
-  - Case "ScanState_moveActiveToHandled".
-    apply IHst.
-  - Case "ScanState_moveInactiveToActive".
-    apply IHst.
-  - Case "ScanState_moveInactiveToHandled".
-    apply IHst.
+  - Case "ScanState_moveActiveToInactive".  apply IHst.
+  - Case "ScanState_moveActiveToHandled".   apply IHst.
+  - Case "ScanState_moveInactiveToActive".  apply IHst.
+  - Case "ScanState_moveInactiveToHandled". apply IHst.
 Qed.
+
+Lemma one_gt_zero : forall n, n = 1 -> n > 0.
+Proof. intros. omega. Qed.
+
+Lemma nil_list_0 : forall a (xs : list a), length xs = 0 <-> xs = [].
+Proof.
+  split; intros.
+    induction xs. reflexivity.
+    inversion H.
+  rewrite H. auto.
+Qed.
+
+Lemma ScanState_no_unhandledExtent `(st : ScanState sd)
+  (H : length (unhandled sd) = 0) : unhandledExtent sd = 0.
+Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". apply H.
+  - Case "ScanState_newUnhandled". inversion H.
+  - Case "ScanState_dropUnhandled".
+    subst. inversion i; inversion H0. omega.
+    apply nil_list_0 in H. contradiction.
+  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
+  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
+  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
+  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
+Defined.
+
+Lemma ScanState_sole_unhandledExtent `(st : ScanState sd)
+  (H : length (unhandled sd) = 1) :
+  intervalExtent (projT2 (getInterval sd
+                  (safe_hd (unhandled sd) (one_gt_zero _ H)))) =
+  unhandledExtent sd.
+Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". inversion H.
+  - Case "ScanState_newUnhandled".
+    assert (cmp_eq_dec newi newi = left eq_refl).
+      intros. destruct (cmp_eq_dec newi newi).
+        f_equal. apply proof_irrelevance.
+      intuition.
+    rewrite H1. clear H1. simpl.
+    inversion H.
+    rewrite map_length in H2.
+    pose (ScanState_no_unhandledExtent st). simpl in e.
+    rewrite e; auto.
+  - Case "ScanState_dropUnhandled".
+    inversion i; inversion H0.
+      subst. inversion H.
+    destruct unh eqn:Heqe. inversion H.
+    subst. simpl in *.
+    destruct (geti x).
+    destruct (geti f). simpl in *.
+    admit.
+  - Case "ScanState_moveActiveToInactive".  apply IHst.
+  - Case "ScanState_moveActiveToHandled".   apply IHst.
+  - Case "ScanState_moveInactiveToActive".  apply IHst.
+  - Case "ScanState_moveInactiveToHandled". apply IHst.
+Defined.
+
+Lemma gt_one_gt_zero : forall n, n > 1 -> n > 0.
+Proof. intros. omega. Qed.
+
+Lemma ScanState_more_unhandledExtent `(st : ScanState sd)
+  (H : length (unhandled sd) > 1) :
+  intervalExtent (projT2 (getInterval sd
+                  (safe_hd (unhandled sd) (gt_one_gt_zero _ H)))) <
+  unhandledExtent sd.
+Proof.
+  ScanState_cases (induction st) Case; intros; simpl in *.
+  - Case "ScanState_nil". inversion H.
+  - Case "ScanState_newUnhandled".
+    assert (cmp_eq_dec newi newi = left eq_refl).
+      intros. destruct (cmp_eq_dec newi newi).
+        f_equal. apply proof_irrelevance.
+      intuition.
+    rewrite H1 in *. clear H1. simpl in *.
+    assert (forall n m, m > 0 -> n < m + n).
+      intros. omega. apply H1. clear H1.
+    admit.
+  - Case "ScanState_dropUnhandled".
+    inversion i; inversion H0.
+      subst. inversion H.
+    admit.
+  - Case "ScanState_moveActiveToInactive".  apply IHst.
+  - Case "ScanState_moveActiveToHandled".   apply IHst.
+  - Case "ScanState_moveInactiveToActive".  apply IHst.
+  - Case "ScanState_moveInactiveToHandled". apply IHst.
+Defined.
 
 Definition nextUnhandled `(st : ScanState sd)
   : option { sd' : ScanStateDesc &
              { st' : ScanState sd' &
                CurrentInterval st' & SSMorphSt sd sd' } }.
 Proof.
+  pose (ScanState_sole_unhandledExtent st).
+  pose (ScanState_more_unhandledExtent st).
+
   destruct sd.
   destruct unhandled0.
     apply None.
@@ -740,7 +733,8 @@ Proof.
 
   eexists.
   pose (intervalExtent (projT2 (getInterval0 i))).
-  eexists (s n eq_refl _).
+  specialize (s n eq_refl).
+  eexists (s _).
 
   rapply Build_CurrentInterval.
     apply i.
@@ -775,8 +769,12 @@ Proof.
   Grab Existential Variables.
   destruct unhandled0.
     left. split. reflexivity.
-    admit.
-  admit.
+    simpl in *. unfold n.
+    apply e. reflexivity.
+  right. split.
+    unfold not. intros. inversion H.
+  simpl in *. unfold n.
+  apply l. omega.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
@@ -789,12 +787,6 @@ Proof.
   apply Le.le_n_Sn.
 Defined.
 
-(*
-Lemma moveActiveToHandled_spec1 : forall st st' (x : IntervalId st) H,
-  st' = moveActiveToHandled x H -> nextInterval st' = nextInterval st.
-Proof. intros. subst. destruct st. reflexivity. Qed.
-*)
-
 Definition moveActiveToInactive `(st : ScanState sd) `(x : IntervalId sd)
   (H : In x (active sd))
   : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
@@ -803,12 +795,6 @@ Proof.
   destruct sd. simpl.
   rapply Build_SSMorph; auto.
 Defined.
-
-(*
-Lemma moveActiveToInactive_spec1 : forall st st' (x : IntervalId st) H,
-  st' = moveActiveToInactive x H -> nextInterval st' = nextInterval st.
-Proof. intros. subst. destruct st. reflexivity. Qed.
-*)
 
 Definition moveInactiveToActive `(st : ScanState sd) `(x : IntervalId sd)
   (H : In x (inactive sd))
@@ -992,24 +978,6 @@ Definition allocateBlockedReg `(st : ScanState sd) `(i : CurrentInterval st)
   let result := existT _ sd (existT2 _ _ st i (newSSMorph sd)) in
   (None, result).
 
-(*
-Definition transportId `(H : nextInterval st = nextInterval st')
-  (x : IntervalId st) : IntervalId st' :=
-  transportId_le (Nat.eq_le_incl _ _ H) x.
-*)
-
-Definition existT_in_cons : forall {A a} {l : list A},
-  {x : A & In x l} -> {x : A & In x (a :: l)}.
-Proof.
-  destruct l; intros; simpl.
-    destruct X. inversion i.
-  destruct X. exists x.
-  apply in_inv in i.
-  destruct i.
-    right. left. assumption.
-  right. right. assumption.
-Defined.
-
 Definition activeIntervals `(st : ScanState sd)
   : list { i : IntervalId sd & In i (active sd) } :=
   let fix go l :=
@@ -1055,141 +1023,6 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
     end in
   go sd st (existT2 _ _ sd st (newSSMorph sd)) (activeIntervals st) pos.
 
-(*
-Lemma checkActiveIntervals_spec1 `(st : ScanState sd) : forall sp pos,
-  sp = checkActiveIntervals st pos
-    -> nextInterval (projT1 sp) = nextInterval sd.
-Proof.
-  intros. subst.
-  induction st; simpl.
-  - reflexivity.
-  - admit.
-  - 
-  induction active0. reflexivity.
-  unfold all_state_lists0 in *.
-  pose proof lists_are_unique0.
-  apply NoDup_swap in H.
-  rewrite <- app_comm_cons in H.
-  inversion H.
-  subst. apply NoDup_swap in H3.
-  specialize (IHactive0 H3).
-Admitted.
-*)
-
-(* Given a starting [ScanState] (at which point, [st = st0]), walk through the
-   list of active intervals and mutate [st0] until it arrives at the desired
-   end state. *)
-
-(*
-Fixpoint checkActiveIntervals st pos
-  : { st' : ScanState & nextInterval st' = nextInterval st } :=
-  let fix go st st0 H is pos :=
-    match is with
-    | nil => existT _ st0 eq_refl
-    | x :: xs =>
-        (* // check for intervals in active that are handled or inactive
-           for each interval it in active do
-             if it ends before position then
-               move it from active to handled
-             else if it does not cover position then
-               move it from active to inactive *)
-        let i := projT2 (getInterval st (projT1 x)) in
-        let p :=
-            if intervalEnd i <? pos
-            then let st1 := moveActiveToHandled (projT1 x) (projT2 x) in
-                 let H'  := moveActiveToHandled_spec1 st st1 _ _ eq_refl
-                 existT _ st1 H'
-            else if negb (intervalCoversPos i pos)
-                 then let st1 := moveActiveToInactive (projT1 x) (projT2 x) in
-                      let H'  := moveActiveToInactive_spec1 st st1 _ _
-                                                            eq_refl in
-                      existT _ st1 H'
-                 else existT _ st0 eq_refl in
-        go st (projT1 p) (projT2 p) xs pos
-    end in
-  go st st eq_refl (activeIntervals st) pos.
-*)
-
-(*
-Lemma checkActiveIntervals_spec1 : forall st st' pos,
-  st' = checkActiveIntervals st pos -> nextInterval st = nextInterval st'.
-Proof.
-  intros.
-  assert (nextInterval (checkActiveIntervals st pos) = nextInterval st).
-    clear. destruct st. simpl.
-    pose moveActiveToHandled_spec1.
-    pose moveActiveToInactive_spec1.
-    induction active0. reflexivity.
-    admit.
-  congruence.
-(*.
-  unfold all_state_lists0 in *.
-  clear H.
-  apply NoDup_swap in lists_are_unique0.
-  rewrite <- app_comm_cons in lists_are_unique0.
-  inversion lists_are_unique0.
-  subst. apply NoDup_swap in H2.
-  apply (IHactive0 H2).
-*)
-Admitted.
-*)
-
-(*
-Lemma checkActiveIntervals_spec2 `(st : ScanState sd) : forall ss i pos
-  (H : ss = checkActiveIntervals st pos),
-  ~ In i (all_state_lists sd)
-    -> ~ In (transportId (next_interval_increases (projT2 ss)) i)
-            (all_state_lists (projT1 ss)).
-Proof.
-  intros.
-  destruct ss. simpl.
-  destruct s. simpl.
-  unfold all_state_lists in *.
-  simpl in H0.
-  destruct x. simpl.
-  destruct H.
-  unfold not in *. intros.
-  apply H0.
-Admitted.
-*)
-
-(*
-Fixpoint checkInactiveIntervals st pos : ScanState :=
-  let fix go st st0 (is : list (IntervalId st)) (pos : nat) :=
-    match is with
-    | nil => st0
-    | x :: xs =>
-        (* // check for intervals in inactive that are handled or active
-           for each interval it in inactive do
-             if it ends before position then
-               move it from inactive to handled
-             else if it covers position then
-               move it from inactive to active *)
-        let i := projT2 (getInterval st x) in
-        let x0 := transportId eq_refl x in
-        let st1 := if intervalEnd i <? pos
-                   then moveInactiveToHandled x0
-                   else if intervalCoversPos i pos
-                        then moveInactiveToActive x0
-                        else st0 in
-        go st st1 xs pos
-    end in
-  go st st (inactive st) pos.
-
-Lemma checkInactiveIntervals_spec1 : forall st st0 pos,
-  st0 = checkInactiveIntervals st pos -> nextInterval st = nextInterval st0.
-Proof.
-Admitted.
-
-Lemma checkInactiveIntervals_spec2 : forall st st' i pos
-  (H : st' = checkInactiveIntervals st pos),
-  ~ In i (all_state_lists st)
-    -> ~ In (transportId (checkInactiveIntervals_spec1 st st' pos H) i)
-            (all_state_lists st').
-Proof.
-Admitted.
-*)
-
 Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' } :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
@@ -1211,16 +1044,6 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
         go sd st st1 xs pos
     end in
   go sd st (existT2 _ _ sd st (newSSMorph sd)) (inactiveIntervals st) pos.
-
-(*
-Lemma checkInactiveIntervals_spec2 `(st : ScanState sd) : forall ss i pos
-  (H : ss = checkInactiveIntervals st pos),
-  ~ In i (all_state_lists sd)
-    -> ~ In (transportId (next_interval_increases (projT2 ss)) i)
-            (all_state_lists (projT1 ss)).
-Proof.
-Admitted.
-*)
 
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
@@ -1246,8 +1069,6 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
        else if it does not cover position then
          move it from active to inactive *)
   let sp1  := checkActiveIntervals st0 position in
-  (* let Hnp1 := checkActiveIntervals_spec2 st0 sp1 currentId position *)
-  (*                                        eq_refl (not_present i) in *)
   let cid1 := transportId (next_interval_increases (projTT3 sp1)) currentId in
 
   (* // check for intervals in inactive that are handled or active
@@ -1256,9 +1077,7 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let sp2 := checkInactiveIntervals (projTT2 sp1) position in
-  (* let Hnp2 := checkInactiveIntervals_spec2 (projT1 sp1) sp2 cid1 position *)
-  (*                                          eq_refl Hnp1 in *)
+  let sp2  := checkInactiveIntervals (projTT2 sp1) position in
   let cid2 := transportId (next_interval_increases (projTT3 sp2)) cid1 in
 
   (* // find a register for current
@@ -1268,13 +1087,8 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
   let current' :=
       Build_CurrentInterval (projTT1 sp2) (projTT2 sp2)
                             cid2 (currentDesc i) (currentInterval i) in
-      (* {| currentIntervalId := cid2 *)
-      (*  ; currentDesc       := currentDesc i *)
-      (*  ; currentInterval   := currentInterval i *)
-      (*  (* ; not_present       := Hnp2 *) *)
-      (*  |} in *)
   let (mreg, result) :=
-      match tryAllocateFreeReg st0 i with (* jww (2014-09-19): wrong? *)
+      match tryAllocateFreeReg st0 i with
       | Some (reg, result) => (Some reg, result)
       | None => allocateBlockedReg st0 i
       end in
@@ -1307,8 +1121,8 @@ Proof.
   (* We must prove that after every call to handleInterval, the total extent
      of the remaining unhandled intervals is less than it was before. *)
   intros.
-  apply ssmorphst_proj_unhandledExtent.
-  apply compose_ssmorph_with_ssmorphst with (sd2 := sd1); assumption.
+  apply SSMorphSt_proj_unhandledExtent.
+  apply compose_SSMorph_with_SSMorphSt with (sd2 := sd1); assumption.
 Defined.
 
 (****************************************************************************)
