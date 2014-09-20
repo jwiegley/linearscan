@@ -340,7 +340,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        |}
 
   | ScanState_newUnhandled
-      ni ue unh unhsort act inact hnd geti assgn lau :
+      ni (* ue *) unh unhsort act inact hnd geti assgn lau :
     forall `(i : Interval d),
     ScanState
       {| nextInterval     := ni
@@ -377,7 +377,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        |}
 
   | ScanState_dropUnhandled
-      ni ue x unh unhsort act inact hnd geti assgn lau :
+      ni (* ue *) x unh unhsort act inact hnd geti assgn lau :
     ScanState
       {| nextInterval     := ni
        (* ; unhandledExtent  := intervalExtent (projT2 (geti x)) + ue *)
@@ -499,7 +499,7 @@ Ltac cmp_reflexive :=
       rewrite Hrcmp in *; clear Hrcmp; simpl in *
   end.
 
-Definition unhandledExtent `(st : ScanState sd) : nat :=
+Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandled sd with
   | nil => 0
   | [i] => intervalExtent (projT2 (getInterval sd i))
@@ -517,120 +517,16 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   | i :: _ => ue > intervalExtent (projT2 (getInterval sd i))
   end.
 Proof.
-  induction unh eqn:Heqe; simpl.
-    ScanState_cases (induction st) Case; simpl in *.
-    Case "ScanState_nil". reflexivity.
-    Case "ScanState_newUnhandled".
-      subst. inversion Heqe.
-    Case "ScanState_dropUnhandled".
-      pose (Interval_extent_nonempty (projT2 (geti x))).
-      destruct (geti x). simpl in *. subst.
-      destruct unh0.
-        admit.
-      inversion Heqe.
-    Case "ScanState_moveActiveToInactive". auto.
-    Case "ScanState_moveActiveToHandled". auto.
-    Case "ScanState_moveInactiveToActive". auto.
-    Case "ScanState_moveInactiveToHandled". auto.
-  simpl in *.
-  induction l eqn:Heqe2; simpl.
-    ScanState_cases (induction st) Case; simpl in *.
-    Case "ScanState_nil".
-      subst. inversion Heqe.
-    Case "ScanState_newUnhandled".
-      destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
-                            a newi) eqn:Heqe3; simpl in *.
-        simpl.
-          left. split.
-    Case "ScanState_dropUnhandled".
-      admit.
-    Case "ScanState_moveActiveToInactive". auto.
-    Case "ScanState_moveActiveToHandled". auto.
-    Case "ScanState_moveInactiveToActive". auto.
-    Case "ScanState_moveInactiveToHandled". auto.
-  simpl in *.
-  ScanState_cases (induction st) Case; simpl in *.
-  Case "ScanState_nil".
-    subst. inversion Heqe.
-  Case "ScanState_newUnhandled".
-    right. split.
-      apply not_eq_sym.
-      apply nil_cons.
-    intros.
-    induction l eqn:Heqe3.
-    destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
-                          i0 newi) eqn:Heqe2.
-        left. split.
-  Case "ScanState_dropUnhandled".
-    admit.
-  Case "ScanState_moveActiveToInactive". auto.
-  Case "ScanState_moveActiveToHandled". auto.
-  Case "ScanState_moveInactiveToActive". auto.
-  Case "ScanState_moveInactiveToHandled". auto.
-Qed.
-
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". left. auto.
-  - Case "ScanState_newUnhandled".
-    inversion IHst.
-      right. split.
-        apply not_eq_sym.
-        apply nil_cons.
-      eexists.
-      left. split.
-        inversion H0.
-    right. split.
-      apply not_eq_sym.
-      apply nil_cons.
-    intros. intuition.
-    destruct unh eqn:Heqe; simpl.
-      destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
-                            i0 newi) eqn:Heqe2.
-        left. split. rewrite e. reflexivity.
-        inversion IHst; inversion H0.
-          simpl. omega.
-        contradiction H1. reflexivity.
-      admit.
-    right. split.
-      intuition. inversion H0.
-    destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
-                          i0 newi) eqn:Heqe2.
-      inversion IHst; inversion H0. inversion H1.
-      simpl in *.
-      specialize (H2 i0).
-      contradiction H1. reflexivity.
-    
-    inversion IHst.
-      destruct unh eqn:Heqe; simpl.
-        right. split.
-          unfold not. intros.
-          inversion H1.
-        intros.
-        destruct (@cmp_eq_dec (fin (S ni)) (@fin_CompareSpec (S ni))
-                              i0 newi) eqn:Heqe2.
-          left. split. rewrite e. reflexivity.
-          inversion H0. simpl. omega.
-        right. split.
-          unfold not in *. intros.
-          apply n. congruence.
-        
-    destruct unh eqn:Heqe; simpl.
-      right. split.
-        unfold not. intros. inversion H0.
-      intros. simpl in *.
-      right. split.
-        unfold not in *. intros.
-        apply n. congruence.
-      inversion IHst; inversion H0.
-        rewrite H2 in *. simpl in *.
-      rewrite Heqe2.
-    admit.
-  - Case "ScanState_dropUnhandled". admit.
-  - Case "ScanState_moveActiveToInactive". admit.
-  - Case "ScanState_moveActiveToHandled". admit.
-  - Case "ScanState_moveInactiveToActive". admit.
-  - Case "ScanState_moveInactiveToHandled". admit.
-Admitted.
+  destruct sd.
+  destruct unhandled0 eqn:Heqe;
+  unfold unhandledExtent; simpl.
+    reflexivity.
+  destruct l eqn:Heqe2; simpl.
+    reflexivity.
+  apply fold_gt.
+  pose (Interval_extent_nonempty (projT2 (getInterval0 i0))).
+  omega.
+Defined.
 
 (** ** SSMorph *)
 
@@ -713,27 +609,31 @@ Proof.
   - Case "ScanState_nil".
     split; intros; inversion H.
   - Case "ScanState_newUnhandled".
-    pose (Interval_extent_nonempty i); omega.
+    pose (Interval_extent_nonempty i).
+    destruct unh eqn:Heqe;
+    unfold unhandledExtent; simpl.
+      split; intros; try cmp_reflexive; auto.
+    destruct l eqn:Heqe2; simpl.
+      split; intros; try cmp_reflexive; auto. omega.
+    split; intros.
+      apply fold_gt.
+      cmp_reflexive. omega.
+    apply Gt.gt_Sn_O.
   - Case "ScanState_dropUnhandled".
     apply ScanState_unhandledExtent in st.
     rename st into i. simpl in *.
     destruct unh eqn:Heqe.
-      split; intros. inversion H.
-      inversion i; inversion H0.
-        inversion H1.
-      specialize (H2 x).
-      inversion H2; inversion H3.
-        apply plus_eq_zero in H5. omega.
-      contradiction H4. reflexivity.
-    inversion i; inversion H.
-      inversion H0.
-    specialize (H1 x).
-    inversion H1; inversion H2.
-      split; intros; inversion H3.
+      split; intros. inversion H. auto.
+    unfold unhandledExtent; simpl.
+    destruct l eqn:Heqe2; simpl.
+      split; intros.
+      apply Interval_extent_nonempty.
+      auto.
     split; intros.
-      apply plus_gt_zero in H4.
-      assumption.
-    simpl. apply Gt.gt_Sn_O.
+      apply fold_gt.
+      pose (Interval_extent_nonempty (projT2 (geti f))).
+      omega.
+    omega.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
@@ -749,13 +649,10 @@ Proof.
   - Case "ScanState_dropUnhandled".
     apply ScanState_unhandledExtent in st.
     rename st into Hi. simpl in *.
-    destruct unh eqn:Heqe.
-      subst. inversion Hi; inversion H0. omega.
-      apply nil_list_0 in H.
-      specialize (H2 x).
-      inversion H2; inversion H3. omega.
-      contradiction H4. reflexivity.
-    inversion H.
+    destruct unh eqn:Heqe;
+    unfold unhandledExtent; simpl.
+      reflexivity.
+    simpl in H. inversion H.
   - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
   - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
   - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
@@ -778,16 +675,17 @@ Proof.
     inversion H.
     rewrite map_length in H2.
     pose (ScanState_no_unhandledExtent st). simpl in e.
-    rewrite e; auto.
+    destruct unh eqn:Heqe;
+    unfold unhandledExtent in *; simpl in *.
+      auto.
+    destruct l eqn:Heqe2; inversion H2.
   - Case "ScanState_dropUnhandled".
     clear IHst.
     destruct unh eqn:Heqe. inversion H.
     assert (l = []). apply nil_list_0. auto.
     simpl in *. subst.
-    inversion Hi; inversion H0. inversion H1.
-    specialize (H2 f).
-    inversion H2; inversion H3. auto.
-    contradiction H4. reflexivity.
+    unfold unhandledExtent in *; simpl in *.
+    assumption.
   - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
   - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
   - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
@@ -809,14 +707,9 @@ Proof.
     apply ScanState_unhandledExtent in st.
     rename st into Hi.
     cmp_reflexive.
-    destruct unh eqn:Heqe. inversion H. inversion H2.
-    inversion Hi; inversion H1. inversion H2.
-    simpl in *.
-    specialize (H3 f).
-    assert (forall n m, m > 0 -> n < m + n).
-      intros. omega. apply H4. clear H4.
-    inversion H3; inversion H4.
-      pose (Interval_extent_nonempty (projT2 (geti f))). omega.
+    destruct unh eqn:Heqe.
+      inversion H. inversion H2.
+    unfold unhandledExtent in *; simpl in *.
     omega.
   - Case "ScanState_dropUnhandled".
     clear IHst.
@@ -825,11 +718,8 @@ Proof.
     destruct unh eqn:Heqe. inversion H.
     subst. simpl in *.
     destruct l. inversion H. inversion H1.
-    inversion Hi0; inversion H0.
-      inversion H1.
-    specialize (H2 f).
-    inversion H2. inversion H3. inversion H4.
-    inversion H3. omega.
+    unfold unhandledExtent in *; simpl in *.
+    omega.
   - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
   - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
   - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
@@ -849,34 +739,34 @@ Proof.
     apply None.
   apply Some.
 
-  assert { xe : nat & unhandledExtent0 =
-                      intervalExtent (projT2 (getInterval0 i)) + xe } as Hxe.
-    exists (unhandledExtent0 - intervalExtent (projT2 (getInterval0 i))).
-    apply Minus.le_plus_minus. subst. simpl in *.
-    apply Lt.le_lt_or_eq_iff.
-    destruct unhandled0.
-      right. apply e. auto.
-    left. apply l. simpl. omega.
+  (* assert { xe : nat & unhandledExtent0 = *)
+  (*                     intervalExtent (projT2 (getInterval0 i)) + xe } as Hxe. *)
+  (*   exists (unhandledExtent0 - intervalExtent (projT2 (getInterval0 i))). *)
+  (*   apply Minus.le_plus_minus. subst. simpl in *. *)
+  (*   apply Lt.le_lt_or_eq_iff. *)
+  (*   destruct unhandled0. *)
+  (*     right. apply e. auto. *)
+  (*   left. apply l. simpl. omega. *)
 
-  assert (unhandledExtent0 > 0) as Hu.
-    apply (@ScanState_unhandledExtent_nonzero
-           {| nextInterval := nextInterval0
-            ; unhandledExtent := unhandledExtent0
-            ; unhandled := i :: unhandled0
-            ; active := active0
-            ; inactive := inactive0
-            ; handled := handled0
-            ; getInterval := getInterval0
-            ; assignments := assignments0
-            ; unhandled_sorted := unhandled_sorted0
-            ; lists_are_unique := lists_are_unique0 |}); simpl.
-      apply st.
-    omega.
+  (* assert (unhandledExtent0 > 0) as Hu. *)
+  (*   apply (@ScanState_unhandledExtent_nonzero *)
+  (*          {| nextInterval := nextInterval0 *)
+  (*           ; unhandledExtent := unhandledExtent0 *)
+  (*           ; unhandled := i :: unhandled0 *)
+  (*           ; active := active0 *)
+  (*           ; inactive := inactive0 *)
+  (*           ; handled := handled0 *)
+  (*           ; getInterval := getInterval0 *)
+  (*           ; assignments := assignments0 *)
+  (*           ; unhandled_sorted := unhandled_sorted0 *)
+  (*           ; lists_are_unique := lists_are_unique0 |}); simpl. *)
+  (*     apply st. *)
+  (*   omega. *)
 
-  destruct Hxe. subst.
+  (* destruct Hxe. subst. *)
   pose (ScanState_dropUnhandled
         nextInterval0
-        x i unhandled0
+        i unhandled0
         unhandled_sorted0
         active0
         inactive0
@@ -898,19 +788,18 @@ Proof.
   clear s.
   constructor.
     constructor; auto.
-    simpl. unfold intervalExtent.
-    unfold intervalStart, intervalEnd.
-    remember (getInterval0 i) as v.
-    destruct v. simpl. omega.
+    destruct unhandled0 eqn:Heqe;
+    unfold unhandledExtent; simpl.
+      apply Le.le_0_n.
+    destruct l0 eqn:Heqe2; simpl. omega.
+    apply fold_fold_le. omega.
 
-  (* jww (2014-09-19): How can I remove this duplication? *)
-  simpl. unfold intervalExtent.
-  unfold intervalStart, intervalEnd.
-  remember (getInterval0 i) as v.
-  destruct v. simpl.
-  assert (ibeg x0 < iend x0)
-    by (apply (interval_nonempty x0)).
-  apply lt_minus in H. omega.
+  pose (Interval_extent_nonempty (projT2 (getInterval0 i))).
+  destruct unhandled0 eqn:Heqe;
+  unfold unhandledExtent; simpl.
+    omega.
+  destruct l0 eqn:Heqe2; simpl. omega.
+  apply fold_fold_lt. omega.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)

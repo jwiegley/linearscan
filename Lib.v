@@ -96,6 +96,37 @@ Proof. intros. omega. Qed.
 Lemma plus_gt_zero : forall n m, n + m > n -> m > 0.
 Proof. intros. omega. Qed.
 
+Lemma fold_gt : forall a f n m (xs : list a),
+  n > m -> fold_left (fun n x => n + f x) xs n > m.
+Proof.
+  intros.
+  generalize dependent n.
+  induction xs; intros; simpl. assumption.
+  apply IHxs. omega.
+Qed.
+
+Lemma fold_fold_le : forall a f n m (xs : list a),
+  n <= m -> fold_left (fun n x => n + f x) xs n <=
+            fold_left (fun n x => n + f x) xs m.
+Proof.
+  intros.
+  generalize dependent n.
+  generalize dependent m.
+  induction xs; intros; simpl. assumption.
+  apply IHxs. omega.
+Qed.
+
+Lemma fold_fold_lt : forall a f n m (xs : list a),
+  n < m -> fold_left (fun n x => n + f x) xs n <
+           fold_left (fun n x => n + f x) xs m.
+Proof.
+  intros.
+  generalize dependent n.
+  generalize dependent m.
+  induction xs; intros; simpl. assumption.
+  apply IHxs. omega.
+Qed.
+
 (** ** option *)
 
 Fixpoint catMaybes {a : Set} (l : list (option a)) : list a :=
