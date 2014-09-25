@@ -92,15 +92,41 @@ Inductive Range : RangeDesc -> Set :=
 
 Definition rangeExtent (x : RangeDesc) := rend x - rbeg x.
 
-Definition rangesIntersect `(x : RangeDesc) `(y : RangeDesc) : bool :=
+Definition rangesIntersect (x y : RangeDesc) : bool :=
   if rbeg x <? rbeg y
   then rbeg y <? rend x
   else rbeg x <? rend y.
+
+Definition rangesIntersectionPoint (x y : RangeDesc) : option nat :=
+  if rangesIntersect x y
+  then Some (min (rbeg x) (rbeg y))
+  else None.
 
 Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
   fold_right
     (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
     false (NE_to_list is).
+
+Fixpoint NE_fold_left {a b : Set} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
+  match ne with
+    | NE_Sing x => f z x
+    | NE_Cons x xs => NE_fold_left f xs (f z x)
+  end.
+
+Definition firstIntersectionPoint (rd1 rd2 : NonEmpty RangeDesc)
+  : option nat :=
+  NE_fold_left
+    (fun acc rd =>
+       match acc with
+       | Some x => Some x
+       | None =>
+         NE_fold_left
+           (fun acc' rd' =>
+              match acc' with
+              | Some x => Some x
+              | None => rangesIntersectionPoint rd rd'
+              end) rd2 None
+       end) rd1 None.
 
 (** ** Interval *)
 
@@ -892,20 +918,20 @@ Defined.
 
 (** ** Main functions *)
 
-Definition getRegisterIndex `(st : ScanState sd) (k : IntervalId sd -> nat)
+Definition nextIntersectionWith
+  `(Interval xd) `(it : IntervalId sd) : option nat :=
+  let itval := getInterval sd it in
+  firstIntersectionPoint (rds (projT1 itval)) (rds xd).
+
+Definition getRegisterIndex `(st : ScanState sd) (k : IntervalId sd -> option nat)
   (z : PhysReg -> option nat) (is : list (IntervalId sd))
   : PhysReg -> option nat :=
   fold_right
     (fun x f => fun r =>
        match assignments sd x with
        | None => f r
-       | Some a => if cmp_eq_dec a r then Some (k x) else f r
+       | Some a => if cmp_eq_dec a r then k x else f r
        end) z is.
-
-Definition nextIntersectionWith `(st : ScanState sd)
-  `(x : Interval xd) (yid : IntervalId sd) : nat.
-Proof.
-Admitted.
 
 Function findRegister (freeUntilPos : PhysReg -> option nat) (reg : PhysReg)
   {measure fin_to_nat reg} : (PhysReg * option nat)%type :=
@@ -924,7 +950,7 @@ Function findRegister (freeUntilPos : PhysReg -> option nat) (reg : PhysReg)
           end
       end
   end.
-Proof. intros. apply pred_fin_lt. assumption. Qed.
+Proof. intros; apply pred_fin_lt; assumption. Qed.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -941,7 +967,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
      for each interval it in active do
        freeUntilPos[it.reg] = 0 *)
   let freeUntilPos' :=
-        getRegisterIndex st (const 0) (const None) (active sd) in
+        getRegisterIndex st (const None) (const None) (active sd) in
 
   (* for each interval it in inactive intersecting with current do
        freeUntilPos[it.reg] = next intersection of it with current *)
@@ -950,7 +976,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
                            (rds cd) (rds (projT1 (getInterval sd x))))
                (inactive sd) in
   let freeUntilPos :=
-        getRegisterIndex st (nextIntersectionWith st current) freeUntilPos'
+        getRegisterIndex st (nextIntersectionWith current) freeUntilPos'
                          intersectingIntervals in
 
   (* reg = register with highest freeUntilPos *)
@@ -1023,9 +1049,6 @@ Definition activeIntervals `(st : ScanState sd)
       end in
   go (active sd).
 
-(* Given a starting [ScanState] (at which point, [st = st0]), walk through the
-   list of active intervals and mutate [st0] until it reflects the desired end
-   state. *)
 Fixpoint checkActiveIntervals `(st : ScanState sd) pos
   : NextScanState (SSMorphLen sd) :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
@@ -1082,7 +1105,7 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   go sd st (Build_NextScanState _ sd st (newSSMorphLen sd))
      (inactiveIntervals st) pos.
 
-Lemma SSMorphLenSt_transitivity
+Lemma SSMorphLenLenSt_transitivity
   `( i : SSMorphLen sd0 sd1)
   `( j : SSMorphLen sd1 sd2)
   `( k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
@@ -1138,8 +1161,8 @@ Definition handleInterval `(st0 : ScanState sd0)
   {| nextDesc   := nextDesc result
    ; nextState  := nextState result
    ; morphProof :=
-       SSMorphLenSt_transitivity (morphProof sp1) (morphProof sp2)
-                                 (morphProof result)
+       SSMorphLenLenSt_transitivity (morphProof sp1) (morphProof sp2)
+                                    (morphProof result)
    |}.
 
 Lemma list_cons_nonzero : forall {a x} {xs l : list a},
