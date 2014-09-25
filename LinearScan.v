@@ -22,7 +22,9 @@ Require Import Lib.
 Require String.
 
 Module Import LN := ListNotations.
-(* Module Import MergeSort := Sort FinOrder. *)
+(* jww (2014-09-25): I'll need to sort by the starting position of the
+   interval. *)
+(* Module Import MergeSort := Sort ??. *)
 
 Open Scope string_scope.
 Open Scope nat_scope.
@@ -245,9 +247,8 @@ Record ScanStateDesc := {
     getInterval  : IntervalId -> { d : IntervalDesc & Interval d };
     assignments  : IntervalId -> option PhysReg
 
-    (* jww (2014-09-25): I haven't demonstrated yet that these extra
-       restrictions are worth the effort.  It would be nicely to add them back
-       in once everything is functioning. *)
+    (* jww (2014-09-25): These restricting lemmas should be added back once
+       everything is functional. *)
 
     (* unhandled_sorted : StronglySorted cmp_le unhandled; *)
 
@@ -377,8 +378,9 @@ Inductive ScanState : ScanStateDesc -> Set :=
        (* ; lists_are_unique := lau *)
        |} ->
     forall newi (H : newi = ultimate_Sn ni),
-    (* jww (2014-09-25): I really do need to ensure that what is added here
-       does not break ordering or non-duplication. *)
+    (* jww (2014-09-25): I need to ensure that what is added here does not
+       break ordering or non-duplication.  The supporting lemmas (see
+       IntervalDesc) accomplish this. *)
     ScanState
       {| nextInterval     := S ni
        ; unhandled        := newi :: map (fin_bump ni) unh
@@ -492,23 +494,6 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
-
-(*
-Theorem ScanState_active_bounded : forall st,
-  length (active st) <= nextInterval st.
-Proof.
-  destruct st. simpl.
-  unfold all_state_lists0 in lists_are_unique0.
-  compute.
-  apply NoDup_unapp in lists_are_unique0.
-  inversion lists_are_unique0.
-  apply NoDup_swap in H0.
-  apply NoDup_unapp in H0.
-  inversion H0.
-  apply fin_list in H2.
-  auto.
-Qed.
-*)
 
 Ltac cmp_reflexive :=
   match goal with
@@ -636,21 +621,6 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
 Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
 Proof. intros. constructor; auto. constructor; auto. Defined.
 
-(** ** CurrentInterval *)
-
-Record CurrentInterval `(st : ScanState sd) := {
-    currentIntervalId : IntervalId sd;
-    currentDesc       : IntervalDesc;
-    currentInterval   : Interval currentDesc
-
-    (* jww (2014-09-20): Not sure if I need this *)
-    (* not_present : ~ In currentIntervalId (all_state_lists sd) *)
-}.
-
-Arguments currentIntervalId [sd st] _.
-Arguments currentDesc       [sd st] _.
-Arguments currentInterval   [sd st] _.
-
 Record SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
     st_is_SSMorph :> SSMorph sd1 sd2;
 
@@ -713,145 +683,6 @@ Proof.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
 Qed.
-
-(*
-Lemma ScanState_no_unhandledExtent `(st : ScanState sd)
-  (H : length (unhandled sd) = 0) : unhandledExtent sd = 0.
-Proof.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". apply H.
-  - Case "ScanState_newUnhandled". inversion H.
-  - Case "ScanState_moveUnhandledToActive".
-    apply ScanState_unhandledExtent in st.
-    rename st into Hi. simpl in *.
-    destruct unh eqn:Heqe;
-    unfold unhandledExtent; simpl.
-      reflexivity.
-    simpl in H. inversion H.
-  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
-  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
-  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
-  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
-Defined.
-
-Lemma ScanState_sole_unhandledExtent `(st : ScanState sd)
-  (H : length (unhandled sd) = 1) :
-  intervalExtent (projT2 (getInterval sd
-                  (safe_hd (unhandled sd) (one_gt_zero _ H)))) =
-  unhandledExtent sd.
-Proof.
-  pose proof st as Hi.
-  apply ScanState_unhandledExtent in Hi.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". inversion H.
-  - Case "ScanState_newUnhandled".
-    clear IHst.
-    cmp_reflexive.
-    inversion H.
-    rewrite map_length in H2.
-    pose (ScanState_no_unhandledExtent st). simpl in e.
-    destruct unh eqn:Heqe;
-    unfold unhandledExtent in *; simpl in *.
-      auto.
-    destruct l eqn:Heqe2; inversion H2.
-  - Case "ScanState_moveUnhandledToActive".
-    clear IHst.
-    destruct unh eqn:Heqe. inversion H.
-    assert (l = []). apply nil_list_0. auto.
-    simpl in *. subst.
-    unfold unhandledExtent in *; simpl in *.
-    assumption.
-  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
-  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
-  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
-  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
-Defined.
-
-Lemma ScanState_more_unhandledExtent `(st : ScanState sd)
-  (H : length (unhandled sd) > 1) :
-  intervalExtent (projT2 (getInterval sd
-                  (safe_hd (unhandled sd) (gt_one_gt_zero _ H)))) <
-  unhandledExtent sd.
-Proof.
-  pose proof st as Hi0.
-  apply ScanState_unhandledExtent in Hi0.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". inversion H.
-  - Case "ScanState_newUnhandled".
-    clear IHst.
-    apply ScanState_unhandledExtent in st.
-    rename st into Hi.
-    cmp_reflexive.
-    destruct unh eqn:Heqe.
-      inversion H. inversion H2.
-    unfold unhandledExtent in *; simpl in *.
-    omega.
-  - Case "ScanState_moveUnhandledToActive".
-    clear IHst.
-    apply ScanState_unhandledExtent in st.
-    rename st into Hi.
-    destruct unh eqn:Heqe. inversion H.
-    subst. simpl in *.
-    destruct l. inversion H. inversion H1.
-    unfold unhandledExtent in *; simpl in *.
-    omega.
-  - Case "ScanState_moveActiveToInactive".  apply IHst. assumption.
-  - Case "ScanState_moveActiveToHandled".   apply IHst. assumption.
-  - Case "ScanState_moveInactiveToActive".  apply IHst. assumption.
-  - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
-Defined.
-
-Definition nextUnhandled `(st : ScanState sd)
-  : option { sd' : ScanStateDesc &
-             { st' : ScanState sd' &
-               CurrentInterval st' & SSMorphSt sd sd' } }.
-Proof.
-  pose (ScanState_sole_unhandledExtent st).
-  pose (ScanState_more_unhandledExtent st).
-
-  destruct sd.
-  destruct unhandled0.
-    apply None.
-  apply Some.
-
-  pose (ScanState_dropUnhandled
-        nextInterval0
-        i unhandled0
-        (* unhandled_sorted0 *)
-        active0
-        inactive0
-        handled0
-        getInterval0
-        assignments0
-        (* lists_are_unique0 *) st).
-
-  eexists.
-  pose (intervalExtent (projT2 (getInterval0 i))).
-  exists s.
-
-  rapply Build_CurrentInterval.
-    apply i.
-    apply (projT2 (getInterval0 i)).
-
-  (* Prove that a call to [nextUnhandled] must always reduce the unhandled
-     extent. *)
-  clear s.
-  constructor.
-    constructor; auto.
-    destruct unhandled0 eqn:Heqe;
-    unfold unhandledExtent; simpl.
-      apply Le.le_0_n.
-    destruct l0 eqn:Heqe2; simpl. omega.
-    apply fold_fold_le. omega.
-
-  pose (Interval_extent_nonzero (projT2 (getInterval0 i))).
-  destruct unhandled0 eqn:Heqe;
-  unfold unhandledExtent; simpl.
-    omega.
-  destruct l0 eqn:Heqe2; simpl. omega.
-  apply fold_fold_lt. omega.
-Defined.
-*)
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
   (H : In x (active sd)) : NextScanState (SSMorphLen sd).
