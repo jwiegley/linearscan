@@ -452,6 +452,33 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
+       |}
+
+  | ScanState_moveUnhandledToActive
+      ni unh (* unhsort *) act inact hnd geti assgn (* lau *) x reg :
+    ScanState
+      {| nextInterval     := ni
+       ; unhandled        := x :: unh
+       ; active           := act
+       ; inactive         := inact
+       ; handled          := hnd
+       ; getInterval      := geti
+       ; assignments      := assgn
+       (* ; unhandled_sorted := unhandled_sorted sd *)
+       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
+       |} ->
+    ScanState
+      {| nextInterval     := ni
+       ; unhandled        := unh
+       ; active           := x :: act
+       ; inactive         := inact
+       ; handled          := hnd
+       ; getInterval      := geti
+       ; assignments      := fun i => if cmp_eq_dec i x
+                                      then Some reg
+                                      else assgn i
+       (* ; unhandled_sorted := unhandled_sorted sd *)
+       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
@@ -463,6 +490,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveActiveToHandled"
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
+  | Case_aux c "ScanState_moveUnhandledToActive"
   ].
 
 (*
@@ -521,6 +549,16 @@ Proof.
   omega.
 Defined.
 
+Record NextScanState (P : ScanStateDesc -> Set) := {
+    priorDesc  : ScanStateDesc;
+    priorState : ScanState priorDesc;
+    morphProof : P priorDesc
+}.
+
+Arguments priorDesc  [P] _.
+Arguments priorState [P] _.
+Arguments morphProof [P] _.
+
 (** ** SSMorph *)
 
 (** A [SSMorph] is a relation describe a lawful transition between two
@@ -569,6 +607,11 @@ Record SSMorphSt (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) : Prop := {
     total_extent_measurably_decreases :
       unhandledExtent sd2 < unhandledExtent sd1
 }.
+
+Definition newSSMorphSt (s : ScanStateDesc) : SSMorphSt s s.
+  constructor.
+  constructor; auto.
+Admitted.
 
 Program Instance SSMorphSt_Trans : Transitive SSMorphSt.
 Obligation 1.
@@ -632,6 +675,7 @@ Proof.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
+  - Case "ScanState_moveUnhandledToActive".
 Qed.
 
 Lemma ScanState_no_unhandledExtent `(st : ScanState sd)
@@ -720,6 +764,7 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
 Defined.
 
+(*
 Definition nextUnhandled `(st : ScanState sd)
   : option { sd' : ScanStateDesc &
              { st' : ScanState sd' &
@@ -770,10 +815,10 @@ Proof.
   destruct l0 eqn:Heqe2; simpl. omega.
   apply fold_fold_lt. omega.
 Defined.
+*)
 
 Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (active sd))
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
+  (H : In x (active sd)) : NextScanState (SSMorph sd).
 Proof.
   pose (ScanState_moveActiveToHandled sd x st H). eexists. apply s.
   destruct sd. simpl.
@@ -781,16 +826,8 @@ Proof.
   apply Le.le_n_Sn.
 Defined.
 
-Definition moveActiveToHandled' `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (active sd))
-  : { sd' : ScanStateDesc & ScanState sd' }.
-Proof.
-  pose (ScanState_moveActiveToHandled sd x st H). eexists. apply s.
-Defined.
-
 Definition moveActiveToInactive `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (active sd))
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
+  (H : In x (active sd)) : NextScanState (SSMorph sd).
 Proof.
   pose (ScanState_moveActiveToInactive sd x st H). eexists. apply s.
   destruct sd. simpl.
@@ -798,8 +835,7 @@ Proof.
 Defined.
 
 Definition moveInactiveToActive `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (inactive sd))
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
+  (H : In x (inactive sd)) : NextScanState (SSMorph sd).
 Proof.
   pose (ScanState_moveInactiveToActive sd x st H). eexists. apply s.
   destruct sd. simpl.
@@ -807,8 +843,7 @@ Proof.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (inactive sd))
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
+  (H : In x (inactive sd)) : NextScanState (SSMorph sd).
 Proof.
   pose (ScanState_moveInactiveToHandled sd x st H). eexists. apply s.
   destruct sd. simpl.
@@ -820,9 +855,10 @@ Defined.
    know it was removed from the [ScanState] by [nextUnhandled], but it may
    have been split and the other parts added back to the unhandled list, so we
    need to know that it's not going to recur. *)
-Definition addToActive `(st : ScanState sd) `(result : CurrentInterval st)
-  (reg : PhysReg) : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' }.
+Definition moveUnhandledToActive `(st : ScanState sd) (reg : PhysReg)
+  : NextScanState (SSMorphSt sd).
 Proof.
+  rapply Build_NextScanState.
 Admitted.
 (*
   destruct st.
@@ -886,18 +922,12 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
-Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
-  : option (PhysReg *
-            { sd' : ScanStateDesc &
-              { st' : ScanState sd' &
-                      CurrentInterval st' & SSMorph sd sd' } }) :=
+Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
+  : option (PhysReg * NextScanState (SSMorphSt sd)) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
      and iterate over the register set. *)
-  let currentId := currentIntervalId i in
-  let cd        := currentDesc i in
-  let current   := currentInterval i in
 
   (* set freeUntilPos of all physical registers to maxInt
      for each interval it in active do
@@ -918,7 +948,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
   (* reg = register with highest freeUntilPos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
   let (reg, mres) := findRegister freeUntilPos lastReg in
-  let result      := existT _ sd (existT2 _ _ st i (newSSMorph sd)) in
+  let result      := Build_NextScanState _ sd st (newSSMorphSt sd) in
   let useReg      := (reg, result) in
 
   (* [mres] indicates the highest use position of the indicated register,
@@ -947,10 +977,8 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(i : CurrentInterval st)
     that the only outcome was to split one or more intervals.  This is why the
     type differs from [tryAllocateFreeReg], since in all cases the final state
     is changed. *)
-Definition allocateBlockedReg `(st : ScanState sd) `(i : CurrentInterval st)
-  : option PhysReg *
-    { sd' : ScanStateDesc &
-      { st' : ScanState sd' & CurrentInterval st' & SSMorph sd sd' } } :=
+Definition allocateBlockedReg `(st : ScanState sd) `(current : Interval cd)
+  : option PhysReg * NextScanState (SSMorphSt sd) :=
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -975,7 +1003,7 @@ Definition allocateBlockedReg `(st : ScanState sd) `(i : CurrentInterval st)
      if current intersects with the fixed interval for reg then
        split current before this intersection *)
 
-  let result := existT _ sd (existT2 _ _ st i (newSSMorph sd)) in
+  let result := Build_NextScanState _ sd st (newSSMorphSt sd) in
   (None, result).
 
 Definition activeIntervals `(st : ScanState sd)
@@ -992,7 +1020,7 @@ Definition activeIntervals `(st : ScanState sd)
    list of active intervals and mutate [st0] until it reflects the desired end
    state. *)
 Fixpoint checkActiveIntervals `(st : ScanState sd) pos
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' } :=
+  : NextScanState (SSMorph sd) :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
@@ -1011,7 +1039,8 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
                         else ss in
         go sd st st1 xs pos
     end in
-  go sd st (existT2 _ _ sd st (newSSMorph sd)) (activeIntervals st) pos.
+  go sd st (Build_NextScanState _ sd st (newSSMorph sd))
+     (activeIntervals st) pos.
 
 Definition inactiveIntervals `(st : ScanState sd)
   : list { i : IntervalId sd & In i (inactive sd) } :=
@@ -1024,7 +1053,7 @@ Definition inactiveIntervals `(st : ScanState sd)
   go (inactive sd).
 
 Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd sd' } :=
+  : NextScanState (SSMorph sd) :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
@@ -1043,13 +1072,15 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
                         else ss in
         go sd st st1 xs pos
     end in
-  go sd st (existT2 _ _ sd st (newSSMorph sd)) (inactiveIntervals st) pos.
+  go sd st (Build_NextScanState _ sd st (newSSMorph sd))
+     (inactiveIntervals st) pos.
 
-Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
-  : { sd' : ScanStateDesc & ScanState sd' & SSMorph sd0 sd' } :=
+Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0)
+  : NextScanState (SSMorphSt sd0) :=
   (* position = start position of current *)
-  let currentId := currentIntervalId i in
-  let position  := intervalStart (currentInterval i) in
+  let currentId := safe_hd (unhandled sd0) H in
+  let current   := projT2 (getInterval sd0 currentId) in
+  let position  := intervalStart current in
 
   (* // check for intervals in active that are handled or inactive
      for each interval it in active do
@@ -1058,7 +1089,7 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
        else if it does not cover position then
          move it from active to inactive *)
   let sp1  := checkActiveIntervals st0 position in
-  let cid1 := transportId (next_interval_increases (projTT3 sp1)) currentId in
+  let cid1 := transportId (next_interval_increases (morphProof sp1)) currentId in
 
   (* // check for intervals in inactive that are handled or active
      for each interval it in inactive do
@@ -1066,33 +1097,33 @@ Definition handleInterval `(st0 : ScanState sd0) `(i : CurrentInterval st0)
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let sp2  := checkInactiveIntervals (projTT2 sp1) position in
-  let cid2 := transportId (next_interval_increases (projTT3 sp2)) cid1 in
+  let sp2  := checkInactiveIntervals (priorState sp1) position in
+  let cid2 := transportId (next_interval_increases (morphProof sp2)) cid1 in
 
   (* // find a register for current
      tryAllocateFreeReg
      if allocation failed then
        allocateBlockedReg *)
   let (mreg, result) :=
-      match tryAllocateFreeReg st0 i with
+      match tryAllocateFreeReg st0 current with
       | Some (reg, result) => (Some reg, result)
-      | None => allocateBlockedReg st0 i
+      | None => allocateBlockedReg st0 current
       end in
 
   (* if current has a register assigned then
        add current to active *)
   match result with
-  | existT sd3 (existT2 st3 current' ss3) =>
+  | Build_NextScanState sd3 st3 ss3 =>
       match mreg with
       | Some reg =>
-          let (sd4,st4,ss4) := addToActive st3 current' reg in
-          existT2 _ _ sd4 st4 (transitivity ss3 ss4)
-      | None => existT2 _ _ sd3 st3 ss3
+          let (sd4,st4,ss4) := moveUnhandledToActive st3 reg in
+          Build_NextScanState _ sd4 st4 (transitivity ss3 ss4)
+      | None => result
       end
   end.
 
 Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure unhandledExtent sd} : { sd' : ScanStateDesc & ScanState sd' } :=
+  {measure unhandledExtent sd} : NextScanState (SSMorphSt sd) :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
@@ -1119,7 +1150,9 @@ Defined.
     instructions are associated with virtual registers, compute the linear
     mapping to intervals. *)
 
-Class Graph (a : Set) := {}.
+Class Graph (a : Set) := {
+    postorderTraversal : a
+}.
 
 Definition determineIntervals (g : Graph VirtReg)
   : { sd : ScanStateDesc & ScanState sd }.
