@@ -69,23 +69,25 @@ Record RangeDesc := {
 
 Inductive Range : RangeDesc -> Set :=
   | R_Sing u :
-      Range {| rbeg := uloc u
-             ; rend := S (uloc u)
-             ; ups  := NE_Sing u
-             ; range_nonempty := le_n (S (uloc u))
-             |}
+    Range {| rbeg := uloc u
+           ; rend := S (uloc u)
+           ; ups  := NE_Sing u
+           ; range_nonempty := le_n (S (uloc u))
+           |}
+
   | R_Cons u x : Range x -> forall (H : uloc u < rbeg x),
-      Range {| rbeg := uloc u
-             ; rend := rend x
-             ; ups  := NE_Cons u (ups x)
-             ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
-             |}
+    Range {| rbeg := uloc u
+           ; rend := rend x
+           ; ups  := NE_Cons u (ups x)
+           ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
+           |}
+
   | R_Extend x b' e' : Range x ->
-      Range {| rbeg := min b' (rbeg x)
-             ; rend := Peano.max e' (rend x)
-             ; ups  := ups x
-             ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
-             |}.
+    Range {| rbeg := min b' (rbeg x)
+           ; rend := Peano.max e' (rend x)
+           ; ups  := ups x
+           ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
+           |}.
 
 Definition rangeExtent (x : RangeDesc) := rend x - rbeg x.
 
@@ -126,7 +128,9 @@ Record IntervalDesc := {
     iend : nat;
     rds  : NonEmpty RangeDesc;
 
-    interval_nonempty : ibeg < iend         (* comes in handy *)
+    (** Caching this property comes in handy, as it can be tricky to determine
+        it by reduction in some cases. *)
+    interval_nonempty : ibeg < iend
 }.
 
 Inductive Interval : IntervalDesc -> Set :=
@@ -136,6 +140,7 @@ Inductive Interval : IntervalDesc -> Set :=
                 ; rds  := NE_Sing x
                 ; interval_nonempty := range_nonempty x
                 |}
+
   | I_Cons1 : forall x y ib ie ne,
       Interval {| ibeg := ib; iend := ie; rds := NE_Sing y;
                   interval_nonempty := ne |}
@@ -145,6 +150,7 @@ Inductive Interval : IntervalDesc -> Set :=
                 ; rds  := NE_Cons x (NE_Sing y)
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}
+
   | I_Consn : forall x y xs ib ie ne,
       Interval {| ibeg := ib; iend := ie; rds := NE_Cons y xs;
                   interval_nonempty := ne |}
@@ -158,6 +164,12 @@ Inductive Interval : IntervalDesc -> Set :=
 Definition intervalStart `(i : Interval d) : nat := ibeg d.
 Definition intervalEnd   `(i : Interval d) : nat := iend d.
 
+Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
+  andb (intervalStart i <=? pos) (pos <? intervalEnd i).
+
+Definition intervalExtent `(i : Interval rs) :=
+  intervalEnd i - intervalStart i.
+
 Lemma Interval_nonempty : forall `(i : Interval rs),
   intervalStart i < intervalEnd i.
 Proof.
@@ -166,13 +178,7 @@ Proof.
   induction r; simpl in *; min_max.
 Qed.
 
-Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
-  andb (intervalStart i <=? pos) (pos <? intervalEnd i).
-
-Definition intervalExtent `(i : Interval rs) :=
-  intervalEnd i - intervalStart i.
-
-Lemma Interval_extent_nonempty : forall `(i : Interval rs),
+Lemma Interval_extent_nonzero : forall `(i : Interval rs),
   intervalExtent i > 0.
 Proof.
   intros.
@@ -212,6 +218,10 @@ Record ScanStateDesc := {
     getInterval  : IntervalId -> { d : IntervalDesc & Interval d };
     assignments  : IntervalId -> option PhysReg
 
+    (* jww (2014-09-25): I haven't demonstrated yet that these extra
+       restrictions are worth the effort.  It would be nicely to add them back
+       in once everything is functioning. *)
+
     (* unhandled_sorted : StronglySorted cmp_le unhandled; *)
 
     (* all_state_lists  := unhandled ++ active ++ inactive ++ handled; *)
@@ -229,20 +239,6 @@ Proof.
 Defined.
 
 (*
-Lemma NoDup_wip : forall n x unh act inact hnd,
-  NoDup (unh ++ act ++ inact ++ hnd) ->
-  NoDup ((x :: map (fin_bump n) unh) ++
-         map (fin_bump n) act ++ map (fin_bump n) inact ++
-         map (fin_bump n) hnd).
-Proof.
-  intros.
-  rewrite <- app_comm_cons.
-  apply NoDup_cons.
-  (* apply NoDup_unapp in H1. inversion H1. clear H1. *)
-  (* apply NoDup_unapp in H2. inversion H2. clear H2. *)
-Admitted.
-*)
-
 Lemma move_active_to_inactive : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
     -> In x (active sd)
@@ -302,6 +298,7 @@ Definition move_inactive_to_handled : forall sd x,
               remove cmp_eq_dec x (inactive sd) ++ x :: handled sd).
 Proof.
 Admitted.
+*)
 
 (** The [ScanState] inductive data type describes the allowable state
     transitions that can be applied to a [ScanStateDesc] value.
@@ -353,6 +350,8 @@ Inductive ScanState : ScanStateDesc -> Set :=
        (* ; lists_are_unique := lau *)
        |} ->
     forall newi (H : newi = ultimate_Sn ni),
+    (* jww (2014-09-25): I really do need to ensure that what is added here
+       does not break ordering or non-duplication. *)
     ScanState
       {| nextInterval     := S ni
        ; unhandled        := newi :: map (fin_bump ni) unh
@@ -373,8 +372,8 @@ Inductive ScanState : ScanStateDesc -> Set :=
        (* ; lists_are_unique := lau *)
        |}
 
-  | ScanState_dropUnhandled
-      ni x unh (* unhsort *) act inact hnd geti assgn (* lau *) :
+  | ScanState_moveUnhandledToActive
+      ni unh (* unhsort *) act inact hnd geti assgn (* lau *) x reg :
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh
@@ -383,19 +382,21 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; handled          := hnd
        ; getInterval      := geti
        ; assignments      := assgn
-       (* ; unhandled_sorted := unhsort *)
-       (* ; lists_are_unique := lau *)
+       (* ; unhandled_sorted := unhandled_sorted sd *)
+       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
        |} ->
     ScanState
       {| nextInterval     := ni
        ; unhandled        := unh
-       ; active           := act
+       ; active           := x :: act
        ; inactive         := inact
        ; handled          := hnd
        ; getInterval      := geti
-       ; assignments      := assgn
-       (* ; unhandled_sorted := LocallySorted_uncons _ _ _ _ unhsort *)
-       (* ; lists_are_unique := NoDup_uncons _ _ _ _ lau *)
+       ; assignments      := fun i => if cmp_eq_dec i x
+                                      then Some reg
+                                      else assgn i
+       (* ; unhandled_sorted := unhandled_sorted sd *)
+       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
        |}
 
   | ScanState_moveActiveToInactive sd x :
@@ -452,45 +453,17 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; assignments      := assignments sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
-       |}
-
-  | ScanState_moveUnhandledToActive
-      ni unh (* unhsort *) act inact hnd geti assgn (* lau *) x reg :
-    ScanState
-      {| nextInterval     := ni
-       ; unhandled        := x :: unh
-       ; active           := act
-       ; inactive         := inact
-       ; handled          := hnd
-       ; getInterval      := geti
-       ; assignments      := assgn
-       (* ; unhandled_sorted := unhandled_sorted sd *)
-       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
-       |} ->
-    ScanState
-      {| nextInterval     := ni
-       ; unhandled        := unh
-       ; active           := x :: act
-       ; inactive         := inact
-       ; handled          := hnd
-       ; getInterval      := geti
-       ; assignments      := fun i => if cmp_eq_dec i x
-                                      then Some reg
-                                      else assgn i
-       (* ; unhandled_sorted := unhandled_sorted sd *)
-       (* ; lists_are_unique := move_inactive_to_handled sd x (lists_are_unique sd) H *)
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
   | Case_aux c "ScanState_newUnhandled"
-  | Case_aux c "ScanState_dropUnhandled"
+  | Case_aux c "ScanState_moveUnhandledToActive"
   | Case_aux c "ScanState_moveActiveToInactive"
   | Case_aux c "ScanState_moveActiveToHandled"
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
-  | Case_aux c "ScanState_moveUnhandledToActive"
   ].
 
 (*
@@ -545,18 +518,47 @@ Proof.
   destruct l eqn:Heqe2; simpl.
     reflexivity.
   apply fold_gt.
-  pose (Interval_extent_nonempty (projT2 (getInterval0 i0))).
+  pose (Interval_extent_nonzero (projT2 (getInterval0 i0))).
   omega.
 Defined.
 
+Lemma unhandledExtent_cons
+  : forall ni i (unh : list (fin ni)) geti assgn assgn'
+           (act act' inact inact' hnd hnd' : list (fin ni)),
+  unhandledExtent
+    {|
+    nextInterval := ni;
+    unhandled := unh;
+    active := act;
+    inactive := inact;
+    handled := hnd;
+    getInterval := geti;
+    assignments := assgn |} <
+  unhandledExtent
+    {|
+    nextInterval := ni;
+    unhandled := i :: unh;
+    active := act';
+    inactive := inact';
+    handled := hnd';
+    getInterval := geti;
+    assignments := assgn' |}.
+Proof.
+  intros.
+  induction unh; unfold unhandledExtent; simpl;
+  pose (Interval_extent_nonzero (projT2 (geti i))). omega.
+  destruct unh; simpl. omega.
+  apply fold_fold_lt. omega.
+Qed.
+
 Record NextScanState (P : ScanStateDesc -> Set) := {
-    priorDesc  : ScanStateDesc;
-    priorState : ScanState priorDesc;
-    morphProof : P priorDesc
+    nextDesc   : ScanStateDesc;
+    nextState  : ScanState nextDesc;
+    morphProof : P nextDesc
 }.
 
-Arguments priorDesc  [P] _.
-Arguments priorState [P] _.
+Arguments nextDesc  [P] _.
+Arguments nextState [P] _.
 Arguments morphProof [P] _.
 
 (** ** SSMorph *)
@@ -564,7 +566,7 @@ Arguments morphProof [P] _.
 (** A [SSMorph] is a relation describe a lawful transition between two
     states.  It is a [PreOrder] relation. *)
 
-Record SSMorph (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) := {
+Record SSMorph (sd1 sd2 : ScanStateDesc) := {
     next_interval_increases : nextInterval sd1     <= nextInterval sd2;
     total_extent_decreases  : unhandledExtent sd2  <= unhandledExtent sd1;
     handled_count_increases : length (handled sd1) <= length (handled sd2)
@@ -586,6 +588,20 @@ Obligation 2.
   transitivity (length (handled y)); auto.
 Defined.
 
+Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    len_is_SSMorph :> SSMorph sd1 sd2;
+
+    unhandled_nonempty :
+         (length (unhandled sd1) = 0 /\ length (unhandled sd2) = 0)
+      \/ (length (unhandled sd1) > 0 /\ length (unhandled sd2) > 0)
+}.
+
+(* jww (2014-09-25): This is just a stub and will be deleted. *)
+Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
+  constructor.
+  constructor; auto.
+Admitted.
+
 (** ** CurrentInterval *)
 
 Record CurrentInterval `(st : ScanState sd) := {
@@ -601,13 +617,14 @@ Arguments currentIntervalId [sd st] _.
 Arguments currentDesc       [sd st] _.
 Arguments currentInterval   [sd st] _.
 
-Record SSMorphSt (sd1 : ScanStateDesc) (sd2 : ScanStateDesc) : Prop := {
-    is_SSMorph :> SSMorph sd1 sd2;
+Record SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
+    st_is_SSMorph :> SSMorph sd1 sd2;
 
     total_extent_measurably_decreases :
       unhandledExtent sd2 < unhandledExtent sd1
 }.
 
+(* jww (2014-09-25): This is just a stub and will be deleted. *)
 Definition newSSMorphSt (s : ScanStateDesc) : SSMorphSt s s.
   constructor.
   constructor; auto.
@@ -624,20 +641,6 @@ Obligation 1.
   right. omega.
 Qed.
 
-Theorem compose_SSMorph_with_SSMorphSt : forall (sd1 sd2 sd3 : ScanStateDesc),
-  SSMorphSt sd1 sd2 -> SSMorph sd2 sd3 -> SSMorphSt sd1 sd3.
-Proof.
-  intros.
-  constructor.
-  inversion H.
-  transitivity sd2; assumption.
-  inversion H. inversion H0. omega.
-Qed.
-
-Theorem SSMorphSt_proj_unhandledExtent : forall (sd1 sd3 : ScanStateDesc),
-  SSMorphSt sd1 sd3 -> unhandledExtent sd3 < unhandledExtent sd1.
-Proof. intros. inversion H. assumption. Qed.
-
 Lemma ScanState_unhandledExtent_nonzero `(st : ScanState sd) :
   length (unhandled sd) > 0 <-> unhandledExtent sd > 0.
 Proof.
@@ -646,7 +649,7 @@ Proof.
   - Case "ScanState_nil".
     split; intros; inversion H.
   - Case "ScanState_newUnhandled".
-    pose (Interval_extent_nonempty i).
+    pose (Interval_extent_nonzero i).
     destruct unh eqn:Heqe;
     unfold unhandledExtent; simpl.
       split; intros; try cmp_reflexive; auto.
@@ -656,7 +659,7 @@ Proof.
       apply fold_gt.
       cmp_reflexive. omega.
     apply Gt.gt_Sn_O.
-  - Case "ScanState_dropUnhandled".
+  - Case "ScanState_moveUnhandledToActive".
     apply ScanState_unhandledExtent in st.
     rename st into i. simpl in *.
     destruct unh eqn:Heqe.
@@ -664,27 +667,27 @@ Proof.
     unfold unhandledExtent; simpl.
     destruct l eqn:Heqe2; simpl.
       split; intros.
-      apply Interval_extent_nonempty.
+      apply Interval_extent_nonzero.
       auto.
     split; intros.
       apply fold_gt.
-      pose (Interval_extent_nonempty (projT2 (geti f))).
+      pose (Interval_extent_nonzero (projT2 (geti f))).
       omega.
     omega.
   - Case "ScanState_moveActiveToInactive".  apply IHst.
   - Case "ScanState_moveActiveToHandled".   apply IHst.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
-  - Case "ScanState_moveUnhandledToActive".
 Qed.
 
+(*
 Lemma ScanState_no_unhandledExtent `(st : ScanState sd)
   (H : length (unhandled sd) = 0) : unhandledExtent sd = 0.
 Proof.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". apply H.
   - Case "ScanState_newUnhandled". inversion H.
-  - Case "ScanState_dropUnhandled".
+  - Case "ScanState_moveUnhandledToActive".
     apply ScanState_unhandledExtent in st.
     rename st into Hi. simpl in *.
     destruct unh eqn:Heqe;
@@ -717,7 +720,7 @@ Proof.
     unfold unhandledExtent in *; simpl in *.
       auto.
     destruct l eqn:Heqe2; inversion H2.
-  - Case "ScanState_dropUnhandled".
+  - Case "ScanState_moveUnhandledToActive".
     clear IHst.
     destruct unh eqn:Heqe. inversion H.
     assert (l = []). apply nil_list_0. auto.
@@ -749,7 +752,7 @@ Proof.
       inversion H. inversion H2.
     unfold unhandledExtent in *; simpl in *.
     omega.
-  - Case "ScanState_dropUnhandled".
+  - Case "ScanState_moveUnhandledToActive".
     clear IHst.
     apply ScanState_unhandledExtent in st.
     rename st into Hi.
@@ -764,7 +767,6 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". apply IHst. assumption.
 Defined.
 
-(*
 Definition nextUnhandled `(st : ScanState sd)
   : option { sd' : ScanStateDesc &
              { st' : ScanState sd' &
@@ -808,7 +810,7 @@ Proof.
     destruct l0 eqn:Heqe2; simpl. omega.
     apply fold_fold_le. omega.
 
-  pose (Interval_extent_nonempty (projT2 (getInterval0 i))).
+  pose (Interval_extent_nonzero (projT2 (getInterval0 i))).
   destruct unhandled0 eqn:Heqe;
   unfold unhandledExtent; simpl.
     omega.
@@ -817,71 +819,76 @@ Proof.
 Defined.
 *)
 
-Definition moveActiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (active sd)) : NextScanState (SSMorph sd).
+Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
+  (H : In x (active sd)) : NextScanState (SSMorphLen sd).
 Proof.
   pose (ScanState_moveActiveToHandled sd x st H). eexists. apply s.
   destruct sd. simpl.
+  rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
+  destruct unhandled0. auto.
+  simpl. right. split; omega.
 Defined.
 
-Definition moveActiveToInactive `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (active sd)) : NextScanState (SSMorph sd).
+Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
+  (H : In x (active sd)) : NextScanState (SSMorphLen sd).
 Proof.
   pose (ScanState_moveActiveToInactive sd x st H). eexists. apply s.
   destruct sd. simpl.
+  rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
+  destruct unhandled0. auto.
+  simpl. right. split; omega.
 Defined.
 
-Definition moveInactiveToActive `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (inactive sd)) : NextScanState (SSMorph sd).
+Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
+  (H : In x (inactive sd)) : NextScanState (SSMorphLen sd).
 Proof.
   pose (ScanState_moveInactiveToActive sd x st H). eexists. apply s.
   destruct sd. simpl.
+  rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
+  destruct unhandled0. auto.
+  simpl. right. split; omega.
 Defined.
 
-Definition moveInactiveToHandled `(st : ScanState sd) `(x : IntervalId sd)
-  (H : In x (inactive sd)) : NextScanState (SSMorph sd).
+Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
+  (H : In x (inactive sd)) : NextScanState (SSMorphLen sd).
 Proof.
   pose (ScanState_moveInactiveToHandled sd x st H). eexists. apply s.
   destruct sd. simpl.
+  rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
+  destruct unhandled0. auto.
+  simpl. right. split; omega.
 Defined.
 
-(* We need to know that [x] is not already a member of the [ScanState].  We
-   know it was removed from the [ScanState] by [nextUnhandled], but it may
-   have been split and the other parts added back to the unhandled list, so we
-   need to know that it's not going to recur. *)
 Definition moveUnhandledToActive `(st : ScanState sd) (reg : PhysReg)
-  : NextScanState (SSMorphSt sd).
+  (H : length (unhandled sd) > 0) : NextScanState (SSMorphSt sd).
 Proof.
-  rapply Build_NextScanState.
-Admitted.
-(*
-  destruct st.
-  destruct result.
-  eexists {| nextInterval := nextInterval0
-           ; unhandled    := unhandled0
-           ; active       := currentIntervalId0 :: active0
-           ; inactive     := inactive0
-           ; handled      := handled0
-           ; getInterval  := getInterval0
-           ; assignments  := fun i =>
-               if cmp_eq_dec i currentIntervalId0
-               then Some reg
-               else assignments0 i
-           |}.
-  rapply Build_SSMorph; simpl; auto.
-  Grab Existential Variables.
-  apply NoDup_swap.
-  rewrite <- app_comm_cons.
-  apply NoDup_swap_cons.
-  apply NoDup_cons; assumption.
+  destruct sd.
+  destruct unhandled0; simpl in *. omega.
+  pose (ScanState_moveUnhandledToActive
+          nextInterval0 unhandled0
+          (* unhsort *)
+          active0 inactive0 handled0
+          getInterval0 assignments0
+          (* lau *)
+          i reg).
+  eexists. apply s. apply st.
+  pose (unhandledExtent_cons nextInterval0 i unhandled0 getInterval0
+         (fun i0 : fin nextInterval0 =>
+            if cmp_eq_dec i0 i
+            then Some reg
+            else assignments0 i0) assignments0
+         (i :: active0) active0 inactive0 inactive0 handled0 handled0)
+    as ue_cons.
+  rapply Build_SSMorphSt; auto.
+  rapply Build_SSMorph; auto.
+  apply (Lt.lt_le_weak _ _ ue_cons).
 Defined.
-*)
 
 (** ** Main functions *)
 
@@ -923,7 +930,8 @@ Proof. intros. apply pred_fin_lt. assumption. Qed.
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
 Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
-  : option (PhysReg * NextScanState (SSMorphSt sd)) :=
+  (H : length (unhandled sd) > 0)
+  : option (NextScanState (SSMorphSt sd)) :=
   (* The first part of this algorithm has been modified to be more functional:
      instead of mutating an array called [freeUntilPos] and finding the
      register with the highest value, we use a function produced by a fold,
@@ -948,13 +956,12 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
   (* reg = register with highest freeUntilPos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
   let (reg, mres) := findRegister freeUntilPos lastReg in
-  let result      := Build_NextScanState _ sd st (newSSMorphSt sd) in
-  let useReg      := (reg, result) in
+  let result      := moveUnhandledToActive st reg H in
 
   (* [mres] indicates the highest use position of the indicated register,
      which is the furthest available. *)
   match mres with
-  | None => Some useReg
+  | None => Some result
   | Some n =>
       (* if freeUntilPos[reg] = 0 then
            // no register available without spilling
@@ -969,7 +976,7 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
       if beq_nat n 0
       then None
       else if ltb (intervalEnd current) n
-           then Some useReg
+           then Some result
            else None            (* jww (2014-09-12): NYI *)
   end.
 
@@ -978,7 +985,8 @@ Definition tryAllocateFreeReg `(st : ScanState sd) `(current : Interval cd)
     type differs from [tryAllocateFreeReg], since in all cases the final state
     is changed. *)
 Definition allocateBlockedReg `(st : ScanState sd) `(current : Interval cd)
-  : option PhysReg * NextScanState (SSMorphSt sd) :=
+  (H : length (unhandled sd) > 0)
+  : NextScanState (SSMorphSt sd) :=
   (* set nextUsePos of all physical registers to maxInt *)
 
   (* for each interval it in active do
@@ -1003,8 +1011,7 @@ Definition allocateBlockedReg `(st : ScanState sd) `(current : Interval cd)
      if current intersects with the fixed interval for reg then
        split current before this intersection *)
 
-  let result := Build_NextScanState _ sd st (newSSMorphSt sd) in
-  (None, result).
+  Build_NextScanState _ sd st (newSSMorphSt sd).
 
 Definition activeIntervals `(st : ScanState sd)
   : list { i : IntervalId sd & In i (active sd) } :=
@@ -1020,7 +1027,7 @@ Definition activeIntervals `(st : ScanState sd)
    list of active intervals and mutate [st0] until it reflects the desired end
    state. *)
 Fixpoint checkActiveIntervals `(st : ScanState sd) pos
-  : NextScanState (SSMorph sd) :=
+  : NextScanState (SSMorphLen sd) :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
@@ -1039,7 +1046,7 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
                         else ss in
         go sd st st1 xs pos
     end in
-  go sd st (Build_NextScanState _ sd st (newSSMorph sd))
+  go sd st (Build_NextScanState _ sd st (newSSMorphLen sd))
      (activeIntervals st) pos.
 
 Definition inactiveIntervals `(st : ScanState sd)
@@ -1053,7 +1060,7 @@ Definition inactiveIntervals `(st : ScanState sd)
   go (inactive sd).
 
 Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
-  : NextScanState (SSMorph sd) :=
+  : NextScanState (SSMorphLen sd) :=
   let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
@@ -1072,7 +1079,7 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
                         else ss in
         go sd st st1 xs pos
     end in
-  go sd st (Build_NextScanState _ sd st (newSSMorph sd))
+  go sd st (Build_NextScanState _ sd st (newSSMorphLen sd))
      (inactiveIntervals st) pos.
 
 Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0)
@@ -1097,49 +1104,43 @@ Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
-  let sp2  := checkInactiveIntervals (priorState sp1) position in
+  let sp2  := checkInactiveIntervals (nextState sp1) position in
   let cid2 := transportId (next_interval_increases (morphProof sp2)) cid1 in
 
   (* // find a register for current
      tryAllocateFreeReg
      if allocation failed then
-       allocateBlockedReg *)
-  let (mreg, result) :=
-      match tryAllocateFreeReg st0 current with
-      | Some (reg, result) => (Some reg, result)
-      | None => allocateBlockedReg st0 current
-      end in
-
-  (* if current has a register assigned then
-       add current to active *)
-  match result with
-  | Build_NextScanState sd3 st3 ss3 =>
-      match mreg with
-      | Some reg =>
-          let (sd4,st4,ss4) := moveUnhandledToActive st3 reg in
-          Build_NextScanState _ sd4 st4 (transitivity ss3 ss4)
-      | None => result
-      end
+       allocateBlockedReg
+     if current has a register assigned then
+       add current to active (done by the helper functions) *)
+  match tryAllocateFreeReg st0 current H with
+  | Some result => result
+  | None => allocateBlockedReg st0 current H
   end.
 
+Lemma list_cons_nonzero : forall {a x} {xs l : list a},
+  l = x :: xs -> length l > 0.
+Proof. intros. rewrite H. simpl. omega. Qed.
+
+(* while unhandled /= { } do
+     current = pick and remove first interval from unhandled
+     HANDLE_INTERVAL (current) *)
+
 Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure unhandledExtent sd} : NextScanState (SSMorphSt sd) :=
-  (* while unhandled /= { } do
-       current = pick and remove first interval from unhandled
-       HANDLE_INTERVAL (current) *)
-  match nextUnhandled st with
-  | None => existT _ sd st
-  | Some (existT sd1 (existT2 st1 i smorph1)) =>
-    match handleInterval st1 i with
-    | existT2 sd2 st2 smorph2 => linearScan sd2 st2
+  {measure unhandledExtent sd} : { sd' : ScanStateDesc & ScanState sd' } :=
+  match destruct_list (unhandled sd) with
+  | inleft (existT x (exist xs H)) =>
+    match handleInterval st (list_cons_nonzero H) with
+    | Build_NextScanState sd2 st2 smorph2 => linearScan sd2 st2
     end
+  | inright _ => existT _ sd st
   end.
 Proof.
   (* We must prove that after every call to handleInterval, the total extent
      of the remaining unhandled intervals is less than it was before. *)
   intros.
-  apply SSMorphSt_proj_unhandledExtent.
-  apply compose_SSMorph_with_SSMorphSt with (sd2 := sd1); assumption.
+  inversion smorph2.
+  assumption.
 Defined.
 
 (****************************************************************************)
