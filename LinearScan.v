@@ -552,7 +552,7 @@ Proof.
   apply fold_fold_lt. omega.
 Qed.
 
-Record NextScanState (P : ScanStateDesc -> Set) := {
+Record NextScanState (P : ScanStateDesc -> Prop) : Type := {
     nextDesc   : ScanStateDesc;
     nextState  : ScanState nextDesc;
     morphProof : P nextDesc
@@ -562,12 +562,23 @@ Arguments nextDesc  [P] _.
 Arguments nextState [P] _.
 Arguments morphProof [P] _.
 
+Definition NextScanState_transitivity
+  {P : ScanStateDesc -> ScanStateDesc -> Prop} `{Transitive _ P}
+  `(n : NextScanState (P sd0)) `(o : NextScanState (P (nextDesc n)))
+  : NextScanState (P sd0).
+  destruct n. destruct o.
+  simpl in *.
+  rapply Build_NextScanState.
+    apply nextState1.
+  transitivity nextDesc0; assumption.
+Defined.
+
 (** ** SSMorph *)
 
 (** A [SSMorph] is a relation describe a lawful transition between two
     states.  It is a [PreOrder] relation. *)
 
-Record SSMorph (sd1 sd2 : ScanStateDesc) := {
+Record SSMorph (sd1 sd2 : ScanStateDesc) : Prop := {
     next_interval_increases : nextInterval sd1     <= nextInterval sd2;
     total_extent_decreases  : unhandledExtent sd2  <= unhandledExtent sd1;
     handled_count_increases : length (handled sd1) <= length (handled sd2)
@@ -593,15 +604,11 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
     unhandled_nonempty :
-         (length (unhandled sd1) = 0 /\ length (unhandled sd2) = 0)
-      \/ (length (unhandled sd1) > 0 /\ length (unhandled sd2) > 0)
+      length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
 }.
 
-(* jww (2014-09-25): This is just a stub and will be deleted. *)
 Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
-  constructor.
-  constructor; auto.
-Admitted.
+Proof. intros. constructor; auto. constructor; auto. Defined.
 
 (** ** CurrentInterval *)
 
@@ -828,8 +835,6 @@ Proof.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
-  destruct unhandled0. auto.
-  simpl. right. split; omega.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
@@ -839,8 +844,6 @@ Proof.
   destruct sd. simpl.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
-  destruct unhandled0. auto.
-  simpl. right. split; omega.
 Defined.
 
 Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
@@ -850,8 +853,6 @@ Proof.
   destruct sd. simpl.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
-  destruct unhandled0. auto.
-  simpl. right. split; omega.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
@@ -862,8 +863,6 @@ Proof.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
-  destruct unhandled0. auto.
-  simpl. right. split; omega.
 Defined.
 
 Definition moveUnhandledToActive `(st : ScanState sd) (reg : PhysReg)
@@ -1083,6 +1082,20 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   go sd st (Build_NextScanState _ sd st (newSSMorphLen sd))
      (inactiveIntervals st) pos.
 
+Lemma SSMorphLenSt_transitivity
+  `( i : SSMorphLen sd0 sd1)
+  `( j : SSMorphLen sd1 sd2)
+  `( k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
+Proof.
+  constructor;
+  destruct i;
+  destruct j;
+  destruct k.
+    transitivity sd1; auto.
+    transitivity sd2; auto.
+  intuition.
+Qed.
+
 Definition handleInterval `(st0 : ScanState sd0)
   (H : length (unhandled sd0) > 0) : NextScanState (SSMorphSt sd0) :=
   (* position = start position of current *)
@@ -1097,6 +1110,7 @@ Definition handleInterval `(st0 : ScanState sd0)
        else if it does not cover position then
          move it from active to inactive *)
   let sp1  := checkActiveIntervals st0 position in
+  let Hlt1 := unhandled_nonempty sd0 (nextDesc sp1) (morphProof sp1) H in
   let H1   := next_interval_increases (morphProof sp1) in
   let cid1 := transportId H1 currentId in
 
@@ -1107,6 +1121,8 @@ Definition handleInterval `(st0 : ScanState sd0)
        else if it covers position then
          move it from inactive to active *)
   let sp2  := checkInactiveIntervals (nextState sp1) position in
+  let Hlt2 := unhandled_nonempty (nextDesc sp1) (nextDesc sp2)
+                                 (morphProof sp2) Hlt1 in
   let H2   := next_interval_increases (morphProof sp2) in
   let cid2 := transportId H2 cid1 in
 
@@ -1116,10 +1132,15 @@ Definition handleInterval `(st0 : ScanState sd0)
        allocateBlockedReg
      if current has a register assigned then
        add current to active (done by the helper functions) *)
-  match tryAllocateFreeReg st0 current H with
-  | Some result => result
-  | None => allocateBlockedReg st0 current H
-  end.
+  let result :=
+      fromMaybe (allocateBlockedReg (nextState sp2) current Hlt2)
+                (tryAllocateFreeReg (nextState sp2) current Hlt2) in
+  {| nextDesc   := nextDesc result
+   ; nextState  := nextState result
+   ; morphProof :=
+       SSMorphLenSt_transitivity (morphProof sp1) (morphProof sp2)
+                                 (morphProof result)
+   |}.
 
 Lemma list_cons_nonzero : forall {a x} {xs l : list a},
   l = x :: xs -> length l > 0.

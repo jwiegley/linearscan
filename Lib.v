@@ -24,6 +24,12 @@ Generalizable All Variables.
 
 (** The following are extensions to the Coq standard library. *)
 
+Definition fromMaybe {a} (d : a) (mx : option a) : a :=
+  match mx with
+    | Some x => x
+    | None => d
+  end.
+
 Ltac move_to_top x :=
   match reverse goal with
   | H : _ |- _ => try move x after H
