@@ -6,6 +6,7 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
+Require Import Alternative.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Classes.EquivDec.
 Require Import Coq.Lists.List.
@@ -1082,8 +1083,8 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   go sd st (Build_NextScanState _ sd st (newSSMorphLen sd))
      (inactiveIntervals st) pos.
 
-Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0)
-  : NextScanState (SSMorphSt sd0) :=
+Definition handleInterval `(st0 : ScanState sd0)
+  (H : length (unhandled sd0) > 0) : NextScanState (SSMorphSt sd0) :=
   (* position = start position of current *)
   let currentId := safe_hd (unhandled sd0) H in
   let current   := projT2 (getInterval sd0 currentId) in
@@ -1096,7 +1097,8 @@ Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0
        else if it does not cover position then
          move it from active to inactive *)
   let sp1  := checkActiveIntervals st0 position in
-  let cid1 := transportId (next_interval_increases (morphProof sp1)) currentId in
+  let H1   := next_interval_increases (morphProof sp1) in
+  let cid1 := transportId H1 currentId in
 
   (* // check for intervals in inactive that are handled or active
      for each interval it in inactive do
@@ -1105,7 +1107,8 @@ Definition handleInterval `(st0 : ScanState sd0) (H : length (unhandled sd0) > 0
        else if it covers position then
          move it from inactive to active *)
   let sp2  := checkInactiveIntervals (nextState sp1) position in
-  let cid2 := transportId (next_interval_increases (morphProof sp2)) cid1 in
+  let H2   := next_interval_increases (morphProof sp2) in
+  let cid2 := transportId H2 cid1 in
 
   (* // find a register for current
      tryAllocateFreeReg
@@ -1135,13 +1138,9 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
     end
   | inright _ => existT _ sd st
   end.
-Proof.
-  (* We must prove that after every call to handleInterval, the total extent
-     of the remaining unhandled intervals is less than it was before. *)
-  intros.
-  inversion smorph2.
-  assumption.
-Defined.
+(* We must prove that after every call to handleInterval, the total extent
+   of the remaining unhandled intervals is less than it was before. *)
+Proof. intros; inversion smorph2; assumption. Defined.
 
 (****************************************************************************)
 
@@ -1152,7 +1151,7 @@ Defined.
     mapping to intervals. *)
 
 Class Graph (a : Set) := {
-    postorderTraversal : a
+    postOrderTraversal : a
 }.
 
 Definition determineIntervals (g : Graph VirtReg)
