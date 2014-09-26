@@ -345,6 +345,14 @@ Definition move_inactive_to_handled : forall sd x,
 Proof.
 Admitted.
 
+Lemma newi_map_L_R_rewrite : forall {m : nat} {newi unh act inact hnd},
+  NoDup (newi :: map (@L_R m 1) (unh ++ act ++ inact ++ hnd))
+    -> NoDup ((newi :: map (L_R 1) unh) ++
+               map (L_R 1) act ++ map (L_R 1) inact ++ map (L_R 1) hnd).
+Proof.
+  intros.
+Admitted.
+
 (** The [ScanState] inductive data type describes the allowable state
     transitions that can be applied to a [ScanStateDesc] value.
 
@@ -365,43 +373,6 @@ Admitted.
     4. Move an item from the active list to the inactive or handled lists.
 
     5. Move an item from the inactive list to the active or handled lists. *)
-
-Definition undefined {a : Type} : a. Admitted.
-
-Definition Injective {A B} (f : A->B) :=
- forall x y, f x = f y -> x = y.
-
-Lemma Injective_map_NoDup A B (f : A -> B) (l : list A) :
- Injective f -> NoDup l -> NoDup (map f l).
-Proof.
-  intros Ij.
-  induction 1; simpl; constructor; trivial.
-  rewrite in_map_iff. intros (y & E & Y). apply Ij in E. now subst.
-Qed.
-
-Lemma NoDup_map_inv {A B} {f : A -> B} l : NoDup (map f l) -> NoDup l.
-Proof.
- induction l; simpl; inversion_clear 1; subst; constructor; auto.
- intro H. now apply (in_map f) in H.
-Qed.
-
-Lemma NoDup_fin_cons {n} (x : fin (S n)) (l : list (fin n))
-  : NoDup l -> x = ultimate_Sn n -> NoDup (x :: map FS l).
-Proof.
-  intros.
-  pose (fin_safe_reduce x).
-  constructor.
-    unfold not. intros.
-    induction l. auto.
-    apply IHl.
-    inversion H. auto.
-    apply in_map_iff in H1.
-    apply in_map_iff.
-    destruct H1.
-    exists x0.
-    destruct H1.
-    split. assumption.
-Admitted.
 
 Inductive ScanState : ScanStateDesc -> Set :=
   | ScanState_nil :
@@ -434,10 +405,10 @@ Inductive ScanState : ScanStateDesc -> Set :=
     forall newi (H : newi = ultimate_Sn ni),
     ScanState
       {| nextInterval     := S ni
-       ; unhandled        := newi :: map FS unh
-       ; active           := map FS act
-       ; inactive         := map FS inact
-       ; handled          := map FS hnd
+       ; unhandled        := newi :: map (L_R 1) unh
+       ; active           := map (L_R 1) act
+       ; inactive         := map (L_R 1) inact
+       ; handled          := map (L_R 1) hnd
        ; getInterval      :=
          fun n => match cmp_eq_dec n newi with
                   | left _ => existT _ d i
@@ -449,7 +420,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
                   | right Hn => assgn (fin_safe_reduce n (rew_in_not_eq H Hn))
                   end
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := undefined (* lau *)
+       ; lists_are_unique := newi_map_L_R_rewrite (NoDup_fin_cons _ _ lau H)
        |}
 
   | ScanState_moveUnhandledToActive

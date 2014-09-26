@@ -920,3 +920,47 @@ Proof.
     inversion f.
   unfold ultimate_Sn in *. simpl.
 Admitted.
+
+Definition undefined {a : Type} : a. Admitted.
+
+Definition Injective {A B} (f : A->B) :=
+ forall x y, f x = f y -> x = y.
+
+Lemma Injective_map_NoDup A B (f : A -> B) (l : list A) :
+ Injective f -> NoDup l -> NoDup (map f l).
+Proof.
+  intros Ij.
+  induction 1; simpl; constructor; trivial.
+  rewrite in_map_iff. intros (y & E & Y). apply Ij in E. now subst.
+Qed.
+
+Lemma NoDup_map_inv {A B} {f : A -> B} l : NoDup (map f l) -> NoDup l.
+Proof.
+ induction l; simpl; inversion_clear 1; subst; constructor; auto.
+ intro H. now apply (in_map f) in H.
+Qed.
+
+Lemma L_R_inj {n m} (x y: t n) (eq: L_R m x = L_R m y): x = y.
+Proof.
+  induction n. inversion x.
+  destruct x using fin_Sn_inv;
+  destruct y using fin_Sn_inv.
+  - reflexivity.
+  - admit.
+  - admit.
+  - unfold L_R in eq.
+Admitted.
+
+Lemma NoDup_fin_cons {n} (x : fin (S n)) (l : list (fin n))
+  : NoDup l -> x = ultimate_Sn n -> NoDup (x :: map (L_R 1) l).
+Proof.
+  intros.
+  constructor.
+    rewrite H0.
+    apply ultimate_Sn_not_In.
+  apply Injective_map_NoDup.
+    unfold Injective. intros.
+    apply L_R_inj in H1.
+    assumption.
+  assumption.
+Qed.
