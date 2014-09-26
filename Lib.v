@@ -627,28 +627,18 @@ Definition fin := Coq.Vectors.Fin.t.
 Definition fin_contra : forall {x}, fin 0 -> x.
 Proof. intros. inversion H. Defined.
 
-Definition fin_transport (n m : nat) (H : n <= m) (f : fin n) : fin m.
-Proof.
-  induction f.
-    induction n.
-      destruct m. omega.
-      constructor.
-    apply IHn. omega.
-  apply IHf. omega.
-Defined.
-
-Definition fin_bump (n : nat) := fin_transport n (S n) (le_S n n (le_n n)).
-
 Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
 
 Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
 
-Definition ultimate_Sn (n : nat) : fin (S n).
-Proof. induction n; [ apply F1 | apply FS; apply IHn ]. Defined.
+Definition ultimate_Sn (n : nat) : fin (S n) := from_nat n (le_n (S n)).
 
 (** Return the last possible inhabitant of a [fin n]. *)
 Definition ultimate_from_nat (n : nat) (H : n > 0) : fin n.
-Proof. induction n; [ omega | apply ultimate_Sn ]. Defined.
+  apply (@from_nat (pred n) n).
+  apply lt_pred_n_n.
+  trivial.
+Defined.
 
 (** Given a value [x] of type [fin n], return the next lower inhabitant [y],
     such that y < x.  Returns [None] if [x = 0]. *)
@@ -788,12 +778,21 @@ Proof.
 Qed.
 
 Lemma in_map_FS_inv : forall {n} (l : list (fin (S n))) (y : fin n),
-  In y (map_FS_inv l) -> In (FS y) l.
+  In y (map_FS_inv l) <-> In (FS y) l.
 Proof.
+  split.
+    induction l; simpl. trivial.
+    destruct a using fin_Sn_inv; simpl. auto.
+    destruct 1. left; f_equal; trivial.
+    right; auto.
   induction l; simpl. trivial.
-  destruct a using fin_Sn_inv; simpl. auto.
-  destruct 1. left; f_equal; trivial.
-  right; auto.
+  destruct a using fin_Sn_inv; simpl in *.
+    unfold map_FS_inv. simpl.
+    intros. apply IHl.
+    intuition. inversion H0.
+  intros. inversion H.
+  left. apply FS_inj in H0. trivial.
+  right. apply IHl. assumption.
 Qed.
 
 Lemma map_FS_inv_NoDup : forall {n:nat} (l : list (fin (S n))),
@@ -882,3 +881,42 @@ Proof.
     apply F1.
   apply x.
 Defined.
+
+Lemma fin_to_nat_Sn : forall {m} n, fin_to_nat (@FS m n) = S (fin_to_nat n).
+Proof.
+  induction m. inversion n.
+  destruct n using fin_Sn_inv. trivial.
+Admitted.
+
+Lemma ultimate_Sn_spec : forall n, fin_to_nat (ultimate_Sn n) = n.
+Proof.
+  intros.
+  induction n. reflexivity.
+  unfold ultimate_Sn, fin_to_nat.
+  rewrite fin_to_from_id.
+  reflexivity.
+  apply gt_Sn_O.
+Qed.
+
+Lemma fin_lt {n : nat} (l : list (fin n)) : forall x, In x l -> fin_to_nat x < n.
+Proof.
+  intros.
+  induction n. inversion x.
+  destruct x using fin_Sn_inv.
+    unfold fin_to_nat.
+    unfold proj1_sig, to_nat.
+    apply lt_0_Sn.
+  rewrite fin_to_nat_Sn.
+  apply lt_n_S.
+  apply (IHn (map_FS_inv l)).
+  apply in_map_FS_inv. assumption.
+Qed.
+
+Lemma ultimate_Sn_not_In {n : nat} (l : list (fin n))
+  : ~ In (ultimate_Sn n) (map (L_R 1) l).
+Proof.
+  induction n.
+    destruct l; auto.
+    inversion f.
+  unfold ultimate_Sn in *. simpl.
+Admitted.
