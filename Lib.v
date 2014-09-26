@@ -1037,8 +1037,7 @@ Proof.
   - inversion eq.
   - f_equal. apply IHn.
     simpl in eq.
-    apply FS_inj in eq.
-    assumption.
+    apply FS_inj in eq. assumption.
 Qed.
 
 Lemma NoDup_fin_cons {n} (x : fin (S n)) (l : list (fin n))
@@ -1053,4 +1052,15 @@ Proof.
     apply fin_expand_inj in H1.
     assumption.
   assumption.
+Qed.
+
+Lemma map_fin_expand_rewrite : forall {m : nat} {newi unh act inact hnd},
+  NoDup (newi :: map (@fin_expand m) (unh ++ act ++ inact ++ hnd))
+    -> NoDup ((newi :: map (@fin_expand m) unh) ++
+               map fin_expand act ++ map fin_expand inact ++
+               map fin_expand hnd).
+Proof.
+  intros.
+  repeat rewrite map_app in H.
+  rewrite <- app_comm_cons. assumption.
 Qed.

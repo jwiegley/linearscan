@@ -258,10 +258,7 @@ Record ScanStateDesc := {
 }.
 
 Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
-Proof.
-  intros.
-  exists (m - n). reflexivity.
-Defined.
+Proof. intros. exists (m - n). reflexivity. Defined.
 
 Definition transportId `(H : nextInterval st <= nextInterval st')
   (x : IntervalId st) : IntervalId st'.
@@ -285,6 +282,14 @@ Proof.
   assumption.
 Defined.
 
+Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
+  NoDup ((x :: unh) ++ act ++ inact ++ hnd)
+    -> NoDup (unh ++ (x :: act) ++ inact ++ hnd).
+Proof.
+  intros. rewrite <- app_comm_cons.
+  apply NoDup_app_cons. assumption.
+Qed.
+
 Lemma move_active_to_inactive : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
     -> In x (active sd)
@@ -302,7 +307,7 @@ Proof.
   rewrite <- app_assoc.
   assumption.
   apply H0.
-Defined.
+Qed.
 
 Lemma move_active_to_handled : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
@@ -327,32 +332,52 @@ Proof.
   rewrite <- app_assoc.
   assumption.
   apply H0.
-Defined.
+Qed.
 
-Definition move_inactive_to_active : forall sd x,
+Lemma move_inactive_to_active : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
     -> In x (inactive sd)
     -> NoDup (unhandled sd ++ x :: active sd ++
               remove cmp_eq_dec x (inactive sd) ++ handled sd).
 Proof.
-Admitted.
+  intros.
+  rewrite app_comm_cons.
+  apply NoDup_swap.
+  rewrite <- app_assoc.
+  apply NoDup_swap.
+  repeat rewrite <- app_assoc.
+  rewrite (app_assoc (handled sd)).
+  apply NoDup_swap2.
+  apply NoDup_juggle.
+  repeat rewrite app_assoc.
+  apply NoDup_swap.
+  rewrite <- app_assoc.
+  apply NoDup_swap2.
+  rewrite <- app_assoc.
+  rewrite app_assoc.
+  apply NoDup_swap2.
+  rewrite <- app_assoc.
+  assumption.
+  apply H0.
+Qed.
 
-Definition move_inactive_to_handled : forall sd x,
+Lemma move_inactive_to_handled : forall sd x,
   NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
     -> In x (inactive sd)
     -> NoDup (unhandled sd ++ active sd ++
               remove cmp_eq_dec x (inactive sd) ++ x :: handled sd).
 Proof.
-Admitted.
-
-Lemma map_fin_expand_rewrite : forall {m : nat} {newi unh act inact hnd},
-  NoDup (newi :: map (@L_R m 1) (unh ++ act ++ inact ++ hnd))
-    -> NoDup ((newi :: map fin_expand unh) ++
-               map fin_expand act ++ map fin_expand inact ++
-               map fin_expand hnd).
-Proof.
   intros.
-Admitted.
+  rewrite (app_assoc (unhandled sd)).
+  apply NoDup_swap.
+  repeat rewrite <- app_assoc.
+  apply NoDup_juggle.
+  rewrite (app_assoc (inactive sd)).
+  apply NoDup_swap.
+  repeat rewrite <- app_assoc.
+  assumption.
+  apply H0.
+Qed.
 
 (** The [ScanState] inductive data type describes the allowable state
     transitions that can be applied to a [ScanStateDesc] value.
@@ -425,7 +450,8 @@ Inductive ScanState : ScanStateDesc -> Set :=
        |}
 
   | ScanState_moveUnhandledToActive
-      ni unh (* unhsort *) act inact hnd geti assgn (* lau *) x reg :
+      ni unh (* unhsort *) act inact hnd geti assgn x reg :
+    forall lau : NoDup ((x :: unh) ++ act ++ inact ++ hnd),
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh
@@ -435,7 +461,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; getInterval      := geti
        ; assignments      := assgn
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := undefined
+       ; lists_are_unique := lau
        |} ->
     ScanState
       {| nextInterval     := ni
@@ -448,7 +474,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
                                       then Some reg
                                       else assgn i
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := undefined
+       ; lists_are_unique := move_unhandled_to_active _ x unh act inact hnd lau
        |}
 
   | ScanState_moveActiveToInactive sd x :
@@ -763,14 +789,16 @@ Proof.
           (* unhsort *)
           active0 inactive0 handled0
           getInterval0 assignments0
-          i reg).
+          i reg lists_are_unique0).
   eexists. apply s. apply st.
   pose (unhandledExtent_cons nextInterval0 i unhandled0 getInterval0
          (fun i0 : fin nextInterval0 =>
             if cmp_eq_dec i0 i
             then Some reg
             else assignments0 i0) assignments0
-         (i :: active0) active0 inactive0 inactive0 handled0 handled0)
+         (i :: active0) active0 inactive0 inactive0 handled0 handled0
+         (move_unhandled_to_active _ i unhandled0 active0 inactive0 handled0
+            lists_are_unique0) lists_are_unique0)
     as ue_cons.
   rapply Build_SSMorphSt; auto.
   rapply Build_SSMorph; auto.
