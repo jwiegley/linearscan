@@ -12,17 +12,30 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
+Require Import FunctionalExtensionality.
+Require Import Iso.
 Require Import Recdef.
 
 Module Import LN := ListNotations.
 
 Infix "$" := apply (at level 90, right associativity) : program_scope.
 
+Open Scope nat_scope.
 Open Scope program_scope.
 
 Generalizable All Variables.
 
 (** The following are extensions to the Coq standard library. *)
+
+Definition undefined {a : Type} : a. Admitted.
+
+Definition curry_sig {A C} {B : A -> Prop}
+  (f : forall x : A, B x -> C) (p : { x : A | B x }) : C :=
+  let (x,H) := p in f x H.
+
+Definition curry_sigT {A C} {B : A -> Type}
+  (f : forall x : A, B x -> C) (p : { x : A & B x }) : C :=
+  let (x,H) := p in f x H.
 
 Definition fromMaybe {a} (d : a) (mx : option a) : a :=
   match mx with
@@ -593,6 +606,21 @@ Class CompareSpec (a : Set) := {
     mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
 
+Lemma nat_compare_gt_flip : forall (x y : nat),
+  nat_compare x y = Gt -> nat_compare y x = Lt.
+Proof.
+  intros.
+  apply nat_compare_lt.
+  apply nat_compare_gt in H.
+  trivial.
+Qed.
+
+Program Instance nat_CompareSpec : CompareSpec nat := {
+  cmp         := nat_compare;
+  cmp_eq_iff  := nat_compare_eq_iff;
+  cmp_gt_flip := nat_compare_gt_flip
+}.
+
 (** ** NonEmpty lists *)
 
 Inductive NonEmpty (a : Set) : Set :=
@@ -627,15 +655,15 @@ Definition fin := Coq.Vectors.Fin.t.
 Definition fin_contra : forall {x}, fin 0 -> x.
 Proof. intros. inversion H. Defined.
 
-Definition from_nat (n : nat) {m} (H : n < m) : fin m := @of_nat_lt n m H.
+Definition from_nat {m} (n : nat) (H : n < m) : fin m := @of_nat_lt n m H.
 
 Definition fin_to_nat {n} (f : fin n) : nat := proj1_sig (to_nat f).
 
-Definition ultimate_Sn (n : nat) : fin (S n) := from_nat n (le_n (S n)).
+Definition last_fin_from_nat (n : nat) : fin (S n) := from_nat n (le_n (S n)).
 
 (** Return the last possible inhabitant of a [fin n]. *)
 Definition ultimate_from_nat (n : nat) (H : n > 0) : fin n.
-  apply (@from_nat (pred n) n).
+  apply (@from_nat n (pred n)).
   apply lt_pred_n_n.
   trivial.
 Defined.
@@ -651,21 +679,25 @@ Definition pred_fin {n} (f : fin n) : option (fin n).
   apply (from_nat x l).
 Defined.
 
-(** Given a value of type [fin (S n)], return the equivalent [fin n],
-    returning None if the input value was the highest possible value of [fin
-    (S n)]. *)
-
-Definition fin_reduce {n : nat} (x : fin (S n)) : option (fin n) :=
-  let n' := fin_to_nat x in
-  match le_lt_dec n n' with
-  | right H => Some (from_nat n' H)
-  | left _  => None
-  end.
+Definition fin_Sn_inv {n:nat} (P : fin (S n) -> Type)
+  (PO : P F1) (PS : forall y : fin n, P (FS y)) :
+  forall x : fin (S n), P x :=
+  fun x =>
+    match x in (t Sn) return
+      (match Sn return (fin Sn -> Type) with
+       | 0 => const unit
+       | S n' => fun x => forall (P : fin (S n') -> Type),
+         P F1 -> (forall y : fin n', P (FS y)) ->
+         P x
+       end x) with
+    | F1 _ => fun P PO PS => PO
+    | FS _ y => fun P PO PS => PS y
+    end P PO PS.
 
 (** [to_nat] and [from_nat] compose to an identity module the hypothesis that
     [n < m]. *)
 Lemma fin_to_from_id : forall m n (H : n < m),
-  m > 0 -> @to_nat m (from_nat n H) = exist _ n H.
+  m > 0 -> to_nat (from_nat n H) = exist _ n H.
 Proof.
   intros.
   generalize dependent n.
@@ -677,10 +709,60 @@ Proof.
   omega.
 Qed.
 
+Definition FS_inv {n} (x : fin (S n)) : option (fin n) :=
+  fin_Sn_inv (const (option (fin n))) None (@Some _) x.
+
+Lemma fin_to_nat_Sn : forall {m} (n : fin m),
+  fin_to_nat (@FS m n) = S (fin_to_nat n).
+Proof.
+  intros. unfold fin_to_nat. simpl.
+  induction (to_nat n); reflexivity.
+Qed.
+
+Lemma fin_from_to_id : forall n (x : fin n),
+  (let (m,H) := to_nat x in from_nat m H) = x.
+Proof.
+  induction n; intros. inversion x.
+  destruct x using fin_Sn_inv; trivial.
+  specialize (IHn x). simpl in *.
+  destruct (to_nat x) eqn:Heqe. simpl.
+  f_equal.
+  assert (l = lt_S_n x0 n (lt_n_S x0 n l)) by (apply proof_irrelevance).
+  rewrite <- H.
+  apply IHn.
+Qed.
+
+Program Instance fin_nat_iso : forall {n}, fin n ≅ { m : nat | m < n } := {
+    to   := to_nat;
+    from := curry_sig (@from_nat n)
+}.
+Obligation 1.
+  extensionality x.
+  unfold compose, id, curry_sig.
+  apply fin_from_to_id.
+Qed.
+Obligation 2.
+  extensionality x.
+  unfold compose, id, curry_sig.
+  destruct x.
+  apply fin_to_from_id. omega.
+Qed.
+
+(** Given a value of type [fin (S n)], return the equivalent [fin n],
+    returning None if the input value was the highest possible value of [fin
+    (S n)]. *)
+
+Definition fin_reduce {n : nat} (x : fin (S n)) : option (fin n) :=
+  let n' := fin_to_nat x in
+  match le_lt_dec n n' with
+  | right H => Some (from_nat n' H)
+  | left _  => None
+  end.
+
 (** The behavior of [pred_fin] is specified as follows: the predecessor of a
     successor, by way of [fin n], is a no-op. *)
 Lemma pred_fin_spec : forall (n m : nat) (H : S n < m),
-  pred_fin (@from_nat _ m H) = Some (from_nat n (Le.le_Sn_le _ _ H)).
+  pred_fin (@from_nat m _ H) = Some (from_nat n (Le.le_Sn_le _ _ H)).
 Proof.
   intros. unfold pred_fin.
   rewrite fin_to_from_id.
@@ -701,7 +783,6 @@ Proof.
   destruct x0; inversion H.
   subst. simpl. clear H.
   destruct x0; simpl. omega.
-  unfold from_nat. clear x.
   rewrite fin_to_from_id.
   simpl. omega. omega.
 Qed.
@@ -734,24 +815,6 @@ Proof.
     subst. reflexivity.
   - f_equal. f_equal. assumption.
 Qed.
-
-Definition fin_Sn_inv {n:nat} (P : fin (S n) -> Type)
-  (PO : P F1) (PS : forall y : fin n, P (FS y)) :
-  forall x : fin (S n), P x :=
-  fun x =>
-    match x in (t Sn) return
-      (match Sn return (fin Sn -> Type) with
-       | 0 => const unit
-       | S n' => fun x => forall (P : fin (S n') -> Type),
-         P F1 -> (forall y : fin n', P (FS y)) ->
-         P x
-       end x) with
-    | F1 _ => fun P PO PS => PO
-    | FS _ y => fun P PO PS => PS y
-    end P PO PS.
-
-Definition FS_inv {n} (x : fin (S n)) : option (fin n) :=
-  fin_Sn_inv (const (option (fin n))) None (@Some _) x.
 
 Definition map_FS_inv {n:nat} (l : list (fin (S n))) : list (fin n) :=
   catMaybes (map FS_inv l).
@@ -871,28 +934,21 @@ Module FinOrder <: TotalLeBool.
 End FinOrder.
 
 Definition fin_safe_reduce {n : nat} (x : fin (S n))
-  (H : x <> ultimate_Sn n) : fin n.
+  (H : x <> last_fin_from_nat n) : fin n.
 Proof.
-  induction n; simpl in *.
-    destruct x using fin_Sn_inv.
-      contradiction H. reflexivity.
-    apply x.
+  induction n; simpl in *;
   destruct x using fin_Sn_inv.
-    apply F1.
-  apply x.
+  - contradiction H. reflexivity.
+  - apply x.
+  - apply F1.
+  - apply x.
 Defined.
 
-Lemma fin_to_nat_Sn : forall {m} n, fin_to_nat (@FS m n) = S (fin_to_nat n).
-Proof.
-  induction m. inversion n.
-  destruct n using fin_Sn_inv. trivial.
-Admitted.
-
-Lemma ultimate_Sn_spec : forall n, fin_to_nat (ultimate_Sn n) = n.
+Lemma last_fin_from_nat_spec : forall n, fin_to_nat (last_fin_from_nat n) = n.
 Proof.
   intros.
   induction n. reflexivity.
-  unfold ultimate_Sn, fin_to_nat.
+  unfold last_fin_from_nat, fin_to_nat.
   rewrite fin_to_from_id.
   reflexivity.
   apply gt_Sn_O.
@@ -912,16 +968,47 @@ Proof.
   apply in_map_FS_inv. assumption.
 Qed.
 
-Lemma ultimate_Sn_not_In {n : nat} (l : list (fin n))
-  : ~ In (ultimate_Sn n) (map (L_R 1) l).
-Proof.
-  induction n.
-    destruct l; auto.
-    inversion f.
-  unfold ultimate_Sn in *. simpl.
-Admitted.
+Definition fin_expand {n} (p : t n) : t (S n).
+  induction n. inversion p.
+  destruct p using fin_Sn_inv.
+    apply F1.
+  apply FS.
+  apply IHn.
+  apply y.
+Defined.
 
-Definition undefined {a : Type} : a. Admitted.
+(*
+Example fin_expand_sane : forall m n, fin_reduce (@fin_expand m n) = Some n.
+Proof.
+  intros.
+  induction m. inversion n.
+  destruct n using fin_Sn_inv.
+    reflexivity.
+  simpl.
+*)
+
+Lemma fin_bounded : forall m (n : fin m), fin_expand n <> last_fin_from_nat m.
+Proof.
+  intros.
+  induction m. inversion n.
+  destruct n using fin_Sn_inv; intuition. inversion H.
+  apply (IHm n).
+  unfold last_fin_from_nat in *.
+  simpl in *.
+  apply FS_inj in H.
+  rewrite H. f_equal.
+  apply proof_irrelevance.
+Qed.
+
+Lemma last_fin_from_nat_not_In {n : nat} (l : list (fin n))
+  : ~ In (last_fin_from_nat n) (map fin_expand l).
+Proof.
+  induction l; simpl. now easy.
+  unfold not. intros.
+  destruct H.
+    pose (fin_bounded n a). contradiction.
+  contradiction.
+Qed.
 
 Definition Injective {A B} (f : A->B) :=
  forall x y, f x = f y -> x = y.
@@ -940,27 +1027,30 @@ Proof.
  intro H. now apply (in_map f) in H.
 Qed.
 
-Lemma L_R_inj {n m} (x y: t n) (eq: L_R m x = L_R m y): x = y.
+Lemma fin_expand_inj {n} (x y: t n) (eq: fin_expand x = fin_expand y): x = y.
 Proof.
   induction n. inversion x.
   destruct x using fin_Sn_inv;
   destruct y using fin_Sn_inv.
   - reflexivity.
-  - admit.
-  - admit.
-  - unfold L_R in eq.
-Admitted.
+  - inversion eq.
+  - inversion eq.
+  - f_equal. apply IHn.
+    simpl in eq.
+    apply FS_inj in eq.
+    assumption.
+Qed.
 
 Lemma NoDup_fin_cons {n} (x : fin (S n)) (l : list (fin n))
-  : NoDup l -> x = ultimate_Sn n -> NoDup (x :: map (L_R 1) l).
+  : NoDup l -> x = last_fin_from_nat n -> NoDup (x :: map fin_expand l).
 Proof.
   intros.
   constructor.
     rewrite H0.
-    apply ultimate_Sn_not_In.
+    apply last_fin_from_nat_not_In.
   apply Injective_map_NoDup.
     unfold Injective. intros.
-    apply L_R_inj in H1.
+    apply fin_expand_inj in H1.
     assumption.
   assumption.
 Qed.

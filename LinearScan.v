@@ -345,10 +345,11 @@ Definition move_inactive_to_handled : forall sd x,
 Proof.
 Admitted.
 
-Lemma newi_map_L_R_rewrite : forall {m : nat} {newi unh act inact hnd},
+Lemma map_fin_expand_rewrite : forall {m : nat} {newi unh act inact hnd},
   NoDup (newi :: map (@L_R m 1) (unh ++ act ++ inact ++ hnd))
-    -> NoDup ((newi :: map (L_R 1) unh) ++
-               map (L_R 1) act ++ map (L_R 1) inact ++ map (L_R 1) hnd).
+    -> NoDup ((newi :: map fin_expand unh) ++
+               map fin_expand act ++ map fin_expand inact ++
+               map fin_expand hnd).
 Proof.
   intros.
 Admitted.
@@ -402,13 +403,13 @@ Inductive ScanState : ScanStateDesc -> Set :=
        (* ; unhandled_sorted := unhsort *)
        ; lists_are_unique := lau
        |} ->
-    forall newi (H : newi = ultimate_Sn ni),
+    forall newi (H : newi = last_fin_from_nat ni),
     ScanState
       {| nextInterval     := S ni
-       ; unhandled        := newi :: map (L_R 1) unh
-       ; active           := map (L_R 1) act
-       ; inactive         := map (L_R 1) inact
-       ; handled          := map (L_R 1) hnd
+       ; unhandled        := newi :: map fin_expand unh
+       ; active           := map fin_expand act
+       ; inactive         := map fin_expand inact
+       ; handled          := map fin_expand hnd
        ; getInterval      :=
          fun n => match cmp_eq_dec n newi with
                   | left _ => existT _ d i
@@ -420,7 +421,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
                   | right Hn => assgn (fin_safe_reduce n (rew_in_not_eq H Hn))
                   end
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := newi_map_L_R_rewrite (NoDup_fin_cons _ _ lau H)
+       ; lists_are_unique := map_fin_expand_rewrite (NoDup_fin_cons _ _ lau H)
        |}
 
   | ScanState_moveUnhandledToActive
