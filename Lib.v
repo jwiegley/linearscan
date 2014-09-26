@@ -83,6 +83,15 @@ Proof.
   right. right. assumption.
 Defined.
 
+Definition list_membership {a} (l : list a) : list { x : a & In x l } :=
+  let fix go l :=
+      match l with
+      | nil => nil
+      | cons x xs =>
+          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
+      end in
+  go l.
+
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
