@@ -18,8 +18,6 @@ Require Import Recdef.
 
 Module Import LN := ListNotations.
 
-Infix "$" := apply (at level 90, right associativity) : program_scope.
-
 Open Scope nat_scope.
 Open Scope program_scope.
 
