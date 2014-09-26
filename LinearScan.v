@@ -6,7 +6,6 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
 
-Require Import Alternative.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Classes.EquivDec.
 Require Import Coq.Lists.List.
@@ -685,12 +684,6 @@ Record SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
       unhandledExtent sd2 < unhandledExtent sd1
 }.
 
-(* jww (2014-09-25): This is just a stub and will be deleted. *)
-Definition newSSMorphSt (s : ScanStateDesc) : SSMorphSt s s.
-  constructor.
-  constructor; auto.
-Admitted.
-
 Program Instance SSMorphSt_Trans : Transitive SSMorphSt.
 Obligation 1.
   constructor.
@@ -921,7 +914,7 @@ Definition allocateBlockedReg `(st : ScanState sd) `(current : Interval cd)
      if current intersects with the fixed interval for reg then
        split current before this intersection *)
 
-  Build_NextScanState _ sd st (newSSMorphSt sd).
+  Build_NextScanState _ sd st undefined.
 
 Definition activeIntervals `(st : ScanState sd)
   : list { i : IntervalId sd & In i (active sd) } :=

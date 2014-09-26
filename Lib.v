@@ -13,7 +13,7 @@ Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
 Require Import Coq.Vectors.Fin.
 Require Import FunctionalExtensionality.
-Require Import Iso.
+(* Require Import Iso. *)
 Require Import Recdef.
 
 Module Import LN := ListNotations.
@@ -732,6 +732,7 @@ Proof.
   apply IHn.
 Qed.
 
+(*
 Program Instance fin_nat_iso : forall {n}, fin n ≅ { m : nat | m < n } := {
     to   := to_nat;
     from := curry_sig (@from_nat n)
@@ -747,6 +748,7 @@ Obligation 2.
   destruct x.
   apply fin_to_from_id. omega.
 Qed.
+*)
 
 (** Given a value of type [fin (S n)], return the equivalent [fin n],
     returning None if the input value was the highest possible value of [fin
