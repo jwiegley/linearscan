@@ -1,36 +1,41 @@
 module Data.Peano where
 
 import qualified Prelude
-import qualified Data.Datatypes as Datatypes
 
-
-pred :: Datatypes.Coq_nat -> Datatypes.Coq_nat
+pred :: Prelude.Int -> Prelude.Int
 pred n =
-  case n of {
-   Datatypes.O -> n;
-   Datatypes.S u -> u}
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    n)
+    (\u ->
+    u)
+    n
 
-plus :: Datatypes.Coq_nat -> Datatypes.Coq_nat -> Datatypes.Coq_nat
-plus n m =
-  case n of {
-   Datatypes.O -> m;
-   Datatypes.S p -> Datatypes.S (plus p m)}
-
-minus :: Datatypes.Coq_nat -> Datatypes.Coq_nat -> Datatypes.Coq_nat
+minus :: Prelude.Int -> Prelude.Int -> Prelude.Int
 minus n m =
-  case n of {
-   Datatypes.O -> n;
-   Datatypes.S k ->
-    case m of {
-     Datatypes.O -> n;
-     Datatypes.S l -> minus k l}}
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    n)
+    (\k ->
+    (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+      (\_ ->
+      n)
+      (\l ->
+      minus k l)
+      m)
+    n
 
-min :: Datatypes.Coq_nat -> Datatypes.Coq_nat -> Datatypes.Coq_nat
+min :: Prelude.Int -> Prelude.Int -> Prelude.Int
 min n m =
-  case n of {
-   Datatypes.O -> Datatypes.O;
-   Datatypes.S n' ->
-    case m of {
-     Datatypes.O -> Datatypes.O;
-     Datatypes.S m' -> Datatypes.S (min n' m')}}
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    0)
+    (\n' ->
+    (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+      (\_ ->
+      0)
+      (\m' -> Prelude.succ
+      (min n' m'))
+      m)
+    n
 

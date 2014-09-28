@@ -1,7 +1,6 @@
 module Data.Interval where
 
 import qualified Prelude
-import qualified Data.Datatypes as Datatypes
 import qualified Data.List as List
 import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty as NonEmpty
@@ -11,17 +10,16 @@ import qualified Data.Specif as Specif
 
 
 data IntervalDesc =
-   Build_IntervalDesc Datatypes.Coq_nat Datatypes.Coq_nat (NonEmpty.NonEmpty
-                                                          (Specif.Coq_sigT
-                                                          Range.RangeDesc
-                                                          Range.Range))
+   Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty.NonEmpty
+                                              (Specif.Coq_sigT
+                                              Range.RangeDesc Range.Range))
 
-ibeg :: IntervalDesc -> Datatypes.Coq_nat
+ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> ibeg0}
 
-iend :: IntervalDesc -> Datatypes.Coq_nat
+iend :: IntervalDesc -> Prelude.Int
 iend i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
@@ -34,34 +32,33 @@ rds i =
 
 data Interval =
    I_Sing Range.RangeDesc Range.Range
- | I_Cons1 (Specif.Coq_sigT Range.RangeDesc Range.Range) Datatypes.Coq_nat 
- Datatypes.Coq_nat Interval Range.RangeDesc Range.Range
+ | I_Cons1 (Specif.Coq_sigT Range.RangeDesc Range.Range) Prelude.Int 
+ Prelude.Int Interval Range.RangeDesc Range.Range
  | I_Consn (Specif.Coq_sigT Range.RangeDesc Range.Range) (NonEmpty.NonEmpty
                                                          (Specif.Coq_sigT
                                                          Range.RangeDesc
                                                          Range.Range)) 
- Datatypes.Coq_nat Datatypes.Coq_nat Interval Range.RangeDesc Range.Range
+ Prelude.Int Prelude.Int Interval Range.RangeDesc Range.Range
 
-intervalStart :: IntervalDesc -> Interval -> Datatypes.Coq_nat
+intervalStart :: IntervalDesc -> Interval -> Prelude.Int
 intervalStart i interval0 =
   ibeg i
 
-intervalEnd :: IntervalDesc -> Interval -> Datatypes.Coq_nat
+intervalEnd :: IntervalDesc -> Interval -> Prelude.Int
 intervalEnd i interval0 =
   iend i
 
-intervalCoversPos :: IntervalDesc -> Interval -> Datatypes.Coq_nat ->
-                     Datatypes.Coq_bool
+intervalCoversPos :: IntervalDesc -> Interval -> Prelude.Int -> Prelude.Bool
 intervalCoversPos d i pos =
-  Datatypes.andb (NPeano.leb (intervalStart d i) pos)
+  (Prelude.&&) (NPeano.leb (intervalStart d i) pos)
     (NPeano.ltb pos (intervalEnd d i))
 
-intervalExtent :: IntervalDesc -> Interval -> Datatypes.Coq_nat
+intervalExtent :: IntervalDesc -> Interval -> Prelude.Int
 intervalExtent d i =
   Peano.minus (intervalEnd d i) (intervalStart d i)
 
 anyRangeIntersects :: IntervalDesc -> Interval -> IntervalDesc -> Interval ->
-                      Datatypes.Coq_bool
+                      Prelude.Bool
 anyRangeIntersects i interval0 j interval1 =
   let {
    f = \x y ->
@@ -69,23 +66,23 @@ anyRangeIntersects i interval0 j interval1 =
       (Specif.projT1 y) (Specif.projT2 y)}
   in
   List.fold_right (\r b ->
-    Datatypes.orb b (List.existsb (f r) (NonEmpty.coq_NE_to_list (rds j))))
-    Datatypes.Coq_false (NonEmpty.coq_NE_to_list (rds i))
+    (Prelude.||) b (List.existsb (f r) (NonEmpty.coq_NE_to_list (rds j))))
+    Prelude.False (NonEmpty.coq_NE_to_list (rds i))
 
 firstIntersectionPoint :: IntervalDesc -> Interval -> IntervalDesc ->
-                          Interval -> Datatypes.Coq_option Datatypes.Coq_nat
+                          Interval -> Prelude.Maybe Prelude.Int
 firstIntersectionPoint i interval0 j interval1 =
   NonEmpty.coq_NE_fold_left (\acc rd ->
     case acc of {
-     Datatypes.Some x -> Datatypes.Some x;
-     Datatypes.None ->
+     Prelude.Just x -> Prelude.Just x;
+     Prelude.Nothing ->
       NonEmpty.coq_NE_fold_left (\acc' rd' ->
         case acc' of {
-         Datatypes.Some x -> Datatypes.Some x;
-         Datatypes.None ->
+         Prelude.Just x -> Prelude.Just x;
+         Prelude.Nothing ->
           Range.rangesIntersectionPoint (Specif.projT1 rd) (Specif.projT2 rd)
-            (Specif.projT1 rd') (Specif.projT2 rd')}) (rds j) Datatypes.None})
-    (rds i) Datatypes.None
+            (Specif.projT1 rd') (Specif.projT2 rd')}) (rds j) Prelude.Nothing})
+    (rds i) Prelude.Nothing
 
 type FixedInterval = Interval
 

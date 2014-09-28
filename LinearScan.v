@@ -6,6 +6,7 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
+Require Import Coq.Bool.Bool.
 Require Import Machine.
 Require Import Allocate.
 
@@ -24,5 +25,26 @@ Module Import Allocator := MAllocate MyMachine.
 (* Unset Extraction AutoInline. *)
 
 Extraction Language Haskell.
+
+(** Danger!  Using Int is efficient, but requires we know we won't exceed its
+    bounds. *)
+Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "Prelude.succ"]
+  "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
+
+Extract Inductive bool   => "Prelude.Bool" ["Prelude.True" "Prelude.False"].
+Extract Inductive list   => "[]" ["[]" "(:)"].
+Extract Inductive prod   => "(,)" ["(,)"].
+Extract Inductive option => "Prelude.Maybe" ["Prelude.Just" "Prelude.Nothing"].
+
+Extract Inductive comparison =>
+  "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].
+
+Extract Inlined Constant negb => "(Prelude.not)".
+Extract Inlined Constant andb => "(Prelude.&&)".
+Extract Inlined Constant orb  => "(Prelude.||)".
+Extract Inlined Constant eqb  => "(Prelude.==)".
+Extract Inlined Constant plus => "(Prelude.+)".
+Extract Inlined Constant mult => "(Prelude.*)".
+Extract Inlined Constant app  => "(Prelude.++)".
 
 Separate Extraction allocateRegisters.

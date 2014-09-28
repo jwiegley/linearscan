@@ -3,7 +3,6 @@ module Data.LinearScan where
 import qualified Prelude
 import qualified Data.Compare as Compare
 import qualified Data.Compare_dec as Compare_dec
-import qualified Data.Datatypes as Datatypes
 import qualified Data.EqNat as EqNat
 import qualified Data.Fin0 as Fin0
 import qualified Data.Fin as Fin
@@ -19,47 +18,41 @@ import qualified Data.Specif as Specif
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
-_MyMachine__maxReg :: Datatypes.Coq_nat
+_MyMachine__maxReg :: Prelude.Int
 _MyMachine__maxReg =
-  Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S (Datatypes.S
-    (Datatypes.S (Datatypes.S Datatypes.O)))))))))))))))))))))))))))))))
+  Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
+    (Prelude.succ (Prelude.succ 0)))))))))))))))))))))))))))))))
 
 type Allocator__PhysReg = Fin0.Coq_fin
 
-_Allocator__maxReg :: Datatypes.Coq_nat
+_Allocator__maxReg :: Prelude.Int
 _Allocator__maxReg =
   _MyMachine__maxReg
 
 data Allocator__ScanStateDesc =
-   Allocator__Build_ScanStateDesc Datatypes.Coq_nat (Datatypes.Coq_list
-                                                    Fin0.Coq_fin) (Datatypes.Coq_list
-                                                                  Fin0.Coq_fin) 
- (Datatypes.Coq_list Fin0.Coq_fin) (Datatypes.Coq_list Fin0.Coq_fin) 
- (Fin0.Coq_fin -> Specif.Coq_sigT Interval.IntervalDesc Interval.Interval) 
- (Fin0.Coq_fin -> Datatypes.Coq_option Allocator__PhysReg) (Allocator__PhysReg
-                                                           ->
-                                                           Datatypes.Coq_option
-                                                           (Specif.Coq_sigT
-                                                           Interval.IntervalDesc
-                                                           Interval.FixedInterval))
+   Allocator__Build_ScanStateDesc Prelude.Int ([] Fin0.Coq_fin) ([]
+                                                                Fin0.Coq_fin) 
+ ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
+                                     Interval.IntervalDesc Interval.Interval) 
+ (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
+                                                    Prelude.Maybe
+                                                    (Specif.Coq_sigT
+                                                    Interval.IntervalDesc
+                                                    Interval.FixedInterval))
 
-_Allocator__coq_ScanStateDesc_rect :: (Datatypes.Coq_nat ->
-                                      (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                      (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                      (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                      (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                      (Fin0.Coq_fin -> Specif.Coq_sigT
+_Allocator__coq_ScanStateDesc_rect :: (Prelude.Int -> ([] Fin0.Coq_fin) ->
+                                      ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
+                                      -> ([] Fin0.Coq_fin) -> (Fin0.Coq_fin
+                                      -> Specif.Coq_sigT
                                       Interval.IntervalDesc
                                       Interval.Interval) -> (Fin0.Coq_fin ->
-                                      Datatypes.Coq_option
-                                      Allocator__PhysReg) ->
-                                      (Allocator__PhysReg ->
-                                      Datatypes.Coq_option
+                                      Prelude.Maybe Allocator__PhysReg) ->
+                                      (Allocator__PhysReg -> Prelude.Maybe
                                       (Specif.Coq_sigT Interval.IntervalDesc
                                       Interval.FixedInterval)) -> () -> a1)
                                       -> Allocator__ScanStateDesc -> a1
@@ -68,24 +61,20 @@ _Allocator__coq_ScanStateDesc_rect f s =
    Allocator__Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 x6 ->
     f x x0 x1 x2 x3 x4 x5 x6 __}
 
-_Allocator__coq_ScanStateDesc_rec :: (Datatypes.Coq_nat ->
-                                     (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                     (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                     (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                     (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                     (Fin0.Coq_fin -> Specif.Coq_sigT
-                                     Interval.IntervalDesc Interval.Interval)
-                                     -> (Fin0.Coq_fin -> Datatypes.Coq_option
-                                     Allocator__PhysReg) ->
-                                     (Allocator__PhysReg ->
-                                     Datatypes.Coq_option
+_Allocator__coq_ScanStateDesc_rec :: (Prelude.Int -> ([] Fin0.Coq_fin) -> ([]
+                                     Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
+                                     ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
+                                     Specif.Coq_sigT Interval.IntervalDesc
+                                     Interval.Interval) -> (Fin0.Coq_fin ->
+                                     Prelude.Maybe Allocator__PhysReg) ->
+                                     (Allocator__PhysReg -> Prelude.Maybe
                                      (Specif.Coq_sigT Interval.IntervalDesc
                                      Interval.FixedInterval)) -> () -> a1) ->
                                      Allocator__ScanStateDesc -> a1
 _Allocator__coq_ScanStateDesc_rec =
   _Allocator__coq_ScanStateDesc_rect
 
-_Allocator__nextInterval :: Allocator__ScanStateDesc -> Datatypes.Coq_nat
+_Allocator__nextInterval :: Allocator__ScanStateDesc -> Prelude.Int
 _Allocator__nextInterval s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
@@ -93,29 +82,25 @@ _Allocator__nextInterval s =
 
 type Allocator__IntervalId = Fin0.Coq_fin
 
-_Allocator__unhandled :: Allocator__ScanStateDesc -> Datatypes.Coq_list
-                         Allocator__IntervalId
+_Allocator__unhandled :: Allocator__ScanStateDesc -> [] Allocator__IntervalId
 _Allocator__unhandled s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
     handled0 getInterval0 assignments0 getFixedInterval0 -> unhandled0}
 
-_Allocator__active :: Allocator__ScanStateDesc -> Datatypes.Coq_list
-                      Allocator__IntervalId
+_Allocator__active :: Allocator__ScanStateDesc -> [] Allocator__IntervalId
 _Allocator__active s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
     handled0 getInterval0 assignments0 getFixedInterval0 -> active0}
 
-_Allocator__inactive :: Allocator__ScanStateDesc -> Datatypes.Coq_list
-                        Allocator__IntervalId
+_Allocator__inactive :: Allocator__ScanStateDesc -> [] Allocator__IntervalId
 _Allocator__inactive s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
     handled0 getInterval0 assignments0 getFixedInterval0 -> inactive0}
 
-_Allocator__handled :: Allocator__ScanStateDesc -> Datatypes.Coq_list
-                       Allocator__IntervalId
+_Allocator__handled :: Allocator__ScanStateDesc -> [] Allocator__IntervalId
 _Allocator__handled s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
@@ -130,14 +115,14 @@ _Allocator__getInterval s =
     handled0 getInterval0 assignments0 getFixedInterval0 -> getInterval0}
 
 _Allocator__assignments :: Allocator__ScanStateDesc -> Allocator__IntervalId
-                           -> Datatypes.Coq_option Allocator__PhysReg
+                           -> Prelude.Maybe Allocator__PhysReg
 _Allocator__assignments s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
     handled0 getInterval0 assignments0 getFixedInterval0 -> assignments0}
 
 _Allocator__getFixedInterval :: Allocator__ScanStateDesc ->
-                                Allocator__PhysReg -> Datatypes.Coq_option
+                                Allocator__PhysReg -> Prelude.Maybe
                                 (Specif.Coq_sigT Interval.IntervalDesc
                                 Interval.FixedInterval)
 _Allocator__getFixedInterval s =
@@ -145,15 +130,14 @@ _Allocator__getFixedInterval s =
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
     handled0 getInterval0 assignments0 getFixedInterval0 -> getFixedInterval0}
 
-_Allocator__all_state_lists :: Allocator__ScanStateDesc -> Datatypes.Coq_list
+_Allocator__all_state_lists :: Allocator__ScanStateDesc -> []
                                Allocator__IntervalId
 _Allocator__all_state_lists s =
-  Datatypes.app (_Allocator__unhandled s)
-    (Datatypes.app (_Allocator__active s)
-      (Datatypes.app (_Allocator__inactive s) (_Allocator__handled s)))
+  (Prelude.++) (_Allocator__unhandled s)
+    ((Prelude.++) (_Allocator__active s)
+      ((Prelude.++) (_Allocator__inactive s) (_Allocator__handled s)))
 
-_Allocator__lt_sub :: Datatypes.Coq_nat -> Datatypes.Coq_nat ->
-                      Datatypes.Coq_nat
+_Allocator__lt_sub :: Prelude.Int -> Prelude.Int -> Prelude.Int
 _Allocator__lt_sub n m =
   Peano.minus m n
 
@@ -174,7 +158,7 @@ _Allocator__transportId st st' x =
        Allocator__Build_ScanStateDesc nextInterval1 unhandled1 active1
         inactive1 handled1 getInterval1 assignments1 getFixedInterval1 ->
         let {h0 = _Allocator__lt_sub nextInterval0 nextInterval1} in
-        Logic.eq_rec (Peano.plus h0 nextInterval0)
+        Logic.eq_rec ((Prelude.+) h0 nextInterval0)
           (Fin.coq_R nextInterval0 h0 x) nextInterval1}};
    Specif.Coq_right ->
     Logic.eq_rec (_Allocator__nextInterval st) x
@@ -182,29 +166,26 @@ _Allocator__transportId st st' x =
 
 data Allocator__ScanState =
    Allocator__ScanState_nil
- | Allocator__ScanState_newUnhandled Datatypes.Coq_nat (Datatypes.Coq_list
-                                                       Fin0.Coq_fin) 
- (Datatypes.Coq_list Fin0.Coq_fin) (Datatypes.Coq_list Fin0.Coq_fin) 
- (Datatypes.Coq_list Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
-                                   Interval.IntervalDesc Interval.Interval) 
- (Fin0.Coq_fin -> Datatypes.Coq_option Allocator__PhysReg) (Allocator__PhysReg
-                                                           ->
-                                                           Datatypes.Coq_option
-                                                           (Specif.Coq_sigT
-                                                           Interval.IntervalDesc
-                                                           Interval.FixedInterval)) 
+ | Allocator__ScanState_newUnhandled Prelude.Int ([] Fin0.Coq_fin) ([]
+                                                                   Fin0.Coq_fin) 
+ ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
+                                     Interval.IntervalDesc Interval.Interval) 
+ (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
+                                                    Prelude.Maybe
+                                                    (Specif.Coq_sigT
+                                                    Interval.IntervalDesc
+                                                    Interval.FixedInterval)) 
  Interval.IntervalDesc Interval.Interval Allocator__ScanState Fin0.Coq_fin
- | Allocator__ScanState_moveUnhandledToActive Datatypes.Coq_nat (Datatypes.Coq_list
-                                                                Fin0.Coq_fin) 
- (Datatypes.Coq_list Fin0.Coq_fin) (Datatypes.Coq_list Fin0.Coq_fin) 
- (Datatypes.Coq_list Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
-                                   Interval.IntervalDesc Interval.Interval) 
- (Fin0.Coq_fin -> Datatypes.Coq_option Allocator__PhysReg) (Allocator__PhysReg
-                                                           ->
-                                                           Datatypes.Coq_option
-                                                           (Specif.Coq_sigT
-                                                           Interval.IntervalDesc
-                                                           Interval.FixedInterval)) 
+ | Allocator__ScanState_moveUnhandledToActive Prelude.Int ([] Fin0.Coq_fin) 
+ ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin ->
+                                                       Specif.Coq_sigT
+                                                       Interval.IntervalDesc
+                                                       Interval.Interval) 
+ (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
+                                                    Prelude.Maybe
+                                                    (Specif.Coq_sigT
+                                                    Interval.IntervalDesc
+                                                    Interval.FixedInterval)) 
  Fin0.Coq_fin Allocator__PhysReg Allocator__ScanState
  | Allocator__ScanState_moveActiveToInactive Allocator__ScanStateDesc 
  Allocator__IntervalId Allocator__ScanState
@@ -215,30 +196,25 @@ data Allocator__ScanState =
  | Allocator__ScanState_moveInactiveToHandled Allocator__ScanStateDesc 
  Allocator__IntervalId Allocator__ScanState
 
-_Allocator__coq_ScanState_rect :: a1 -> (Datatypes.Coq_nat ->
-                                  (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                  (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                  (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                  (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                  (Fin0.Coq_fin -> Specif.Coq_sigT
-                                  Interval.IntervalDesc Interval.Interval) ->
-                                  (Fin0.Coq_fin -> Datatypes.Coq_option
-                                  Allocator__PhysReg) -> (Allocator__PhysReg
-                                  -> Datatypes.Coq_option
+_Allocator__coq_ScanState_rect :: a1 -> (Prelude.Int -> ([] Fin0.Coq_fin) ->
+                                  ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
+                                  ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
+                                  Specif.Coq_sigT Interval.IntervalDesc
+                                  Interval.Interval) -> (Fin0.Coq_fin ->
+                                  Prelude.Maybe Allocator__PhysReg) ->
+                                  (Allocator__PhysReg -> Prelude.Maybe
                                   (Specif.Coq_sigT Interval.IntervalDesc
                                   Interval.FixedInterval)) -> () ->
                                   Interval.IntervalDesc -> Interval.Interval
                                   -> Allocator__ScanState -> a1 ->
-                                  Fin0.Coq_fin -> () -> a1) ->
-                                  (Datatypes.Coq_nat -> (Datatypes.Coq_list
-                                  Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                  Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                  Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                  Fin0.Coq_fin) -> (Fin0.Coq_fin ->
-                                  Specif.Coq_sigT Interval.IntervalDesc
-                                  Interval.Interval) -> (Fin0.Coq_fin ->
-                                  Datatypes.Coq_option Allocator__PhysReg) ->
-                                  (Allocator__PhysReg -> Datatypes.Coq_option
+                                  Fin0.Coq_fin -> () -> a1) -> (Prelude.Int
+                                  -> ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
+                                  -> ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
+                                  -> (Fin0.Coq_fin -> Specif.Coq_sigT
+                                  Interval.IntervalDesc Interval.Interval) ->
+                                  (Fin0.Coq_fin -> Prelude.Maybe
+                                  Allocator__PhysReg) -> (Allocator__PhysReg
+                                  -> Prelude.Maybe
                                   (Specif.Coq_sigT Interval.IntervalDesc
                                   Interval.FixedInterval)) -> Fin0.Coq_fin ->
                                   Allocator__PhysReg -> () ->
@@ -270,8 +246,8 @@ _Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 s s0 =
     getfixi x reg s1 ->
     f1 ni unh act inact hnd geti assgn getfixi x reg __ s1
       (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5
-        (Allocator__Build_ScanStateDesc ni (Datatypes.Coq_cons x unh) act
-        inact hnd geti assgn getfixi) s1);
+        (Allocator__Build_ScanStateDesc ni ((:) x unh) act inact hnd geti
+        assgn getfixi) s1);
    Allocator__ScanState_moveActiveToInactive sd x s1 ->
     f2 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __;
    Allocator__ScanState_moveActiveToHandled sd x s1 ->
@@ -281,30 +257,25 @@ _Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 s s0 =
    Allocator__ScanState_moveInactiveToHandled sd x s1 ->
     f5 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __}
 
-_Allocator__coq_ScanState_rec :: a1 -> (Datatypes.Coq_nat ->
-                                 (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                 (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                 (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                 (Datatypes.Coq_list Fin0.Coq_fin) ->
-                                 (Fin0.Coq_fin -> Specif.Coq_sigT
-                                 Interval.IntervalDesc Interval.Interval) ->
-                                 (Fin0.Coq_fin -> Datatypes.Coq_option
-                                 Allocator__PhysReg) -> (Allocator__PhysReg
-                                 -> Datatypes.Coq_option
+_Allocator__coq_ScanState_rec :: a1 -> (Prelude.Int -> ([] Fin0.Coq_fin) ->
+                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
+                                 ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
+                                 Specif.Coq_sigT Interval.IntervalDesc
+                                 Interval.Interval) -> (Fin0.Coq_fin ->
+                                 Prelude.Maybe Allocator__PhysReg) ->
+                                 (Allocator__PhysReg -> Prelude.Maybe
                                  (Specif.Coq_sigT Interval.IntervalDesc
                                  Interval.FixedInterval)) -> () ->
                                  Interval.IntervalDesc -> Interval.Interval
                                  -> Allocator__ScanState -> a1 ->
-                                 Fin0.Coq_fin -> () -> a1) ->
-                                 (Datatypes.Coq_nat -> (Datatypes.Coq_list
-                                 Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                 Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                 Fin0.Coq_fin) -> (Datatypes.Coq_list
-                                 Fin0.Coq_fin) -> (Fin0.Coq_fin ->
-                                 Specif.Coq_sigT Interval.IntervalDesc
-                                 Interval.Interval) -> (Fin0.Coq_fin ->
-                                 Datatypes.Coq_option Allocator__PhysReg) ->
-                                 (Allocator__PhysReg -> Datatypes.Coq_option
+                                 Fin0.Coq_fin -> () -> a1) -> (Prelude.Int ->
+                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
+                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
+                                 (Fin0.Coq_fin -> Specif.Coq_sigT
+                                 Interval.IntervalDesc Interval.Interval) ->
+                                 (Fin0.Coq_fin -> Prelude.Maybe
+                                 Allocator__PhysReg) -> (Allocator__PhysReg
+                                 -> Prelude.Maybe
                                  (Specif.Coq_sigT Interval.IntervalDesc
                                  Interval.FixedInterval)) -> Fin0.Coq_fin ->
                                  Allocator__PhysReg -> () ->
@@ -326,25 +297,24 @@ _Allocator__coq_ScanState_rec :: a1 -> (Datatypes.Coq_nat ->
 _Allocator__coq_ScanState_rec =
   _Allocator__coq_ScanState_rect
 
-_Allocator__unhandledExtent :: Allocator__ScanStateDesc -> Datatypes.Coq_nat
+_Allocator__unhandledExtent :: Allocator__ScanStateDesc -> Prelude.Int
 _Allocator__unhandledExtent sd =
   case _Allocator__unhandled sd of {
-   Datatypes.Coq_nil -> Datatypes.O;
-   Datatypes.Coq_cons i l ->
+   [] -> 0;
+   (:) i l ->
     case l of {
-     Datatypes.Coq_nil ->
+     [] ->
       Interval.intervalExtent (Specif.projT1 (_Allocator__getInterval sd i))
         (Specif.projT2 (_Allocator__getInterval sd i));
-     Datatypes.Coq_cons i0 l0 ->
+     (:) i0 l0 ->
       let {
        f = \n x ->
-        Peano.plus n
+        (Prelude.+) n
           (Interval.intervalExtent
             (Specif.projT1 (_Allocator__getInterval sd x))
             (Specif.projT2 (_Allocator__getInterval sd x)))}
       in
-      List.fold_left f (Datatypes.Coq_cons i (Datatypes.Coq_cons i0 l0))
-        Datatypes.O}}
+      List.fold_left f ((:) i ((:) i0 l0)) 0}}
 
 data Allocator__ScanStateCursor =
    Allocator__Build_ScanStateCursor Allocator__ScanState Interval.IntervalDesc
@@ -387,7 +357,7 @@ _Allocator__curInterval sd s =
   Specif.projT2 (_Allocator__getInterval sd (_Allocator__curId sd s))
 
 _Allocator__curPosition :: Allocator__ScanStateDesc ->
-                           Allocator__ScanStateCursor -> Datatypes.Coq_nat
+                           Allocator__ScanStateCursor -> Prelude.Int
 _Allocator__curPosition sd s =
   Interval.intervalStart
     (Specif.projT1 (_Allocator__getInterval sd (_Allocator__curId sd s)))
@@ -423,8 +393,7 @@ type Allocator__NextState = Allocator__NextScanState
 
 type Allocator__NextStateDep q = Specif.Coq_sigT Allocator__NextScanState q
 
-type Allocator__NextStateWith a =
-  Datatypes.Coq_prod a Allocator__NextScanState
+type Allocator__NextStateWith a = (,) a Allocator__NextScanState
 
 _Allocator__coq_NextScanState_transitivity :: Allocator__ScanStateDesc ->
                                               Allocator__NextScanState ->
@@ -491,10 +460,9 @@ _Allocator__moveActiveToHandled sd st x =
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
   (List.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__active sd)) (Datatypes.Coq_cons x
-  (_Allocator__inactive sd)) (_Allocator__handled sd)
-  (_Allocator__getInterval sd) (_Allocator__assignments sd)
-  (_Allocator__getFixedInterval sd)) s
+    x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
+  (_Allocator__handled sd) (_Allocator__getInterval sd)
+  (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)) s
 
 _Allocator__moveActiveToInactive :: Allocator__ScanStateDesc ->
                                     Allocator__ScanState ->
@@ -506,10 +474,9 @@ _Allocator__moveActiveToInactive sd st x =
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
   (List.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__active sd)) (Datatypes.Coq_cons x
-  (_Allocator__inactive sd)) (_Allocator__handled sd)
-  (_Allocator__getInterval sd) (_Allocator__assignments sd)
-  (_Allocator__getFixedInterval sd)) s
+    x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
+  (_Allocator__handled sd) (_Allocator__getInterval sd)
+  (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)) s
 
 _Allocator__moveInactiveToActive :: Allocator__ScanStateDesc ->
                                     Allocator__ScanState ->
@@ -518,8 +485,8 @@ _Allocator__moveInactiveToActive :: Allocator__ScanStateDesc ->
 _Allocator__moveInactiveToActive sd st x =
   let {s = Allocator__ScanState_moveInactiveToActive sd x st} in
   Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-  (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (Datatypes.Coq_cons x (_Allocator__active sd))
+  (_Allocator__nextInterval sd) (_Allocator__unhandled sd) ((:) x
+  (_Allocator__active sd))
   (List.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
     x (_Allocator__inactive sd)) (_Allocator__handled sd)
@@ -537,9 +504,9 @@ _Allocator__moveInactiveToHandled sd st x =
   (_Allocator__active sd)
   (List.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__inactive sd)) (Datatypes.Coq_cons x
-  (_Allocator__handled sd)) (_Allocator__getInterval sd)
-  (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)) s
+    x (_Allocator__inactive sd)) ((:) x (_Allocator__handled sd))
+  (_Allocator__getInterval sd) (_Allocator__assignments sd)
+  (_Allocator__getFixedInterval sd)) s
 
 _Allocator__moveUnhandledToActive :: Allocator__ScanStateDesc ->
                                      Allocator__ScanStateCursor ->
@@ -552,26 +519,26 @@ _Allocator__moveUnhandledToActive sd cur reg =
      Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0
       inactive0 handled0 getInterval0 assignments0 getFixedInterval0 ->
       case unhandled0 of {
-       Datatypes.Coq_nil -> Logic.coq_False_rec;
-       Datatypes.Coq_cons i unhandled1 ->
+       [] -> Logic.coq_False_rec;
+       (:) i unhandled1 ->
         let {
          s = \x0 -> Allocator__ScanState_moveUnhandledToActive nextInterval0
           unhandled1 active0 inactive0 handled0 getInterval0 assignments0
           getFixedInterval0 i reg x0}
         in
         Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-        nextInterval0 unhandled1 (Datatypes.Coq_cons i active0) inactive0
-        handled0 getInterval0 (\i0 ->
+        nextInterval0 unhandled1 ((:) i active0) inactive0 handled0
+        getInterval0 (\i0 ->
         case Compare.cmp_eq_dec (Fin0.fin_CompareSpec nextInterval0) i0 i of {
-         Specif.Coq_left -> Datatypes.Some reg;
+         Specif.Coq_left -> Prelude.Just reg;
          Specif.Coq_right -> assignments0 i0}) getFixedInterval0)
         (s curState0)}}}
 
 _Allocator__nextIntersectionWith :: Interval.IntervalDesc ->
                                     Interval.Interval ->
                                     Allocator__ScanStateDesc ->
-                                    Allocator__IntervalId ->
-                                    Datatypes.Coq_option Datatypes.Coq_nat
+                                    Allocator__IntervalId -> Prelude.Maybe
+                                    Prelude.Int
 _Allocator__nextIntersectionWith d i sd jid =
   Interval.firstIntersectionPoint
     (Specif.projT1 (_Allocator__getInterval sd jid))
@@ -579,147 +546,123 @@ _Allocator__nextIntersectionWith d i sd jid =
 
 _Allocator__getRegisterIndex :: Allocator__ScanStateDesc ->
                                 Allocator__ScanState ->
-                                (Allocator__IntervalId ->
-                                Datatypes.Coq_option Datatypes.Coq_nat) ->
-                                (Allocator__PhysReg -> Datatypes.Coq_option
-                                Datatypes.Coq_nat) -> (Datatypes.Coq_list
+                                (Allocator__IntervalId -> Prelude.Maybe
+                                Prelude.Int) -> (Allocator__PhysReg ->
+                                Prelude.Maybe Prelude.Int) -> ([]
                                 Allocator__IntervalId) -> Allocator__PhysReg
-                                -> Datatypes.Coq_option Datatypes.Coq_nat
+                                -> Prelude.Maybe Prelude.Int
 _Allocator__getRegisterIndex sd st intervalIndex registerIndex intervals =
   List.fold_right (\x f r ->
     case _Allocator__assignments sd x of {
-     Datatypes.Some a ->
+     Prelude.Just a ->
       case Compare.cmp_eq_dec (Fin0.fin_CompareSpec _MyMachine__maxReg) a r of {
        Specif.Coq_left -> intervalIndex x;
        Specif.Coq_right -> f r};
-     Datatypes.None -> f r}) registerIndex intervals
+     Prelude.Nothing -> f r}) registerIndex intervals
 
-_Allocator__findRegister_F :: ((Allocator__PhysReg -> Datatypes.Coq_option
-                              Datatypes.Coq_nat) -> Allocator__PhysReg ->
-                              Datatypes.Coq_prod Allocator__PhysReg
-                              (Datatypes.Coq_option Datatypes.Coq_nat)) ->
-                              (Allocator__PhysReg -> Datatypes.Coq_option
-                              Datatypes.Coq_nat) -> Allocator__PhysReg ->
-                              Datatypes.Coq_prod Allocator__PhysReg
-                              (Datatypes.Coq_option Datatypes.Coq_nat)
+_Allocator__findRegister_F :: ((Allocator__PhysReg -> Prelude.Maybe
+                              Prelude.Int) -> Allocator__PhysReg -> (,)
+                              Allocator__PhysReg (Prelude.Maybe Prelude.Int))
+                              -> (Allocator__PhysReg -> Prelude.Maybe
+                              Prelude.Int) -> Allocator__PhysReg -> (,)
+                              Allocator__PhysReg (Prelude.Maybe Prelude.Int)
 _Allocator__findRegister_F findRegister0 registerIndex start =
   case registerIndex start of {
-   Datatypes.Some pos ->
+   Prelude.Just pos ->
     case Fin0.pred_fin _MyMachine__maxReg start of {
-     Datatypes.Some nreg ->
+     Prelude.Just nreg ->
       case findRegister0 registerIndex nreg of {
-       Datatypes.Coq_pair reg o ->
+       (,) reg o ->
         case o of {
-         Datatypes.Some pos' ->
+         Prelude.Just pos' ->
           case NPeano.ltb pos pos' of {
-           Datatypes.Coq_true -> Datatypes.Coq_pair reg (Datatypes.Some pos');
-           Datatypes.Coq_false -> Datatypes.Coq_pair reg (Datatypes.Some pos)};
-         Datatypes.None -> Datatypes.Coq_pair reg Datatypes.None}};
-     Datatypes.None -> Datatypes.Coq_pair start (Datatypes.Some pos)};
-   Datatypes.None -> Datatypes.Coq_pair start Datatypes.None}
+           Prelude.True -> (,) reg (Prelude.Just pos');
+           Prelude.False -> (,) reg (Prelude.Just pos)};
+         Prelude.Nothing -> (,) reg Prelude.Nothing}};
+     Prelude.Nothing -> (,) start (Prelude.Just pos)};
+   Prelude.Nothing -> (,) start Prelude.Nothing}
 
-_Allocator__findRegister_terminate :: (Allocator__PhysReg ->
-                                      Datatypes.Coq_option Datatypes.Coq_nat)
-                                      -> Allocator__PhysReg ->
-                                      (Datatypes.Coq_prod Allocator__PhysReg
-                                      (Datatypes.Coq_option
-                                      Datatypes.Coq_nat))
+_Allocator__findRegister_terminate :: (Allocator__PhysReg -> Prelude.Maybe
+                                      Prelude.Int) -> Allocator__PhysReg ->
+                                      ((,) Allocator__PhysReg
+                                      (Prelude.Maybe Prelude.Int))
 _Allocator__findRegister_terminate registerIndex start =
   case registerIndex start of {
-   Datatypes.Some pos ->
+   Prelude.Just pos ->
     case Fin0.pred_fin _MyMachine__maxReg start of {
-     Datatypes.Some nreg ->
+     Prelude.Just nreg ->
       Specif.sig_rec (\rec_res _ ->
         case rec_res of {
-         Datatypes.Coq_pair reg o ->
+         (,) reg o ->
           case o of {
-           Datatypes.Some pos' ->
+           Prelude.Just pos' ->
             case NPeano.ltb pos pos' of {
-             Datatypes.Coq_true -> Datatypes.Coq_pair reg (Datatypes.Some
-              pos');
-             Datatypes.Coq_false -> Datatypes.Coq_pair reg (Datatypes.Some
-              pos)};
-           Datatypes.None -> Datatypes.Coq_pair reg Datatypes.None}})
+             Prelude.True -> (,) reg (Prelude.Just pos');
+             Prelude.False -> (,) reg (Prelude.Just pos)};
+           Prelude.Nothing -> (,) reg Prelude.Nothing}})
         (_Allocator__findRegister_terminate registerIndex nreg);
-     Datatypes.None -> Datatypes.Coq_pair start (Datatypes.Some pos)};
-   Datatypes.None -> Datatypes.Coq_pair start Datatypes.None}
+     Prelude.Nothing -> (,) start (Prelude.Just pos)};
+   Prelude.Nothing -> (,) start Prelude.Nothing}
 
-_Allocator__findRegister :: (Allocator__PhysReg -> Datatypes.Coq_option
-                            Datatypes.Coq_nat) -> Allocator__PhysReg ->
-                            Datatypes.Coq_prod Allocator__PhysReg
-                            (Datatypes.Coq_option Datatypes.Coq_nat)
+_Allocator__findRegister :: (Allocator__PhysReg -> Prelude.Maybe Prelude.Int)
+                            -> Allocator__PhysReg -> (,) Allocator__PhysReg
+                            (Prelude.Maybe Prelude.Int)
 _Allocator__findRegister registerIndex start =
   case registerIndex start of {
-   Datatypes.Some pos ->
+   Prelude.Just pos ->
     case Fin0.pred_fin _MyMachine__maxReg start of {
-     Datatypes.Some nreg ->
+     Prelude.Just nreg ->
       Specif.sig_rec (\rec_res _ ->
         case rec_res of {
-         Datatypes.Coq_pair reg o ->
+         (,) reg o ->
           case o of {
-           Datatypes.Some pos' ->
+           Prelude.Just pos' ->
             case NPeano.ltb pos pos' of {
-             Datatypes.Coq_true -> Datatypes.Coq_pair reg (Datatypes.Some
-              pos');
-             Datatypes.Coq_false -> Datatypes.Coq_pair reg (Datatypes.Some
-              pos)};
-           Datatypes.None -> Datatypes.Coq_pair reg Datatypes.None}})
+             Prelude.True -> (,) reg (Prelude.Just pos');
+             Prelude.False -> (,) reg (Prelude.Just pos)};
+           Prelude.Nothing -> (,) reg Prelude.Nothing}})
         (_Allocator__findRegister registerIndex nreg);
-     Datatypes.None -> Datatypes.Coq_pair start (Datatypes.Some pos)};
-   Datatypes.None -> Datatypes.Coq_pair start Datatypes.None}
+     Prelude.Nothing -> (,) start (Prelude.Just pos)};
+   Prelude.Nothing -> (,) start Prelude.Nothing}
 
 data Allocator__R_findRegister =
    Allocator__R_findRegister_0 Allocator__PhysReg
- | Allocator__R_findRegister_1 Allocator__PhysReg Datatypes.Coq_nat
- | Allocator__R_findRegister_2 Allocator__PhysReg Datatypes.Coq_nat Fin0.Coq_fin 
- (Datatypes.Coq_prod Allocator__PhysReg
- (Datatypes.Coq_option Datatypes.Coq_nat)) Allocator__R_findRegister 
+ | Allocator__R_findRegister_1 Allocator__PhysReg Prelude.Int
+ | Allocator__R_findRegister_2 Allocator__PhysReg Prelude.Int Fin0.Coq_fin 
+ ((,) Allocator__PhysReg (Prelude.Maybe Prelude.Int)) Allocator__R_findRegister 
  Allocator__PhysReg
- | Allocator__R_findRegister_3 Allocator__PhysReg Datatypes.Coq_nat Fin0.Coq_fin 
- (Datatypes.Coq_prod Allocator__PhysReg
- (Datatypes.Coq_option Datatypes.Coq_nat)) Allocator__R_findRegister 
- Allocator__PhysReg Datatypes.Coq_nat
- | Allocator__R_findRegister_4 Allocator__PhysReg Datatypes.Coq_nat Fin0.Coq_fin 
- (Datatypes.Coq_prod Allocator__PhysReg
- (Datatypes.Coq_option Datatypes.Coq_nat)) Allocator__R_findRegister 
- Allocator__PhysReg Datatypes.Coq_nat
+ | Allocator__R_findRegister_3 Allocator__PhysReg Prelude.Int Fin0.Coq_fin 
+ ((,) Allocator__PhysReg (Prelude.Maybe Prelude.Int)) Allocator__R_findRegister 
+ Allocator__PhysReg Prelude.Int
+ | Allocator__R_findRegister_4 Allocator__PhysReg Prelude.Int Fin0.Coq_fin 
+ ((,) Allocator__PhysReg (Prelude.Maybe Prelude.Int)) Allocator__R_findRegister 
+ Allocator__PhysReg Prelude.Int
 
-_Allocator__coq_R_findRegister_rect :: (Allocator__PhysReg ->
-                                       Datatypes.Coq_option
-                                       Datatypes.Coq_nat) ->
-                                       (Allocator__PhysReg -> () -> a1) ->
-                                       (Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () -> () -> a1)
-                                       -> (Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () ->
-                                       Fin0.Coq_fin -> () ->
-                                       (Datatypes.Coq_prod Allocator__PhysReg
-                                       (Datatypes.Coq_option
-                                       Datatypes.Coq_nat)) ->
+_Allocator__coq_R_findRegister_rect :: (Allocator__PhysReg -> Prelude.Maybe
+                                       Prelude.Int) -> (Allocator__PhysReg ->
+                                       () -> a1) -> (Allocator__PhysReg ->
+                                       Prelude.Int -> () -> () -> a1) ->
+                                       (Allocator__PhysReg -> Prelude.Int ->
+                                       () -> Fin0.Coq_fin -> () -> ((,)
+                                       Allocator__PhysReg
+                                       (Prelude.Maybe Prelude.Int)) ->
                                        Allocator__R_findRegister -> a1 ->
                                        Allocator__PhysReg -> () -> a1) ->
-                                       (Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () ->
-                                       Fin0.Coq_fin -> () ->
-                                       (Datatypes.Coq_prod Allocator__PhysReg
-                                       (Datatypes.Coq_option
-                                       Datatypes.Coq_nat)) ->
+                                       (Allocator__PhysReg -> Prelude.Int ->
+                                       () -> Fin0.Coq_fin -> () -> ((,)
+                                       Allocator__PhysReg
+                                       (Prelude.Maybe Prelude.Int)) ->
                                        Allocator__R_findRegister -> a1 ->
-                                       Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () -> () -> a1)
-                                       -> (Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () ->
-                                       Fin0.Coq_fin -> () ->
-                                       (Datatypes.Coq_prod Allocator__PhysReg
-                                       (Datatypes.Coq_option
-                                       Datatypes.Coq_nat)) ->
+                                       Allocator__PhysReg -> Prelude.Int ->
+                                       () -> () -> a1) -> (Allocator__PhysReg
+                                       -> Prelude.Int -> () -> Fin0.Coq_fin
+                                       -> () -> ((,) Allocator__PhysReg
+                                       (Prelude.Maybe Prelude.Int)) ->
                                        Allocator__R_findRegister -> a1 ->
-                                       Allocator__PhysReg ->
-                                       Datatypes.Coq_nat -> () -> () -> a1)
-                                       -> Allocator__PhysReg ->
-                                       (Datatypes.Coq_prod Allocator__PhysReg
-                                       (Datatypes.Coq_option
-                                       Datatypes.Coq_nat)) ->
+                                       Allocator__PhysReg -> Prelude.Int ->
+                                       () -> () -> a1) -> Allocator__PhysReg
+                                       -> ((,) Allocator__PhysReg
+                                       (Prelude.Maybe Prelude.Int)) ->
                                        Allocator__R_findRegister -> a1
 _Allocator__coq_R_findRegister_rect registerIndex f f0 f1 f2 f3 start p r =
   case r of {
@@ -738,187 +681,164 @@ _Allocator__coq_R_findRegister_rect registerIndex f f0 f1 f2 f3 start p r =
       (_Allocator__coq_R_findRegister_rect registerIndex f f0 f1 f2 f3 nreg
         res r0) reg pos' __ __}
 
-_Allocator__coq_R_findRegister_rec :: (Allocator__PhysReg ->
-                                      Datatypes.Coq_option Datatypes.Coq_nat)
-                                      -> (Allocator__PhysReg -> () -> a1) ->
-                                      (Allocator__PhysReg ->
-                                      Datatypes.Coq_nat -> () -> () -> a1) ->
-                                      (Allocator__PhysReg ->
-                                      Datatypes.Coq_nat -> () -> Fin0.Coq_fin
-                                      -> () -> (Datatypes.Coq_prod
+_Allocator__coq_R_findRegister_rec :: (Allocator__PhysReg -> Prelude.Maybe
+                                      Prelude.Int) -> (Allocator__PhysReg ->
+                                      () -> a1) -> (Allocator__PhysReg ->
+                                      Prelude.Int -> () -> () -> a1) ->
+                                      (Allocator__PhysReg -> Prelude.Int ->
+                                      () -> Fin0.Coq_fin -> () -> ((,)
                                       Allocator__PhysReg
-                                      (Datatypes.Coq_option
-                                      Datatypes.Coq_nat)) ->
+                                      (Prelude.Maybe Prelude.Int)) ->
                                       Allocator__R_findRegister -> a1 ->
                                       Allocator__PhysReg -> () -> a1) ->
-                                      (Allocator__PhysReg ->
-                                      Datatypes.Coq_nat -> () -> Fin0.Coq_fin
-                                      -> () -> (Datatypes.Coq_prod
+                                      (Allocator__PhysReg -> Prelude.Int ->
+                                      () -> Fin0.Coq_fin -> () -> ((,)
                                       Allocator__PhysReg
-                                      (Datatypes.Coq_option
-                                      Datatypes.Coq_nat)) ->
+                                      (Prelude.Maybe Prelude.Int)) ->
                                       Allocator__R_findRegister -> a1 ->
-                                      Allocator__PhysReg -> Datatypes.Coq_nat
-                                      -> () -> () -> a1) ->
-                                      (Allocator__PhysReg ->
-                                      Datatypes.Coq_nat -> () -> Fin0.Coq_fin
-                                      -> () -> (Datatypes.Coq_prod
-                                      Allocator__PhysReg
-                                      (Datatypes.Coq_option
-                                      Datatypes.Coq_nat)) ->
+                                      Allocator__PhysReg -> Prelude.Int -> ()
+                                      -> () -> a1) -> (Allocator__PhysReg ->
+                                      Prelude.Int -> () -> Fin0.Coq_fin -> ()
+                                      -> ((,) Allocator__PhysReg
+                                      (Prelude.Maybe Prelude.Int)) ->
                                       Allocator__R_findRegister -> a1 ->
-                                      Allocator__PhysReg -> Datatypes.Coq_nat
-                                      -> () -> () -> a1) ->
-                                      Allocator__PhysReg ->
-                                      (Datatypes.Coq_prod Allocator__PhysReg
-                                      (Datatypes.Coq_option
-                                      Datatypes.Coq_nat)) ->
+                                      Allocator__PhysReg -> Prelude.Int -> ()
+                                      -> () -> a1) -> Allocator__PhysReg ->
+                                      ((,) Allocator__PhysReg
+                                      (Prelude.Maybe Prelude.Int)) ->
                                       Allocator__R_findRegister -> a1
 _Allocator__coq_R_findRegister_rec registerIndex =
   _Allocator__coq_R_findRegister_rect registerIndex
 
-_Allocator__findRegister_rect :: (Allocator__PhysReg -> Datatypes.Coq_option
-                                 Datatypes.Coq_nat) -> (Allocator__PhysReg ->
-                                 () -> a1) -> (Allocator__PhysReg ->
-                                 Datatypes.Coq_nat -> () -> () -> a1) ->
-                                 (Allocator__PhysReg -> Datatypes.Coq_nat ->
-                                 () -> Fin0.Coq_fin -> () -> a1 ->
-                                 Allocator__PhysReg -> () -> a1) ->
-                                 (Allocator__PhysReg -> Datatypes.Coq_nat ->
-                                 () -> Fin0.Coq_fin -> () -> a1 ->
-                                 Allocator__PhysReg -> Datatypes.Coq_nat ->
+_Allocator__findRegister_rect :: (Allocator__PhysReg -> Prelude.Maybe
+                                 Prelude.Int) -> (Allocator__PhysReg -> () ->
+                                 a1) -> (Allocator__PhysReg -> Prelude.Int ->
                                  () -> () -> a1) -> (Allocator__PhysReg ->
-                                 Datatypes.Coq_nat -> () -> Fin0.Coq_fin ->
-                                 () -> a1 -> Allocator__PhysReg ->
-                                 Datatypes.Coq_nat -> () -> () -> a1) ->
-                                 Allocator__PhysReg -> a1
+                                 Prelude.Int -> () -> Fin0.Coq_fin -> () ->
+                                 a1 -> Allocator__PhysReg -> () -> a1) ->
+                                 (Allocator__PhysReg -> Prelude.Int -> () ->
+                                 Fin0.Coq_fin -> () -> a1 ->
+                                 Allocator__PhysReg -> Prelude.Int -> () ->
+                                 () -> a1) -> (Allocator__PhysReg ->
+                                 Prelude.Int -> () -> Fin0.Coq_fin -> () ->
+                                 a1 -> Allocator__PhysReg -> Prelude.Int ->
+                                 () -> () -> a1) -> Allocator__PhysReg -> a1
 _Allocator__findRegister_rect registerIndex f f0 f1 f2 f3 start =
   Logic.eq_rect_r
     (case registerIndex start of {
-      Datatypes.Some pos ->
+      Prelude.Just pos ->
        case Fin0.pred_fin _MyMachine__maxReg start of {
-        Datatypes.Some nreg ->
+        Prelude.Just nreg ->
          case _Allocator__findRegister registerIndex nreg of {
-          Datatypes.Coq_pair reg o ->
+          (,) reg o ->
            case o of {
-            Datatypes.Some pos' ->
+            Prelude.Just pos' ->
              case NPeano.ltb pos pos' of {
-              Datatypes.Coq_true -> Datatypes.Coq_pair reg (Datatypes.Some
-               pos');
-              Datatypes.Coq_false -> Datatypes.Coq_pair reg (Datatypes.Some
-               pos)};
-            Datatypes.None -> Datatypes.Coq_pair reg Datatypes.None}};
-        Datatypes.None -> Datatypes.Coq_pair start (Datatypes.Some pos)};
-      Datatypes.None -> Datatypes.Coq_pair start Datatypes.None})
+              Prelude.True -> (,) reg (Prelude.Just pos');
+              Prelude.False -> (,) reg (Prelude.Just pos)};
+            Prelude.Nothing -> (,) reg Prelude.Nothing}};
+        Prelude.Nothing -> (,) start (Prelude.Just pos)};
+      Prelude.Nothing -> (,) start Prelude.Nothing})
     (let {f4 = f3 start} in
      let {f5 = f2 start} in
      let {f6 = f1 start} in
      let {f7 = f0 start} in
      let {f8 = f start} in
      case registerIndex start of {
-      Datatypes.Some n ->
+      Prelude.Just n ->
        let {f9 = f7 n __} in
        let {f10 = f6 n __} in
        let {f11 = f5 n __} in
        let {f12 = f4 n __} in
        case Fin0.pred_fin _MyMachine__maxReg start of {
-        Datatypes.Some f13 ->
+        Prelude.Just f13 ->
          let {f14 = f12 f13 __} in
          let {f15 = f11 f13 __} in
          let {f16 = f10 f13 __} in
          case _Allocator__findRegister registerIndex f13 of {
-          Datatypes.Coq_pair p o ->
+          (,) p o ->
            case o of {
-            Datatypes.Some n0 ->
+            Prelude.Just n0 ->
              let {f17 = \h -> f14 h p n0 __} in
              let {f18 = \h -> f15 h p n0 __} in
              case NPeano.ltb n n0 of {
-              Datatypes.Coq_true ->
+              Prelude.True ->
                let {f19 = \h -> f18 h __} in
                let {
                 hrec = Logic.eq_rect o
                          (Logic.eq_rect
                            (_Allocator__findRegister registerIndex f13)
                            (_Allocator__findRegister_rect registerIndex f f0
-                             f1 f2 f3 f13) (Datatypes.Coq_pair p o))
-                         (Datatypes.Some n0)}
+                             f1 f2 f3 f13) ((,) p o)) (Prelude.Just n0)}
                in
                f19 hrec;
-              Datatypes.Coq_false ->
+              Prelude.False ->
                let {f19 = \h -> f17 h __} in
                let {
                 hrec = Logic.eq_rect o
                          (Logic.eq_rect
                            (_Allocator__findRegister registerIndex f13)
                            (_Allocator__findRegister_rect registerIndex f f0
-                             f1 f2 f3 f13) (Datatypes.Coq_pair p o))
-                         (Datatypes.Some n0)}
+                             f1 f2 f3 f13) ((,) p o)) (Prelude.Just n0)}
                in
                f19 hrec};
-            Datatypes.None ->
+            Prelude.Nothing ->
              let {f17 = \h -> f16 h p __} in
              let {
               hrec = Logic.eq_rect o
                        (Logic.eq_rect
                          (_Allocator__findRegister registerIndex f13)
                          (_Allocator__findRegister_rect registerIndex f f0 f1
-                           f2 f3 f13) (Datatypes.Coq_pair p o))
-                       Datatypes.None}
+                           f2 f3 f13) ((,) p o)) Prelude.Nothing}
              in
              f17 hrec}};
-        Datatypes.None -> f9 __};
-      Datatypes.None -> f8 __})
+        Prelude.Nothing -> f9 __};
+      Prelude.Nothing -> f8 __})
     (_Allocator__findRegister registerIndex start)
 
-_Allocator__findRegister_rec :: (Allocator__PhysReg -> Datatypes.Coq_option
-                                Datatypes.Coq_nat) -> (Allocator__PhysReg ->
-                                () -> a1) -> (Allocator__PhysReg ->
-                                Datatypes.Coq_nat -> () -> () -> a1) ->
-                                (Allocator__PhysReg -> Datatypes.Coq_nat ->
-                                () -> Fin0.Coq_fin -> () -> a1 ->
-                                Allocator__PhysReg -> () -> a1) ->
-                                (Allocator__PhysReg -> Datatypes.Coq_nat ->
-                                () -> Fin0.Coq_fin -> () -> a1 ->
-                                Allocator__PhysReg -> Datatypes.Coq_nat -> ()
-                                -> () -> a1) -> (Allocator__PhysReg ->
-                                Datatypes.Coq_nat -> () -> Fin0.Coq_fin -> ()
-                                -> a1 -> Allocator__PhysReg ->
-                                Datatypes.Coq_nat -> () -> () -> a1) ->
-                                Allocator__PhysReg -> a1
+_Allocator__findRegister_rec :: (Allocator__PhysReg -> Prelude.Maybe
+                                Prelude.Int) -> (Allocator__PhysReg -> () ->
+                                a1) -> (Allocator__PhysReg -> Prelude.Int ->
+                                () -> () -> a1) -> (Allocator__PhysReg ->
+                                Prelude.Int -> () -> Fin0.Coq_fin -> () -> a1
+                                -> Allocator__PhysReg -> () -> a1) ->
+                                (Allocator__PhysReg -> Prelude.Int -> () ->
+                                Fin0.Coq_fin -> () -> a1 ->
+                                Allocator__PhysReg -> Prelude.Int -> () -> ()
+                                -> a1) -> (Allocator__PhysReg -> Prelude.Int
+                                -> () -> Fin0.Coq_fin -> () -> a1 ->
+                                Allocator__PhysReg -> Prelude.Int -> () -> ()
+                                -> a1) -> Allocator__PhysReg -> a1
 _Allocator__findRegister_rec registerIndex =
   _Allocator__findRegister_rect registerIndex
 
 _Allocator__coq_R_findRegister_correct :: (Allocator__PhysReg ->
-                                          Datatypes.Coq_option
-                                          Datatypes.Coq_nat) ->
-                                          Allocator__PhysReg ->
-                                          (Datatypes.Coq_prod
+                                          Prelude.Maybe Prelude.Int) ->
+                                          Allocator__PhysReg -> ((,)
                                           Allocator__PhysReg
-                                          (Datatypes.Coq_option
-                                          Datatypes.Coq_nat)) ->
+                                          (Prelude.Maybe Prelude.Int)) ->
                                           Allocator__R_findRegister
 _Allocator__coq_R_findRegister_correct x x0 res =
   _Allocator__findRegister_rect x (\y _ z _ ->
-    Logic.eq_rec_r (Datatypes.Coq_pair y Datatypes.None)
-      (Allocator__R_findRegister_0 y) z) (\y y0 _ _ z _ ->
-    Logic.eq_rec_r (Datatypes.Coq_pair y (Datatypes.Some y0))
-      (Allocator__R_findRegister_1 y y0) z) (\y y0 _ y2 _ y4 y5 _ z _ ->
-    Logic.eq_rec_r (Datatypes.Coq_pair y5 Datatypes.None)
-      (Allocator__R_findRegister_2 y y0 y2 (_Allocator__findRegister x y2)
+    Logic.eq_rec_r ((,) y Prelude.Nothing) (Allocator__R_findRegister_0 y) z)
+    (\y y0 _ _ z _ ->
+    Logic.eq_rec_r ((,) y (Prelude.Just y0)) (Allocator__R_findRegister_1 y
+      y0) z) (\y y0 _ y2 _ y4 y5 _ z _ ->
+    Logic.eq_rec_r ((,) y5 Prelude.Nothing) (Allocator__R_findRegister_2 y y0
+      y2 (_Allocator__findRegister x y2)
       (y4 (_Allocator__findRegister x y2) __) y5) z)
     (\y y0 _ y2 _ y4 y5 y6 _ _ z _ ->
-    Logic.eq_rec_r (Datatypes.Coq_pair y5 (Datatypes.Some y6))
-      (Allocator__R_findRegister_3 y y0 y2 (_Allocator__findRegister x y2)
+    Logic.eq_rec_r ((,) y5 (Prelude.Just y6)) (Allocator__R_findRegister_3 y
+      y0 y2 (_Allocator__findRegister x y2)
       (y4 (_Allocator__findRegister x y2) __) y5 y6) z)
     (\y y0 _ y2 _ y4 y5 y6 _ _ z _ ->
-    Logic.eq_rec_r (Datatypes.Coq_pair y5 (Datatypes.Some y0))
-      (Allocator__R_findRegister_4 y y0 y2 (_Allocator__findRegister x y2)
+    Logic.eq_rec_r ((,) y5 (Prelude.Just y0)) (Allocator__R_findRegister_4 y
+      y0 y2 (_Allocator__findRegister x y2)
       (y4 (_Allocator__findRegister x y2) __) y5 y6) z) x0 res __
 
 _Allocator__splitInterval :: Allocator__ScanStateDesc ->
-                             Allocator__ScanStateCursor ->
-                             (Datatypes.Coq_option Datatypes.Coq_nat) ->
-                             Allocator__NextState
+                             Allocator__ScanStateCursor -> (Prelude.Maybe
+                             Prelude.Int) -> Allocator__NextState
 _Allocator__splitInterval sd cur before =
   Allocator__Build_NextScanState sd (_Allocator__curState sd cur)
 
@@ -942,15 +862,14 @@ _Allocator__cursorFromMorphStLen sd cur n =
     (_Allocator__nextDesc n) (_Allocator__nextState n))
 
 _Allocator__tryAllocateFreeReg :: Allocator__ScanStateDesc ->
-                                  Allocator__ScanStateCursor ->
-                                  Datatypes.Coq_option Allocator__NextState
+                                  Allocator__ScanStateCursor -> Prelude.Maybe
+                                  Allocator__NextState
 _Allocator__tryAllocateFreeReg sd cur =
   let {st = _Allocator__curState sd cur} in
   let {current = _Allocator__curInterval sd cur} in
   let {
-   freeUntilPos' = _Allocator__getRegisterIndex sd st (\x -> Datatypes.Some
-                     Datatypes.O) (\x -> Datatypes.None)
-                     (_Allocator__active sd)}
+   freeUntilPos' = _Allocator__getRegisterIndex sd st (\x -> Prelude.Just 0)
+                     (\x -> Prelude.Nothing) (_Allocator__active sd)}
   in
   let {
    intersectingIntervals = List.filter (\x ->
@@ -972,30 +891,30 @@ _Allocator__tryAllocateFreeReg sd cur =
   in
   let {lastReg = Fin0.ultimate_from_nat _Allocator__maxReg} in
   case _Allocator__findRegister freeUntilPos lastReg of {
-   Datatypes.Coq_pair reg mres ->
+   (,) reg mres ->
     let {default0 = _Allocator__moveUnhandledToActive sd cur reg} in
     case mres of {
-     Datatypes.Some n ->
-      case EqNat.beq_nat n Datatypes.O of {
-       Datatypes.Coq_true -> Datatypes.None;
-       Datatypes.Coq_false -> Datatypes.Some
+     Prelude.Just n ->
+      case EqNat.beq_nat n 0 of {
+       Prelude.True -> Prelude.Nothing;
+       Prelude.False -> Prelude.Just
         (case NPeano.ltb
                 (Interval.intervalEnd
                   (Specif.projT1
                     (_Allocator__getInterval sd (_Allocator__curId sd cur)))
                   current) n of {
-          Datatypes.Coq_true -> default0;
-          Datatypes.Coq_false ->
+          Prelude.True -> default0;
+          Prelude.False ->
            _Allocator__moveUnhandledToActive
              (_Allocator__nextDesc
-               (_Allocator__splitInterval sd cur (Datatypes.Some n)))
+               (_Allocator__splitInterval sd cur (Prelude.Just n)))
              (_Allocator__cursorFromMorphStLen sd cur
-               (_Allocator__splitInterval sd cur (Datatypes.Some n))) reg})};
-     Datatypes.None -> Datatypes.Some default0}}
+               (_Allocator__splitInterval sd cur (Prelude.Just n))) reg})};
+     Prelude.Nothing -> Prelude.Just default0}}
 
-_Allocator__nextUseAfter :: Datatypes.Coq_nat -> Allocator__ScanStateDesc ->
-                            Allocator__IntervalId -> Datatypes.Coq_option
-                            Datatypes.Coq_nat
+_Allocator__nextUseAfter :: Prelude.Int -> Allocator__ScanStateDesc ->
+                            Allocator__IntervalId -> Prelude.Maybe
+                            Prelude.Int
 _Allocator__nextUseAfter =
   Prelude.error "AXIOM TO BE REALIZED"
 
@@ -1012,14 +931,14 @@ _Allocator__allocateBlockedReg sd cur =
   Lib.undefined
 
 _Allocator__checkActiveIntervals :: Allocator__ScanStateDesc ->
-                                    Allocator__ScanState -> Datatypes.Coq_nat
-                                    -> Allocator__NextScanState
+                                    Allocator__ScanState -> Prelude.Int ->
+                                    Allocator__NextScanState
 _Allocator__checkActiveIntervals sd st pos =
   let {
    go sd0 st0 ss is pos0 =
      case is of {
-      Datatypes.Coq_nil -> ss;
-      Datatypes.Coq_cons x xs ->
+      [] -> ss;
+      (:) x xs ->
        let {
         i = Specif.projT2 (_Allocator__getInterval sd0 (Specif.projT1 x))}
        in
@@ -1029,32 +948,31 @@ _Allocator__checkActiveIntervals sd st pos =
                        (Specif.projT1
                          (_Allocator__getInterval sd0 (Specif.projT1 x))) i)
                      pos0 of {
-               Datatypes.Coq_true ->
+               Prelude.True ->
                 _Allocator__moveActiveToHandled sd0 st0 (Specif.projT1 x);
-               Datatypes.Coq_false ->
-                case Datatypes.negb
+               Prelude.False ->
+                case (Prelude.not)
                        (Interval.intervalCoversPos
                          (Specif.projT1
                            (_Allocator__getInterval sd0 (Specif.projT1 x))) i
                          pos0) of {
-                 Datatypes.Coq_true ->
+                 Prelude.True ->
                   _Allocator__moveActiveToInactive sd0 st0 (Specif.projT1 x);
-                 Datatypes.Coq_false -> ss}}}
+                 Prelude.False -> ss}}}
        in
        go sd0 st0 st1 xs pos0}}
   in go sd st (Allocator__Build_NextScanState sd st)
        (Lib.list_membership (_Allocator__active sd)) pos
 
 _Allocator__checkInactiveIntervals :: Allocator__ScanStateDesc ->
-                                      Allocator__ScanState ->
-                                      Datatypes.Coq_nat ->
+                                      Allocator__ScanState -> Prelude.Int ->
                                       Allocator__NextScanState
 _Allocator__checkInactiveIntervals sd st pos =
   let {
    go sd0 st0 ss is pos0 =
      case is of {
-      Datatypes.Coq_nil -> ss;
-      Datatypes.Coq_cons x xs ->
+      [] -> ss;
+      (:) x xs ->
        let {
         i = Specif.projT2 (_Allocator__getInterval sd0 (Specif.projT1 x))}
        in
@@ -1064,16 +982,16 @@ _Allocator__checkInactiveIntervals sd st pos =
                        (Specif.projT1
                          (_Allocator__getInterval sd0 (Specif.projT1 x))) i)
                      pos0 of {
-               Datatypes.Coq_true ->
+               Prelude.True ->
                 _Allocator__moveInactiveToHandled sd0 st0 (Specif.projT1 x);
-               Datatypes.Coq_false ->
+               Prelude.False ->
                 case Interval.intervalCoversPos
                        (Specif.projT1
                          (_Allocator__getInterval sd0 (Specif.projT1 x))) i
                        pos0 of {
-                 Datatypes.Coq_true ->
+                 Prelude.True ->
                   _Allocator__moveInactiveToActive sd0 st0 (Specif.projT1 x);
-                 Datatypes.Coq_false -> ss}}}
+                 Prelude.False -> ss}}}
        in
        go sd0 st0 st1 xs pos0}}
   in go sd st (Allocator__Build_NextScanState sd st)
@@ -1154,15 +1072,14 @@ _Allocator__linearScan sd st =
 
 data Allocator__R_linearScan =
    Allocator__R_linearScan_0 Allocator__ScanStateDesc Allocator__ScanState 
- Allocator__IntervalId (Datatypes.Coq_list Allocator__IntervalId) Allocator__ScanStateDesc 
+ Allocator__IntervalId ([] Allocator__IntervalId) Allocator__ScanStateDesc 
  Allocator__ScanState (Specif.Coq_sigT Allocator__ScanStateDesc
                       Allocator__ScanState) Allocator__R_linearScan
  | Allocator__R_linearScan_1 Allocator__ScanStateDesc Allocator__ScanState
 
 _Allocator__coq_R_linearScan_rect :: (Allocator__ScanStateDesc ->
                                      Allocator__ScanState ->
-                                     Allocator__IntervalId ->
-                                     (Datatypes.Coq_list
+                                     Allocator__IntervalId -> ([]
                                      Allocator__IntervalId) -> () -> () ->
                                      Allocator__ScanStateDesc ->
                                      Allocator__ScanState -> () -> () ->
@@ -1186,8 +1103,7 @@ _Allocator__coq_R_linearScan_rect f f0 sd st s r =
 
 _Allocator__coq_R_linearScan_rec :: (Allocator__ScanStateDesc ->
                                     Allocator__ScanState ->
-                                    Allocator__IntervalId ->
-                                    (Datatypes.Coq_list
+                                    Allocator__IntervalId -> ([]
                                     Allocator__IntervalId) -> () -> () ->
                                     Allocator__ScanStateDesc ->
                                     Allocator__ScanState -> () -> () ->
@@ -1204,7 +1120,7 @@ _Allocator__coq_R_linearScan_rec :: (Allocator__ScanStateDesc ->
 _Allocator__coq_R_linearScan_rec =
   _Allocator__coq_R_linearScan_rect
 
-type Allocator__VirtReg = Datatypes.Coq_nat
+type Allocator__VirtReg = Prelude.Int
 
 type Allocator__Graph a =
   a

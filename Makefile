@@ -196,10 +196,8 @@ clean:
 	rm -f $(VOFILES) $(VIFILES) $(GFILES) $(VFILES:.v=.v.d) $(VFILES:=.beautified) $(VFILES:=.old)
 	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) all-mli.tex
 	- rm -rf mlihtml
-	rm -f $(HSFILES)
-	rm -f Compare_dec.hs Datatypes.hs EqNat.hs Fin0.hs List.hs
-	rm -f Logic.hs NPeano.hs Peano.hs Specif.hs
-	rm -f *.hi Setup
+	rm -rf Data
+	rm -f Setup
 	rm -fr dist
 
 allclean: clean
