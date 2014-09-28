@@ -86,6 +86,7 @@ VFILES:=Compare.v\
   Lib.v\
   LinearScan.v\
   Machine.v\
+  Main.v\
   NoDup.v\
   NonEmpty.v\
   Range.v\

@@ -17,17 +17,8 @@ Require Import SSMorph.
 
 Generalizable All Variables.
 
-Module MyMachine <: Machine.
-
-Definition maxReg := 32.
-
-Lemma registers_exist : maxReg > 0.
-Proof. unfold maxReg. omega. Qed.
-
-End MyMachine.
-
-Module Import SS := MScanState MyMachine.
-Module Import SSM := MSSMorph MyMachine.
+Module MLinearScan (M : Machine).
+Include MSSMorph M.
 
 (** * Helper functions *)
 
@@ -390,3 +381,5 @@ Admitted.
 Definition allocateRegisters (g : Graph VirtReg)
   : { sd : ScanStateDesc & ScanState sd } :=
   let (sd,st) := determineIntervals g in linearScan sd st.
+
+End MLinearScan.
