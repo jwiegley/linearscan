@@ -1,3 +1,5 @@
+Require Export Machine.
+
 Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
@@ -9,14 +11,6 @@ Require Import NoDup.
 Module Import LN := ListNotations.
 
 Generalizable All Variables.
-
-Module Type Machine.
-
-Variable maxReg : nat.          (* max number of registers *)
-
-Hypothesis registers_exist : maxReg > 0.
-
-End Machine.
 
 Module MScanState (M : Machine).
 Import M.

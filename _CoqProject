@@ -1,10 +1,11 @@
 -I .
 Compare.v
 Fin.v
-NoDup.v
-NonEmpty.v
 Lib.v
+NonEmpty.v
 Range.v
 Interval.v
+NoDup.v
 ScanState.v
 LinearScan.v
+Machine.v
