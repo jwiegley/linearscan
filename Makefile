@@ -116,7 +116,14 @@ endif
 #                                     #
 #######################################
 
-all: $(VOFILES)
+all: $(VOFILES) hsfixup
+
+hsfixup:
+	ls -1 *.hs | grep -v Setup.hs | \
+	    while read file; do mv $$file Data; done
+	perl -i -pe 's/import qualified (.*)/import qualified Data.\1 as \1/' Data/*.hs
+	perl -i -pe 's/import qualified Data\.Prelude as Prelude/import qualified Prelude/' Data/*.hs
+	perl -i -pe 's/module (.+?) where/module Data.\1 where/' Data/*.hs
 
 spec: $(VIFILES)
 
