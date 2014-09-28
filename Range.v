@@ -1,6 +1,8 @@
 Require Import Lib.
 Require Import NonEmpty.
 
+Generalizable All Variables.
+
 (** ** UsePos *)
 
 (** A "use position", or [UsePos], identifies an exact point in the
@@ -13,16 +15,21 @@ Record UsePos : Set := {
   regReq : bool
 }.
 
-(** ** Range *)
+(** ** RangeDesc *)
 
-(** The *extent* of a [Range] is the set of use positions it ranges over,
-    inclusively.
+(** The *extent* of a [RangeDesc] is the set of use positions it ranges over,
+    inclusively, plus any extensions that have been applied to the range.
 
-    A Range is built up from a set of use positions, and defines the inclusive
-    range of those positions.  It can be extended, or split, but never shrunk.
-    Also, the non-empty list of use positions is not guaranteed to be in any
-    order, and overlapping use positions are accepted but only the most recent
-    one "wins". *)
+    A [RangeDesc] is built up from a set of use positions, and defines the
+    inclusive range of those positions.  It can be extended, or split, but
+    never shrunk.  Also, the non-empty list of use positions is not guaranteed
+    to be in any order, and overlapping use positions are accepted, where the
+    most recent one "wins".
+
+    Although minimally there is at least one position fixing the beginning and
+    end of the range, it's possible for the range to extend before or beyond
+    the first and last use positions; for example, in the case of a use
+    position ranging over the scope of a loop. *)
 
 Record RangeDesc := {
     rbeg : nat;
@@ -31,6 +38,11 @@ Record RangeDesc := {
 
     range_nonempty : rbeg < rend         (* this comes in handy *)
 }.
+
+(** ** Range *)
+
+(** A [Range] constrains how a [RangeDesc] may be constructed, and maintains
+    any invariants. *)
 
 Inductive Range : RangeDesc -> Set :=
   | R_Sing u :
@@ -54,40 +66,18 @@ Inductive Range : RangeDesc -> Set :=
            ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
            |}.
 
-Definition rangeExtent (x : RangeDesc) := rend x - rbeg x.
+Definition getRangeDesc `(r : Range d) := d.
 
-Definition rangesIntersect (x y : RangeDesc) : bool :=
+Coercion getRangeDesc : Range >-> RangeDesc.
+
+Definition rangeExtent `(Range r) := rend r - rbeg r.
+
+Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x <? rbeg y
   then rbeg y <? rend x
   else rbeg x <? rend y.
 
-Definition rangesIntersectionPoint (x y : RangeDesc) : option nat :=
-  if rangesIntersect x y
+Definition rangesIntersectionPoint `(xr : Range x) `(yr : Range y) : option nat :=
+  if rangesIntersect xr yr
   then Some (min (rbeg x) (rbeg y))
   else None.
-
-Definition anyRangeIntersects (is js : NonEmpty RangeDesc) : bool :=
-  fold_right
-    (fun r b => orb b (existsb (rangesIntersect r) (NE_to_list js)))
-    false (NE_to_list is).
-
-Fixpoint NE_fold_left {a b : Set} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
-  match ne with
-    | NE_Sing x => f z x
-    | NE_Cons x xs => NE_fold_left f xs (f z x)
-  end.
-
-Definition firstIntersectionPoint (rd1 rd2 : NonEmpty RangeDesc)
-  : option nat :=
-  NE_fold_left
-    (fun acc rd =>
-       match acc with
-       | Some x => Some x
-       | None =>
-         NE_fold_left
-           (fun acc' rd' =>
-              match acc' with
-              | Some x => Some x
-              | None => rangesIntersectionPoint rd rd'
-              end) rd2 None
-       end) rd1 None.

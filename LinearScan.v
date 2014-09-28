@@ -13,6 +13,7 @@ Require Import Interval.
 Require Import Lib.
 Require Import Range.
 Require Import ScanState.
+Require Import SSMorph.
 
 Generalizable All Variables.
 
@@ -26,13 +27,13 @@ Proof. unfold maxReg. omega. Qed.
 End MyMachine.
 
 Module Import SS := MScanState MyMachine.
+Module Import SSM := MSSMorph MyMachine.
 
 (** * Helper functions *)
 
 Definition nextIntersectionWith
-  `(Interval xd) `(it : IntervalId sd) : option nat :=
-  let itval := getInterval sd it in
-  firstIntersectionPoint (rds (projT1 itval)) (rds xd).
+  `(i : Interval d) `(jid : IntervalId sd) : option nat :=
+  firstIntersectionPoint (projT2 (getInterval sd jid)) i.
 
 (** Given a function from intervals to indices ([intervalIndex]), and a
     default function from registers to indices ([registerIndex]), build a
@@ -134,9 +135,8 @@ Definition tryAllocateFreeReg `(cur : ScanStateCursor sd)
   let freeUntilPos' :=
       getRegisterIndex st (fun _ => Some 0) (fun _ => None) (active sd) in
   let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects
-                           (rds (curIntDesc cur))
-                           (rds (projT1 (getInterval sd x))))
+        filter (fun x => anyRangeIntersects current
+                           (projT2 (getInterval sd x)))
                (inactive sd) in
   let freeUntilPos :=
       getRegisterIndex st (nextIntersectionWith current) freeUntilPos'
@@ -196,9 +196,8 @@ Definition allocateBlockedReg `(cur : ScanStateCursor sd)
   let nextUsePos' :=
       getRegisterIndex st (nextUseAfter pos) (fun _ => None) (active sd) in
   let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects
-                           (rds (curIntDesc cur))
-                           (rds (projT1 (getInterval sd x))))
+        filter (fun x => anyRangeIntersects current
+                           (projT2 (getInterval sd x)))
                (inactive sd) in
   let nextUsePos :=
       getRegisterIndex st (nextUseAfter pos)

@@ -89,7 +89,8 @@ VFILES:=Compare.v\
   NoDup.v\
   NonEmpty.v\
   Range.v\
-  ScanState.v
+  ScanState.v\
+  SSMorph.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

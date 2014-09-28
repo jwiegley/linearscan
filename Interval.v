@@ -32,7 +32,7 @@ Generalizable All Variables.
 Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
-    rds  : NonEmpty RangeDesc;
+    rds  : NonEmpty { r : RangeDesc & Range r };
 
     (** Caching this property comes in handy, as it can be tricky to determine
         it by reduction in some cases. *)
@@ -40,43 +40,47 @@ Record IntervalDesc := {
 }.
 
 Inductive Interval : IntervalDesc -> Set :=
-  | I_Sing : forall x, Range x ->
+  | I_Sing : forall x (r : Range x),
       Interval {| ibeg := rbeg x
                 ; iend := rend x
-                ; rds  := NE_Sing x
+                ; rds  := NE_Sing (existT _ x r)
                 ; interval_nonempty := range_nonempty x
                 |}
 
-  | I_Cons1 : forall x y ib ie ne,
+  | I_Cons1 : forall y ib ie ne,
       Interval {| ibeg := ib; iend := ie; rds := NE_Sing y;
                   interval_nonempty := ne |}
-        -> Range x -> forall (H : rend x <= ib),
+        -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons x (NE_Sing y)
+                ; rds  := NE_Cons (existT _ x r) (NE_Sing y)
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}
 
-  | I_Consn : forall x y xs ib ie ne,
+  | I_Consn : forall y xs ib ie ne,
       Interval {| ibeg := ib; iend := ie; rds := NE_Cons y xs;
                   interval_nonempty := ne |}
-        -> Range x -> forall (H : rend x <= ib),
+        -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons x (NE_Cons y xs)
+                ; rds  := NE_Cons (existT _ x r) (NE_Cons y xs)
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}.
 
-Definition intervalStart `(i : Interval d) : nat := ibeg d.
-Definition intervalEnd   `(i : Interval d) : nat := iend d.
+Definition getIntervalDesc `(i : Interval d) := d.
 
-Definition intervalCoversPos `(i : Interval rs) (pos : nat) : bool :=
+Coercion getIntervalDesc : Interval >-> IntervalDesc.
+
+Definition intervalStart `(Interval i) : nat := ibeg i.
+Definition intervalEnd   `(Interval i) : nat := iend i.
+
+Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
   andb (intervalStart i <=? pos) (pos <? intervalEnd i).
 
-Definition intervalExtent `(i : Interval rs) :=
+Definition intervalExtent `(i : Interval d) :=
   intervalEnd i - intervalStart i.
 
-Lemma Interval_nonempty : forall `(i : Interval rs),
+Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
 Proof.
   intros. unfold intervalStart, intervalEnd.
@@ -84,7 +88,7 @@ Proof.
   induction r; simpl in *; min_max.
 Qed.
 
-Lemma Interval_extent_nonzero : forall `(i : Interval rs),
+Lemma Interval_extent_nonzero : forall `(i : Interval d),
   intervalExtent i > 0.
 Proof.
   intros.
@@ -92,6 +96,26 @@ Proof.
   pose (Interval_nonempty i).
   apply lt_minus in l. assumption.
 Qed.
+
+Definition anyRangeIntersects `(Interval i) `(Interval j) : bool :=
+  let f x y := rangesIntersect (projT2 x) (projT2 y) in
+  fold_right
+    (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
+    false (NE_to_list (rds i)).
+
+Definition firstIntersectionPoint `(Interval i) `(Interval j) : option nat :=
+  NE_fold_left
+    (fun acc rd =>
+       match acc with
+       | Some x => Some x
+       | None =>
+         NE_fold_left
+           (fun acc' rd' =>
+              match acc' with
+              | Some x => Some x
+              | None => rangesIntersectionPoint (projT2 rd) (projT2 rd')
+              end) (rds j) None
+       end) (rds i) None.
 
 (** Fixed Intervals
 

@@ -7,5 +7,6 @@ Range.v
 Interval.v
 NoDup.v
 ScanState.v
+SSMorph.v
 LinearScan.v
 Machine.v
