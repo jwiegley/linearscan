@@ -102,6 +102,7 @@ GLOBFILES:=$(VFILES:.v=.glob)
 VIFILES:=$(VFILES:.v=.vi)
 GFILES:=$(VFILES:.v=.g)
 HTMLFILES:=$(VFILES:.v=.html)
+HSFILES:=$(VFILES:.v=.hs)
 GHTMLFILES:=$(VFILES:.v=.g.html)
 ifeq '$(HASNATDYNLINK)' 'true'
 HASNATDYNLINK_OR_EMPTY := yes
@@ -187,7 +188,10 @@ install-doc:
 clean:
 	rm -f $(VOFILES) $(VIFILES) $(GFILES) $(VFILES:.v=.v.d) $(VFILES:=.beautified) $(VFILES:=.old)
 	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) all-mli.tex
-	- rm -rf html mlihtml
+	- rm -rf mlihtml
+	rm -f $(HSFILES)
+	rm -f Compare_dec.hs Datatypes.hs EqNat.hs Fin0.hs List.hs
+	rm -f Logic.hs NPeano.hs Peano.hs Specif.hs
 
 archclean:
 	rm -f *.cmx *.o
