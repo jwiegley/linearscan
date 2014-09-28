@@ -17,7 +17,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Compare, Compare_dec, Datatypes, EqNat, Fin, Fin0, Interval, Lib, List, Logic, NonEmpty, NPeano, Peano, Range, Specif, Top
+  exposed-modules:     Compare, Compare_dec, Datatypes, EqNat, Fin, Fin0, Interval, Lib, List, Logic, NonEmpty, NPeano, Peano, Range, Specif
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8

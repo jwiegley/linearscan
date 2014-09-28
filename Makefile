@@ -84,9 +84,9 @@ VFILES:=Compare.v\
   Fin.v\
   Interval.v\
   Lib.v\
+  Allocate.v\
   LinearScan.v\
   Machine.v\
-  Main.v\
   NoDup.v\
   NonEmpty.v\
   Range.v\

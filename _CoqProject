@@ -6,8 +6,8 @@ NonEmpty.v
 Range.v
 Interval.v
 NoDup.v
+Machine.v
 ScanState.v
 SSMorph.v
+Allocate.v
 LinearScan.v
-Machine.v
-Main.v

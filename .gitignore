@@ -1,5 +1,6 @@
 *.d
 *.glob
+dist
 Compare.hs
 Compare_dec.hs
 Datatypes.hs
@@ -16,3 +17,5 @@ NonEmpty.hs
 Peano.hs
 Range.hs
 Specif.hs
+/Setup
+/LinearScan.hs
