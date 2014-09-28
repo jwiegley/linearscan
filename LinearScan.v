@@ -4,24 +4,17 @@
     "Optimized Interval Splitting in a Linear Scan Register Allocator" by
     Christian Wimmer and Hanspeter Mӧssenbӧck:
 
-    https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf *)
-
-(* Require Import Coq.Arith.EqNat. *)
-(* Require Import Coq.Classes.EquivDec. *)
-(* Require Import Coq.Lists.List. *)
-(* Require Import Coq.Numbers.Natural.Peano.NPeano. *)
-(* Require Import Coq.Program.Basics. *)
+    https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
+*)
 Require Import Coq.Program.Tactics.
-(* Require Import Coq.Logic.ProofIrrelevance. *)
-(* (* Require Import Coq.Sorting.Mergesort. *) *)
-(* (* Require Import Coq.Sorting.Sorting. *) *)
-(* Require Import Coq.Structures.Orders. *)
-(* Require Import Coq.Vectors.Fin. *)
-(* Require Import Recdef. *)
+Require Import Compare.
+Require Import Fin.
 Require Import Interval.
-Require Import Range.
 Require Import Lib.
+Require Import Range.
 Require Import ScanState.
+
+Generalizable All Variables.
 
 Module MyMachine <: Machine.
 
@@ -33,18 +26,8 @@ Proof. unfold maxReg. omega. Qed.
 End MyMachine.
 
 Module Import SS := MScanState MyMachine.
-(* Require String. *)
 
-(* Module Import LN := ListNotations. *)
-(* (* jww (2014-09-25): I'll need to sort by the starting position of the *)
-(*    interval, so a custom sorting predicate. *) *)
-(* (* Module Import MergeSort := Sort ??. *) *)
-
-(* Open Scope string_scope. *)
-(* Open Scope nat_scope. *)
-(* Open Scope program_scope. *)
-
-Generalizable All Variables.
+(** * Helper functions *)
 
 Definition nextIntersectionWith
   `(Interval xd) `(it : IntervalId sd) : option nat :=
@@ -149,7 +132,7 @@ Definition tryAllocateFreeReg `(cur : ScanStateCursor sd)
   let current := curInterval cur in
 
   let freeUntilPos' :=
-      getRegisterIndex st (const (Some 0)) (const None) (active sd) in
+      getRegisterIndex st (fun _ => Some 0) (fun _ => None) (active sd) in
   let intersectingIntervals :=
         filter (fun x => anyRangeIntersects
                            (rds (curIntDesc cur))
@@ -211,7 +194,7 @@ Definition allocateBlockedReg `(cur : ScanStateCursor sd)
   let pos     := curPosition cur in
 
   let nextUsePos' :=
-      getRegisterIndex st (nextUseAfter pos) (const None) (active sd) in
+      getRegisterIndex st (nextUseAfter pos) (fun _ => None) (active sd) in
   let intersectingIntervals :=
         filter (fun x => anyRangeIntersects
                            (rds (curIntDesc cur))
@@ -387,8 +370,6 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
 (* We must prove that after every call to handleInterval, the total extent
    of the remaining unhandled intervals is less than it was before. *)
 Proof. intros; inversion smorph2; assumption. Defined.
-
-(****************************************************************************)
 
 (** * Program graphs *)
 

@@ -1,4 +1,5 @@
 Require Import Lib.
+Require Import NonEmpty.
 Require Import Range.
 
 Generalizable All Variables.
@@ -8,7 +9,10 @@ Generalizable All Variables.
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
     a list of ranges "covered" by that variable in the low-level intermediate
     representation (LIR).  Gaps in the list of ranges are called "lifetime
-    holes".
+    holes".  By summing the extent of a list of ranges, we have an idea of how
+    much ground is left to cover, and this gives us a notion of well-founded
+    recursion for iterating over intervals that may split as we examine them
+    -- i.e., whose total extent must decrease after each pass.
 
     A lifetime is not necessarily only the distance that a variable is first
     and last used.  The lifetime of a variable used in a loop extends to the

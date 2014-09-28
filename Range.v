@@ -1,4 +1,5 @@
 Require Import Lib.
+Require Import NonEmpty.
 
 (** ** UsePos *)
 
@@ -14,11 +15,8 @@ Record UsePos : Set := {
 
 (** ** Range *)
 
-(** The extent of a [Range] is the set of locations it ranges over.  By
-    summing the extent of a list of ranges, we have an idea of how much ground
-    is left to cover, and this gives us a notion of well-founded recursion for
-    iterating over intervals that may split as we examine them -- i.e., whose
-    total extent must decrease after each pass.
+(** The *extent* of a [Range] is the set of use positions it ranges over,
+    inclusively.
 
     A Range is built up from a set of use positions, and defines the inclusive
     range of those positions.  It can be extended, or split, but never shrunk.

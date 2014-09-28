@@ -1,7 +1,10 @@
+Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
+Require Import Fin.
 Require Import Interval.
 Require Import Lib.
+Require Import NoDup.
 
 Module Import LN := ListNotations.
 
@@ -223,7 +226,7 @@ Inductive ScanState : ScanStateDesc -> Set :=
        ; handled          := nil
        ; getInterval      := fin_contra
        ; assignments      := fin_contra
-       ; getFixedInterval := const None
+       ; getFixedInterval := fun _ => None
        (* ; unhandled_sorted := LSorted_nil _ *)
        ; lists_are_unique := NoDup_nil _
        |}

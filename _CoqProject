@@ -1,4 +1,8 @@
 -I .
+Compare.v
+Fin.v
+NoDup.v
+NonEmpty.v
 Lib.v
 Range.v
 Interval.v
