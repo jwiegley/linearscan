@@ -192,6 +192,11 @@ clean:
 	rm -f $(HSFILES)
 	rm -f Compare_dec.hs Datatypes.hs EqNat.hs Fin0.hs List.hs
 	rm -f Logic.hs NPeano.hs Peano.hs Specif.hs
+	rm -f *.hi Setup
+	rm -fr dist
+
+allclean: clean
+	rm -fr Makefile html linearscan.cabal default.nix _CoqProject
 
 archclean:
 	rm -f *.cmx *.o
@@ -244,4 +249,3 @@ printenv:
 # Edit at your own risks !
 #
 # END OF WARNING
-
