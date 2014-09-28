@@ -38,25 +38,20 @@ _Allocator__maxReg =
 data Allocator__ScanStateDesc =
    Allocator__Build_ScanStateDesc Prelude.Int ([] Fin0.Coq_fin) ([]
                                                                 Fin0.Coq_fin) 
- ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
-                                     Interval.IntervalDesc Interval.Interval) 
+ ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin -> Interval.IntervalDesc) 
  (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
                                                     Prelude.Maybe
-                                                    (Specif.Coq_sigT
-                                                    Interval.IntervalDesc
-                                                    Interval.FixedInterval))
+                                                    Interval.IntervalDesc)
 
 _Allocator__coq_ScanStateDesc_rect :: (Prelude.Int -> ([] Fin0.Coq_fin) ->
                                       ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
                                       -> ([] Fin0.Coq_fin) -> (Fin0.Coq_fin
-                                      -> Specif.Coq_sigT
-                                      Interval.IntervalDesc
-                                      Interval.Interval) -> (Fin0.Coq_fin ->
-                                      Prelude.Maybe Allocator__PhysReg) ->
+                                      -> Interval.IntervalDesc) ->
+                                      (Fin0.Coq_fin -> Prelude.Maybe
+                                      Allocator__PhysReg) ->
                                       (Allocator__PhysReg -> Prelude.Maybe
-                                      (Specif.Coq_sigT Interval.IntervalDesc
-                                      Interval.FixedInterval)) -> () -> a1)
-                                      -> Allocator__ScanStateDesc -> a1
+                                      Interval.IntervalDesc) -> () -> a1) ->
+                                      Allocator__ScanStateDesc -> a1
 _Allocator__coq_ScanStateDesc_rect f s =
   case s of {
    Allocator__Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 x6 ->
@@ -65,12 +60,10 @@ _Allocator__coq_ScanStateDesc_rect f s =
 _Allocator__coq_ScanStateDesc_rec :: (Prelude.Int -> ([] Fin0.Coq_fin) -> ([]
                                      Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
                                      ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
-                                     Specif.Coq_sigT Interval.IntervalDesc
-                                     Interval.Interval) -> (Fin0.Coq_fin ->
-                                     Prelude.Maybe Allocator__PhysReg) ->
+                                     Interval.IntervalDesc) -> (Fin0.Coq_fin
+                                     -> Prelude.Maybe Allocator__PhysReg) ->
                                      (Allocator__PhysReg -> Prelude.Maybe
-                                     (Specif.Coq_sigT Interval.IntervalDesc
-                                     Interval.FixedInterval)) -> () -> a1) ->
+                                     Interval.IntervalDesc) -> () -> a1) ->
                                      Allocator__ScanStateDesc -> a1
 _Allocator__coq_ScanStateDesc_rec =
   _Allocator__coq_ScanStateDesc_rect
@@ -108,8 +101,7 @@ _Allocator__handled s =
     handled0 getInterval0 assignments0 getFixedInterval0 -> handled0}
 
 _Allocator__getInterval :: Allocator__ScanStateDesc -> Allocator__IntervalId
-                           -> Specif.Coq_sigT Interval.IntervalDesc
-                           Interval.Interval
+                           -> Interval.IntervalDesc
 _Allocator__getInterval s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
@@ -124,8 +116,7 @@ _Allocator__assignments s =
 
 _Allocator__getFixedInterval :: Allocator__ScanStateDesc ->
                                 Allocator__PhysReg -> Prelude.Maybe
-                                (Specif.Coq_sigT Interval.IntervalDesc
-                                Interval.FixedInterval)
+                                Interval.IntervalDesc
 _Allocator__getFixedInterval s =
   case s of {
    Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
@@ -165,139 +156,6 @@ _Allocator__transportId st st' x =
     Logic.eq_rec (_Allocator__nextInterval st) x
       (_Allocator__nextInterval st')}
 
-data Allocator__ScanState =
-   Allocator__ScanState_nil
- | Allocator__ScanState_newUnhandled Prelude.Int ([] Fin0.Coq_fin) ([]
-                                                                   Fin0.Coq_fin) 
- ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin -> Specif.Coq_sigT
-                                     Interval.IntervalDesc Interval.Interval) 
- (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
-                                                    Prelude.Maybe
-                                                    (Specif.Coq_sigT
-                                                    Interval.IntervalDesc
-                                                    Interval.FixedInterval)) 
- Interval.IntervalDesc Interval.Interval Allocator__ScanState Fin0.Coq_fin
- | Allocator__ScanState_moveUnhandledToActive Prelude.Int ([] Fin0.Coq_fin) 
- ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) ([] Fin0.Coq_fin) (Fin0.Coq_fin ->
-                                                       Specif.Coq_sigT
-                                                       Interval.IntervalDesc
-                                                       Interval.Interval) 
- (Fin0.Coq_fin -> Prelude.Maybe Allocator__PhysReg) (Allocator__PhysReg ->
-                                                    Prelude.Maybe
-                                                    (Specif.Coq_sigT
-                                                    Interval.IntervalDesc
-                                                    Interval.FixedInterval)) 
- Fin0.Coq_fin Allocator__PhysReg Allocator__ScanState
- | Allocator__ScanState_moveActiveToInactive Allocator__ScanStateDesc 
- Allocator__IntervalId Allocator__ScanState
- | Allocator__ScanState_moveActiveToHandled Allocator__ScanStateDesc 
- Allocator__IntervalId Allocator__ScanState
- | Allocator__ScanState_moveInactiveToActive Allocator__ScanStateDesc 
- Allocator__IntervalId Allocator__ScanState
- | Allocator__ScanState_moveInactiveToHandled Allocator__ScanStateDesc 
- Allocator__IntervalId Allocator__ScanState
-
-_Allocator__coq_ScanState_rect :: a1 -> (Prelude.Int -> ([] Fin0.Coq_fin) ->
-                                  ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
-                                  ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
-                                  Specif.Coq_sigT Interval.IntervalDesc
-                                  Interval.Interval) -> (Fin0.Coq_fin ->
-                                  Prelude.Maybe Allocator__PhysReg) ->
-                                  (Allocator__PhysReg -> Prelude.Maybe
-                                  (Specif.Coq_sigT Interval.IntervalDesc
-                                  Interval.FixedInterval)) -> () ->
-                                  Interval.IntervalDesc -> Interval.Interval
-                                  -> Allocator__ScanState -> a1 ->
-                                  Fin0.Coq_fin -> () -> a1) -> (Prelude.Int
-                                  -> ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
-                                  -> ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin)
-                                  -> (Fin0.Coq_fin -> Specif.Coq_sigT
-                                  Interval.IntervalDesc Interval.Interval) ->
-                                  (Fin0.Coq_fin -> Prelude.Maybe
-                                  Allocator__PhysReg) -> (Allocator__PhysReg
-                                  -> Prelude.Maybe
-                                  (Specif.Coq_sigT Interval.IntervalDesc
-                                  Interval.FixedInterval)) -> Fin0.Coq_fin ->
-                                  Allocator__PhysReg -> () ->
-                                  Allocator__ScanState -> a1 -> a1) ->
-                                  (Allocator__ScanStateDesc ->
-                                  Allocator__IntervalId ->
-                                  Allocator__ScanState -> a1 -> () -> a1) ->
-                                  (Allocator__ScanStateDesc ->
-                                  Allocator__IntervalId ->
-                                  Allocator__ScanState -> a1 -> () -> a1) ->
-                                  (Allocator__ScanStateDesc ->
-                                  Allocator__IntervalId ->
-                                  Allocator__ScanState -> a1 -> () -> a1) ->
-                                  (Allocator__ScanStateDesc ->
-                                  Allocator__IntervalId ->
-                                  Allocator__ScanState -> a1 -> () -> a1) ->
-                                  Allocator__ScanStateDesc ->
-                                  Allocator__ScanState -> a1
-_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 s s0 =
-  case s0 of {
-   Allocator__ScanState_nil -> f;
-   Allocator__ScanState_newUnhandled ni unh act inact hnd geti assgn getfixi
-    d i s1 newi ->
-    f0 ni unh act inact hnd geti assgn getfixi __ d i s1
-      (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5
-        (Allocator__Build_ScanStateDesc ni unh act inact hnd geti assgn
-        getfixi) s1) newi __;
-   Allocator__ScanState_moveUnhandledToActive ni unh act inact hnd geti assgn
-    getfixi x reg s1 ->
-    f1 ni unh act inact hnd geti assgn getfixi x reg __ s1
-      (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5
-        (Allocator__Build_ScanStateDesc ni ((:) x unh) act inact hnd geti
-        assgn getfixi) s1);
-   Allocator__ScanState_moveActiveToInactive sd x s1 ->
-    f2 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __;
-   Allocator__ScanState_moveActiveToHandled sd x s1 ->
-    f3 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __;
-   Allocator__ScanState_moveInactiveToActive sd x s1 ->
-    f4 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __;
-   Allocator__ScanState_moveInactiveToHandled sd x s1 ->
-    f5 sd x s1 (_Allocator__coq_ScanState_rect f f0 f1 f2 f3 f4 f5 sd s1) __}
-
-_Allocator__coq_ScanState_rec :: a1 -> (Prelude.Int -> ([] Fin0.Coq_fin) ->
-                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
-                                 ([] Fin0.Coq_fin) -> (Fin0.Coq_fin ->
-                                 Specif.Coq_sigT Interval.IntervalDesc
-                                 Interval.Interval) -> (Fin0.Coq_fin ->
-                                 Prelude.Maybe Allocator__PhysReg) ->
-                                 (Allocator__PhysReg -> Prelude.Maybe
-                                 (Specif.Coq_sigT Interval.IntervalDesc
-                                 Interval.FixedInterval)) -> () ->
-                                 Interval.IntervalDesc -> Interval.Interval
-                                 -> Allocator__ScanState -> a1 ->
-                                 Fin0.Coq_fin -> () -> a1) -> (Prelude.Int ->
-                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
-                                 ([] Fin0.Coq_fin) -> ([] Fin0.Coq_fin) ->
-                                 (Fin0.Coq_fin -> Specif.Coq_sigT
-                                 Interval.IntervalDesc Interval.Interval) ->
-                                 (Fin0.Coq_fin -> Prelude.Maybe
-                                 Allocator__PhysReg) -> (Allocator__PhysReg
-                                 -> Prelude.Maybe
-                                 (Specif.Coq_sigT Interval.IntervalDesc
-                                 Interval.FixedInterval)) -> Fin0.Coq_fin ->
-                                 Allocator__PhysReg -> () ->
-                                 Allocator__ScanState -> a1 -> a1) ->
-                                 (Allocator__ScanStateDesc ->
-                                 Allocator__IntervalId ->
-                                 Allocator__ScanState -> a1 -> () -> a1) ->
-                                 (Allocator__ScanStateDesc ->
-                                 Allocator__IntervalId ->
-                                 Allocator__ScanState -> a1 -> () -> a1) ->
-                                 (Allocator__ScanStateDesc ->
-                                 Allocator__IntervalId ->
-                                 Allocator__ScanState -> a1 -> () -> a1) ->
-                                 (Allocator__ScanStateDesc ->
-                                 Allocator__IntervalId ->
-                                 Allocator__ScanState -> a1 -> () -> a1) ->
-                                 Allocator__ScanStateDesc ->
-                                 Allocator__ScanState -> a1
-_Allocator__coq_ScanState_rec =
-  _Allocator__coq_ScanState_rect
-
 _Allocator__unhandledExtent :: Allocator__ScanStateDesc -> Prelude.Int
 _Allocator__unhandledExtent sd =
   case _Allocator__unhandled sd of {
@@ -305,41 +163,32 @@ _Allocator__unhandledExtent sd =
    (:) i l ->
     case l of {
      [] ->
-      Interval.intervalExtent (Specif.projT1 (_Allocator__getInterval sd i))
-        (Specif.projT2 (_Allocator__getInterval sd i));
+      Interval.intervalExtent
+        (Specif.proj1_sig (_Allocator__getInterval sd i));
      (:) i0 l0 ->
       let {
        f = \n x ->
         (Prelude.+) n
           (Interval.intervalExtent
-            (Specif.projT1 (_Allocator__getInterval sd x))
-            (Specif.projT2 (_Allocator__getInterval sd x)))}
+            (Specif.proj1_sig (_Allocator__getInterval sd x)))}
       in
       (\f -> Prelude.flip (Data.List.foldl' f)) f ((:) i ((:) i0 l0)) 0}}
 
-data Allocator__ScanStateCursor =
-   Allocator__Build_ScanStateCursor Allocator__ScanState Interval.IntervalDesc
-
-_Allocator__coq_ScanStateCursor_rect :: Allocator__ScanStateDesc ->
-                                        (Allocator__ScanState -> () ->
-                                        Interval.IntervalDesc -> a1) ->
+type Allocator__ScanStateCursor =
+  Interval.IntervalDesc
+  -- singleton inductive, whose constructor was Build_ScanStateCursor
+  
+_Allocator__coq_ScanStateCursor_rect :: Allocator__ScanStateDesc -> (() -> ()
+                                        -> Interval.IntervalDesc -> a1) ->
                                         Allocator__ScanStateCursor -> a1
 _Allocator__coq_ScanStateCursor_rect sd f s =
-  case s of {
-   Allocator__Build_ScanStateCursor x x0 -> f x __ x0}
+  f __ __ s
 
-_Allocator__coq_ScanStateCursor_rec :: Allocator__ScanStateDesc ->
-                                       (Allocator__ScanState -> () ->
-                                       Interval.IntervalDesc -> a1) ->
+_Allocator__coq_ScanStateCursor_rec :: Allocator__ScanStateDesc -> (() -> ()
+                                       -> Interval.IntervalDesc -> a1) ->
                                        Allocator__ScanStateCursor -> a1
 _Allocator__coq_ScanStateCursor_rec sd =
   _Allocator__coq_ScanStateCursor_rect sd
-
-_Allocator__curState :: Allocator__ScanStateDesc ->
-                        Allocator__ScanStateCursor -> Allocator__ScanState
-_Allocator__curState sd s =
-  case s of {
-   Allocator__Build_ScanStateCursor curState0 x -> curState0}
 
 _Allocator__curId :: Allocator__ScanStateDesc -> Allocator__ScanStateCursor
                      -> Allocator__IntervalId
@@ -349,50 +198,36 @@ _Allocator__curId sd s =
 _Allocator__curIntDesc :: Allocator__ScanStateDesc ->
                           Allocator__ScanStateCursor -> Interval.IntervalDesc
 _Allocator__curIntDesc sd s =
-  case s of {
-   Allocator__Build_ScanStateCursor curState0 x -> x}
-
-_Allocator__curInterval :: Allocator__ScanStateDesc ->
-                           Allocator__ScanStateCursor -> Interval.Interval
-_Allocator__curInterval sd s =
-  Specif.projT2 (_Allocator__getInterval sd (_Allocator__curId sd s))
+  s
 
 _Allocator__curPosition :: Allocator__ScanStateDesc ->
                            Allocator__ScanStateCursor -> Prelude.Int
 _Allocator__curPosition sd s =
   Interval.intervalStart
-    (Specif.projT1 (_Allocator__getInterval sd (_Allocator__curId sd s)))
-    (_Allocator__curInterval sd s)
+    (Specif.proj1_sig (_Allocator__getInterval sd (_Allocator__curId sd s)))
 
-data Allocator__NextScanState =
-   Allocator__Build_NextScanState Allocator__ScanStateDesc Allocator__ScanState
-
-_Allocator__coq_NextScanState_rect :: (Allocator__ScanStateDesc ->
-                                      Allocator__ScanState -> () -> a1) ->
-                                      Allocator__NextScanState -> a1
+type Allocator__NextScanState =
+  Allocator__ScanStateDesc
+  -- singleton inductive, whose constructor was Build_NextScanState
+  
+_Allocator__coq_NextScanState_rect :: (Allocator__ScanStateDesc -> () -> ()
+                                      -> a1) -> Allocator__NextScanState ->
+                                      a1
 _Allocator__coq_NextScanState_rect f n =
-  case n of {
-   Allocator__Build_NextScanState x x0 -> f x x0 __}
+  f n __ __
 
-_Allocator__coq_NextScanState_rec :: (Allocator__ScanStateDesc ->
-                                     Allocator__ScanState -> () -> a1) ->
-                                     Allocator__NextScanState -> a1
+_Allocator__coq_NextScanState_rec :: (Allocator__ScanStateDesc -> () -> () ->
+                                     a1) -> Allocator__NextScanState -> a1
 _Allocator__coq_NextScanState_rec =
   _Allocator__coq_NextScanState_rect
 
 _Allocator__nextDesc :: Allocator__NextScanState -> Allocator__ScanStateDesc
 _Allocator__nextDesc n =
-  case n of {
-   Allocator__Build_NextScanState nextDesc0 nextState0 -> nextDesc0}
-
-_Allocator__nextState :: Allocator__NextScanState -> Allocator__ScanState
-_Allocator__nextState n =
-  case n of {
-   Allocator__Build_NextScanState nextDesc0 nextState0 -> nextState0}
+  n
 
 type Allocator__NextState = Allocator__NextScanState
 
-type Allocator__NextStateDep q = Specif.Coq_sigT Allocator__NextScanState q
+type Allocator__NextStateDep = Allocator__NextScanState
 
 type Allocator__NextStateWith a = (,) a Allocator__NextScanState
 
@@ -452,107 +287,88 @@ _Allocator__coq_SSMorphStLen_rec sd1 sd2 f =
   _Allocator__coq_SSMorphStLen_rect sd1 sd2 f
 
 _Allocator__moveActiveToHandled :: Allocator__ScanStateDesc ->
-                                   Allocator__ScanState ->
                                    Allocator__IntervalId ->
                                    Allocator__NextScanState
-_Allocator__moveActiveToHandled sd st x =
-  let {s = Allocator__ScanState_moveActiveToInactive sd x st} in
-  Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-  (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (List0.remove
-    (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
-  (_Allocator__handled sd) (_Allocator__getInterval sd)
-  (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)) s
+_Allocator__moveActiveToHandled sd x =
+  Allocator__Build_ScanStateDesc (_Allocator__nextInterval sd)
+    (_Allocator__unhandled sd)
+    (List0.remove
+      (Compare.cmp_eq_dec
+        (Fin0.fin_CompareSpec (_Allocator__nextInterval sd))) x
+      (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
+    (_Allocator__handled sd) (_Allocator__getInterval sd)
+    (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)
 
 _Allocator__moveActiveToInactive :: Allocator__ScanStateDesc ->
-                                    Allocator__ScanState ->
                                     Allocator__IntervalId ->
                                     Allocator__NextScanState
-_Allocator__moveActiveToInactive sd st x =
-  let {s = Allocator__ScanState_moveActiveToInactive sd x st} in
-  Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-  (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (List0.remove
-    (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
-  (_Allocator__handled sd) (_Allocator__getInterval sd)
-  (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)) s
+_Allocator__moveActiveToInactive sd x =
+  Allocator__Build_ScanStateDesc (_Allocator__nextInterval sd)
+    (_Allocator__unhandled sd)
+    (List0.remove
+      (Compare.cmp_eq_dec
+        (Fin0.fin_CompareSpec (_Allocator__nextInterval sd))) x
+      (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
+    (_Allocator__handled sd) (_Allocator__getInterval sd)
+    (_Allocator__assignments sd) (_Allocator__getFixedInterval sd)
 
 _Allocator__moveInactiveToActive :: Allocator__ScanStateDesc ->
-                                    Allocator__ScanState ->
                                     Allocator__IntervalId ->
                                     Allocator__NextScanState
-_Allocator__moveInactiveToActive sd st x =
-  let {s = Allocator__ScanState_moveInactiveToActive sd x st} in
-  Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-  (_Allocator__nextInterval sd) (_Allocator__unhandled sd) ((:) x
-  (_Allocator__active sd))
-  (List0.remove
-    (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__inactive sd)) (_Allocator__handled sd)
-  (_Allocator__getInterval sd) (_Allocator__assignments sd)
-  (_Allocator__getFixedInterval sd)) s
+_Allocator__moveInactiveToActive sd x =
+  Allocator__Build_ScanStateDesc (_Allocator__nextInterval sd)
+    (_Allocator__unhandled sd) ((:) x (_Allocator__active sd))
+    (List0.remove
+      (Compare.cmp_eq_dec
+        (Fin0.fin_CompareSpec (_Allocator__nextInterval sd))) x
+      (_Allocator__inactive sd)) (_Allocator__handled sd)
+    (_Allocator__getInterval sd) (_Allocator__assignments sd)
+    (_Allocator__getFixedInterval sd)
 
 _Allocator__moveInactiveToHandled :: Allocator__ScanStateDesc ->
-                                     Allocator__ScanState ->
                                      Allocator__IntervalId ->
                                      Allocator__NextScanState
-_Allocator__moveInactiveToHandled sd st x =
-  let {s = Allocator__ScanState_moveInactiveToHandled sd x st} in
-  Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-  (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (_Allocator__active sd)
-  (List0.remove
-    (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
-    x (_Allocator__inactive sd)) ((:) x (_Allocator__handled sd))
-  (_Allocator__getInterval sd) (_Allocator__assignments sd)
-  (_Allocator__getFixedInterval sd)) s
+_Allocator__moveInactiveToHandled sd x =
+  Allocator__Build_ScanStateDesc (_Allocator__nextInterval sd)
+    (_Allocator__unhandled sd) (_Allocator__active sd)
+    (List0.remove
+      (Compare.cmp_eq_dec
+        (Fin0.fin_CompareSpec (_Allocator__nextInterval sd))) x
+      (_Allocator__inactive sd)) ((:) x (_Allocator__handled sd))
+    (_Allocator__getInterval sd) (_Allocator__assignments sd)
+    (_Allocator__getFixedInterval sd)
 
 _Allocator__moveUnhandledToActive :: Allocator__ScanStateDesc ->
                                      Allocator__ScanStateCursor ->
                                      Allocator__PhysReg ->
                                      Allocator__NextState
 _Allocator__moveUnhandledToActive sd cur reg =
-  case cur of {
-   Allocator__Build_ScanStateCursor curState0 x ->
-    case sd of {
-     Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0
-      inactive0 handled0 getInterval0 assignments0 getFixedInterval0 ->
-      case unhandled0 of {
-       [] -> Logic.coq_False_rec;
-       (:) i unhandled1 ->
-        let {
-         s = \x0 -> Allocator__ScanState_moveUnhandledToActive nextInterval0
-          unhandled1 active0 inactive0 handled0 getInterval0 assignments0
-          getFixedInterval0 i reg x0}
-        in
-        Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
-        nextInterval0 unhandled1 ((:) i active0) inactive0 handled0
-        getInterval0 (\i0 ->
-        case Compare.cmp_eq_dec (Fin0.fin_CompareSpec nextInterval0) i0 i of {
-         Specif.Coq_left -> Prelude.Just reg;
-         Specif.Coq_right -> assignments0 i0}) getFixedInterval0)
-        (s curState0)}}}
+  case sd of {
+   Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0 inactive0
+    handled0 getInterval0 assignments0 getFixedInterval0 ->
+    case unhandled0 of {
+     [] -> Logic.coq_False_rec;
+     (:) i unhandled1 -> Allocator__Build_ScanStateDesc nextInterval0
+      unhandled1 ((:) i active0) inactive0 handled0 getInterval0 (\i0 ->
+      case Compare.cmp_eq_dec (Fin0.fin_CompareSpec nextInterval0) i0 i of {
+       Specif.Coq_left -> Prelude.Just reg;
+       Specif.Coq_right -> assignments0 i0}) getFixedInterval0}}
 
 _Allocator__nextIntersectionWith :: Interval.IntervalDesc ->
-                                    Interval.Interval ->
                                     Allocator__ScanStateDesc ->
                                     Allocator__IntervalId -> Prelude.Maybe
                                     Prelude.Int
-_Allocator__nextIntersectionWith d i sd jid =
+_Allocator__nextIntersectionWith d sd jid =
   Interval.firstIntersectionPoint
-    (Specif.projT1 (_Allocator__getInterval sd jid))
-    (Specif.projT2 (_Allocator__getInterval sd jid)) d i
+    (Specif.proj1_sig (_Allocator__getInterval sd jid)) d
 
 _Allocator__getRegisterIndex :: Allocator__ScanStateDesc ->
-                                Allocator__ScanState ->
                                 (Allocator__IntervalId -> Prelude.Maybe
                                 Prelude.Int) -> (Allocator__PhysReg ->
                                 Prelude.Maybe Prelude.Int) -> ([]
                                 Allocator__IntervalId) -> Allocator__PhysReg
                                 -> Prelude.Maybe Prelude.Int
-_Allocator__getRegisterIndex sd st intervalIndex registerIndex intervals =
+_Allocator__getRegisterIndex sd intervalIndex registerIndex intervals =
   Prelude.foldr (\x f r ->
     case _Allocator__assignments sd x of {
      Prelude.Just a ->
@@ -841,54 +657,47 @@ _Allocator__splitInterval :: Allocator__ScanStateDesc ->
                              Allocator__ScanStateCursor -> (Prelude.Maybe
                              Prelude.Int) -> Allocator__NextState
 _Allocator__splitInterval sd cur before =
-  Allocator__Build_NextScanState sd (_Allocator__curState sd cur)
+  sd
 
 _Allocator__cursorFromMorphLen :: Allocator__ScanStateDesc ->
                                   Allocator__ScanStateCursor ->
                                   Allocator__NextState ->
                                   Allocator__ScanStateCursor
 _Allocator__cursorFromMorphLen sd cur n =
-  case cur of {
-   Allocator__Build_ScanStateCursor curState0 x ->
-    Allocator__Build_ScanStateCursor
-    (case n of {
-      Allocator__Build_NextScanState nextDesc0 nextState0 -> nextState0}) x}
+  cur
 
 _Allocator__cursorFromMorphStLen :: Allocator__ScanStateDesc ->
                                     Allocator__ScanStateCursor ->
                                     Allocator__NextState ->
                                     Allocator__ScanStateCursor
 _Allocator__cursorFromMorphStLen sd cur n =
-  _Allocator__cursorFromMorphLen sd cur (Allocator__Build_NextScanState
-    (_Allocator__nextDesc n) (_Allocator__nextState n))
+  _Allocator__cursorFromMorphLen sd cur (_Allocator__nextDesc n)
 
 _Allocator__tryAllocateFreeReg :: Allocator__ScanStateDesc ->
                                   Allocator__ScanStateCursor -> Prelude.Maybe
                                   Allocator__NextState
 _Allocator__tryAllocateFreeReg sd cur =
-  let {st = _Allocator__curState sd cur} in
-  let {current = _Allocator__curInterval sd cur} in
   let {
-   freeUntilPos' = _Allocator__getRegisterIndex sd st (\x -> Prelude.Just 0)
+   freeUntilPos' = _Allocator__getRegisterIndex sd (\x -> Prelude.Just 0)
                      (\x -> Prelude.Nothing) (_Allocator__active sd)}
   in
   let {
    intersectingIntervals = (Prelude.filter) (\x ->
                              Interval.anyRangeIntersects
-                               (Specif.projT1
+                               (Specif.proj1_sig
                                  (_Allocator__getInterval sd
-                                   (_Allocator__curId sd cur))) current
-                               (Specif.projT1 (_Allocator__getInterval sd x))
-                               (Specif.projT2 (_Allocator__getInterval sd x)))
+                                   (_Allocator__curId sd cur)))
+                               (Specif.proj1_sig
+                                 (_Allocator__getInterval sd x)))
                              (_Allocator__inactive sd)}
   in
   let {
-   freeUntilPos = _Allocator__getRegisterIndex sd st
+   freeUntilPos = _Allocator__getRegisterIndex sd
                     (_Allocator__nextIntersectionWith
-                      (Specif.projT1
+                      (Specif.proj1_sig
                         (_Allocator__getInterval sd
-                          (_Allocator__curId sd cur))) current sd)
-                    freeUntilPos' intersectingIntervals}
+                          (_Allocator__curId sd cur))) sd) freeUntilPos'
+                    intersectingIntervals}
   in
   let {lastReg = Fin0.ultimate_from_nat _Allocator__maxReg} in
   case _Allocator__findRegister freeUntilPos lastReg of {
@@ -901,9 +710,9 @@ _Allocator__tryAllocateFreeReg sd cur =
        Prelude.False -> Prelude.Just
         (case NPeano.ltb
                 (Interval.intervalEnd
-                  (Specif.projT1
-                    (_Allocator__getInterval sd (_Allocator__curId sd cur)))
-                  current) n of {
+                  (Specif.proj1_sig
+                    (_Allocator__getInterval sd (_Allocator__curId sd cur))))
+                n of {
           Prelude.True -> default0;
           Prelude.False ->
            _Allocator__moveUnhandledToActive
@@ -931,90 +740,74 @@ _Allocator__allocateBlockedReg :: Allocator__ScanStateDesc ->
 _Allocator__allocateBlockedReg sd cur =
   Lib.undefined
 
-_Allocator__checkActiveIntervals :: Allocator__ScanStateDesc ->
-                                    Allocator__ScanState -> Prelude.Int ->
-                                    Allocator__NextScanState
-_Allocator__checkActiveIntervals sd st pos =
+_Allocator__checkActiveIntervals :: Allocator__ScanStateDesc -> Prelude.Int
+                                    -> Allocator__NextScanState
+_Allocator__checkActiveIntervals sd pos =
   let {
-   go sd0 st0 ss is pos0 =
+   go sd0 ss is pos0 =
      case is of {
       [] -> ss;
       (:) x xs ->
        let {
-        i = Specif.projT2 (_Allocator__getInterval sd0 (Specif.projT1 x))}
-       in
-       let {
         st1 = case NPeano.ltb
                      (Interval.intervalEnd
-                       (Specif.projT1
-                         (_Allocator__getInterval sd0 (Specif.projT1 x))) i)
+                       (Specif.proj1_sig
+                         (_Allocator__getInterval sd0 (Specif.proj1_sig x))))
                      pos0 of {
                Prelude.True ->
-                _Allocator__moveActiveToHandled sd0 st0 (Specif.projT1 x);
+                _Allocator__moveActiveToHandled sd0 (Specif.proj1_sig x);
                Prelude.False ->
                 case (Prelude.not)
                        (Interval.intervalCoversPos
-                         (Specif.projT1
-                           (_Allocator__getInterval sd0 (Specif.projT1 x))) i
+                         (Specif.proj1_sig
+                           (_Allocator__getInterval sd0 (Specif.proj1_sig x)))
                          pos0) of {
                  Prelude.True ->
-                  _Allocator__moveActiveToInactive sd0 st0 (Specif.projT1 x);
+                  _Allocator__moveActiveToInactive sd0 (Specif.proj1_sig x);
                  Prelude.False -> ss}}}
        in
-       go sd0 st0 st1 xs pos0}}
-  in go sd st (Allocator__Build_NextScanState sd st)
-       (Lib.list_membership (_Allocator__active sd)) pos
+       go sd0 st1 xs pos0}}
+  in go sd sd (Lib.list_membership (_Allocator__active sd)) pos
 
-_Allocator__checkInactiveIntervals :: Allocator__ScanStateDesc ->
-                                      Allocator__ScanState -> Prelude.Int ->
-                                      Allocator__NextScanState
-_Allocator__checkInactiveIntervals sd st pos =
+_Allocator__checkInactiveIntervals :: Allocator__ScanStateDesc -> Prelude.Int
+                                      -> Allocator__NextScanState
+_Allocator__checkInactiveIntervals sd pos =
   let {
-   go sd0 st0 ss is pos0 =
+   go sd0 ss is pos0 =
      case is of {
       [] -> ss;
       (:) x xs ->
        let {
-        i = Specif.projT2 (_Allocator__getInterval sd0 (Specif.projT1 x))}
-       in
-       let {
         st1 = case NPeano.ltb
                      (Interval.intervalEnd
-                       (Specif.projT1
-                         (_Allocator__getInterval sd0 (Specif.projT1 x))) i)
+                       (Specif.proj1_sig
+                         (_Allocator__getInterval sd0 (Specif.proj1_sig x))))
                      pos0 of {
                Prelude.True ->
-                _Allocator__moveInactiveToHandled sd0 st0 (Specif.projT1 x);
+                _Allocator__moveInactiveToHandled sd0 (Specif.proj1_sig x);
                Prelude.False ->
                 case Interval.intervalCoversPos
-                       (Specif.projT1
-                         (_Allocator__getInterval sd0 (Specif.projT1 x))) i
+                       (Specif.proj1_sig
+                         (_Allocator__getInterval sd0 (Specif.proj1_sig x)))
                        pos0 of {
                  Prelude.True ->
-                  _Allocator__moveInactiveToActive sd0 st0 (Specif.projT1 x);
+                  _Allocator__moveInactiveToActive sd0 (Specif.proj1_sig x);
                  Prelude.False -> ss}}}
        in
-       go sd0 st0 st1 xs pos0}}
-  in go sd st (Allocator__Build_NextScanState sd st)
-       (Lib.list_membership (_Allocator__inactive sd)) pos
+       go sd0 st1 xs pos0}}
+  in go sd sd (Lib.list_membership (_Allocator__inactive sd)) pos
 
 _Allocator__handleInterval :: Allocator__ScanStateDesc ->
                               Allocator__ScanStateCursor ->
                               Allocator__NextState
 _Allocator__handleInterval sd cur =
   let {position = _Allocator__curPosition sd cur} in
-  let {
-   sp1 = _Allocator__checkActiveIntervals sd (_Allocator__curState sd cur)
-           position}
-  in
+  let {sp1 = _Allocator__checkActiveIntervals sd position} in
   let {
    sp2 = _Allocator__checkInactiveIntervals (_Allocator__nextDesc sp1)
-           (_Allocator__nextState sp1) position}
+           position}
   in
-  let {
-   cursor = Allocator__Build_ScanStateCursor (_Allocator__nextState sp2)
-    (_Allocator__curIntDesc sd cur)}
-  in
+  let {cursor = _Allocator__curIntDesc sd cur} in
   let {
    result = Lib.fromMaybe
               (_Allocator__allocateBlockedReg (_Allocator__nextDesc sp2)
@@ -1022,104 +815,83 @@ _Allocator__handleInterval sd cur =
               (_Allocator__tryAllocateFreeReg (_Allocator__nextDesc sp2)
                 cursor)}
   in
-  Allocator__Build_NextScanState (_Allocator__nextDesc result)
-  (_Allocator__nextState result)
+  _Allocator__nextDesc result
 
-_Allocator__linearScan_F :: (Allocator__ScanStateDesc -> Allocator__ScanState
-                            -> Specif.Coq_sigT Allocator__ScanStateDesc
-                            Allocator__ScanState) -> Allocator__ScanStateDesc
-                            -> Allocator__ScanState -> Specif.Coq_sigT
-                            Allocator__ScanStateDesc Allocator__ScanState
-_Allocator__linearScan_F linearScan0 sd st =
+_Allocator__linearScan_F :: (Allocator__ScanStateDesc -> () ->
+                            Allocator__ScanStateDesc) ->
+                            Allocator__ScanStateDesc ->
+                            Allocator__ScanStateDesc
+_Allocator__linearScan_F linearScan0 sd =
   case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
-      case _Allocator__handleInterval sd (Allocator__Build_ScanStateCursor st
-             (Specif.projT1 (_Allocator__getInterval sd x))) of {
-       Allocator__Build_NextScanState sd2 st2 -> linearScan0 sd2 st2}};
-   Specif.Coq_inright -> Specif.Coq_existT sd st}
+      linearScan0
+        (_Allocator__handleInterval sd
+          (Specif.proj1_sig (_Allocator__getInterval sd x))) __};
+   Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
 _Allocator__linearScan_terminate :: Allocator__ScanStateDesc ->
-                                    Allocator__ScanState ->
-                                    (Specif.Coq_sigT Allocator__ScanStateDesc
-                                    Allocator__ScanState)
-_Allocator__linearScan_terminate sd st =
+                                    Allocator__ScanStateDesc
+_Allocator__linearScan_terminate sd =
   case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
-      case _Allocator__handleInterval sd (Allocator__Build_ScanStateCursor st
-             (Specif.projT1 (_Allocator__getInterval sd x))) of {
-       Allocator__Build_NextScanState sd2 st2 ->
-        Specif.sig_rec (\rec_res _ -> rec_res)
-          (_Allocator__linearScan_terminate sd2 st2)}};
-   Specif.Coq_inright -> Specif.Coq_existT sd st}
+      Specif.sig_rec (\rec_res _ -> rec_res)
+        (_Allocator__linearScan_terminate
+          (_Allocator__handleInterval sd
+            (Specif.proj1_sig (_Allocator__getInterval sd x))))};
+   Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
-_Allocator__linearScan :: Allocator__ScanStateDesc -> Allocator__ScanState ->
-                          Specif.Coq_sigT Allocator__ScanStateDesc
-                          Allocator__ScanState
-_Allocator__linearScan sd st =
+_Allocator__linearScan :: Allocator__ScanStateDesc ->
+                          Allocator__ScanStateDesc
+_Allocator__linearScan sd =
   case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
-      case _Allocator__handleInterval sd (Allocator__Build_ScanStateCursor st
-             (Specif.projT1 (_Allocator__getInterval sd x))) of {
-       Allocator__Build_NextScanState sd2 st2 ->
-        Specif.sig_rec (\rec_res _ -> rec_res)
-          (_Allocator__linearScan sd2 st2)}};
-   Specif.Coq_inright -> Specif.Coq_existT sd st}
+      Specif.sig_rec (\rec_res _ -> rec_res)
+        (_Allocator__linearScan
+          (_Allocator__handleInterval sd
+            (Specif.proj1_sig (_Allocator__getInterval sd x))))};
+   Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
 data Allocator__R_linearScan =
-   Allocator__R_linearScan_0 Allocator__ScanStateDesc Allocator__ScanState 
- Allocator__IntervalId ([] Allocator__IntervalId) Allocator__ScanStateDesc 
- Allocator__ScanState (Specif.Coq_sigT Allocator__ScanStateDesc
-                      Allocator__ScanState) Allocator__R_linearScan
- | Allocator__R_linearScan_1 Allocator__ScanStateDesc Allocator__ScanState
+   Allocator__R_linearScan_0 Allocator__ScanStateDesc Allocator__IntervalId 
+ ([] Allocator__IntervalId) Allocator__ScanStateDesc Allocator__ScanStateDesc 
+ Allocator__R_linearScan
+ | Allocator__R_linearScan_1 Allocator__ScanStateDesc
 
-_Allocator__coq_R_linearScan_rect :: (Allocator__ScanStateDesc ->
-                                     Allocator__ScanState ->
+_Allocator__coq_R_linearScan_rect :: (Allocator__ScanStateDesc -> () ->
                                      Allocator__IntervalId -> ([]
                                      Allocator__IntervalId) -> () -> () ->
-                                     Allocator__ScanStateDesc ->
-                                     Allocator__ScanState -> () -> () ->
-                                     (Specif.Coq_sigT
-                                     Allocator__ScanStateDesc
-                                     Allocator__ScanState) ->
+                                     Allocator__ScanStateDesc -> () -> () ->
+                                     () -> Allocator__ScanStateDesc ->
                                      Allocator__R_linearScan -> a1 -> a1) ->
-                                     (Allocator__ScanStateDesc ->
-                                     Allocator__ScanState -> () -> () -> a1)
-                                     -> Allocator__ScanStateDesc ->
-                                     Allocator__ScanState -> (Specif.Coq_sigT
-                                     Allocator__ScanStateDesc
-                                     Allocator__ScanState) ->
+                                     (Allocator__ScanStateDesc -> () -> () ->
+                                     () -> a1) -> Allocator__ScanStateDesc ->
+                                     Allocator__ScanStateDesc ->
                                      Allocator__R_linearScan -> a1
-_Allocator__coq_R_linearScan_rect f f0 sd st s r =
+_Allocator__coq_R_linearScan_rect f f0 sd s r =
   case r of {
-   Allocator__R_linearScan_0 sd0 st0 x xs x0 x1 x2 x3 ->
-    f sd0 st0 x xs __ __ x0 x1 __ __ x2 x3
-      (_Allocator__coq_R_linearScan_rect f f0 x0 x1 x2 x3);
-   Allocator__R_linearScan_1 sd0 st0 -> f0 sd0 st0 __ __}
+   Allocator__R_linearScan_0 sd0 x xs x0 x1 x2 ->
+    f sd0 __ x xs __ __ x0 __ __ __ x1 x2
+      (_Allocator__coq_R_linearScan_rect f f0 x0 x1 x2);
+   Allocator__R_linearScan_1 sd0 -> f0 sd0 __ __ __}
 
-_Allocator__coq_R_linearScan_rec :: (Allocator__ScanStateDesc ->
-                                    Allocator__ScanState ->
+_Allocator__coq_R_linearScan_rec :: (Allocator__ScanStateDesc -> () ->
                                     Allocator__IntervalId -> ([]
                                     Allocator__IntervalId) -> () -> () ->
-                                    Allocator__ScanStateDesc ->
-                                    Allocator__ScanState -> () -> () ->
-                                    (Specif.Coq_sigT Allocator__ScanStateDesc
-                                    Allocator__ScanState) ->
+                                    Allocator__ScanStateDesc -> () -> () ->
+                                    () -> Allocator__ScanStateDesc ->
                                     Allocator__R_linearScan -> a1 -> a1) ->
-                                    (Allocator__ScanStateDesc ->
-                                    Allocator__ScanState -> () -> () -> a1)
-                                    -> Allocator__ScanStateDesc ->
-                                    Allocator__ScanState -> (Specif.Coq_sigT
-                                    Allocator__ScanStateDesc
-                                    Allocator__ScanState) ->
+                                    (Allocator__ScanStateDesc -> () -> () ->
+                                    () -> a1) -> Allocator__ScanStateDesc ->
+                                    Allocator__ScanStateDesc ->
                                     Allocator__R_linearScan -> a1
-_Allocator__coq_R_linearScan_rec =
-  _Allocator__coq_R_linearScan_rect
+_Allocator__coq_R_linearScan_rec f f0 sd s r =
+  _Allocator__coq_R_linearScan_rect f f0 sd s r
 
 type Allocator__VirtReg = Prelude.Int
 
@@ -1140,14 +912,13 @@ _Allocator__postOrderTraversal graph =
   graph
 
 _Allocator__determineIntervals :: (Allocator__Graph Allocator__VirtReg) ->
-                                  Specif.Coq_sigT Allocator__ScanStateDesc
-                                  Allocator__ScanState
+                                  Allocator__ScanStateDesc
 _Allocator__determineIntervals =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _Allocator__allocateRegisters :: (Allocator__Graph Allocator__VirtReg) ->
                                  Allocator__ScanStateDesc
 _Allocator__allocateRegisters g =
-  case _Allocator__determineIntervals g of {
-   Specif.Coq_existT sd st -> Specif.projT1 (_Allocator__linearScan sd st)}
+  Specif.proj1_sig
+    (_Allocator__linearScan (_Allocator__determineIntervals g))
 

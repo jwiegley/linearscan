@@ -11,8 +11,7 @@ import qualified Data.Specif as Specif
 
 data IntervalDesc =
    Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty
-                                              (Specif.Coq_sigT
-                                              Range.RangeDesc Range.Range))
+                                              Range.RangeDesc)
 
 ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
@@ -24,54 +23,41 @@ iend i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
 
-rds :: IntervalDesc -> NonEmpty0.NonEmpty
-       (Specif.Coq_sigT Range.RangeDesc Range.Range)
+rds :: IntervalDesc -> NonEmpty0.NonEmpty Range.RangeDesc
 rds i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> rds0}
 
-data Interval =
-   I_Sing Range.RangeDesc Range.Range
- | I_Cons1 (Specif.Coq_sigT Range.RangeDesc Range.Range) Prelude.Int 
- Prelude.Int Interval Range.RangeDesc Range.Range
- | I_Consn (Specif.Coq_sigT Range.RangeDesc Range.Range) (NonEmpty0.NonEmpty
-                                                         (Specif.Coq_sigT
-                                                         Range.RangeDesc
-                                                         Range.Range)) 
- Prelude.Int Prelude.Int Interval Range.RangeDesc Range.Range
-
-intervalStart :: IntervalDesc -> Interval -> Prelude.Int
-intervalStart i interval0 =
+intervalStart :: IntervalDesc -> Prelude.Int
+intervalStart i =
   ibeg i
 
-intervalEnd :: IntervalDesc -> Interval -> Prelude.Int
-intervalEnd i interval0 =
+intervalEnd :: IntervalDesc -> Prelude.Int
+intervalEnd i =
   iend i
 
-intervalCoversPos :: IntervalDesc -> Interval -> Prelude.Int -> Prelude.Bool
-intervalCoversPos d i pos =
-  (Prelude.&&) (NPeano.leb (intervalStart d i) pos)
-    (NPeano.ltb pos (intervalEnd d i))
+intervalCoversPos :: IntervalDesc -> Prelude.Int -> Prelude.Bool
+intervalCoversPos d pos =
+  (Prelude.&&) (NPeano.leb (intervalStart d) pos)
+    (NPeano.ltb pos (intervalEnd d))
 
-intervalExtent :: IntervalDesc -> Interval -> Prelude.Int
-intervalExtent d i =
-  Peano.minus (intervalEnd d i) (intervalStart d i)
+intervalExtent :: IntervalDesc -> Prelude.Int
+intervalExtent d =
+  Peano.minus (intervalEnd d) (intervalStart d)
 
-anyRangeIntersects :: IntervalDesc -> Interval -> IntervalDesc -> Interval ->
-                      Prelude.Bool
-anyRangeIntersects i interval0 j interval1 =
+anyRangeIntersects :: IntervalDesc -> IntervalDesc -> Prelude.Bool
+anyRangeIntersects i j =
   let {
    f = \x y ->
-    Range.rangesIntersect (Specif.projT1 x) (Specif.projT2 x)
-      (Specif.projT1 y) (Specif.projT2 y)}
+    Range.rangesIntersect (Specif.proj1_sig x) (Specif.proj1_sig y)}
   in
   Prelude.foldr (\r b ->
     (Prelude.||) b ((Prelude.any) (f r) (NonEmpty0.coq_NE_to_list (rds j))))
     Prelude.False (NonEmpty0.coq_NE_to_list (rds i))
 
-firstIntersectionPoint :: IntervalDesc -> Interval -> IntervalDesc ->
-                          Interval -> Prelude.Maybe Prelude.Int
-firstIntersectionPoint i interval0 j interval1 =
+firstIntersectionPoint :: IntervalDesc -> IntervalDesc -> Prelude.Maybe
+                          Prelude.Int
+firstIntersectionPoint i j =
   NonEmpty0.coq_NE_fold_left (\acc rd ->
     case acc of {
      Prelude.Just x -> Prelude.Just x;
@@ -80,9 +66,7 @@ firstIntersectionPoint i interval0 j interval1 =
         case acc' of {
          Prelude.Just x -> Prelude.Just x;
          Prelude.Nothing ->
-          Range.rangesIntersectionPoint (Specif.projT1 rd) (Specif.projT2 rd)
-            (Specif.projT1 rd') (Specif.projT2 rd')}) (rds j) Prelude.Nothing})
-    (rds i) Prelude.Nothing
-
-type FixedInterval = Interval
+          Range.rangesIntersectionPoint (Specif.proj1_sig rd)
+            (Specif.proj1_sig rd')}) (rds j) Prelude.Nothing}) (rds i)
+    Prelude.Nothing
 

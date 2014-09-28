@@ -25,15 +25,10 @@ proj1_sig :: a1 -> a1
 proj1_sig e =
   e
 
-projT1 :: (Coq_sigT a1 a2) -> a1
-projT1 x =
+sig_of_sigT :: (Coq_sigT a1 ()) -> a1
+sig_of_sigT x =
   case x of {
-   Coq_existT a p -> a}
-
-projT2 :: (Coq_sigT a1 a2) -> a2
-projT2 x =
-  case x of {
-   Coq_existT x0 h -> h}
+   Coq_existT x0 _ -> x0}
 
 data Coq_sumbool =
    Coq_left

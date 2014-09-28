@@ -100,7 +100,7 @@ Proof.
       auto.
     split; intros.
       apply fold_gt.
-      pose (Interval_extent_nonzero (projT2 (geti f))).
+      pose (Interval_extent_nonzero (proj2_sig (geti f))).
       omega.
     omega.
   - Case "ScanState_moveActiveToInactive".  apply IHst.

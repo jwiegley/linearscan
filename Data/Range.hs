@@ -23,21 +23,16 @@ rend r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups -> rend0}
 
-data Range =
-   R_Sing UsePos
- | R_Cons UsePos RangeDesc Range
- | R_Extend RangeDesc Prelude.Int Prelude.Int Range
-
-rangesIntersect :: RangeDesc -> Range -> RangeDesc -> Range -> Prelude.Bool
-rangesIntersect x range0 y range1 =
+rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
+rangesIntersect x y =
   case NPeano.ltb (rbeg x) (rbeg y) of {
    Prelude.True -> NPeano.ltb (rbeg y) (rend x);
    Prelude.False -> NPeano.ltb (rbeg x) (rend y)}
 
-rangesIntersectionPoint :: RangeDesc -> Range -> RangeDesc -> Range ->
-                           Prelude.Maybe Prelude.Int
-rangesIntersectionPoint x xr y yr =
-  case rangesIntersect x xr y yr of {
+rangesIntersectionPoint :: RangeDesc -> RangeDesc -> Prelude.Maybe
+                           Prelude.Int
+rangesIntersectionPoint x y =
+  case rangesIntersect x y of {
    Prelude.True -> Prelude.Just (Peano.min (rbeg x) (rbeg y));
    Prelude.False -> Prelude.Nothing}
 

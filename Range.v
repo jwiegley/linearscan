@@ -44,7 +44,7 @@ Record RangeDesc := {
 (** A [Range] constrains how a [RangeDesc] may be constructed, and maintains
     any invariants. *)
 
-Inductive Range : RangeDesc -> Set :=
+Inductive Range : RangeDesc -> Prop :=
   | R_Sing u :
     Range {| rbeg := uloc u
            ; rend := S (uloc u)

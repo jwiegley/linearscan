@@ -34,7 +34,7 @@ Record ScanStateDesc := {
     inactive  : list IntervalId;   (* falls in lifetime hole *)
     handled   : list IntervalId;   (* ends before pos *)
 
-    getInterval : IntervalId -> { d : IntervalDesc & Interval d };
+    getInterval : IntervalId -> { d : IntervalDesc | Interval d };
     assignments : IntervalId -> option PhysReg;
 
     (** Fixed Intervals
@@ -57,7 +57,7 @@ Record ScanStateDesc := {
         site. Therefore, the allocation pass cannot assign a register to any
         interval there, and all intervals are spilled before the call. *)
 
-    getFixedInterval : PhysReg -> option { d : IntervalDesc & FixedInterval d };
+    getFixedInterval : PhysReg -> option { d : IntervalDesc | FixedInterval d };
 
     (* jww (2014-09-25): These restricting lemmas should be added back once
        everything is functional. *)
@@ -210,7 +210,7 @@ Qed.
 
     5. Move an item from the inactive list to the active or handled lists. *)
 
-Inductive ScanState : ScanStateDesc -> Set :=
+Inductive ScanState : ScanStateDesc -> Prop :=
   | ScanState_nil :
     ScanState
       {| nextInterval     := 0
@@ -380,9 +380,9 @@ Ltac cmp_reflexive :=
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandled sd with
   | nil => 0
-  | [i] => intervalExtent (projT2 (getInterval sd i))
+  | [i] => intervalExtent (proj2_sig (getInterval sd i))
   | xs  =>
-    let f n x := n + intervalExtent (projT2 (getInterval sd x)) in
+    let f n x := n + intervalExtent (proj2_sig (getInterval sd x)) in
     fold_left f xs 0
   end.
 
@@ -391,8 +391,8 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let ue  := unhandledExtent sd in
   match unh with
   | nil    => ue = 0
-  | [i]    => ue = intervalExtent (projT2 (getInterval sd i))
-  | i :: _ => ue > intervalExtent (projT2 (getInterval sd i))
+  | [i]    => ue = intervalExtent (proj2_sig (getInterval sd i))
+  | i :: _ => ue > intervalExtent (proj2_sig (getInterval sd i))
   end.
 Proof.
   destruct sd.
@@ -402,7 +402,7 @@ Proof.
   destruct l eqn:Heqe2; simpl.
     reflexivity.
   apply fold_gt.
-  pose (Interval_extent_nonzero (projT2 (getInterval0 i0))).
+  pose (Interval_extent_nonzero (proj2_sig (getInterval0 i0))).
   omega.
 Defined.
 
@@ -436,7 +436,7 @@ Lemma unhandledExtent_cons
 Proof.
   intros.
   induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (projT2 (geti i))). omega.
+  pose (Interval_extent_nonzero (proj2_sig (geti i))). omega.
   destruct unh; simpl. omega.
   apply fold_fold_lt. omega.
 Qed.
@@ -448,7 +448,7 @@ Record ScanStateCursor (sd : ScanStateDesc) := {
     curId       := safe_hd (unhandled sd) curExists;
 
     curIntDesc  : IntervalDesc;
-    curInterval := projT2 (getInterval sd curId);
+    curInterval := proj2_sig (getInterval sd curId);
 
     curPosition := intervalStart curInterval
 }.
@@ -475,7 +475,7 @@ Arguments morphProof [P] _.
 Definition NextState `(cur : ScanStateCursor sd) P := NextScanState (P sd).
 
 Definition NextStateDep  `(cur : ScanStateCursor sd) P Q :=
-  { x : NextScanState (P sd) & Q x }.
+  { x : NextScanState (P sd) | Q x }.
 
 Definition NextStateWith `(cur : ScanStateCursor sd) P A :=
   (A * NextScanState (P sd))%type.

@@ -16,7 +16,7 @@ Include MSSMorph M.
 
 Definition nextIntersectionWith
   `(i : Interval d) `(jid : IntervalId sd) : option nat :=
-  firstIntersectionPoint (projT2 (getInterval sd jid)) i.
+  firstIntersectionPoint (proj2_sig (getInterval sd jid)) i.
 
 (** Given a function from intervals to indices ([intervalIndex]), and a
     default function from registers to indices ([registerIndex]), build a
@@ -119,7 +119,7 @@ Definition tryAllocateFreeReg `(cur : ScanStateCursor sd)
       getRegisterIndex st (fun _ => Some 0) (fun _ => None) (active sd) in
   let intersectingIntervals :=
         filter (fun x => anyRangeIntersects current
-                           (projT2 (getInterval sd x)))
+                           (proj2_sig (getInterval sd x)))
                (inactive sd) in
   let freeUntilPos :=
       getRegisterIndex st (nextIntersectionWith current) freeUntilPos'
@@ -180,7 +180,7 @@ Definition allocateBlockedReg `(cur : ScanStateCursor sd)
       getRegisterIndex st (nextUseAfter pos) (fun _ => None) (active sd) in
   let intersectingIntervals :=
         filter (fun x => anyRangeIntersects current
-                           (projT2 (getInterval sd x)))
+                           (proj2_sig (getInterval sd x)))
                (inactive sd) in
   let nextUsePos :=
       getRegisterIndex st (nextUseAfter pos)
@@ -233,11 +233,11 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
-        let i := projT2 (getInterval sd (projT1 x)) in
+        let i := proj2_sig (getInterval sd (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
-                   then moveActiveToHandled st (projT1 x) (projT2 x)
+                   then moveActiveToHandled st (proj1_sig x) (proj2_sig x)
                    else if negb (intervalCoversPos i pos)
-                        then moveActiveToInactive st (projT1 x) (projT2 x)
+                        then moveActiveToInactive st (proj1_sig x) (proj2_sig x)
                         else ss in
         go sd st st1 xs pos
     end in
@@ -256,11 +256,11 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
                move it from active to handled
              else if it covers position then
                move it from active to inactive *)
-        let i := projT2 (getInterval sd (projT1 x)) in
+        let i := proj2_sig (getInterval sd (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
-                   then moveInactiveToHandled st (projT1 x) (projT2 x)
+                   then moveInactiveToHandled st (proj1_sig x) (proj2_sig x)
                    else if intervalCoversPos i pos
-                        then moveInactiveToActive st (projT1 x) (projT2 x)
+                        then moveInactiveToActive st (proj1_sig x) (proj2_sig x)
                         else ss in
         go sd st st1 xs pos
     end in
@@ -337,12 +337,12 @@ Proof. intros. rewrite H. simpl. omega. Qed.
      HANDLE_INTERVAL (current) *)
 
 Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure unhandledExtent sd} : { sd' : ScanStateDesc & ScanState sd' } :=
+  {measure unhandledExtent sd} : { sd' : ScanStateDesc | ScanState sd' } :=
   match destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
     let cursor := {| curState   := st
                    ; curExists  := list_cons_nonzero H
-                   ; curIntDesc := projT1 (getInterval sd x)
+                   ; curIntDesc := proj1_sig (getInterval sd x)
                    |} in
     match handleInterval cursor with
     | Build_NextScanState sd2 st2 smorph2 => linearScan sd2 st2
@@ -366,11 +366,11 @@ Class Graph (a : Set) := {
 }.
 
 Definition determineIntervals (g : Graph VirtReg)
-  : { sd : ScanStateDesc & ScanState sd }.
+  : { sd : ScanStateDesc | ScanState sd }.
   (* jww (2014-09-26): NYI *)
 Admitted.
 
 Definition allocateRegisters (g : Graph VirtReg) : ScanStateDesc :=
-  let (sd,st) := determineIntervals g in projT1 (linearScan sd st).
+  let (sd,st) := determineIntervals g in proj1_sig (linearScan sd st).
 
 End MAllocate.

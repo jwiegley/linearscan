@@ -52,8 +52,8 @@ Tactic Notation "SSSSSSSCase" constr(name) := Case_aux SSSSSSSCase name.
 Require String.
 Open Scope string_scope.
 
-Definition existT_in_cons : forall {A a} {l : list A},
-  {x : A & In x l} -> {x : A & In x (a :: l)}.
+Definition exist_in_cons : forall {A a} {l : list A},
+  {x : A | In x l} -> {x : A | In x (a :: l)}.
 Proof.
   destruct l; intros; simpl.
     destruct X. inversion i.
@@ -64,12 +64,12 @@ Proof.
   right. right. assumption.
 Defined.
 
-Definition list_membership {a} (l : list a) : list { x : a & In x l } :=
+Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
   let fix go l :=
       match l with
       | nil => nil
       | cons x xs =>
-          existT _ x (in_eq x xs) :: map existT_in_cons (go xs)
+          exist _ x (in_eq x xs) :: map exist_in_cons (go xs)
       end in
   go l.
 

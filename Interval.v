@@ -32,18 +32,18 @@ Generalizable All Variables.
 Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
-    rds  : NonEmpty { r : RangeDesc & Range r };
+    rds  : NonEmpty { r : RangeDesc | Range r };
 
     (** Caching this property comes in handy, as it can be tricky to determine
         it by reduction in some cases. *)
     interval_nonempty : ibeg < iend
 }.
 
-Inductive Interval : IntervalDesc -> Set :=
+Inductive Interval : IntervalDesc -> Prop :=
   | I_Sing : forall x (r : Range x),
       Interval {| ibeg := rbeg x
                 ; iend := rend x
-                ; rds  := NE_Sing (existT _ x r)
+                ; rds  := NE_Sing (exist _ x r)
                 ; interval_nonempty := range_nonempty x
                 |}
 
@@ -53,7 +53,7 @@ Inductive Interval : IntervalDesc -> Set :=
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons (existT _ x r) (NE_Sing y)
+                ; rds  := NE_Cons (exist _ x r) (NE_Sing y)
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}
 
@@ -63,7 +63,7 @@ Inductive Interval : IntervalDesc -> Set :=
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons (existT _ x r) (NE_Cons y xs)
+                ; rds  := NE_Cons (exist _ x r) (NE_Cons y xs)
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}.
 
@@ -98,7 +98,7 @@ Proof.
 Qed.
 
 Definition anyRangeIntersects `(Interval i) `(Interval j) : bool :=
-  let f x y := rangesIntersect (projT2 x) (projT2 y) in
+  let f x y := rangesIntersect (proj2_sig x) (proj2_sig y) in
   fold_right
     (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
     false (NE_to_list (rds i)).
@@ -113,7 +113,7 @@ Definition firstIntersectionPoint `(Interval i) `(Interval j) : option nat :=
            (fun acc' rd' =>
               match acc' with
               | Some x => Some x
-              | None => rangesIntersectionPoint (projT2 rd) (projT2 rd')
+              | None => rangesIntersectionPoint (proj2_sig rd) (proj2_sig rd')
               end) (rds j) None
        end) (rds i) None.
 
