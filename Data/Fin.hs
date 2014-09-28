@@ -1,6 +1,7 @@
 module Data.Fin where
 
 import qualified Prelude
+import qualified Data.List
 import qualified Data.Logic as Logic
 
 

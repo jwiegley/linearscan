@@ -1,6 +1,7 @@
 module Data.Specif where
 
 import qualified Prelude
+import qualified Data.List
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -33,6 +34,10 @@ projT2 :: (Coq_sigT a1 a2) -> a2
 projT2 x =
   case x of {
    Coq_existT x0 h -> h}
+
+data Coq_sumbool =
+   Coq_left
+ | Coq_right
 
 data Coq_sumor a =
    Coq_inleft a

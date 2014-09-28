@@ -1,6 +1,7 @@
 module Data.Datatypes where
 
 import qualified Prelude
+import qualified Data.List
 
 nat_rect :: a1 -> (Prelude.Int -> a1 -> a1) -> Prelude.Int -> a1
 nat_rect f f0 n =

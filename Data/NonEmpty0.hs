@@ -1,6 +1,7 @@
 module Data.NonEmpty0 where
 
 import qualified Prelude
+import qualified Data.List
 
 data NonEmpty a =
    NE_Sing a

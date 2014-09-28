@@ -370,4 +370,7 @@ Definition determineIntervals (g : Graph VirtReg)
   (* jww (2014-09-26): NYI *)
 Admitted.
 
+Definition allocateRegisters (g : Graph VirtReg) : ScanStateDesc :=
+  let (sd,st) := determineIntervals g in projT1 (linearScan sd st).
+
 End MAllocate.

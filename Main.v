@@ -34,7 +34,7 @@ Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "Prelude.succ"]
 
 Extract Inductive unit    => "()" [ "()" ].
 Extract Inductive bool    => "Prelude.Bool" ["Prelude.True" "Prelude.False"].
-Extract Inductive sumbool => "Prelude.Either" [ "Prelude.Left" "Prelude.Right" ].
+(* Extract Inductive sumbool => "Prelude.Either" [ "Prelude.Left" "Prelude.Right" ]. *)
 Extract Inductive list    => "[]" ["[]" "(:)"].
 Extract Inductive prod    => "(,)" ["(,)"].
 Extract Inductive option  => "Prelude.Maybe" ["Prelude.Just" "Prelude.Nothing"].
@@ -51,18 +51,11 @@ Extract Inlined Constant mult => "(Prelude.*)".
 Extract Inlined Constant app  => "(Prelude.++)".
 
 Extract Inlined Constant map        => "(Prelude.map)".
-Extract Inlined Constant fold_left  => "(Data.List.foldl')".
-Extract Inlined Constant fold_right => "(Prelude.foldr)".
+Extract Inlined Constant fold_left  => "(\f -> Prelude.flip (Data.List.foldl' f))".
+Extract Inlined Constant fold_right => "Prelude.foldr".
 Extract Inlined Constant existsb    => "(Prelude.any)".
 Extract Inlined Constant filter     => "(Prelude.filter)".
 
 Extraction Blacklist String List NonEmpty.
-
-Definition Graph := Graph.
-Definition VirtReg := VirtReg.
-Definition ScanStateDesc := ScanStateDesc.
-
-Definition allocateRegisters (g : Graph VirtReg) : ScanStateDesc :=
-  let (sd,st) := determineIntervals g in projT1 (linearScan sd st).
 
 Separate Extraction allocateRegisters.

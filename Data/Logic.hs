@@ -1,6 +1,7 @@
 module Data.Logic where
 
 import qualified Prelude
+import qualified Data.List
 
 coq_False_rect :: a1
 coq_False_rect =

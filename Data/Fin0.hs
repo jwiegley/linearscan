@@ -1,6 +1,7 @@
 module Data.Fin0 where
 
 import qualified Prelude
+import qualified Data.List
 import qualified Data.Compare as Compare
 import qualified Data.Compare_dec as Compare_dec
 import qualified Data.Fin as Fin

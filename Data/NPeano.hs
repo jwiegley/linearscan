@@ -1,6 +1,7 @@
 module Data.NPeano where
 
 import qualified Prelude
+import qualified Data.List
 
 leb :: Prelude.Int -> Prelude.Int -> Prelude.Bool
 leb n m =

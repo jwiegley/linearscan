@@ -1,6 +1,7 @@
 module Data.Interval where
 
 import qualified Prelude
+import qualified Data.List
 import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
@@ -64,7 +65,7 @@ anyRangeIntersects i interval0 j interval1 =
     Range.rangesIntersect (Specif.projT1 x) (Specif.projT2 x)
       (Specif.projT1 y) (Specif.projT2 y)}
   in
-  (Prelude.foldr) (\r b ->
+  Prelude.foldr (\r b ->
     (Prelude.||) b ((Prelude.any) (f r) (NonEmpty0.coq_NE_to_list (rds j))))
     Prelude.False (NonEmpty0.coq_NE_to_list (rds i))
 

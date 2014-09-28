@@ -1,6 +1,7 @@
 module Data.Peano where
 
 import qualified Prelude
+import qualified Data.List
 
 pred :: Prelude.Int -> Prelude.Int
 pred n =

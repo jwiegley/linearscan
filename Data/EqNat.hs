@@ -1,6 +1,7 @@
 module Data.EqNat where
 
 import qualified Prelude
+import qualified Data.List
 
 beq_nat :: Prelude.Int -> Prelude.Int -> Prelude.Bool
 beq_nat n m =

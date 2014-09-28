@@ -1,6 +1,7 @@
 module Data.Lib where
 
 import qualified Prelude
+import qualified Data.List
 import qualified Data.Specif as Specif
 
 

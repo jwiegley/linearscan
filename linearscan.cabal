@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
-    Data.LinearScan
+    LinearScan
   other-modules:
     Data.Compare,
     Data.Compare_dec,
@@ -25,6 +25,7 @@ library
     Data.Fin0,
     Data.Interval,
     Data.Lib,
+    Data.Main,
     Data.List0,
     Data.Logic,
     Data.NonEmpty0,
