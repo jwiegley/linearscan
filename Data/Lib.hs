@@ -1,7 +1,6 @@
 module Data.Lib where
 
 import qualified Prelude
-import qualified Data.List as List
 import qualified Data.Specif as Specif
 
 
@@ -32,7 +31,7 @@ list_membership l =
   case l of {
    [] -> [];
    (:) x xs -> (:) (Specif.Coq_existT x __)
-    (List.map (existT_in_cons x xs) (list_membership xs))}
+    ((Prelude.map) (existT_in_cons x xs) (list_membership xs))}
 
 safe_hd :: ([] a1) -> a1
 safe_hd xs =

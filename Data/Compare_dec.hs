@@ -6,15 +6,14 @@ import qualified Data.Logic as Logic
 import qualified Data.Specif as Specif
 
 
-lt_eq_lt_dec :: Prelude.Int -> Prelude.Int -> Specif.Coq_sumor
-                Specif.Coq_sumbool
+lt_eq_lt_dec :: Prelude.Int -> Prelude.Int -> Specif.Coq_sumor Prelude.Either
 lt_eq_lt_dec n m =
   Datatypes.nat_rec (\m0 ->
     (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
       (\_ -> Specif.Coq_inleft
-      Specif.Coq_right)
+      Prelude.Right)
       (\m1 -> Specif.Coq_inleft
-      Specif.Coq_left)
+      Prelude.Left)
       m0) (\n0 iHn m0 ->
     (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
       (\_ ->
@@ -23,7 +22,7 @@ lt_eq_lt_dec n m =
       iHn m1)
       m0) n m
 
-le_lt_eq_dec :: Prelude.Int -> Prelude.Int -> Specif.Coq_sumbool
+le_lt_eq_dec :: Prelude.Int -> Prelude.Int -> Prelude.Either
 le_lt_eq_dec n m =
   let {s = lt_eq_lt_dec n m} in
   case s of {

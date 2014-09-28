@@ -34,10 +34,6 @@ projT2 x =
   case x of {
    Coq_existT x0 h -> h}
 
-data Coq_sumbool =
-   Coq_left
- | Coq_right
-
 data Coq_sumor a =
    Coq_inleft a
  | Coq_inright

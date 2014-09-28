@@ -2,7 +2,7 @@ module Data.Range where
 
 import qualified Prelude
 import qualified Data.NPeano as NPeano
-import qualified Data.NonEmpty as NonEmpty
+import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
 
 
@@ -10,7 +10,7 @@ data UsePos =
    Build_UsePos Prelude.Int Prelude.Bool
 
 data RangeDesc =
-   Build_RangeDesc Prelude.Int Prelude.Int (NonEmpty.NonEmpty UsePos)
+   Build_RangeDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty UsePos)
 
 rbeg :: RangeDesc -> Prelude.Int
 rbeg r =

@@ -1,4 +1,4 @@
-module Data.NonEmpty where
+module Data.NonEmpty0 where
 
 import qualified Prelude
 

@@ -34,8 +34,8 @@ Record ScanStateDesc := {
     inactive  : list IntervalId;   (* falls in lifetime hole *)
     handled   : list IntervalId;   (* ends before pos *)
 
-    getInterval      : IntervalId -> { d : IntervalDesc & Interval d };
-    assignments      : IntervalId -> option PhysReg;
+    getInterval : IntervalId -> { d : IntervalDesc & Interval d };
+    assignments : IntervalId -> option PhysReg;
 
     (** Fixed Intervals
 

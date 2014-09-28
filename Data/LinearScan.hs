@@ -8,7 +8,7 @@ import qualified Data.Fin0 as Fin0
 import qualified Data.Fin as Fin
 import qualified Data.Interval as Interval
 import qualified Data.Lib as Lib
-import qualified Data.List as List
+import qualified Data.List0 as List0
 import qualified Data.Logic as Logic
 import qualified Data.NPeano as NPeano
 import qualified Data.Peano as Peano
@@ -150,7 +150,7 @@ _Allocator__transportId st st' x =
          (_Allocator__nextInterval st')}
   in
   case h of {
-   Specif.Coq_left ->
+   Prelude.Left ->
     case st of {
      Allocator__Build_ScanStateDesc nextInterval0 unhandled0 active0
       inactive0 handled0 getInterval0 assignments0 getFixedInterval0 ->
@@ -160,7 +160,7 @@ _Allocator__transportId st st' x =
         let {h0 = _Allocator__lt_sub nextInterval0 nextInterval1} in
         Logic.eq_rec ((Prelude.+) h0 nextInterval0)
           (Fin.coq_R nextInterval0 h0 x) nextInterval1}};
-   Specif.Coq_right ->
+   Prelude.Right ->
     Logic.eq_rec (_Allocator__nextInterval st) x
       (_Allocator__nextInterval st')}
 
@@ -314,7 +314,7 @@ _Allocator__unhandledExtent sd =
             (Specif.projT1 (_Allocator__getInterval sd x))
             (Specif.projT2 (_Allocator__getInterval sd x)))}
       in
-      List.fold_left f ((:) i ((:) i0 l0)) 0}}
+      (Data.List.foldl') f ((:) i ((:) i0 l0)) 0}}
 
 data Allocator__ScanStateCursor =
    Allocator__Build_ScanStateCursor Allocator__ScanState Interval.IntervalDesc
@@ -458,7 +458,7 @@ _Allocator__moveActiveToHandled sd st x =
   let {s = Allocator__ScanState_moveActiveToInactive sd x st} in
   Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (List.remove
+  (List0.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
     x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
   (_Allocator__handled sd) (_Allocator__getInterval sd)
@@ -472,7 +472,7 @@ _Allocator__moveActiveToInactive sd st x =
   let {s = Allocator__ScanState_moveActiveToInactive sd x st} in
   Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
-  (List.remove
+  (List0.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
     x (_Allocator__active sd)) ((:) x (_Allocator__inactive sd))
   (_Allocator__handled sd) (_Allocator__getInterval sd)
@@ -487,7 +487,7 @@ _Allocator__moveInactiveToActive sd st x =
   Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd) ((:) x
   (_Allocator__active sd))
-  (List.remove
+  (List0.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
     x (_Allocator__inactive sd)) (_Allocator__handled sd)
   (_Allocator__getInterval sd) (_Allocator__assignments sd)
@@ -502,7 +502,7 @@ _Allocator__moveInactiveToHandled sd st x =
   Allocator__Build_NextScanState (Allocator__Build_ScanStateDesc
   (_Allocator__nextInterval sd) (_Allocator__unhandled sd)
   (_Allocator__active sd)
-  (List.remove
+  (List0.remove
     (Compare.cmp_eq_dec (Fin0.fin_CompareSpec (_Allocator__nextInterval sd)))
     x (_Allocator__inactive sd)) ((:) x (_Allocator__handled sd))
   (_Allocator__getInterval sd) (_Allocator__assignments sd)
@@ -530,9 +530,8 @@ _Allocator__moveUnhandledToActive sd cur reg =
         nextInterval0 unhandled1 ((:) i active0) inactive0 handled0
         getInterval0 (\i0 ->
         case Compare.cmp_eq_dec (Fin0.fin_CompareSpec nextInterval0) i0 i of {
-         Specif.Coq_left -> Prelude.Just reg;
-         Specif.Coq_right -> assignments0 i0}) getFixedInterval0)
-        (s curState0)}}}
+         Prelude.Left -> Prelude.Just reg;
+         Prelude.Right -> assignments0 i0}) getFixedInterval0) (s curState0)}}}
 
 _Allocator__nextIntersectionWith :: Interval.IntervalDesc ->
                                     Interval.Interval ->
@@ -552,12 +551,12 @@ _Allocator__getRegisterIndex :: Allocator__ScanStateDesc ->
                                 Allocator__IntervalId) -> Allocator__PhysReg
                                 -> Prelude.Maybe Prelude.Int
 _Allocator__getRegisterIndex sd st intervalIndex registerIndex intervals =
-  List.fold_right (\x f r ->
+  (Prelude.foldr) (\x f r ->
     case _Allocator__assignments sd x of {
      Prelude.Just a ->
       case Compare.cmp_eq_dec (Fin0.fin_CompareSpec _MyMachine__maxReg) a r of {
-       Specif.Coq_left -> intervalIndex x;
-       Specif.Coq_right -> f r};
+       Prelude.Left -> intervalIndex x;
+       Prelude.Right -> f r};
      Prelude.Nothing -> f r}) registerIndex intervals
 
 _Allocator__findRegister_F :: ((Allocator__PhysReg -> Prelude.Maybe
@@ -872,7 +871,7 @@ _Allocator__tryAllocateFreeReg sd cur =
                      (\x -> Prelude.Nothing) (_Allocator__active sd)}
   in
   let {
-   intersectingIntervals = List.filter (\x ->
+   intersectingIntervals = (Prelude.filter) (\x ->
                              Interval.anyRangeIntersects
                                (Specif.projT1
                                  (_Allocator__getInterval sd
@@ -1030,7 +1029,7 @@ _Allocator__linearScan_F :: (Allocator__ScanStateDesc -> Allocator__ScanState
                             -> Allocator__ScanState -> Specif.Coq_sigT
                             Allocator__ScanStateDesc Allocator__ScanState
 _Allocator__linearScan_F linearScan0 sd st =
-  case List.destruct_list (_Allocator__unhandled sd) of {
+  case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
@@ -1044,7 +1043,7 @@ _Allocator__linearScan_terminate :: Allocator__ScanStateDesc ->
                                     (Specif.Coq_sigT Allocator__ScanStateDesc
                                     Allocator__ScanState)
 _Allocator__linearScan_terminate sd st =
-  case List.destruct_list (_Allocator__unhandled sd) of {
+  case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
@@ -1059,7 +1058,7 @@ _Allocator__linearScan :: Allocator__ScanStateDesc -> Allocator__ScanState ->
                           Specif.Coq_sigT Allocator__ScanStateDesc
                           Allocator__ScanState
 _Allocator__linearScan sd st =
-  case List.destruct_list (_Allocator__unhandled sd) of {
+  case List0.destruct_list (_Allocator__unhandled sd) of {
    Specif.Coq_inleft s ->
     case s of {
      Specif.Coq_existT x s0 ->
@@ -1144,10 +1143,14 @@ _Allocator__determineIntervals :: (Allocator__Graph Allocator__VirtReg) ->
 _Allocator__determineIntervals =
   Prelude.error "AXIOM TO BE REALIZED"
 
-_Allocator__allocateRegisters :: (Allocator__Graph Allocator__VirtReg) ->
-                                 Specif.Coq_sigT Allocator__ScanStateDesc
-                                 Allocator__ScanState
-_Allocator__allocateRegisters g =
+type Graph a = Allocator__Graph a
+
+type VirtReg = Allocator__VirtReg
+
+type ScanStateDesc = Allocator__ScanStateDesc
+
+allocateRegisters :: (Graph VirtReg) -> ScanStateDesc
+allocateRegisters g =
   case _Allocator__determineIntervals g of {
-   Specif.Coq_existT sd st -> _Allocator__linearScan sd st}
+   Specif.Coq_existT sd st -> Specif.projT1 (_Allocator__linearScan sd st)}
 

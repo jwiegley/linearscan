@@ -1,16 +1,15 @@
 module Data.Interval where
 
 import qualified Prelude
-import qualified Data.List as List
 import qualified Data.NPeano as NPeano
-import qualified Data.NonEmpty as NonEmpty
+import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
 import qualified Data.Range as Range
 import qualified Data.Specif as Specif
 
 
 data IntervalDesc =
-   Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty.NonEmpty
+   Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty
                                               (Specif.Coq_sigT
                                               Range.RangeDesc Range.Range))
 
@@ -24,7 +23,7 @@ iend i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
 
-rds :: IntervalDesc -> NonEmpty.NonEmpty
+rds :: IntervalDesc -> NonEmpty0.NonEmpty
        (Specif.Coq_sigT Range.RangeDesc Range.Range)
 rds i =
   case i of {
@@ -34,7 +33,7 @@ data Interval =
    I_Sing Range.RangeDesc Range.Range
  | I_Cons1 (Specif.Coq_sigT Range.RangeDesc Range.Range) Prelude.Int 
  Prelude.Int Interval Range.RangeDesc Range.Range
- | I_Consn (Specif.Coq_sigT Range.RangeDesc Range.Range) (NonEmpty.NonEmpty
+ | I_Consn (Specif.Coq_sigT Range.RangeDesc Range.Range) (NonEmpty0.NonEmpty
                                                          (Specif.Coq_sigT
                                                          Range.RangeDesc
                                                          Range.Range)) 
@@ -65,18 +64,18 @@ anyRangeIntersects i interval0 j interval1 =
     Range.rangesIntersect (Specif.projT1 x) (Specif.projT2 x)
       (Specif.projT1 y) (Specif.projT2 y)}
   in
-  List.fold_right (\r b ->
-    (Prelude.||) b (List.existsb (f r) (NonEmpty.coq_NE_to_list (rds j))))
-    Prelude.False (NonEmpty.coq_NE_to_list (rds i))
+  (Prelude.foldr) (\r b ->
+    (Prelude.||) b ((Prelude.any) (f r) (NonEmpty0.coq_NE_to_list (rds j))))
+    Prelude.False (NonEmpty0.coq_NE_to_list (rds i))
 
 firstIntersectionPoint :: IntervalDesc -> Interval -> IntervalDesc ->
                           Interval -> Prelude.Maybe Prelude.Int
 firstIntersectionPoint i interval0 j interval1 =
-  NonEmpty.coq_NE_fold_left (\acc rd ->
+  NonEmpty0.coq_NE_fold_left (\acc rd ->
     case acc of {
      Prelude.Just x -> Prelude.Just x;
      Prelude.Nothing ->
-      NonEmpty.coq_NE_fold_left (\acc' rd' ->
+      NonEmpty0.coq_NE_fold_left (\acc' rd' ->
         case acc' of {
          Prelude.Just x -> Prelude.Just x;
          Prelude.Nothing ->
