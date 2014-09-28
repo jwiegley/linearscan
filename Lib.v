@@ -1,27 +1,20 @@
-Require Import Coq.Arith.Compare_dec.
-Require Import Coq.Arith.EqNat.
-Require Import Coq.Init.Datatypes.
-Require Import Coq.Lists.List.
+Require Export Coq.Lists.List.
+Require Export Coq.Numbers.Natural.Peano.NPeano.
+Require Export Coq.Program.Basics.
+Require Export Coq.Program.Equality.
+Require Export Coq.Vectors.Fin.
+Require Export Coq.omega.Omega.
+
 Require Import Coq.Logic.ProofIrrelevance.
-Require Import Coq.Numbers.Natural.Peano.NPeano.
-Require Import Coq.omega.Omega.
-Require Import Coq.Program.Basics.
-Require Import Coq.Program.Equality.
-Require Import Coq.Program.Tactics.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.Sorting.
 Require Import Coq.Structures.Orders.
-Require Import Coq.Vectors.Fin.
-Require Import FunctionalExtensionality.
-(* Require Import Iso. *)
 Require Import Recdef.
 
 Module Import LN := ListNotations.
 
 Open Scope nat_scope.
 Open Scope program_scope.
-
-Generalizable All Variables.
 
 (** The following are extensions to the Coq standard library. *)
 
@@ -495,7 +488,7 @@ End Elems.
 Arguments find_in [_] _ _ _.
 
 Theorem Permutation_not_in : forall {A} {l l' : list A} (x : A),
- Permutation l l' -> ~ In x l -> ~ In x l'.
+  Permutation l l' -> ~ In x l -> ~ In x l'.
 Proof.
   intros A l l' x Hperm; induction Hperm; simpl; tauto.
 Qed.
