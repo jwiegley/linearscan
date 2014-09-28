@@ -21,10 +21,6 @@ sig_rec =
 data Coq_sigT a p =
    Coq_existT a p
 
-proj1_sig :: a1 -> a1
-proj1_sig e =
-  e
-
 sig_of_sigT :: (Coq_sigT a1 ()) -> a1
 sig_of_sigT x =
   case x of {

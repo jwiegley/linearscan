@@ -36,7 +36,7 @@ handledIntervalIds (ScanState (Allocator__Build_ScanStateDesc ni _ _ _ hnd _ _ _
 
 getInterval :: ScanState -> IntervalId -> Interval
 getInterval (ScanState (Allocator__Build_ScanStateDesc ni _ _ _ _ f _ _)) n =
-    Interval (proj1_sig (f (from_nat ni n)))
+    Interval (f (from_nat ni n))
 
 registerAssignment :: ScanState -> IntervalId -> Maybe PhysReg
 registerAssignment (ScanState (Allocator__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =

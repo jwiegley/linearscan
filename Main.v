@@ -55,6 +55,7 @@ Extract Inlined Constant fold_left  => "(\f -> Prelude.flip (Data.List.foldl' f)
 Extract Inlined Constant fold_right => "Prelude.foldr".
 Extract Inlined Constant existsb    => "(Prelude.any)".
 Extract Inlined Constant filter     => "(Prelude.filter)".
+Extract Inlined Constant proj1_sig  => "".
 
 Extraction Blacklist String List NonEmpty.
 

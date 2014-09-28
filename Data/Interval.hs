@@ -6,7 +6,6 @@ import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
 import qualified Data.Range as Range
-import qualified Data.Specif as Specif
 
 
 data IntervalDesc =
@@ -47,10 +46,7 @@ intervalExtent d =
 
 anyRangeIntersects :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 anyRangeIntersects i j =
-  let {
-   f = \x y ->
-    Range.rangesIntersect (Specif.proj1_sig x) (Specif.proj1_sig y)}
-  in
+  let {f = \x y -> Range.rangesIntersect ( x) ( y)} in
   Prelude.foldr (\r b ->
     (Prelude.||) b ((Prelude.any) (f r) (NonEmpty0.coq_NE_to_list (rds j))))
     Prelude.False (NonEmpty0.coq_NE_to_list (rds i))
@@ -65,8 +61,6 @@ firstIntersectionPoint i j =
       NonEmpty0.coq_NE_fold_left (\acc' rd' ->
         case acc' of {
          Prelude.Just x -> Prelude.Just x;
-         Prelude.Nothing ->
-          Range.rangesIntersectionPoint (Specif.proj1_sig rd)
-            (Specif.proj1_sig rd')}) (rds j) Prelude.Nothing}) (rds i)
-    Prelude.Nothing
+         Prelude.Nothing -> Range.rangesIntersectionPoint ( rd) ( rd')})
+        (rds j) Prelude.Nothing}) (rds i) Prelude.Nothing
 

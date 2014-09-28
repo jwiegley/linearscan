@@ -6,7 +6,6 @@ import qualified Data.Compare as Compare
 import qualified Data.Compare_dec as Compare_dec
 import qualified Data.Fin as Fin
 import qualified Data.Peano as Peano
-import qualified Data.Specif as Specif
 
 
 type Coq_fin = Fin.Coq_t
@@ -17,7 +16,7 @@ from_nat m n =
 
 fin_to_nat :: Prelude.Int -> Coq_fin -> Prelude.Int
 fin_to_nat n f =
-  Specif.proj1_sig (Fin.to_nat n f)
+   (Fin.to_nat n f)
 
 ultimate_from_nat :: Prelude.Int -> Coq_fin
 ultimate_from_nat n =

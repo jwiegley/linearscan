@@ -162,15 +162,12 @@ _Allocator__unhandledExtent sd =
    [] -> 0;
    (:) i l ->
     case l of {
-     [] ->
-      Interval.intervalExtent
-        (Specif.proj1_sig (_Allocator__getInterval sd i));
+     [] -> Interval.intervalExtent ( (_Allocator__getInterval sd i));
      (:) i0 l0 ->
       let {
        f = \n x ->
         (Prelude.+) n
-          (Interval.intervalExtent
-            (Specif.proj1_sig (_Allocator__getInterval sd x)))}
+          (Interval.intervalExtent ( (_Allocator__getInterval sd x)))}
       in
       (\f -> Prelude.flip (Data.List.foldl' f)) f ((:) i ((:) i0 l0)) 0}}
 
@@ -204,7 +201,7 @@ _Allocator__curPosition :: Allocator__ScanStateDesc ->
                            Allocator__ScanStateCursor -> Prelude.Int
 _Allocator__curPosition sd s =
   Interval.intervalStart
-    (Specif.proj1_sig (_Allocator__getInterval sd (_Allocator__curId sd s)))
+    ( (_Allocator__getInterval sd (_Allocator__curId sd s)))
 
 type Allocator__NextScanState =
   Allocator__ScanStateDesc
@@ -359,8 +356,7 @@ _Allocator__nextIntersectionWith :: Interval.IntervalDesc ->
                                     Allocator__IntervalId -> Prelude.Maybe
                                     Prelude.Int
 _Allocator__nextIntersectionWith d sd jid =
-  Interval.firstIntersectionPoint
-    (Specif.proj1_sig (_Allocator__getInterval sd jid)) d
+  Interval.firstIntersectionPoint ( (_Allocator__getInterval sd jid)) d
 
 _Allocator__getRegisterIndex :: Allocator__ScanStateDesc ->
                                 (Allocator__IntervalId -> Prelude.Maybe
@@ -684,17 +680,16 @@ _Allocator__tryAllocateFreeReg sd cur =
   let {
    intersectingIntervals = (Prelude.filter) (\x ->
                              Interval.anyRangeIntersects
-                               (Specif.proj1_sig
+                               (
                                  (_Allocator__getInterval sd
                                    (_Allocator__curId sd cur)))
-                               (Specif.proj1_sig
-                                 (_Allocator__getInterval sd x)))
+                               ( (_Allocator__getInterval sd x)))
                              (_Allocator__inactive sd)}
   in
   let {
    freeUntilPos = _Allocator__getRegisterIndex sd
                     (_Allocator__nextIntersectionWith
-                      (Specif.proj1_sig
+                      (
                         (_Allocator__getInterval sd
                           (_Allocator__curId sd cur))) sd) freeUntilPos'
                     intersectingIntervals}
@@ -710,8 +705,7 @@ _Allocator__tryAllocateFreeReg sd cur =
        Prelude.False -> Prelude.Just
         (case NPeano.ltb
                 (Interval.intervalEnd
-                  (Specif.proj1_sig
-                    (_Allocator__getInterval sd (_Allocator__curId sd cur))))
+                  ( (_Allocator__getInterval sd (_Allocator__curId sd cur))))
                 n of {
           Prelude.True -> default0;
           Prelude.False ->
@@ -751,19 +745,13 @@ _Allocator__checkActiveIntervals sd pos =
        let {
         st1 = case NPeano.ltb
                      (Interval.intervalEnd
-                       (Specif.proj1_sig
-                         (_Allocator__getInterval sd0 (Specif.proj1_sig x))))
-                     pos0 of {
-               Prelude.True ->
-                _Allocator__moveActiveToHandled sd0 (Specif.proj1_sig x);
+                       ( (_Allocator__getInterval sd0 ( x)))) pos0 of {
+               Prelude.True -> _Allocator__moveActiveToHandled sd0 ( x);
                Prelude.False ->
                 case (Prelude.not)
                        (Interval.intervalCoversPos
-                         (Specif.proj1_sig
-                           (_Allocator__getInterval sd0 (Specif.proj1_sig x)))
-                         pos0) of {
-                 Prelude.True ->
-                  _Allocator__moveActiveToInactive sd0 (Specif.proj1_sig x);
+                         ( (_Allocator__getInterval sd0 ( x))) pos0) of {
+                 Prelude.True -> _Allocator__moveActiveToInactive sd0 ( x);
                  Prelude.False -> ss}}}
        in
        go sd0 st1 xs pos0}}
@@ -780,18 +768,12 @@ _Allocator__checkInactiveIntervals sd pos =
        let {
         st1 = case NPeano.ltb
                      (Interval.intervalEnd
-                       (Specif.proj1_sig
-                         (_Allocator__getInterval sd0 (Specif.proj1_sig x))))
-                     pos0 of {
-               Prelude.True ->
-                _Allocator__moveInactiveToHandled sd0 (Specif.proj1_sig x);
+                       ( (_Allocator__getInterval sd0 ( x)))) pos0 of {
+               Prelude.True -> _Allocator__moveInactiveToHandled sd0 ( x);
                Prelude.False ->
                 case Interval.intervalCoversPos
-                       (Specif.proj1_sig
-                         (_Allocator__getInterval sd0 (Specif.proj1_sig x)))
-                       pos0 of {
-                 Prelude.True ->
-                  _Allocator__moveInactiveToActive sd0 (Specif.proj1_sig x);
+                       ( (_Allocator__getInterval sd0 ( x))) pos0 of {
+                 Prelude.True -> _Allocator__moveInactiveToActive sd0 ( x);
                  Prelude.False -> ss}}}
        in
        go sd0 st1 xs pos0}}
@@ -827,8 +809,7 @@ _Allocator__linearScan_F linearScan0 sd =
     case s of {
      Specif.Coq_existT x s0 ->
       linearScan0
-        (_Allocator__handleInterval sd
-          (Specif.proj1_sig (_Allocator__getInterval sd x))) __};
+        (_Allocator__handleInterval sd ( (_Allocator__getInterval sd x))) __};
    Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
 _Allocator__linearScan_terminate :: Allocator__ScanStateDesc ->
@@ -840,8 +821,7 @@ _Allocator__linearScan_terminate sd =
      Specif.Coq_existT x s0 ->
       Specif.sig_rec (\rec_res _ -> rec_res)
         (_Allocator__linearScan_terminate
-          (_Allocator__handleInterval sd
-            (Specif.proj1_sig (_Allocator__getInterval sd x))))};
+          (_Allocator__handleInterval sd ( (_Allocator__getInterval sd x))))};
    Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
 _Allocator__linearScan :: Allocator__ScanStateDesc ->
@@ -853,8 +833,7 @@ _Allocator__linearScan sd =
      Specif.Coq_existT x s0 ->
       Specif.sig_rec (\rec_res _ -> rec_res)
         (_Allocator__linearScan
-          (_Allocator__handleInterval sd
-            (Specif.proj1_sig (_Allocator__getInterval sd x))))};
+          (_Allocator__handleInterval sd ( (_Allocator__getInterval sd x))))};
    Specif.Coq_inright -> Specif.sig_of_sigT (Specif.Coq_existT sd __)}
 
 data Allocator__R_linearScan =
@@ -919,6 +898,5 @@ _Allocator__determineIntervals =
 _Allocator__allocateRegisters :: (Allocator__Graph Allocator__VirtReg) ->
                                  Allocator__ScanStateDesc
 _Allocator__allocateRegisters g =
-  Specif.proj1_sig
-    (_Allocator__linearScan (_Allocator__determineIntervals g))
+   (_Allocator__linearScan (_Allocator__determineIntervals g))
 
