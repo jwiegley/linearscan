@@ -1,19 +1,19 @@
-module Data.Data.LinearScan where
+module Data.LinearScan where
 
 import qualified Prelude
-import qualified Data.Data.Compare as Compare as Data.Compare as Compare
-import qualified Data.Data.Compare_dec as Compare_dec as Data.Compare_dec as Compare_dec
-import qualified Data.Data.Datatypes as Datatypes as Data.Datatypes as Datatypes
-import qualified Data.Data.EqNat as EqNat as Data.EqNat as EqNat
-import qualified Data.Data.Fin0 as Fin0 as Data.Fin0 as Fin0
-import qualified Data.Data.Fin as Fin as Data.Fin as Fin
-import qualified Data.Data.Interval as Interval as Data.Interval as Interval
-import qualified Data.Data.Lib as Lib as Data.Lib as Lib
-import qualified Data.Data.List as List as Data.List as List
-import qualified Data.Data.Logic as Logic as Data.Logic as Logic
-import qualified Data.Data.NPeano as NPeano as Data.NPeano as NPeano
-import qualified Data.Data.Peano as Peano as Data.Peano as Peano
-import qualified Data.Data.Specif as Specif as Data.Specif as Specif
+import qualified Data.Compare as Compare
+import qualified Data.Compare_dec as Compare_dec
+import qualified Data.Datatypes as Datatypes
+import qualified Data.EqNat as EqNat
+import qualified Data.Fin0 as Fin0
+import qualified Data.Fin as Fin
+import qualified Data.Interval as Interval
+import qualified Data.Lib as Lib
+import qualified Data.List as List
+import qualified Data.Logic as Logic
+import qualified Data.NPeano as NPeano
+import qualified Data.Peano as Peano
+import qualified Data.Specif as Specif
 
 
 __ :: any

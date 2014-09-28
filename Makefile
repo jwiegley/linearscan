@@ -116,9 +116,9 @@ endif
 #                                     #
 #######################################
 
-all: $(VOFILES) hsfixup
+all: $(VOFILES) Data/LinearScan.hs
 
-hsfixup:
+Data/LinearScan.hs: LinearScan.vo
 	ls -1 *.hs | grep -v Setup.hs | \
 	    while read file; do mv $$file Data; done
 	perl -i -pe 's/import qualified (.*)/import qualified Data.\1 as \1/' Data/*.hs
