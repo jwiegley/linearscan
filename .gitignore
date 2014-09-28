@@ -1,6 +1,5 @@
-/LinearScan.html
-/LinearScan.v.d
-/Makefile
+/*.d
+/*.glob
 /coqdoc.css
 /html/
 /index.html
