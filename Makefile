@@ -112,6 +112,7 @@ endif
 #######################################
 
 all: $(VOFILES) Data/Main.hs
+	egrep -i '(admit|undefined)' *.v | egrep -v 'Definition undefined'
 
 Data/Main.hs: Main.vo
 	ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
