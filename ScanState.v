@@ -6,17 +6,21 @@ Require Import Fin.
 Require Import Interval.
 Require Import Lib.
 Require Import NoDup.
+Require Coq.Vectors.Vector.
 
 Module Import LN := ListNotations.
 
 Generalizable All Variables.
 
-Module MScanState (M : Machine).
-Import M.
+Module MScanState (Mach : Machine).
+Import Mach.
 
 Definition maxReg := maxReg.
 Definition PhysReg := fin maxReg.
 Definition registers_exist := registers_exist.
+
+Module V := Coq.Vectors.Vector.
+Definition Vec := V.t.
 
 (** ** ScanStateDesc *)
 
@@ -33,8 +37,8 @@ Record ScanStateDesc := {
     inactive  : list IntervalId;   (* falls in lifetime hole *)
     handled   : list IntervalId;   (* ends before pos *)
 
-    getInterval : IntervalId -> { d : IntervalDesc | Interval d };
-    assignments : IntervalId -> option PhysReg;
+    intervals   : Vec { d : IntervalDesc | Interval d } nextInterval;
+    assignments : Vec (option PhysReg) nextInterval;
 
     (** Fixed Intervals
 
@@ -56,7 +60,8 @@ Record ScanStateDesc := {
         site. Therefore, the allocation pass cannot assign a register to any
         interval there, and all intervals are spilled before the call. *)
 
-    getFixedInterval : PhysReg -> option { d : IntervalDesc | FixedInterval d };
+    fixedIntervals :
+      Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
 
     (* jww (2014-09-25): These restricting lemmas should be added back once
        everything is functional. *)
@@ -94,13 +99,13 @@ Defined.
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandled sd with
   | nil => 0
-  | [i] => intervalExtent (proj2_sig (getInterval sd i))
-  | xs  => let f n x := n + intervalExtent (proj2_sig (getInterval sd x)) in
+  | [i] => intervalExtent (proj2_sig (V.nth (intervals sd) i))
+  | xs  => let f n x := n + intervalExtent (proj2_sig (V.nth (intervals sd) x)) in
            fold_left f xs 0
   end.
 
 Lemma NoDup_unhandledExtent_cons
-  : forall ni i (unh : list (fin ni)) geti assgn assgn' getfixi
+  : forall ni i (unh : list (fin ni)) ints assgn assgn' fixints
            (act act' inact inact' hnd hnd' : list (fin ni))
            (lau : NoDup (unh ++ act ++ inact ++ hnd))
            (lau' : NoDup ((i :: unh) ++ act' ++ inact' ++ hnd')),
@@ -110,9 +115,9 @@ Lemma NoDup_unhandledExtent_cons
      ; active           := act
      ; inactive         := inact
      ; handled          := hnd
-     ; getInterval      := geti
+     ; intervals        := ints
      ; assignments      := assgn
-     ; getFixedInterval := getfixi
+     ; fixedIntervals   := fixints
      ; lists_are_unique := lau
      |} <
   unhandledExtent
@@ -121,15 +126,15 @@ Lemma NoDup_unhandledExtent_cons
      ; active           := act'
      ; inactive         := inact'
      ; handled          := hnd'
-     ; getInterval      := geti
+     ; intervals        := ints
      ; assignments      := assgn'
-     ; getFixedInterval := getfixi
+     ; fixedIntervals   := fixints
      ; lists_are_unique := lau'
      |}.
 Proof.
   intros.
   induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (proj2_sig (geti i))). omega.
+  pose (Interval_extent_nonzero (proj2_sig (V.nth ints i))). omega.
   destruct unh; simpl. omega.
   apply fold_fold_lt. omega.
 Qed.
@@ -262,15 +267,15 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := nil
        ; inactive         := nil
        ; handled          := nil
-       ; getInterval      := fin_contra
-       ; assignments      := fin_contra
-       ; getFixedInterval := fun _ => None
+       ; intervals        := V.nil _
+       ; assignments      := V.nil _
+       ; fixedIntervals   := V.const None _
        (* ; unhandled_sorted := LSorted_nil _ *)
        ; lists_are_unique := NoDup_nil _
        |}
 
   | ScanState_newUnhandled
-      ni unh (* unhsort *) act inact hnd geti assgn getfixi lau :
+      ni unh (* unhsort *) act inact hnd ints assgn fixints lau :
     forall `(i : Interval d),
     ScanState
       {| nextInterval     := ni
@@ -278,9 +283,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := act
        ; inactive         := inact
        ; handled          := hnd
-       ; getInterval      := geti
+       ; intervals        := ints
        ; assignments      := assgn
-       ; getFixedInterval := getfixi
+       ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhsort *)
        ; lists_are_unique := lau
        |} ->
@@ -291,23 +296,15 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := map fin_expand act
        ; inactive         := map fin_expand inact
        ; handled          := map fin_expand hnd
-       ; getInterval      :=
-         fun n => match cmp_eq_dec n newi with
-                  | left _ => existT _ d i
-                  | right Hn => geti (fin_safe_reduce n (rew_in_not_eq H Hn))
-                  end
-       ; assignments      :=
-         fun n => match cmp_eq_dec n newi with
-                  | left _ => None
-                  | right Hn => assgn (fin_safe_reduce n (rew_in_not_eq H Hn))
-                  end
-       ; getFixedInterval := getfixi
+       ; intervals        := V.shiftin (exist _ d i) ints
+       ; assignments      := V.shiftin None assgn
+       ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhsort *)
        ; lists_are_unique := map_fin_expand_rewrite (NoDup_fin_cons _ _ lau H)
        |}
 
   | ScanState_moveUnhandledToActive
-      ni unh (* unhsort *) act inact hnd geti assgn getfixi x reg :
+      ni unh (* unhsort *) act inact hnd ints assgn fixints x reg :
     forall lau : NoDup ((x :: unh) ++ act ++ inact ++ hnd),
     ScanState
       {| nextInterval     := ni
@@ -315,9 +312,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := act
        ; inactive         := inact
        ; handled          := hnd
-       ; getInterval      := geti
+       ; intervals        := ints
        ; assignments      := assgn
-       ; getFixedInterval := getfixi
+       ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique := lau
        |} ->
@@ -327,11 +324,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := x :: act
        ; inactive         := inact
        ; handled          := hnd
-       ; getInterval      := geti
-       ; assignments      := fun i => if cmp_eq_dec i x
-                                      then Some reg
-                                      else assgn i
-       ; getFixedInterval := getfixi
+       ; intervals        := ints
+       ; assignments      := V.replace assgn x (Some reg)
+       ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique := move_unhandled_to_active _ x unh act inact hnd lau
        |}
@@ -344,9 +339,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := remove cmp_eq_dec x (active sd)
        ; inactive         := x :: inactive sd
        ; handled          := handled sd
-       ; getInterval      := getInterval sd
+       ; intervals        := intervals sd
        ; assignments      := assignments sd
-       ; getFixedInterval := getFixedInterval sd
+       ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique :=
          move_active_to_inactive sd x (lists_are_unique sd) H
@@ -360,9 +355,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := remove cmp_eq_dec x (active sd)
        ; inactive         := inactive sd
        ; handled          := x :: handled sd
-       ; getInterval      := getInterval sd
+       ; intervals        := intervals sd
        ; assignments      := assignments sd
-       ; getFixedInterval := getFixedInterval sd
+       ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique :=
          move_active_to_handled sd x (lists_are_unique sd) H
@@ -376,9 +371,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := x :: active sd
        ; inactive         := remove cmp_eq_dec x (inactive sd)
        ; handled          := handled sd
-       ; getInterval      := getInterval sd
+       ; intervals        := intervals sd
        ; assignments      := assignments sd
-       ; getFixedInterval := getFixedInterval sd
+       ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique :=
          move_inactive_to_active sd x (lists_are_unique sd) H
@@ -392,9 +387,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := active sd
        ; inactive         := remove cmp_eq_dec x (inactive sd)
        ; handled          := x :: handled sd
-       ; getInterval      := getInterval sd
+       ; intervals        := intervals sd
        ; assignments      := assignments sd
-       ; getFixedInterval := getFixedInterval sd
+       ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique :=
          move_inactive_to_handled sd x (lists_are_unique sd) H
@@ -417,8 +412,8 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let ue := unhandledExtent sd in
   match unhandled sd with
   | nil    => ue = 0
-  | [i]    => ue = intervalExtent (proj2_sig (getInterval sd i))
-  | i :: _ => ue > intervalExtent (proj2_sig (getInterval sd i))
+  | [i]    => ue = intervalExtent (proj2_sig (V.nth (intervals sd) i))
+  | i :: _ => ue > intervalExtent (proj2_sig (V.nth (intervals sd) i))
   end.
 Proof.
   destruct sd.
@@ -428,7 +423,7 @@ Proof.
   destruct l eqn:Heqe2; simpl.
     reflexivity.
   apply fold_gt.
-  pose (Interval_extent_nonzero (proj2_sig (getInterval0 i0))).
+  pose (Interval_extent_nonzero (proj2_sig (V.nth intervals0 i0))).
   omega.
 Qed.
 
@@ -443,7 +438,7 @@ Record ScanStateCursor (sd : ScanStateDesc) := {
     curExists : length (unhandled sd) > 0;
 
     curId         := safe_hd (unhandled sd) curExists;
-    curIntDetails := getInterval sd curId
+    curIntDetails := V.nth (intervals sd) curId
 }.
 
 Arguments curState {sd} _.

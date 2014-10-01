@@ -19,10 +19,6 @@ eq_rec :: a1 -> a2 -> a1 -> a2
 eq_rec x f y =
   eq_rect x f y
 
-eq_rec_r :: a1 -> a2 -> a1 -> a2
-eq_rec_r x h y =
-  eq_rec x h y
-
 eq_rect_r :: a1 -> a2 -> a1 -> a2
 eq_rect_r x h y =
   eq_rect x h y

@@ -1,6 +1,7 @@
 -I .
 Compare.v
 Fin.v
+Vector.v
 Lib.v
 NonEmpty.v
 Range.v

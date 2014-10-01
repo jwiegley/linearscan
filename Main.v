@@ -57,6 +57,6 @@ Extract Inlined Constant existsb    => "(Prelude.any)".
 Extract Inlined Constant filter     => "(Prelude.filter)".
 Extract Inlined Constant proj1_sig  => "".
 
-Extraction Blacklist String List NonEmpty.
+Extraction Blacklist String List Vector NonEmpty.
 
 Separate Extraction LinearScan.allocateRegisters.

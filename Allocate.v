@@ -1,67 +1,19 @@
 Require Import Coq.Program.Basics.
-Require Import Coq.Program.Tactics.
+Require Import Coq.Vectors.Vector.
 Require Import Compare.
 Require Import Fin.
 Require Import Interval.
 Require Import Lib.
-Require Import Range.
 Require Import ScanState.
+Require Import Vector.
 Require Import SSMorph.
+
+Open Scope program_scope.
 
 Generalizable All Variables.
 
 Module MAllocate (M : Machine).
 Include MSSMorph M.
-
-(** * Helper functions *)
-
-Definition nextIntersectionWith
-  `(i : Interval d) `(jid : IntervalId sd) : option nat :=
-  firstIntersectionPoint (proj2_sig (getInterval sd jid)) i.
-
-(** Given a function from intervals to indices ([intervalIndex]), and a
-    default function from registers to indices ([registerIndex]), build a
-    complete function from registers to indices by looking up the given
-    register in the list of assignments, finding the first interval it has
-    been assigned to, and then using [intervalIndex] to find the index, if
-    any. *)
-
-Definition getRegisterIndex `(st : ScanState sd)
-  (intervalIndex : IntervalId sd -> option nat)
-  (registerIndex : PhysReg -> option nat)
-  (intervals : list (IntervalId sd)) : PhysReg -> option nat :=
-  fold_right
-    (fun x f => fun r =>
-       match assignments sd x with
-       | None => f r
-       | Some a => if cmp_eq_dec a r then intervalIndex x else f r
-       end) registerIndex intervals.
-
-(** Given a function from registers to indices ([registerIndex]), and a
-    starting register [start] (the highest register to be considered), look
-    through the registers from highest to lowest to find the one with the
-    highest associated index, where [None] counts as infinitely high (i.e.,
-    unassociated). *)
-
-Function findRegister (registerIndex : PhysReg -> option nat)
-  (start : PhysReg) {measure fin_to_nat start}
-  : (PhysReg * option nat)%type :=
-  match registerIndex start with
-  | None => (start, None)
-  | Some pos =>
-      match pred_fin start with
-      | None => (start, Some pos)
-      | Some nreg =>
-          match findRegister registerIndex nreg with
-          | (reg, None) => (reg, None)
-          | (reg, Some pos') =>
-              if pos <? pos'
-              then (reg, Some pos')
-              else (reg, Some pos)
-          end
-      end
-  end.
-Proof. intros; apply pred_fin_lt; assumption. Qed.
 
 (** Split the current interval before position [before].  This must succeed,
     which means there must be use positions within the interval prior to
@@ -76,6 +28,27 @@ Definition splitInterval `(cur : ScanStateCursor sd) (before : option nat)
   : NextState cur SSMorphStLen :=
   (* jww (2014-09-26): NYI *)
   Build_NextScanState sd (curState cur) undefined.
+
+Definition atRegister (sd : ScanStateDesc)
+  {a} (x : IntervalId sd -> a) (v : Vec a maxReg) (i : IntervalId sd) :=
+  match V.nth (assignments sd) i with
+  | None => v
+  | Some r => replace v r (x i)
+  end.
+
+Definition registerWithHighestPos :=
+  fold_left_with_index
+    (fun reg (res : fin maxReg * option nat) x =>
+       match (res, x) with
+       | ((r, None), _) => (r, None)
+       | (_, None) => (reg, None)
+       | ((r, Some n), Some m) =>
+         if n <? m then (reg, Some m) else (r, Some n)
+       end) (from_nat 0 registers_exist, Some 0).
+
+Definition nextIntersectionWith
+  `(i : Interval d) `(jid : IntervalId sd) : option nat :=
+  firstIntersectionPoint (proj2_sig (V.nth (intervals sd) jid)) i.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -92,22 +65,24 @@ Definition tryAllocateFreeReg `(cur : ScanStateCursor sd)
        freeUntilPos[it.reg] = 0
      for each interval it in inactive intersecting with current do
        freeUntilPos[it.reg] = next intersection of it with current *)
-  let st      := curState cur in
-  let current := curInterval cur in
+  let st             := curState cur in
+  let current        := curInterval cur in
+  let freeUntilPos'' := const None maxReg in
+  let freeUntilPos'  :=
+      fold_left (atRegister sd (fun _ => Some 0)) (active sd)
+                freeUntilPos'' in
 
-  let freeUntilPos' :=
-      getRegisterIndex st (fun _ => Some 0) (fun _ => None) (active sd) in
   let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects current
-                           (proj2_sig (getInterval sd x)))
-               (inactive sd) in
+      filter (fun x => anyRangeIntersects current
+                         (proj2_sig (V.nth (intervals sd) x)))
+             (inactive sd) in
   let freeUntilPos :=
-      getRegisterIndex st (nextIntersectionWith current) freeUntilPos'
-                       intersectingIntervals in
+      fold_left (atRegister sd (nextIntersectionWith current))
+                intersectingIntervals freeUntilPos' in
 
   (* reg = register with highest freeUntilPos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
-  let (reg, mres) := findRegister freeUntilPos lastReg in
+  let (reg, mres) := registerWithHighestPos freeUntilPos in
   let default     := moveUnhandledToActive cur reg in
 
   (* [mres] indicates the highest use position of the found register *)
@@ -147,28 +122,30 @@ Admitted.
     the change to the [ScanState] must be a productive one. *)
 Definition allocateBlockedReg `(cur : ScanStateCursor sd)
   : NextState cur SSMorphSt :=
+  let st      := curState cur in
+  let current := curInterval cur in
+  let pos     := curPosition cur in
+
   (* set nextUsePos of all physical registers to maxInt
      for each interval it in active do
        nextUsePos[it.reg] = next use of it after start of current
      for each interval it in inactive intersecting with current do
        nextUsePos[it.reg] = next use of it after start of current *)
-  let st      := curState cur in
-  let current := curInterval cur in
-  let pos     := curPosition cur in
-
+  let nextUsePos'' := const None maxReg in
   let nextUsePos' :=
-      getRegisterIndex st (nextUseAfter pos) (fun _ => None) (active sd) in
+      fold_left (atRegister sd (nextUseAfter pos)) (active sd)
+                nextUsePos'' in
   let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects current
-                           (proj2_sig (getInterval sd x)))
-               (inactive sd) in
+      filter (fun x => anyRangeIntersects current
+                         (proj2_sig (V.nth (intervals sd) x)))
+             (inactive sd) in
   let nextUsePos :=
-      getRegisterIndex st (nextUseAfter pos)
-                       nextUsePos' intersectingIntervals in
+      fold_left (atRegister sd (nextUseAfter pos))
+                intersectingIntervals nextUsePos' in
 
   (* reg = register with highest nextUsePos *)
   let lastReg     := ultimate_from_nat maxReg registers_exist in
-  let (reg, mres) := findRegister nextUsePos lastReg in
+  let (reg, mres) := registerWithHighestPos nextUsePos in
 
   (* if first usage of current is after nextUsePos[reg] then
        // all other intervals are used before current, so it is best
@@ -212,7 +189,7 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
-        let i := proj2_sig (getInterval sd (proj1_sig x)) in
+        let i := proj2_sig (V.nth (intervals sd) (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
                    then uncurry_sig (moveActiveToHandled st) x
                    else if negb (intervalCoversPos i pos)
@@ -234,7 +211,7 @@ Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
                move it from active to handled
              else if it covers position then
                move it from active to inactive *)
-        let i := proj2_sig (getInterval sd (proj1_sig x)) in
+        let i := proj2_sig (V.nth (intervals sd) (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
                    then uncurry_sig (moveInactiveToHandled st) x
                    else if intervalCoversPos i pos

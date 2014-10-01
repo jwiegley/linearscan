@@ -22,3 +22,13 @@ list_rect f f0 l =
    [] -> f;
    (:) y l0 -> f0 y l0 (list_rect f f0 l0)}
 
+length :: ([] a1) -> Prelude.Int
+length l =
+  case l of {
+   [] -> 0;
+   (:) y l' -> Prelude.succ (length l')}
+
+id :: a1 -> a1
+id x =
+  x
+

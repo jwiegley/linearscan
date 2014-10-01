@@ -162,14 +162,11 @@ Proof.
   destruct unhandled0; simpl in *. omega.
   pose (ScanState_moveUnhandledToActive nextInterval0 unhandled0
           (* unhsort *)
-          active0 inactive0 handled0 getInterval0 assignments0
-          getFixedInterval0 i reg lists_are_unique0).
+          active0 inactive0 handled0 intervals0 assignments0
+          fixedIntervals0 i reg lists_are_unique0).
   eexists. apply s. apply curState0.
-  pose (NoDup_unhandledExtent_cons nextInterval0 i unhandled0 getInterval0
-         (fun i0 : fin nextInterval0 =>
-            if cmp_eq_dec i0 i
-            then Some reg
-            else assignments0 i0) assignments0 getFixedInterval0
+  pose (NoDup_unhandledExtent_cons nextInterval0 i unhandled0 intervals0
+         (V.replace assignments0 i (Some reg)) assignments0 fixedIntervals0
          (i :: active0) active0 inactive0 inactive0 handled0 handled0
          (move_unhandled_to_active _ i unhandled0 active0 inactive0 handled0
             lists_are_unique0) lists_are_unique0)

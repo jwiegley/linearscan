@@ -75,6 +75,9 @@ Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
       end in
   go l.
 
+(** Move an element from one position within a vector to another position in
+    the same vector. *)
+
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
 

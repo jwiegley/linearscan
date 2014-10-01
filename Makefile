@@ -77,6 +77,7 @@ endif
 
 VFILES:=Compare.v\
   Fin.v\
+  Vector.v\
   Interval.v\
   Lib.v\
   Allocate.v\
@@ -120,6 +121,8 @@ Data/Main.hs: Main.vo
 	    while read file; do mv $$file Data; done
 	perl -i -pe 's/import qualified (.*)/import qualified Data.\1 as \1/' Data/*.hs
 	perl -i -pe 's/import qualified Data\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List/' Data/*.hs
+	perl -i -pe 's/import qualified Data\.GHC/import qualified GHC/' Data/*.hs
+	perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' Data/*.hs
 	perl -i -pe 's/module (.+?) where/module Data.\1 where/' Data/*.hs
 
 spec: $(VIFILES)
