@@ -689,60 +689,63 @@ _LinearScan__moveInactiveToHandled sd x =
     (_LinearScan__intervals sd) (_LinearScan__assignments sd)
     (_LinearScan__fixedIntervals sd)
 
+_LinearScan__registerWithHighestPos :: (LinearScan__Vec
+                                       (Prelude.Maybe Prelude.Int)) -> (,)
+                                       Fin0.Coq_fin
+                                       (Prelude.Maybe Prelude.Int)
+_LinearScan__registerWithHighestPos =
+  unsafeCoerce
+    (Vector1.fold_left_with_index _LinearScan__maxReg (\reg res x ->
+      case res of {
+       (,) r o ->
+        case o of {
+         Prelude.Just n ->
+          case x of {
+           Prelude.Just m ->
+            case NPeano.ltb n m of {
+             Prelude.True -> (,) reg (Prelude.Just m);
+             Prelude.False -> (,) r (Prelude.Just n)};
+           Prelude.Nothing -> (,) reg Prelude.Nothing};
+         Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,)
+      (Fin0.from_nat _MyMachine__maxReg 0) (Prelude.Just 0)))
+
+_LinearScan__atIntervalReg :: LinearScan__ScanStateDesc ->
+                              LinearScan__IntervalId -> (LinearScan__Vec 
+                              a1) -> a1 -> Vector0.Coq_t a1
+_LinearScan__atIntervalReg sd i v x =
+  case _LinearScan__V__nth (_LinearScan__nextInterval sd)
+         (_LinearScan__assignments sd) i of {
+   Prelude.Just r -> Vector0.replace _LinearScan__maxReg (unsafeCoerce v) r x;
+   Prelude.Nothing -> unsafeCoerce v}
+
 _LinearScan__splitInterval :: LinearScan__ScanStateDesc -> (Prelude.Maybe
                               Prelude.Int) -> LinearScan__NextState
 _LinearScan__splitInterval sd before =
   sd
 
-_LinearScan__atRegister :: LinearScan__ScanStateDesc ->
-                           (LinearScan__IntervalId -> a1) -> (LinearScan__Vec
-                           a1) -> LinearScan__IntervalId -> Vector0.Coq_t 
-                           a1
-_LinearScan__atRegister sd x v i =
-  case _LinearScan__V__nth (_LinearScan__nextInterval sd)
-         (_LinearScan__assignments sd) i of {
-   Prelude.Just r ->
-    Vector0.replace _LinearScan__maxReg (unsafeCoerce v) r (x i);
-   Prelude.Nothing -> unsafeCoerce v}
+_LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
+                              LinearScan__IntervalId -> Prelude.Maybe
+                              LinearScan__PhysReg
+_LinearScan__getAssignment sd i =
+  _LinearScan__V__nth (_LinearScan__nextInterval sd)
+    (_LinearScan__assignments sd) i
 
-_LinearScan__registerWithHighestPos :: (Vector1.Vec
-                                       (Prelude.Maybe Prelude.Int)) -> (,)
-                                       Fin0.Coq_fin
-                                       (Prelude.Maybe Prelude.Int)
-_LinearScan__registerWithHighestPos =
-  Vector1.fold_left_with_index _LinearScan__maxReg (\reg res x ->
-    case res of {
-     (,) r o ->
-      case o of {
-       Prelude.Just n ->
-        case x of {
-         Prelude.Just m ->
-          case NPeano.ltb n m of {
-           Prelude.True -> (,) reg (Prelude.Just m);
-           Prelude.False -> (,) r (Prelude.Just n)};
-         Prelude.Nothing -> (,) reg Prelude.Nothing};
-       Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,)
-    (Fin0.from_nat _MyMachine__maxReg 0) (Prelude.Just 0))
-
-_LinearScan__nextIntersectionWith :: Interval.IntervalDesc ->
-                                     LinearScan__ScanStateDesc ->
-                                     LinearScan__IntervalId -> Prelude.Maybe
-                                     Prelude.Int
-_LinearScan__nextIntersectionWith d sd jid =
-  Interval.firstIntersectionPoint
-    (
-      (_LinearScan__V__nth (_LinearScan__nextInterval sd)
-        (_LinearScan__intervals sd) jid)) d
+_LinearScan__assignRegister :: LinearScan__ScanStateDesc ->
+                               LinearScan__PhysReg -> LinearScan__NextState
+_LinearScan__assignRegister =
+  Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc -> Prelude.Maybe
                                    LinearScan__NextState
 _LinearScan__tryAllocateFreeReg sd =
-  let {freeUntilPos'' = Vector0.const Prelude.Nothing _LinearScan__maxReg} in
   let {
-   freeUntilPos' = (\f -> Prelude.flip (Data.List.foldl' f))
-                     (unsafeCoerce
-                       (_LinearScan__atRegister sd (\x -> Prelude.Just 0)))
-                     (_LinearScan__active sd) freeUntilPos''}
+   go = \n ->
+    (\f -> Prelude.flip (Data.List.foldl' f)) (\v i ->
+      _LinearScan__atIntervalReg sd i (unsafeCoerce v) (n i))}
+  in
+  let {
+   freeUntilPos' = go (\x -> Prelude.Just 0) (_LinearScan__active sd)
+                     (Vector0.const Prelude.Nothing _LinearScan__maxReg)}
   in
   let {
    intersectingIntervals = (Prelude.filter) (\x ->
@@ -755,16 +758,17 @@ _LinearScan__tryAllocateFreeReg sd =
                              (_LinearScan__inactive sd)}
   in
   let {
-   freeUntilPos = (\f -> Prelude.flip (Data.List.foldl' f))
-                    (unsafeCoerce
-                      (_LinearScan__atRegister sd
-                        (_LinearScan__nextIntersectionWith
-                          ( (_LinearScan__curIntDetails sd)) sd)))
+   freeUntilPos = go (\i ->
+                    Interval.firstIntersectionPoint
+                      (
+                        (_LinearScan__V__nth (_LinearScan__nextInterval sd)
+                          (_LinearScan__intervals sd) i))
+                      ( (_LinearScan__curIntDetails sd)))
                     intersectingIntervals freeUntilPos'}
   in
   case _LinearScan__registerWithHighestPos (unsafeCoerce freeUntilPos) of {
    (,) reg mres ->
-    let {default0 = _LinearScan__moveUnhandledToActive sd reg} in
+    let {success = _LinearScan__moveUnhandledToActive sd reg} in
     case mres of {
      Prelude.Just n ->
       case EqNat.beq_nat n 0 of {
@@ -772,22 +776,26 @@ _LinearScan__tryAllocateFreeReg sd =
        Prelude.False -> Prelude.Just
         (case NPeano.ltb
                 (Interval.intervalEnd ( (_LinearScan__curIntDetails sd))) n of {
-          Prelude.True -> default0;
+          Prelude.True -> success;
           Prelude.False ->
-           _LinearScan__moveUnhandledToActive
-             (_LinearScan__nextDesc
-               (_LinearScan__splitInterval sd (Prelude.Just n))) reg})};
-     Prelude.Nothing -> Prelude.Just default0}}
+           let {spl = _LinearScan__splitInterval sd (Prelude.Just n)} in
+           _LinearScan__moveUnhandledToActive (_LinearScan__nextDesc spl) reg})};
+     Prelude.Nothing -> Prelude.Just success}}
 
-_LinearScan__nextUseAfter :: Prelude.Int -> LinearScan__ScanStateDesc ->
-                             LinearScan__IntervalId -> Prelude.Maybe
-                             Prelude.Int
+_LinearScan__nextUseAfter :: Interval.IntervalDesc -> Prelude.Int ->
+                             Prelude.Maybe Prelude.Int
 _LinearScan__nextUseAfter =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
                                          LinearScan__NextScanState
 _LinearScan__assignSpillSlotToCurrent =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+_LinearScan__intersectsWithFixedInternal :: LinearScan__ScanStateDesc ->
+                                            LinearScan__PhysReg ->
+                                            Prelude.Bool
+_LinearScan__intersectsWithFixedInternal =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__allocateBlockedReg :: LinearScan__ScanStateDesc ->

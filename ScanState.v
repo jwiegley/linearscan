@@ -325,6 +325,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; inactive         := inact
        ; handled          := hnd
        ; intervals        := ints
+       (* jww (2014-10-01): Prove: It was None before this call *)
        ; assignments      := V.replace assgn x (Some reg)
        ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhandled_sorted sd *)

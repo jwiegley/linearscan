@@ -75,6 +75,15 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
 Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
 Proof. intros. constructor; auto. constructor; auto. Defined.
 
+Program Instance SSMorphLen_Trans : Transitive SSMorphLen.
+Obligation 1.
+  constructor.
+    destruct H. destruct H0.
+    transitivity y; assumption.
+  inversion H. inversion H0.
+  intros. auto.
+Qed.
+
 Record SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
     stlen_is_SSMorphLen :> SSMorphLen sd1 sd2;
     stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
