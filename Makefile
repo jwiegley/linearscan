@@ -80,6 +80,7 @@ VFILES:=Compare.v\
   Interval.v\
   Lib.v\
   Allocate.v\
+  Graph.v\
   Main.v\
   Machine.v\
   NoDup.v\

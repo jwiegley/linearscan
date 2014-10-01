@@ -1,11 +1,16 @@
+Require Import Coq.Arith.Wf_nat.
+Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
 Require Import Fin.
 Require Import Interval.
 Require Import Lib.
 Require Import ScanState.
+Require Import FunctionalExtensionality.
 
 Generalizable All Variables.
+
+Open Scope program_scope.
 
 Module MSSMorph (M : Machine).
 Include MScanState M.
@@ -29,23 +34,13 @@ Definition newSSMorph (s : ScanStateDesc) : SSMorph s s.
 Proof. constructor; auto. Defined.
 
 Program Instance SSMorph_PO : PreOrder SSMorph.
-Obligation 1. constructor; auto. Defined.
+Obligation 1. constructor; auto. Qed.
 Obligation 2.
   constructor; destruct H; destruct H0.
   transitivity (nextInterval y); auto.
   transitivity (unhandledExtent y); auto.
   transitivity (length (handled y)); auto.
-Defined.
-
-Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
-    len_is_SSMorph :> SSMorph sd1 sd2;
-
-    unhandled_nonempty :
-      length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
-}.
-
-Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
-Proof. intros. constructor; auto. constructor; auto. Defined.
+Qed.
 
 Record SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
     st_is_SSMorph :> SSMorph sd1 sd2;
@@ -65,11 +60,61 @@ Obligation 1.
   right. omega.
 Qed.
 
+Program Instance SSMorphSt_SO : StrictOrder SSMorphSt.
+Obligation 1.
+  unfold Irreflexive. reduce_goal. inversion H. omega.
+Qed.
+
+Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    len_is_SSMorph :> SSMorph sd1 sd2;
+
+    unhandled_nonempty :
+      length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
+}.
+
+Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
+Proof. intros. constructor; auto. constructor; auto. Defined.
+
 Record SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
     stlen_is_SSMorphLen :> SSMorphLen sd1 sd2;
     stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
 }.
 
+Lemma SSMorphLenLenSt_transitivity
+  `( i : SSMorphLen sd0 sd1)
+  `( j : SSMorphLen sd1 sd2)
+  `( k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
+Proof.
+  constructor;
+  destruct i;
+  destruct j;
+  destruct k.
+    transitivity sd1; auto.
+    transitivity sd2; auto.
+  intuition.
+Qed.
+
+Definition cursorFromMorphLen `(cur : ScanStateCursor sd)
+  `(n : NextState cur SSMorphLen) : ScanStateCursor (nextDesc n).
+Proof.
+  destruct sd. destruct cur. simpl in *.
+  rapply Build_ScanStateCursor;
+  destruct n; simpl in *.
+  - apply nextState0.
+  - destruct morphProof0.
+    destruct nextDesc0.
+    simpl in *. omega.
+Defined.
+
+Definition cursorFromMorphStLen `(cur : ScanStateCursor sd)
+  `(n : NextState cur SSMorphStLen) : ScanStateCursor (nextDesc n) :=
+  cursorFromMorphLen cur
+    {| nextDesc   := nextDesc n
+     ; nextState  := nextState n
+     ; morphProof := stlen_is_SSMorphLen _ _ (morphProof n)
+     |}.
+
+(*
 Lemma ScanState_unhandledExtent_nonzero `(st : ScanState sd) :
   length (unhandled sd) > 0 <-> unhandledExtent sd > 0.
 Proof.
@@ -108,6 +153,31 @@ Proof.
   - Case "ScanState_moveInactiveToActive".  apply IHst.
   - Case "ScanState_moveInactiveToHandled". apply IHst.
 Qed.
+*)
+
+Definition moveUnhandledToActive `(cur : ScanStateCursor sd) (reg : PhysReg)
+  : NextState cur SSMorphSt.
+Proof.
+  destruct cur. destruct sd.
+  destruct unhandled0; simpl in *. omega.
+  pose (ScanState_moveUnhandledToActive nextInterval0 unhandled0
+          (* unhsort *)
+          active0 inactive0 handled0 getInterval0 assignments0
+          getFixedInterval0 i reg lists_are_unique0).
+  eexists. apply s. apply curState0.
+  pose (NoDup_unhandledExtent_cons nextInterval0 i unhandled0 getInterval0
+         (fun i0 : fin nextInterval0 =>
+            if cmp_eq_dec i0 i
+            then Some reg
+            else assignments0 i0) assignments0 getFixedInterval0
+         (i :: active0) active0 inactive0 inactive0 handled0 handled0
+         (move_unhandled_to_active _ i unhandled0 active0 inactive0 handled0
+            lists_are_unique0) lists_are_unique0)
+    as ue_cons.
+  rapply Build_SSMorphSt; auto.
+  rapply Build_SSMorph; auto.
+  apply (Lt.lt_le_weak _ _ ue_cons).
+Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
   (H : In x (active sd)) : NextScanState (SSMorphLen sd).
@@ -144,30 +214,6 @@ Proof.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
-Defined.
-
-Definition moveUnhandledToActive `(cur : ScanStateCursor sd) (reg : PhysReg)
-  : NextState cur SSMorphSt.
-Proof.
-  destruct cur. destruct sd.
-  destruct unhandled0; simpl in *. omega.
-  pose (ScanState_moveUnhandledToActive nextInterval0 unhandled0
-          (* unhsort *)
-          active0 inactive0 handled0 getInterval0 assignments0
-          getFixedInterval0 i reg lists_are_unique0).
-  eexists. apply s. apply curState0.
-  pose (unhandledExtent_cons nextInterval0 i unhandled0 getInterval0
-         (fun i0 : fin nextInterval0 =>
-            if cmp_eq_dec i0 i
-            then Some reg
-            else assignments0 i0) assignments0 getFixedInterval0
-         (i :: active0) active0 inactive0 inactive0 handled0 handled0
-         (move_unhandled_to_active _ i unhandled0 active0 inactive0 handled0
-            lists_are_unique0) lists_are_unique0)
-    as ue_cons.
-  rapply Build_SSMorphSt; auto.
-  rapply Build_SSMorph; auto.
-  apply (Lt.lt_le_weak _ _ ue_cons).
 Defined.
 
 End MSSMorph.

@@ -9,7 +9,7 @@
 Require Import Coq.Bool.Bool.
 Require Import Coq.Lists.List.
 Require Import Machine.
-Require Import Allocate.
+Require Import Graph.
 
 Module MyMachine <: Machine.
 
@@ -20,7 +20,7 @@ Proof. unfold maxReg. omega. Qed.
 
 End MyMachine.
 
-Module Import Allocator := MAllocate MyMachine.
+Module Import Graph := MGraph MyMachine.
 
 (* Set Extraction KeepSingleton. *)
 (* Unset Extraction AutoInline. *)
@@ -59,4 +59,4 @@ Extract Inlined Constant proj1_sig  => "".
 
 Extraction Blacklist String List NonEmpty.
 
-Separate Extraction allocateRegisters.
+Separate Extraction Graph.allocateRegisters.

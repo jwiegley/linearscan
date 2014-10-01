@@ -10,11 +10,11 @@ Module Import LN := ListNotations.
 
 Definition undefined {a : Type} : a. Admitted.
 
-Definition curry_sig {A C} {B : A -> Prop}
+Definition uncurry_sig {A C} {B : A -> Prop}
   (f : forall x : A, B x -> C) (p : { x : A | B x }) : C :=
   let (x,H) := p in f x H.
 
-Definition curry_sigT {A C} {B : A -> Type}
+Definition uncurry_sigT {A C} {B : A -> Type}
   (f : forall x : A, B x -> C) (p : { x : A & B x }) : C :=
   let (x,H) := p in f x H.
 
@@ -55,14 +55,16 @@ Open Scope string_scope.
 Definition exist_in_cons : forall {A a} {l : list A},
   {x : A | In x l} -> {x : A | In x (a :: l)}.
 Proof.
-  destruct l; intros; simpl.
-    destruct X. inversion i.
-  destruct X. exists x.
+  destruct l; intros; simpl; destruct X.
+    inversion i.
+  exists x.
   apply in_inv in i.
-  destruct i.
-    right. left. assumption.
-  right. right. assumption.
+  destruct i; right; [ left | right]; assumption.
 Defined.
+
+Lemma list_cons_nonzero : forall {a x} {xs l : list a},
+  l = x :: xs -> length l > 0.
+Proof. intros. rewrite H. simpl. omega. Qed.
 
 Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
   let fix go l :=
@@ -81,6 +83,9 @@ Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
 
 Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
   : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
+
+Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
+Proof. intros. exists (m - n). reflexivity. Defined.
 
 Lemma one_gt_zero : forall n, n = 1 -> n > 0.
 Proof. intros. omega. Qed.

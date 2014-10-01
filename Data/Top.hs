@@ -1,4 +1,4 @@
-module Data.Main where
+module Data.Top where
 
 import qualified Prelude
 import qualified Data.List

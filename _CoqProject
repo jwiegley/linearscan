@@ -10,4 +10,5 @@ Machine.v
 ScanState.v
 SSMorph.v
 Allocate.v
+Graph.v
 Main.v

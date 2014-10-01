@@ -1,6 +1,5 @@
 Require Export Machine.
 
-Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
 Require Import Fin.
@@ -15,15 +14,15 @@ Generalizable All Variables.
 Module MScanState (M : Machine).
 Import M.
 
-Definition PhysReg := fin maxReg.
 Definition maxReg := maxReg.
+Definition PhysReg := fin maxReg.
 Definition registers_exist := registers_exist.
 
-(** ** ScanState *)
+(** ** ScanStateDesc *)
 
-(** A [ScanState] is always relative to a current position (pos) as we move
+(** A [ScanStateDesc] is always relative to a current position as we move
     through the sequentialized instruction stream over which registers are
-    allocated.. *)
+    allocated. *)
 
 Record ScanStateDesc := {
     nextInterval : nat;
@@ -67,15 +66,15 @@ Record ScanStateDesc := {
     lists_are_unique : NoDup all_state_lists
 }.
 
-Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
-Proof. intros. exists (m - n). reflexivity. Defined.
-
-Definition transportId `(H : nextInterval st <= nextInterval st')
-  (x : IntervalId st) : IntervalId st'.
+(** Given an [IntervalId] from one [ScanStateDesc], promote it to an
+    [IntervalId] within another [ScanStateDesc], provided we can demonstrate
+    that the [nextInterval] is at least as large. *)
+Definition transportId `(H : nextInterval sd <= nextInterval sd')
+  (x : IntervalId sd) : IntervalId sd'.
 Proof.
   apply Compare_dec.le_lt_eq_dec in H.
   destruct H.
-    destruct st. destruct st'.
+    destruct sd. destruct sd'.
     unfold IntervalId0, IntervalId1 in *.
     unfold IntervalId in *. simpl in *.
     pose proof l.
@@ -91,6 +90,49 @@ Proof.
   rewrite <- e.
   assumption.
 Defined.
+
+Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
+  match unhandled sd with
+  | nil => 0
+  | [i] => intervalExtent (proj2_sig (getInterval sd i))
+  | xs  => let f n x := n + intervalExtent (proj2_sig (getInterval sd x)) in
+           fold_left f xs 0
+  end.
+
+Lemma NoDup_unhandledExtent_cons
+  : forall ni i (unh : list (fin ni)) geti assgn assgn' getfixi
+           (act act' inact inact' hnd hnd' : list (fin ni))
+           (lau : NoDup (unh ++ act ++ inact ++ hnd))
+           (lau' : NoDup ((i :: unh) ++ act' ++ inact' ++ hnd')),
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := unh
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; getInterval      := geti
+     ; assignments      := assgn
+     ; getFixedInterval := getfixi
+     ; lists_are_unique := lau
+     |} <
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := i :: unh
+     ; active           := act'
+     ; inactive         := inact'
+     ; handled          := hnd'
+     ; getInterval      := geti
+     ; assignments      := assgn'
+     ; getFixedInterval := getfixi
+     ; lists_are_unique := lau'
+     |}.
+Proof.
+  intros.
+  induction unh; unfold unhandledExtent; simpl;
+  pose (Interval_extent_nonzero (proj2_sig (geti i))). omega.
+  destruct unh; simpl. omega.
+  apply fold_fold_lt. omega.
+Qed.
 
 Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
   NoDup ((x :: unh) ++ act ++ inact ++ hnd)
@@ -188,6 +230,8 @@ Proof.
   assumption.
   apply H0.
 Qed.
+
+(** ** ScanState *)
 
 (** The [ScanState] inductive data type describes the allowable state
     transitions that can be applied to a [ScanStateDesc] value.
@@ -367,29 +411,11 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
-Ltac cmp_reflexive :=
-  match goal with
-    [ |- context [match cmp_eq_dec ?X ?X with _ => _ end] ] =>
-      assert (cmp_eq_dec X X = left eq_refl) as Hrcmp
-        by (intros; destruct (cmp_eq_dec X X);
-              [ f_equal; apply proof_irrelevance
-              | intuition ]);
-      rewrite Hrcmp in *; clear Hrcmp; simpl in *
-  end.
-
-Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
-  match unhandled sd with
-  | nil => 0
-  | [i] => intervalExtent (proj2_sig (getInterval sd i))
-  | xs  =>
-    let f n x := n + intervalExtent (proj2_sig (getInterval sd x)) in
-    fold_left f xs 0
-  end.
-
+(** [ScanState_unhandledExtent] relates the [unhandledExtent] of a [ScanState]
+    with the [intervalExtent] of the first member of its [unhandled] list. *)
 Theorem ScanState_unhandledExtent `(st : ScanState sd) :
-  let unh := unhandled sd in
-  let ue  := unhandledExtent sd in
-  match unh with
+  let ue := unhandledExtent sd in
+  match unhandled sd with
   | nil    => ue = 0
   | [i]    => ue = intervalExtent (proj2_sig (getInterval sd i))
   | i :: _ => ue > intervalExtent (proj2_sig (getInterval sd i))
@@ -404,61 +430,42 @@ Proof.
   apply fold_gt.
   pose (Interval_extent_nonzero (proj2_sig (getInterval0 i0))).
   omega.
-Defined.
-
-Lemma unhandledExtent_cons
-  : forall ni i (unh : list (fin ni)) geti assgn assgn' getfixi
-           (act act' inact inact' hnd hnd' : list (fin ni))
-           (lau : NoDup (unh ++ act ++ inact ++ hnd))
-           (lau' : NoDup ((i :: unh) ++ act' ++ inact' ++ hnd')),
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := unh
-     ; active           := act
-     ; inactive         := inact
-     ; handled          := hnd
-     ; getInterval      := geti
-     ; assignments      := assgn
-     ; getFixedInterval := getfixi
-     ; lists_are_unique := lau
-     |} <
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := i :: unh
-     ; active           := act'
-     ; inactive         := inact'
-     ; handled          := hnd'
-     ; getInterval      := geti
-     ; assignments      := assgn'
-     ; getFixedInterval := getfixi
-     ; lists_are_unique := lau'
-     |}.
-Proof.
-  intros.
-  induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (proj2_sig (geti i))). omega.
-  destruct unh; simpl. omega.
-  apply fold_fold_lt. omega.
 Qed.
 
+(** ** ScanStateCursor *)
+
+(** A [ScannStateCursor] gives us a view of the first unhandled element within
+    a [ScanState].  The cursor is only valid if such an unhandled element
+    exists, so it combines that assertion with a view onto that element. *)
+
 Record ScanStateCursor (sd : ScanStateDesc) := {
-    curState    : ScanState sd;
-    curExists   : length (unhandled sd) > 0;
+    curState  : ScanState sd;
+    curExists : length (unhandled sd) > 0;
 
-    curId       := safe_hd (unhandled sd) curExists;
-
-    curIntDesc  : IntervalDesc;
-    curInterval := proj2_sig (getInterval sd curId);
-
-    curPosition := intervalStart curInterval
+    curId         := safe_hd (unhandled sd) curExists;
+    curIntDetails := getInterval sd curId
 }.
 
-Arguments curState    {sd} _.
-Arguments curExists   {sd} _.
-Arguments curId       {sd} _.
-Arguments curIntDesc  {sd} _.
-Arguments curInterval {sd} _.
-Arguments curPosition {sd} _.
+Arguments curState {sd} _.
+Arguments curExists {sd} _.
+Arguments curId {sd} _.
+Arguments curIntDetails {sd} _.
+
+Definition curIntDesc `(cur : ScanStateCursor sd) :=
+  proj1_sig (curIntDetails cur).
+
+Definition curInterval `(cur : ScanStateCursor sd) :=
+  proj2_sig (curIntDetails cur).
+
+Definition curPosition `(cur : ScanStateCursor sd) :=
+  intervalStart (curInterval cur).
+
+(** ** NextScanState *)
+
+(** A [NextScanState] is a [ScanState] produced by mutating a prior
+    [ScanState], while respecting the given predicate on the newly generated
+    version.  This allows us to define well-founded recursion easily on the
+    composition a series of [ScanState] mutations. *)
 
 Record NextScanState (P : ScanStateDesc -> Prop) : Type := {
     nextDesc   : ScanStateDesc;

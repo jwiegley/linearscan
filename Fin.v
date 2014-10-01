@@ -340,7 +340,7 @@ Module FinOrder <: TotalTransitiveLeBool.
         simpl in H. apply H.
       repeat rewrite fin_to_nat_Sn in H0.
       simpl in H0. apply H0.
-    Qed.
+  Qed.
 
 End FinOrder.
 

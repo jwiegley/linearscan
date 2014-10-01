@@ -1,3 +1,4 @@
+Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
 Require Import Compare.
 Require Import Fin.
@@ -75,27 +76,6 @@ Definition splitInterval `(cur : ScanStateCursor sd) (before : option nat)
   : NextState cur SSMorphStLen :=
   (* jww (2014-09-26): NYI *)
   Build_NextScanState sd (curState cur) undefined.
-
-Definition cursorFromMorphLen `(cur : ScanStateCursor sd)
-  `(n : NextState cur SSMorphLen) : ScanStateCursor (nextDesc n).
-Proof.
-  destruct sd. destruct cur. simpl in *.
-  rapply Build_ScanStateCursor;
-  destruct n; simpl in *.
-  - apply nextState0.
-  - destruct morphProof0.
-    destruct nextDesc0.
-    simpl in *. omega.
-  - auto.
-Defined.
-
-Definition cursorFromMorphStLen `(cur : ScanStateCursor sd)
-  `(n : NextState cur SSMorphStLen) : ScanStateCursor (nextDesc n) :=
-  cursorFromMorphLen cur
-    {| nextDesc   := nextDesc n
-     ; nextState  := nextState n
-     ; morphProof := stlen_is_SSMorphLen _ _ (morphProof n)
-     |}.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -223,21 +203,20 @@ Definition allocateBlockedReg `(cur : ScanStateCursor sd)
 
 Fixpoint checkActiveIntervals `(st : ScanState sd) pos
   : NextScanState (SSMorphLen sd) :=
-  let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
+  let fix go sd (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
     | x :: xs =>
-        (* // check for intervals in active that are handled or inactive
-           for each interval it in active do
+        (* for each interval it in active do
              if it ends before position then
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
         let i := proj2_sig (getInterval sd (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
-                   then moveActiveToHandled st (proj1_sig x) (proj2_sig x)
+                   then uncurry_sig (moveActiveToHandled st) x
                    else if negb (intervalCoversPos i pos)
-                        then moveActiveToInactive st (proj1_sig x) (proj2_sig x)
+                        then uncurry_sig (moveActiveToInactive st) x
                         else ss in
         go sd st st1 xs pos
     end in
@@ -246,68 +225,48 @@ Fixpoint checkActiveIntervals `(st : ScanState sd) pos
 
 Fixpoint checkInactiveIntervals `(st : ScanState sd) pos
   : NextScanState (SSMorphLen sd) :=
-  let fix go (sd : ScanStateDesc) (st : ScanState sd) ss is pos :=
+  let fix go sd (st : ScanState sd) ss is pos :=
     match is with
     | nil => ss
     | x :: xs =>
-        (* // check for intervals in inactive that are handled or active
-           for each interval it in active do
+        (* for each interval it in active do
              if it ends before position then
                move it from active to handled
              else if it covers position then
                move it from active to inactive *)
         let i := proj2_sig (getInterval sd (proj1_sig x)) in
         let st1 := if intervalEnd i <? pos
-                   then moveInactiveToHandled st (proj1_sig x) (proj2_sig x)
+                   then uncurry_sig (moveInactiveToHandled st) x
                    else if intervalCoversPos i pos
-                        then moveInactiveToActive st (proj1_sig x) (proj2_sig x)
+                        then uncurry_sig (moveInactiveToActive st) x
                         else ss in
         go sd st st1 xs pos
     end in
   go sd st (Build_NextScanState sd st (newSSMorphLen sd))
      (list_membership (inactive sd)) pos.
 
-Lemma SSMorphLenLenSt_transitivity
-  `( i : SSMorphLen sd0 sd1)
-  `( j : SSMorphLen sd1 sd2)
-  `( k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
-Proof.
-  constructor;
-  destruct i;
-  destruct j;
-  destruct k.
-    transitivity sd1; auto.
-    transitivity sd2; auto.
-  intuition.
-Qed.
-
-Definition handleInterval `(cur : ScanStateCursor sd) : NextState cur SSMorphSt :=
+Definition handleInterval `(cur : ScanStateCursor sd)
+  : NextState cur SSMorphSt :=
   (* position = start position of current *)
-  let position  := curPosition cur in
+  let position := curPosition cur in
 
-  (* // check for intervals in active that are handled or inactive
-     for each interval it in active do
-       if it ends before position then
-         move it from active to handled
-       else if it does not cover position then
-         move it from active to inactive *)
+  (* // check for intervals in active that are handled or inactive *)
   let sp1  := checkActiveIntervals (curState cur) position in
   let Hlt1 := unhandled_nonempty sd (nextDesc sp1) (morphProof sp1)
                                  (curExists cur) in
   let H1   := next_interval_increases (morphProof sp1) in
   let cid1 := transportId H1 (curId cur) in
 
-  (* // check for intervals in inactive that are handled or active
-     for each interval it in inactive do
-       if it ends before position then
-         move it from inactive to handled
-       else if it covers position then
-         move it from inactive to active *)
+  (* jww (2014-10-01): OPTIONAL Prove: length active <=. *)
+
+  (* // check for intervals in inactive that are handled or active *)
   let sp2  := checkInactiveIntervals (nextState sp1) position in
   let Hlt2 := unhandled_nonempty (nextDesc sp1) (nextDesc sp2)
                                  (morphProof sp2) Hlt1 in
   let H2   := next_interval_increases (morphProof sp2) in
   let cid2 := transportId H2 cid1 in
+
+  (* jww (2014-10-01): OPTIONAL Prove: length inactive <=. *)
 
   (* // find a register for current
      tryAllocateFreeReg
@@ -315,9 +274,8 @@ Definition handleInterval `(cur : ScanStateCursor sd) : NextState cur SSMorphSt 
        allocateBlockedReg
      if current has a register assigned then
        add current to active (done by the helper functions) *)
-  let cursor := {| curState   := nextState sp2
-                 ; curExists  := Hlt2
-                 ; curIntDesc := curIntDesc cur
+  let cursor := {| curState  := nextState sp2
+                 ; curExists := Hlt2
                  |} in
   let result := fromMaybe (allocateBlockedReg cursor)
                           (tryAllocateFreeReg cursor) in
@@ -328,49 +286,23 @@ Definition handleInterval `(cur : ScanStateCursor sd) : NextState cur SSMorphSt 
                                     (morphProof result)
    |}.
 
-Lemma list_cons_nonzero : forall {a x} {xs l : list a},
-  l = x :: xs -> length l > 0.
-Proof. intros. rewrite H. simpl. omega. Qed.
-
-(* while unhandled /= { } do
-     current = pick and remove first interval from unhandled
-     HANDLE_INTERVAL (current) *)
-
 Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   {measure unhandledExtent sd} : { sd' : ScanStateDesc | ScanState sd' } :=
+  (* while unhandled /= { } do
+       current = pick and remove first interval from unhandled
+       HANDLE_INTERVAL (current) *)
   match destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
-    let cursor := {| curState   := st
-                   ; curExists  := list_cons_nonzero H
-                   ; curIntDesc := proj1_sig (getInterval sd x)
+    let cursor := {| curState  := st
+                   ; curExists := list_cons_nonzero H
                    |} in
     match handleInterval cursor with
-    | Build_NextScanState sd2 st2 smorph2 => linearScan sd2 st2
+      Build_NextScanState sd2 st2 smorph2 => linearScan sd2 st2
     end
-  | inright _ => existT _ sd st
+  | inright _ => exist _ sd st
   end.
 (* We must prove that after every call to handleInterval, the total extent
    of the remaining unhandled intervals is less than it was before. *)
 Proof. intros; inversion smorph2; assumption. Defined.
-
-(** * Program graphs *)
-
-Definition VirtReg := nat.
-
-(** Given a node graph of our low-level intermediate representation, where
-    instructions are associated with virtual registers, compute the linear
-    mapping to intervals. *)
-
-Class Graph (a : Set) := {
-    postOrderTraversal : a
-}.
-
-Definition determineIntervals (g : Graph VirtReg)
-  : { sd : ScanStateDesc | ScanState sd }.
-  (* jww (2014-09-26): NYI *)
-Admitted.
-
-Definition allocateRegisters (g : Graph VirtReg) : ScanStateDesc :=
-  let (sd,st) := determineIntervals g in proj1_sig (linearScan sd st).
 
 End MAllocate.

@@ -21,11 +21,6 @@ sig_rec =
 data Coq_sigT a p =
    Coq_existT a p
 
-sig_of_sigT :: (Coq_sigT a1 ()) -> a1
-sig_of_sigT x =
-  case x of {
-   Coq_existT x0 _ -> x0}
-
 data Coq_sumbool =
    Coq_left
  | Coq_right
