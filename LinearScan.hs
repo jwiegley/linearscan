@@ -18,26 +18,26 @@ import           Data.Main
 import           Data.Specif
 
 type    VirtReg    = Int
-newtype Graph a    = Graph (Graph__Graph a)
-newtype ScanState  = ScanState Graph__ScanStateDesc
+newtype Graph a    = Graph (LinearScan__Graph a)
+newtype ScanState  = ScanState LinearScan__ScanStateDesc
 newtype Interval   = Interval I.IntervalDesc
-newtype PhysReg    = PhysReg Graph__PhysReg
+newtype PhysReg    = PhysReg LinearScan__PhysReg
 type    IntervalId = Int
 
 allocateRegisters :: Graph VirtReg -> ScanState
-allocateRegisters (Graph g) = ScanState (_Graph__allocateRegisters g)
+allocateRegisters (Graph g) = ScanState (_LinearScan__allocateRegisters g)
 
 -- nextInterval :: ScanState -> Int
--- nextInterval (Graph__Build_ScanStateDesc ni _ _ _ _ _ _ _) = ni
+-- nextInterval (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ _ _) = ni
 
 handledIntervalIds :: ScanState -> [IntervalId]
-handledIntervalIds (ScanState (Graph__Build_ScanStateDesc ni _ _ _ hnd _ _ _)) =
+handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ hnd _ _ _)) =
     map (fin_to_nat ni) hnd
 
 getInterval :: ScanState -> IntervalId -> Interval
-getInterval (ScanState (Graph__Build_ScanStateDesc ni _ _ _ _ f _ _)) n =
+getInterval (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ f _ _)) n =
     Interval (f (from_nat ni n))
 
 registerAssignment :: ScanState -> IntervalId -> Maybe PhysReg
-registerAssignment (ScanState (Graph__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =
+registerAssignment (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =
     PhysReg <$> f (from_nat ni n)

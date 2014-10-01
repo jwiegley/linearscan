@@ -20,7 +20,7 @@ Proof. unfold maxReg. omega. Qed.
 
 End MyMachine.
 
-Module Import Graph := MGraph MyMachine.
+Module Import LinearScan := MLinearScan MyMachine.
 
 (* Set Extraction KeepSingleton. *)
 (* Unset Extraction AutoInline. *)
@@ -59,4 +59,4 @@ Extract Inlined Constant proj1_sig  => "".
 
 Extraction Blacklist String List NonEmpty.
 
-Separate Extraction Graph.allocateRegisters.
+Separate Extraction LinearScan.allocateRegisters.

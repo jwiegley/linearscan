@@ -4,7 +4,7 @@ Require Import Machine.
 
 Generalizable All Variables.
 
-Module MGraph (M : Machine).
+Module MLinearScan (M : Machine).
 Include MAllocate M.
 
 (** * Program graphs *)
@@ -27,4 +27,4 @@ Admitted.
 Definition allocateRegisters (g : Graph VirtReg) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals g)).
 
-End MGraph.
+End MLinearScan.
