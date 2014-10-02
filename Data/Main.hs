@@ -19,7 +19,7 @@ import qualified Data.NPeano as NPeano
 import qualified Data.Peano as Peano
 import qualified Data.Plus as Plus
 import qualified Data.Specif as Specif
-import qualified Data.Vector1 as Vector1
+import qualified Data.State as State
 import qualified Data.Vector0 as Vector0
 
 
@@ -465,6 +465,13 @@ _LinearScan__all_state_lists s =
     ((Prelude.++) (_LinearScan__active s)
       ((Prelude.++) (_LinearScan__inactive s) (_LinearScan__handled s)))
 
+_LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
+                              LinearScan__IntervalId -> Prelude.Maybe
+                              LinearScan__PhysReg
+_LinearScan__getAssignment sd i =
+  _LinearScan__V__nth (_LinearScan__nextInterval sd)
+    (_LinearScan__assignments sd) i
+
 _LinearScan__transportId :: LinearScan__ScanStateDesc ->
                             LinearScan__ScanStateDesc ->
                             LinearScan__IntervalId -> LinearScan__IntervalId
@@ -510,8 +517,34 @@ _LinearScan__unhandledExtent sd =
       in
       (\f -> Prelude.flip (Data.List.foldl' f)) f ((:) i ((:) i0 l0)) 0}}
 
-data LinearScan__ScanStateCursor =
-   LinearScan__Build_ScanStateCursor
+_LinearScan__registerWithHighestPos :: (LinearScan__Vec
+                                       (Prelude.Maybe Prelude.Int)) -> (,)
+                                       Fin0.Coq_fin
+                                       (Prelude.Maybe Prelude.Int)
+_LinearScan__registerWithHighestPos =
+  unsafeCoerce
+    (Vector0.fold_left_with_index _LinearScan__maxReg (\reg res x ->
+      case res of {
+       (,) r o ->
+        case o of {
+         Prelude.Just n ->
+          case x of {
+           Prelude.Just m ->
+            case NPeano.ltb n m of {
+             Prelude.True -> (,) reg (Prelude.Just m);
+             Prelude.False -> (,) r (Prelude.Just n)};
+           Prelude.Nothing -> (,) reg Prelude.Nothing};
+         Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,)
+      (Fin0.from_nat _MyMachine__maxReg 0) (Prelude.Just 0)))
+
+_LinearScan__atIntervalReg :: LinearScan__ScanStateDesc ->
+                              LinearScan__IntervalId -> (LinearScan__Vec 
+                              a1) -> a1 -> LinearScan__V__Coq_t a1
+_LinearScan__atIntervalReg sd i v x =
+  case _LinearScan__V__nth (_LinearScan__nextInterval sd)
+         (_LinearScan__assignments sd) i of {
+   Prelude.Just r -> _LinearScan__V__replace _LinearScan__maxReg v r x;
+   Prelude.Nothing -> v}
 
 _LinearScan__coq_ScanStateCursor_rect :: LinearScan__ScanStateDesc -> (() ->
                                          () -> a1) -> a1
@@ -568,12 +601,12 @@ type LinearScan__NextStateDep = LinearScan__NextScanState
 
 type LinearScan__NextStateWith a = (,) a LinearScan__NextScanState
 
-_LinearScan__coq_NextScanState_transitivity :: LinearScan__ScanStateDesc ->
-                                               LinearScan__NextScanState ->
-                                               LinearScan__NextScanState ->
-                                               LinearScan__NextScanState
-_LinearScan__coq_NextScanState_transitivity sd0 n o =
-  o
+_LinearScan__coq_NSS_transport :: LinearScan__ScanStateDesc ->
+                                  LinearScan__ScanStateDesc ->
+                                  LinearScan__NextScanState ->
+                                  LinearScan__NextScanState
+_LinearScan__coq_NSS_transport sd sd' n =
+  _LinearScan__nextDesc n
 
 _LinearScan__coq_SSMorph_rect :: LinearScan__ScanStateDesc ->
                                  LinearScan__ScanStateDesc -> (() -> () -> ()
@@ -622,6 +655,86 @@ _LinearScan__coq_SSMorphStLen_rec :: LinearScan__ScanStateDesc ->
                                      -> a1) -> a1
 _LinearScan__coq_SSMorphStLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStLen_rect sd1 sd2 f
+
+_LinearScan__coq_NS_SSMorphStLen_Len_StLen_transitivity :: LinearScan__ScanStateDesc
+                                                           ->
+                                                           LinearScan__NextState
+                                                           ->
+                                                           LinearScan__NextState
+                                                           ->
+                                                           LinearScan__NextState
+_LinearScan__coq_NS_SSMorphStLen_Len_StLen_transitivity sd i j =
+  j
+
+_LinearScan__coq_NS_SSMorphSt_Len_StLen_transitivity :: LinearScan__ScanStateDesc
+                                                        ->
+                                                        LinearScan__NextState
+                                                        ->
+                                                        LinearScan__NextState
+                                                        ->
+                                                        LinearScan__NextState
+_LinearScan__coq_NS_SSMorphSt_Len_StLen_transitivity sd i j =
+  _LinearScan__coq_NSS_transport sd sd
+    (_LinearScan__coq_NS_SSMorphStLen_Len_StLen_transitivity sd i j)
+
+_LinearScan__coq_NS_SSMorphSt_StLen_St_transitivity :: LinearScan__ScanStateDesc
+                                                       ->
+                                                       LinearScan__NextState
+                                                       ->
+                                                       LinearScan__NextState
+                                                       ->
+                                                       LinearScan__NextState
+_LinearScan__coq_NS_SSMorphSt_StLen_St_transitivity sd i j =
+  j
+
+_LinearScan__coq_NS_SSMorphSt_Len_Len_St_transitivity :: LinearScan__ScanStateDesc
+                                                         ->
+                                                         LinearScan__NextState
+                                                         ->
+                                                         LinearScan__NextState
+                                                         ->
+                                                         LinearScan__NextState
+                                                         ->
+                                                         LinearScan__NextState
+_LinearScan__coq_NS_SSMorphSt_Len_Len_St_transitivity sd i j k =
+  k
+
+_LinearScan__coq_NS_SSMorphStLen_Len_Len_StLen_transitivity :: LinearScan__ScanStateDesc
+                                                               ->
+                                                               LinearScan__NextState
+                                                               ->
+                                                               LinearScan__NextState
+                                                               ->
+                                                               LinearScan__NextState
+                                                               ->
+                                                               LinearScan__NextState
+_LinearScan__coq_NS_SSMorphStLen_Len_Len_StLen_transitivity sd i j k =
+  k
+
+_LinearScan__coq_NS_SSMorphStLen_Len_StLen_StLen_transitivity :: LinearScan__ScanStateDesc
+                                                                 ->
+                                                                 LinearScan__NextState
+                                                                 ->
+                                                                 LinearScan__NextState
+                                                                 ->
+                                                                 LinearScan__NextState
+                                                                 ->
+                                                                 LinearScan__NextState
+_LinearScan__coq_NS_SSMorphStLen_Len_StLen_StLen_transitivity sd i j k =
+  k
+
+_LinearScan__coq_NS_SSMorphSt_Len_StLen_StLen_transitivity :: LinearScan__ScanStateDesc
+                                                              ->
+                                                              LinearScan__NextState
+                                                              ->
+                                                              LinearScan__NextState
+                                                              ->
+                                                              LinearScan__NextState
+                                                              ->
+                                                              LinearScan__NextState
+_LinearScan__coq_NS_SSMorphSt_Len_StLen_StLen_transitivity sd i j k =
+  _LinearScan__coq_NSS_transport sd sd
+    (_LinearScan__coq_NS_SSMorphStLen_Len_StLen_StLen_transitivity sd i j k)
 
 _LinearScan__moveUnhandledToActive :: LinearScan__ScanStateDesc ->
                                       LinearScan__PhysReg ->
@@ -689,50 +802,27 @@ _LinearScan__moveInactiveToHandled sd x =
     (_LinearScan__intervals sd) (_LinearScan__assignments sd)
     (_LinearScan__fixedIntervals sd)
 
-_LinearScan__registerWithHighestPos :: (LinearScan__Vec
-                                       (Prelude.Maybe Prelude.Int)) -> (,)
-                                       Fin0.Coq_fin
-                                       (Prelude.Maybe Prelude.Int)
-_LinearScan__registerWithHighestPos =
-  unsafeCoerce
-    (Vector1.fold_left_with_index _LinearScan__maxReg (\reg res x ->
-      case res of {
-       (,) r o ->
-        case o of {
-         Prelude.Just n ->
-          case x of {
-           Prelude.Just m ->
-            case NPeano.ltb n m of {
-             Prelude.True -> (,) reg (Prelude.Just m);
-             Prelude.False -> (,) r (Prelude.Just n)};
-           Prelude.Nothing -> (,) reg Prelude.Nothing};
-         Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,)
-      (Fin0.from_nat _MyMachine__maxReg 0) (Prelude.Just 0)))
+type LinearScan__SState a =
+  State.State
+  (Specif.Coq_sigT LinearScan__ScanStateDesc
+  (Specif.Coq_sigT () LinearScan__NextState)) a
 
-_LinearScan__atIntervalReg :: LinearScan__ScanStateDesc ->
-                              LinearScan__IntervalId -> (LinearScan__Vec 
-                              a1) -> a1 -> Vector0.Coq_t a1
-_LinearScan__atIntervalReg sd i v x =
-  case _LinearScan__V__nth (_LinearScan__nextInterval sd)
-         (_LinearScan__assignments sd) i of {
-   Prelude.Just r -> Vector0.replace _LinearScan__maxReg (unsafeCoerce v) r x;
-   Prelude.Nothing -> unsafeCoerce v}
-
-_LinearScan__splitInterval :: LinearScan__ScanStateDesc -> (Prelude.Maybe
-                              Prelude.Int) -> LinearScan__NextState
-_LinearScan__splitInterval sd before =
+_LinearScan__splitCurrentInterval :: LinearScan__ScanStateDesc ->
+                                     (Prelude.Maybe Prelude.Int) ->
+                                     LinearScan__NextState
+_LinearScan__splitCurrentInterval sd before =
   sd
 
-_LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
-                              LinearScan__IntervalId -> Prelude.Maybe
-                              LinearScan__PhysReg
-_LinearScan__getAssignment sd i =
-  _LinearScan__V__nth (_LinearScan__nextInterval sd)
-    (_LinearScan__assignments sd) i
+_LinearScan__splitActiveIntervalForReg :: LinearScan__ScanStateDesc ->
+                                          LinearScan__PhysReg -> Prelude.Int
+                                          -> LinearScan__NextScanState
+_LinearScan__splitActiveIntervalForReg =
+  Prelude.error "AXIOM TO BE REALIZED"
 
-_LinearScan__assignRegister :: LinearScan__ScanStateDesc ->
-                               LinearScan__PhysReg -> LinearScan__NextState
-_LinearScan__assignRegister =
+_LinearScan__splitAnyInactiveIntervalForReg :: LinearScan__ScanStateDesc ->
+                                               LinearScan__PhysReg ->
+                                               LinearScan__NextScanState
+_LinearScan__splitAnyInactiveIntervalForReg =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc -> Prelude.Maybe
@@ -741,11 +831,12 @@ _LinearScan__tryAllocateFreeReg sd =
   let {
    go = \n ->
     (\f -> Prelude.flip (Data.List.foldl' f)) (\v i ->
-      _LinearScan__atIntervalReg sd i (unsafeCoerce v) (n i))}
+      _LinearScan__atIntervalReg sd i v (n i))}
   in
   let {
    freeUntilPos' = go (\x -> Prelude.Just 0) (_LinearScan__active sd)
-                     (Vector0.const Prelude.Nothing _LinearScan__maxReg)}
+                     (_LinearScan__V__const Prelude.Nothing
+                       _LinearScan__maxReg)}
   in
   let {
    intersectingIntervals = (Prelude.filter) (\x ->
@@ -766,7 +857,7 @@ _LinearScan__tryAllocateFreeReg sd =
                       ( (_LinearScan__curIntDetails sd)))
                     intersectingIntervals freeUntilPos'}
   in
-  case _LinearScan__registerWithHighestPos (unsafeCoerce freeUntilPos) of {
+  case _LinearScan__registerWithHighestPos freeUntilPos of {
    (,) reg mres ->
     let {success = _LinearScan__moveUnhandledToActive sd reg} in
     case mres of {
@@ -778,7 +869,8 @@ _LinearScan__tryAllocateFreeReg sd =
                 (Interval.intervalEnd ( (_LinearScan__curIntDetails sd))) n of {
           Prelude.True -> success;
           Prelude.False ->
-           let {spl = _LinearScan__splitInterval sd (Prelude.Just n)} in
+           let {spl = _LinearScan__splitCurrentInterval sd (Prelude.Just n)}
+           in
            _LinearScan__moveUnhandledToActive (_LinearScan__nextDesc spl) reg})};
      Prelude.Nothing -> Prelude.Just success}}
 
@@ -787,21 +879,102 @@ _LinearScan__nextUseAfter :: Interval.IntervalDesc -> Prelude.Int ->
 _LinearScan__nextUseAfter =
   Prelude.error "AXIOM TO BE REALIZED"
 
+_LinearScan__firstUseReqReg :: Interval.IntervalDesc -> Prelude.Maybe
+                               Prelude.Int
+_LinearScan__firstUseReqReg =
+  Prelude.error "AXIOM TO BE REALIZED"
+
 _LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
                                          LinearScan__NextScanState
 _LinearScan__assignSpillSlotToCurrent =
   Prelude.error "AXIOM TO BE REALIZED"
 
-_LinearScan__intersectsWithFixedInternal :: LinearScan__ScanStateDesc ->
+_LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
                                             LinearScan__PhysReg ->
-                                            Prelude.Bool
-_LinearScan__intersectsWithFixedInternal =
+                                            Prelude.Maybe Prelude.Int
+_LinearScan__intersectsWithFixedInterval =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__allocateBlockedReg :: LinearScan__ScanStateDesc ->
                                    LinearScan__NextState
 _LinearScan__allocateBlockedReg sd =
-  Lib.undefined
+  let {start = Interval.intervalStart ( (_LinearScan__curIntDetails sd))} in
+  let {pos = _LinearScan__curPosition sd} in
+  let {
+   go = (\f -> Prelude.flip (Data.List.foldl' f)) (\v i ->
+          _LinearScan__atIntervalReg sd i v
+            (_LinearScan__nextUseAfter
+              (
+                (_LinearScan__V__nth (_LinearScan__nextInterval sd)
+                  (_LinearScan__intervals sd) i)) start))}
+  in
+  let {
+   nextUsePos' = go (_LinearScan__active sd)
+                   (_LinearScan__V__const Prelude.Nothing
+                     _LinearScan__maxReg)}
+  in
+  let {
+   intersectingIntervals = (Prelude.filter) (\x ->
+                             Interval.anyRangeIntersects
+                               ( (_LinearScan__curIntDetails sd))
+                               (
+                                 (_LinearScan__V__nth
+                                   (_LinearScan__nextInterval sd)
+                                   (_LinearScan__intervals sd) x)))
+                             (_LinearScan__inactive sd)}
+  in
+  let {nextUsePos = go intersectingIntervals nextUsePos'} in
+  case _LinearScan__registerWithHighestPos nextUsePos of {
+   (,) reg mres ->
+    case case mres of {
+          Prelude.Just n -> NPeano.ltb n start;
+          Prelude.Nothing -> Prelude.False} of {
+     Prelude.True ->
+      let {n1 = _LinearScan__assignSpillSlotToCurrent sd} in
+      let {
+       n2 = _LinearScan__splitCurrentInterval (_LinearScan__nextDesc n1)
+              (_LinearScan__firstUseReqReg
+                ( (_LinearScan__curIntDetails sd)))}
+      in
+      case _LinearScan__intersectsWithFixedInterval
+             (_LinearScan__nextDesc n2) reg of {
+       Prelude.Just n ->
+        let {
+         n3 = _LinearScan__splitCurrentInterval (_LinearScan__nextDesc n2)
+                (Prelude.Just n)}
+        in
+        _LinearScan__coq_NS_SSMorphSt_Len_StLen_StLen_transitivity sd n1 n2
+          n3;
+       Prelude.Nothing ->
+        _LinearScan__coq_NS_SSMorphSt_Len_StLen_transitivity sd n1 n2};
+     Prelude.False ->
+      let {n1 = _LinearScan__splitActiveIntervalForReg sd reg pos} in
+      let {
+       n2 = _LinearScan__splitAnyInactiveIntervalForReg
+              (_LinearScan__nextDesc n1) reg}
+      in
+      case _LinearScan__intersectsWithFixedInterval
+             (_LinearScan__nextDesc n2) reg of {
+       Prelude.Just n ->
+        let {
+         n3 = _LinearScan__splitCurrentInterval (_LinearScan__nextDesc n2)
+                (Prelude.Just n)}
+        in
+        let {
+         n4 = _LinearScan__coq_NS_SSMorphStLen_Len_Len_StLen_transitivity sd
+                n1 n2 n3}
+        in
+        let {
+         n5 = _LinearScan__moveUnhandledToActive (_LinearScan__nextDesc n4)
+                reg}
+        in
+        _LinearScan__coq_NS_SSMorphSt_StLen_St_transitivity sd n4 n5;
+       Prelude.Nothing ->
+        let {
+         n3 = _LinearScan__moveUnhandledToActive (_LinearScan__nextDesc n2)
+                reg}
+        in
+        _LinearScan__coq_NS_SSMorphSt_Len_Len_St_transitivity sd n1 n2 n3}}}
 
 _LinearScan__checkActiveIntervals :: LinearScan__ScanStateDesc -> Prelude.Int
                                      -> LinearScan__NextScanState
@@ -870,17 +1043,17 @@ _LinearScan__handleInterval :: LinearScan__ScanStateDesc ->
                                LinearScan__NextState
 _LinearScan__handleInterval sd =
   let {position = _LinearScan__curPosition sd} in
-  let {sp1 = _LinearScan__checkActiveIntervals sd position} in
+  let {n1 = _LinearScan__checkActiveIntervals sd position} in
   let {
-   sp2 = _LinearScan__checkInactiveIntervals (_LinearScan__nextDesc sp1)
-           position}
+   n2 = _LinearScan__checkInactiveIntervals (_LinearScan__nextDesc n1)
+          position}
   in
   let {
-   result = Lib.fromMaybe
-              (_LinearScan__allocateBlockedReg (_LinearScan__nextDesc sp2))
-              (_LinearScan__tryAllocateFreeReg (_LinearScan__nextDesc sp2))}
+   n3 = Lib.fromMaybe
+          (_LinearScan__allocateBlockedReg (_LinearScan__nextDesc n2))
+          (_LinearScan__tryAllocateFreeReg (_LinearScan__nextDesc n2))}
   in
-  _LinearScan__nextDesc result
+  _LinearScan__coq_NS_SSMorphSt_Len_Len_St_transitivity sd n1 n2 n3
 
 _LinearScan__linearScan_F :: (LinearScan__ScanStateDesc -> () ->
                              LinearScan__ScanStateDesc) ->
