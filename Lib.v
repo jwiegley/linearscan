@@ -87,6 +87,15 @@ Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
 Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
   : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
 
+Definition proj1_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : A :=
+  let (x,_,_) := e in x.
+
+Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
+  : P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p.
+
+Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
+  : Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
+
 Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
 Proof. intros. exists (m - n). reflexivity. Defined.
 

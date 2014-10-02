@@ -449,6 +449,8 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
+Definition scanStateDesc `(st : ScanState sd) := sd.
+
 (** [ScanState_unhandledExtent] relates the [unhandledExtent] of a [ScanState]
     with the [intervalExtent] of the first member of its [unhandled] list. *)
 Theorem ScanState_unhandledExtent `(st : ScanState sd) :
@@ -488,6 +490,8 @@ Arguments curState {sd} _.
 Arguments curExists {sd} _.
 Arguments curId {sd} _.
 Arguments curIntDetails {sd} _.
+
+Definition curStateDesc `(cur : ScanStateCursor sd) := sd.
 
 Definition curIntDesc `(cur : ScanStateCursor sd) :=
   proj1_sig (curIntDetails cur).
