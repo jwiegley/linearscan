@@ -6,6 +6,7 @@ Require Import Fin.
 Require Import Interval.
 Require Import Lib.
 Require Import NoDup.
+Require Import Vector.
 Require Coq.Vectors.Vector.
 
 Module Import LN := ListNotations.
@@ -35,6 +36,13 @@ Record ScanStateDesc := {
     unhandled : list IntervalId;   (* starts after pos *)
     active    : list IntervalId;   (* ranges over pos *)
     inactive  : list IntervalId;   (* falls in lifetime hole *)
+
+    (* jww (2014-10-01): Prove: The length of the active intervals list <
+       maxReg. *)
+    (* active_registers : length active < min maxReg nextInterval; *)
+
+    (* jww (2014-10-01): The handled list is unnecessary and can be deleted
+       when everything is working. *)
     handled   : list IntervalId;   (* ends before pos *)
 
     intervals   : Vec { d : IntervalDesc | Interval d } nextInterval;
@@ -70,6 +78,12 @@ Record ScanStateDesc := {
     all_state_lists  := unhandled ++ active ++ inactive ++ handled;
     lists_are_unique : NoDup all_state_lists
 }.
+
+Definition getInterval `(i : IntervalId sd) :=
+  proj2_sig (V.nth (intervals sd) i).
+
+Definition getAssignment `(i : IntervalId sd) :=
+  V.nth (assignments sd) i.
 
 (** Given an [IntervalId] from one [ScanStateDesc], promote it to an
     [IntervalId] within another [ScanStateDesc], provided we can demonstrate
@@ -235,6 +249,34 @@ Proof.
   assumption.
   apply H0.
 Qed.
+
+(** Given a vector of optional positions associated with register, return the
+    first register (counting downwards) which is either [None], or the highest
+    of [Some] value.
+
+    The worst case scenario is that every register has [Some n] with the same
+    n, in which case register 0 is selected. *)
+
+Definition registerWithHighestPos
+  : Vec (option nat) maxReg -> fin maxReg * option nat :=
+  fold_left_with_index
+    (fun reg (res : fin maxReg * option nat) x =>
+       match (res, x) with
+       | ((r, None), _) => (r, None)
+       | (_, None) => (reg, None)
+       | ((r, Some n), Some m) =>
+         if n <? m then (reg, Some m) else (r, Some n)
+       end) (from_nat 0 registers_exist, Some 0).
+
+(** Given a vector from registers to values, find the slot corresponding to
+    the register assigned to [i] and replace it with [x]. *)
+
+Definition atIntervalReg {sd : ScanStateDesc} (i : IntervalId sd)
+  {a} (v : Vec a maxReg) (x : a) :=
+  match V.nth (assignments sd) i with
+  | None => v
+  | Some r => V.replace v r x
+  end.
 
 (** ** ScanState *)
 
@@ -434,7 +476,7 @@ Qed.
     a [ScanState].  The cursor is only valid if such an unhandled element
     exists, so it combines that assertion with a view onto that element. *)
 
-Record ScanStateCursor (sd : ScanStateDesc) := {
+Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
     curState  : ScanState sd;
     curExists : length (unhandled sd) > 0;
 
@@ -483,15 +525,13 @@ Definition NextStateDep  `(cur : ScanStateCursor sd) P Q :=
 Definition NextStateWith `(cur : ScanStateCursor sd) P A :=
   (A * NextScanState (P sd))%type.
 
-Definition NextScanState_transitivity
-  {P : ScanStateDesc -> ScanStateDesc -> Prop} `{Transitive _ P}
-  `(n : NextScanState (P sd0)) `(o : NextScanState (P (nextDesc n)))
-  : NextScanState (P sd0).
-  destruct n. destruct o.
-  simpl in *.
-  rapply Build_NextScanState.
-    apply nextState1.
-  transitivity nextDesc0; assumption.
-Defined.
+Definition NSS_transport
+  (P Q : ScanStateDesc -> ScanStateDesc -> Prop)
+  {sd : ScanStateDesc} `(n : NextScanState (P sd'))
+  (f : P sd' (nextDesc n) -> Q sd (nextDesc n)) : NextScanState (Q sd) :=
+  {| nextDesc   := nextDesc n
+   ; nextState  := nextState n
+   ; morphProof := f (morphProof n)
+   |}.
 
 End MScanState.

@@ -89,19 +89,125 @@ Record SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
     stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
 }.
 
-Lemma SSMorphLenLenSt_transitivity
-  `( i : SSMorphLen sd0 sd1)
-  `( j : SSMorphLen sd1 sd2)
-  `( k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
+Lemma SSMorphStLen_Len_StLen_transitivity
+  `(i : SSMorphLen sd0 sd1)
+  `(j : SSMorphStLen  sd1 sd2) : SSMorphStLen sd0 sd2.
+Proof. destruct i; destruct j; intuition. Qed.
+
+Lemma NS_SSMorphStLen_Len_StLen_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphStLen)
+  : @NextState sd cur SSMorphStLen.
 Proof.
-  constructor;
-  destruct i;
-  destruct j;
-  destruct k.
-    transitivity sd1; auto.
-    transitivity sd2; auto.
-  intuition.
+  destruct i. destruct j.
+  rapply Build_NextScanState. apply nextState1.
+  apply (SSMorphStLen_Len_StLen_transitivity morphProof0 morphProof1).
 Qed.
+
+Lemma SSMorphSt_Len_St_transitivity
+  `(i : SSMorphLen sd0 sd1)
+  `(j : SSMorphSt sd1 sd2)
+  : SSMorphSt sd0 sd2.
+Proof. destruct i; destruct j; intuition. Qed.
+
+Definition NS_SSMorphSt_Len_StLen_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphStLen)
+  : @NextState sd cur SSMorphSt :=
+  NSS_transport SSMorphStLen SSMorphSt
+    (NS_SSMorphStLen_Len_StLen_transitivity cur i j)
+    (stlen_is_SSMorphSt _ _).
+
+Lemma SSMorphSt_StLen_St_transitivity
+  `(i : SSMorphStLen sd0 sd1)
+  `(j : SSMorphSt sd1 sd2) : SSMorphSt sd0 sd2.
+Proof. destruct i; destruct j; intuition. Qed.
+
+Lemma NS_SSMorphSt_StLen_St_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphStLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphSt)
+  : @NextState sd cur SSMorphSt.
+Proof.
+  destruct i. destruct j.
+  rapply Build_NextScanState. apply nextState1.
+  apply (SSMorphSt_StLen_St_transitivity morphProof0 morphProof1).
+Qed.
+
+Lemma SSMorphSt_Len_Len_St_transitivity
+  `(i : SSMorphLen sd0 sd1)
+  `(j : SSMorphLen sd1 sd2)
+  `(k : SSMorphSt  sd2 sd3) : SSMorphSt sd0 sd3.
+Proof. destruct i; destruct j; destruct k; intuition. Qed.
+
+Lemma NS_SSMorphSt_Len_Len_St_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphLen)
+  `(k : @NextState (nextDesc j) cur'' SSMorphSt)
+  : @NextState sd cur SSMorphSt.
+Proof.
+  destruct i. destruct j. destruct k.
+  rapply Build_NextScanState. apply nextState2.
+  apply (SSMorphSt_Len_Len_St_transitivity
+           morphProof0 morphProof1 morphProof2).
+Qed.
+
+Lemma SSMorphStLen_Len_Len_StLen_transitivity
+  `(i : SSMorphLen sd0 sd1)
+  `(j : SSMorphLen sd1 sd2)
+  `(k : SSMorphStLen sd2 sd3) : SSMorphStLen sd0 sd3.
+Proof. destruct i; destruct j; destruct k; intuition. Qed.
+
+Lemma NS_SSMorphStLen_Len_Len_StLen_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphLen)
+  `(k : @NextState (nextDesc j) cur'' SSMorphStLen)
+  : @NextState sd cur SSMorphStLen.
+Proof.
+  destruct i. destruct j. destruct k.
+  rapply Build_NextScanState. apply nextState2.
+  apply (SSMorphStLen_Len_Len_StLen_transitivity
+           morphProof0 morphProof1 morphProof2).
+Qed.
+
+Lemma SSMorphStLen_Len_StLen_StLen_transitivity
+  `(i : SSMorphLen   sd0 sd1)
+  `(j : SSMorphStLen sd1 sd2)
+  `(k : SSMorphStLen sd2 sd3) : SSMorphStLen sd0 sd3.
+Proof. destruct i; destruct j; destruct k; intuition. Qed.
+
+Lemma NS_SSMorphStLen_Len_StLen_StLen_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphStLen)
+  `(k : @NextState (nextDesc j) cur'' SSMorphStLen)
+  : @NextState sd cur SSMorphStLen.
+Proof.
+  destruct i. destruct j. destruct k.
+  rapply Build_NextScanState. apply nextState2.
+  apply (SSMorphStLen_Len_StLen_StLen_transitivity
+           morphProof0 morphProof1 morphProof2).
+Qed.
+
+Lemma SSMorphSt_Len_StLen_StLen_transitivity
+  `(i : SSMorphLen   sd0 sd1)
+  `(j : SSMorphStLen sd1 sd2)
+  `(k : SSMorphStLen sd2 sd3) : SSMorphSt sd0 sd3.
+Proof. destruct i; destruct j; destruct k; intuition. Qed.
+
+Definition NS_SSMorphSt_Len_StLen_StLen_transitivity
+  `(cur : ScanStateCursor sd)
+  `(i : @NextState sd cur SSMorphLen)
+  `(j : @NextState (nextDesc i) cur' SSMorphStLen)
+  `(k : @NextState (nextDesc j) cur'' SSMorphStLen)
+  : @NextState sd cur SSMorphSt :=
+  NSS_transport SSMorphStLen SSMorphSt
+    (NS_SSMorphStLen_Len_StLen_StLen_transitivity cur i j k)
+    (stlen_is_SSMorphSt _ _).
 
 Definition cursorFromMorphLen `(cur : ScanStateCursor sd)
   `(n : NextState cur SSMorphLen) : ScanStateCursor (nextDesc n).
@@ -109,19 +215,15 @@ Proof.
   destruct sd. destruct cur. simpl in *.
   rapply Build_ScanStateCursor;
   destruct n; simpl in *.
-  - apply nextState0.
-  - destruct morphProof0.
-    destruct nextDesc0.
-    simpl in *. omega.
+    apply nextState0.
+  destruct morphProof0.
+  destruct nextDesc0.
+  simpl in *. omega.
 Defined.
 
 Definition cursorFromMorphStLen `(cur : ScanStateCursor sd)
   `(n : NextState cur SSMorphStLen) : ScanStateCursor (nextDesc n) :=
-  cursorFromMorphLen cur
-    {| nextDesc   := nextDesc n
-     ; nextState  := nextState n
-     ; morphProof := stlen_is_SSMorphLen _ _ (morphProof n)
-     |}.
+  cursorFromMorphLen cur (NSS_transport _ _ n (stlen_is_SSMorphLen _ _)).
 
 (*
 Lemma ScanState_unhandledExtent_nonzero `(st : ScanState sd) :

@@ -34,7 +34,7 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 #                        #
 ##########################
 
-COQLIBS?=-I . 
+COQLIBS?=-I . -R Hask Hask
 COQDOCLIBS?=
 
 ##########################
@@ -113,8 +113,11 @@ endif
 #                                     #
 #######################################
 
-all: $(VOFILES) Data/Main.hs
+all: Hask/State.vo $(VOFILES) Data/Main.hs
 	egrep -i '(admit|undefined)' *.v | egrep -v 'Definition undefined'
+
+Hask/State.vo:
+	(cd Hask ; make)
 
 Data/Main.hs: Main.vo
 	ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \

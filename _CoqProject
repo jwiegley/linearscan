@@ -1,4 +1,4 @@
--I .
+-I . -R Hask Hask
 Compare.v
 Fin.v
 Vector.v
