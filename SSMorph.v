@@ -202,6 +202,9 @@ Qed.
 Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
+    transportation (x : IntervalId sd1) : IntervalId sd2 :=
+      transportId (next_interval_increases len_is_SSMorph) x;
+
     unhandled_nonempty :
       length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
 }.
@@ -294,10 +297,9 @@ Proof.
 Defined.
 
 (*
-Record SSMorphHasLenEq (sd0 sd1 sd2 : ScanStateDesc) : Prop := {
-    hasleneq_is_SSMorph       :> SSMorph sd1 sd2;
-    hasleneq_is_SSMorphLen    :> SSMorphLen sd1 sd2;
-    hasleneq_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2;
+Record SSMorphLenEq (sd0 sd1 sd2 : ScanStateDesc) : Prop := {
+    hasleneq_is_SSMorph    :> SSMorph sd1 sd2;
+    hasleneq_is_SSMorphLen :> SSMorphLen sd1 sd2;
 
     is_unchanged : sd0 = sd2
 }.
@@ -317,7 +319,7 @@ Defined.
 Definition withScanStateEq {a}
   (f : forall sd : ScanStateDesc, ScanState sd
          -> SState SSMorphHasLen (SSMorphHasLenEq sd) a)
-  : SState SSMorphHasLen SSMorphHasLen a :=
+  : SState SSMorphLen SSMorphLen a :=
   i <<- iget ;
   x <<- f (thisDesc i) (thisState i) ;
   weakenHasLenEqToHasLen ;;;
@@ -813,13 +815,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
-Lemma In_transportId : forall {sd sd' x H}
-  (f : forall sd : ScanStateDesc, list (IntervalId sd)),
-  In x (f sd) -> In (transportId H x) (f sd').
-Proof.
-  intros.
-Admitted.
-
+(*
 Definition moveActiveToHandled' `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (active sd)) : SState sd SSMorphLen SSMorphLen unit.
 Proof.
@@ -829,9 +825,7 @@ Proof.
   pose proof thisHolds0 as TH.
   destruct thisHolds0.
   destruct len_is_SSMorph0.
-  pose (moveActiveToHandled thisState0
-          (transportId next_interval_increases0 x)
-          (In_transportId _ H)).
+  pose (moveActiveToHandled thisState0 (transportation0 x)).
   destruct s.
   eapply {| thisDesc  := x0
           ; thisState := s
@@ -839,6 +833,7 @@ Proof.
   Grab Existential Variables.
   transitivity thisDesc0; auto.
 Defined.
+*)
 
 Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (active sd))
@@ -850,6 +845,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
+(*
 Definition moveActiveToInactive' `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (active sd)) : SState sd SSMorphLen SSMorphLen unit.
 Proof.
@@ -869,6 +865,7 @@ Proof.
   Grab Existential Variables.
   transitivity thisDesc0; auto.
 Defined.
+*)
 
 (* Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd) *)
 (*   (H : In x (active sd)) : { sd' : ScanStateDesc | ScanState sd' }. *)
@@ -887,6 +884,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
+(*
 Definition moveInactiveToActive' `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (inactive sd)) : SState sd SSMorphLen SSMorphLen unit.
 Proof.
@@ -906,6 +904,7 @@ Proof.
   Grab Existential Variables.
   transitivity thisDesc0; auto.
 Defined.
+*)
 
 Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
   (H : In x (inactive sd))
@@ -918,6 +917,7 @@ Proof.
   apply Le.le_n_Sn.
 Defined.
 
+(*
 Definition moveInactiveToHandled' `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (inactive sd)) : SState sd SSMorphLen SSMorphLen unit.
 Proof.
@@ -937,5 +937,6 @@ Proof.
   Grab Existential Variables.
   transitivity thisDesc0; auto.
 Defined.
+*)
 
 End MSSMorph.
