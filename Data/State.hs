@@ -1,9 +1,10 @@
-module Data.Data.Data.State where
+module Data.Data.Data.Data.State where
 
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Data.List as Data.List
 import qualified Data.Data.Data.List as Data.List as Data.Data.List as Data.List
+import qualified Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List
 
 type State s a =
   a -> (,) s a

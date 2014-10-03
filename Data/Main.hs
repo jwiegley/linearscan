@@ -668,12 +668,6 @@ _LinearScan__coq_SSMorph_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorph_rec sd1 sd2 f =
   _LinearScan__coq_SSMorph_rect sd1 sd2 f
 
-_LinearScan__withSSInfo :: LinearScan__ScanStateDesc -> (LinearScan__SSInfo
-                           -> LinearScan__SState a1) -> LinearScan__SState 
-                           a1
-_LinearScan__withSSInfo pre f =
-  _LinearScan__stbind f IState.iget
-
 _LinearScan__withScanState :: LinearScan__ScanStateDesc ->
                               (LinearScan__ScanStateDesc -> () ->
                               LinearScan__SState a1) -> LinearScan__SState 
@@ -762,28 +756,6 @@ _LinearScan__coq_SSMorphStHasLen_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphStHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStHasLen_rect sd1 sd2 f
 
-_LinearScan__withLenCursor :: LinearScan__ScanStateDesc ->
-                              (LinearScan__ScanStateDesc -> () ->
-                              LinearScan__SState a1) -> LinearScan__SState 
-                              a1
-_LinearScan__withLenCursor pre f i =
-  f i __ i
-
-_LinearScan__weakenStLenToSt :: LinearScan__ScanStateDesc ->
-                                LinearScan__SState ()
-_LinearScan__weakenStLenToSt pre hS =
-  (,) () hS
-
-_LinearScan__weakenStLenToLen :: LinearScan__ScanStateDesc ->
-                                 LinearScan__SState ()
-_LinearScan__weakenStLenToLen pre hS =
-  (,) () hS
-
-_LinearScan__weakenHasLenToLen :: LinearScan__ScanStateDesc ->
-                                  LinearScan__SState ()
-_LinearScan__weakenHasLenToLen pre hS =
-  (,) () hS
-
 _LinearScan__weakenStHasLenToHasLen :: LinearScan__ScanStateDesc ->
                                        LinearScan__SState ()
 _LinearScan__weakenStHasLenToHasLen pre hS =
@@ -794,11 +766,27 @@ _LinearScan__weakenStHasLenToSt :: LinearScan__ScanStateDesc ->
 _LinearScan__weakenStHasLenToSt pre hS =
   (,) () hS
 
+_LinearScan__withLenCursor :: LinearScan__ScanStateDesc ->
+                              (LinearScan__ScanStateDesc -> () ->
+                              LinearScan__SState a1) -> LinearScan__SState 
+                              a1
+_LinearScan__withLenCursor pre f i =
+  f i __ i
+
 _LinearScan__moveUnhandledToActive :: LinearScan__ScanStateDesc ->
                                       LinearScan__PhysReg ->
                                       LinearScan__SState ()
-_LinearScan__moveUnhandledToActive =
-  Prelude.error "AXIOM TO BE REALIZED"
+_LinearScan__moveUnhandledToActive pre reg h =
+  (,) ()
+    (case h of {
+      LinearScan__Build_ScanStateDesc nextInterval0 unhandled0 active0
+       inactive0 handled0 intervals0 assignments0 fixedIntervals0 ->
+       case unhandled0 of {
+        [] -> Logic.coq_False_rec;
+        (:) i unhandled1 -> LinearScan__Build_ScanStateDesc nextInterval0
+         unhandled1 ((:) i active0) inactive0 handled0 intervals0
+         (_LinearScan__V__replace nextInterval0 assignments0 i (Prelude.Just
+           reg)) fixedIntervals0}})
 
 _LinearScan__moveActiveToHandled :: LinearScan__ScanStateDesc ->
                                     LinearScan__IntervalId -> Specif.Coq_sig2
