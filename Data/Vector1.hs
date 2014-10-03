@@ -1,27 +1,28 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Data.Vector1 where
+module Data.Data.Data.Vector1 where
 
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Data.List as Data.List
-import qualified Data.Data.Datatypes as Datatypes as Data.Datatypes as Datatypes
-import qualified Data.Data.Fin0 as Fin0 as Data.Fin0 as Fin0
-import qualified Data.Data.Fin as Fin as Data.Fin as Fin
-import qualified Data.Data.Logic as Logic as Data.Logic as Logic
-import qualified Data.Data.Peano as Peano as Data.Peano as Peano
-import qualified Data.Data.Plus as Plus as Data.Plus as Plus
+import qualified Data.Data.Data.List as Data.List as Data.Data.List as Data.List
+import qualified Data.Data.Data.Datatypes as Datatypes as Data.Datatypes as Datatypes as Data.Data.Datatypes as Datatypes as Data.Datatypes as Datatypes
+import qualified Data.Data.Data.Fin0 as Fin0 as Data.Fin0 as Fin0 as Data.Data.Fin0 as Fin0 as Data.Fin0 as Fin0
+import qualified Data.Data.Data.Fin as Fin as Data.Fin as Fin as Data.Data.Fin as Fin as Data.Fin as Fin
+import qualified Data.Data.Data.Logic as Logic as Data.Logic as Logic as Data.Data.Logic as Logic as Data.Logic as Logic
+import qualified Data.Data.Data.Peano as Peano as Data.Peano as Peano as Data.Data.Peano as Peano as Data.Peano as Peano
+import qualified Data.Data.Data.Plus as Plus as Data.Plus as Plus as Data.Data.Plus as Plus as Data.Plus as Plus
 
 
 
-----unsafeCoerce :: a -> b
+------unsafeCoerce :: a -> b
 #ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base as GHC.Base as GHC.Base
+import qualified GHC.Base as GHC.Base as GHC.Base as GHC.Base as GHC.Base as GHC.Base as GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.Data.IOExts as IOExts as Data.IOExts as IOExts
+import qualified Data.Data.Data.IOExts as IOExts as Data.IOExts as IOExts as Data.Data.IOExts as IOExts as Data.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

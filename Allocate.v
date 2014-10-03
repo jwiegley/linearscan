@@ -26,28 +26,27 @@ Include MSSMorph M.
 
     jww (2014-10-01): Prove that it always succeeds. *)
 
-Definition splitCurrentInterval {P} (before : option nat)
-  : SState HasUnhandled HasUnhandled P SSMorphStLen unit.
+Definition splitCurrentInterval {pre} (before : option nat)
+  : SState pre SSMorphHasLen SSMorphStHasLen unit.
   (* jww (2014-09-26): NYI *)
 Admitted.
 
-Definition splitActiveIntervalForReg {H P} (reg : PhysReg) (position : nat)
-  : SState H H P P unit.
+Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (position : nat)
+  : SState pre P P unit.
   (* jww (2014-10-01): NYI *)
 Admitted.
 
-Definition splitAnyInactiveIntervalForReg {H P} (reg : PhysReg)
-  : SState H H P P unit.
+Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg)
+  : SState pre P P unit.
   (* jww (2014-10-01): NYI *)
 Admitted.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
-Definition tryAllocateFreeReg
-  : SState HasUnhandled HasUnhandled SSMorphLen SSMorphLen
-           (option (SState HasUnhandled MaybeHasUnhandled
-                           SSMorphLen SSMorphSt PhysReg)) :=
+Definition tryAllocateFreeReg {pre}
+  : SState pre SSMorphHasLen SSMorphHasLen
+           (option (SState pre SSMorphHasLen SSMorphSt PhysReg)) :=
   withLenCursor $ fun sd cur =>
   let current := curInterval cur in
   let sd := curStateDesc cur in
@@ -96,7 +95,7 @@ Definition tryAllocateFreeReg
         else Some (if intervalEnd current <? n
                    then success
                    else splitCurrentInterval (Some n) ;;;
-                        weakenStLenToLen ;;;
+                        weakenStHasLenToHasLen ;;;
                         moveUnhandledToActive reg ;;;
                         return_ reg)
       end in
@@ -110,21 +109,22 @@ Definition firstUseReqReg `(curId : Interval desc) : option nat.
   (* jww (2014-10-01): NYI *)
 Admitted.
 
-Definition assignSpillSlotToCurrent {P}
-  : SState HasUnhandled HasUnhandled P P unit.
+Definition assignSpillSlotToCurrent {pre}
+  : SState pre SSMorphHasLen SSMorphHasLen unit.
   (* jww (2014-09-26): NYI *)
 Admitted.
 
-Definition intersectsWithFixedInterval {P} (reg : PhysReg)
-  : SState HasUnhandled HasUnhandled P P (option nat).
+Definition intersectsWithFixedInterval {pre P} (reg : PhysReg)
+  (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
+  : SState pre P P (option nat).
   (* jww (2014-10-01): NYI *)
 Admitted.
 
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
     the change to the [ScanState] must be a productive one. *)
-Definition allocateBlockedReg
-  : SState HasUnhandled MaybeHasUnhandled SSMorphLen SSMorphSt (option PhysReg) :=
+Definition allocateBlockedReg {pre}
+  : SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
   withLenCursor $ fun sd cur =>
   let st      := curState cur in
   let current := curInterval cur in
@@ -173,11 +173,11 @@ Definition allocateBlockedReg
 
     mloc <<- intersectsWithFixedInterval reg ;
     match mloc with
-    | Some n => splitCurrentInterval (Some n)
+    | Some n => weakenStHasLenToHasLen ;;;
+                splitCurrentInterval (Some n)
     | None   => return_ tt
     end ;;;
-    weakenStLenToSt ;;;
-    weakenHasUnhandled ;;;
+    weakenStHasLenToSt ;;;
     return_ None
   else
     splitActiveIntervalForReg reg pos ;;;
@@ -186,15 +186,17 @@ Definition allocateBlockedReg
     mloc <<- intersectsWithFixedInterval reg ;
     match mloc with
     | Some n => splitCurrentInterval (Some n) ;;;
-                weakenStLenToLen
+                weakenStHasLenToHasLen
     | None   => return_ tt
     end ;;;
 
     moveUnhandledToActive reg ;;;
     return_ (Some reg).
 
-Definition checkActiveIntervals {H} : SState H H SSMorphLen SSMorphLen unit :=
-  let fix go is pos :=
+Definition checkActiveIntervals {pre} (pos : nat)
+  : SState pre SSMorphLen SSMorphLen unit :=
+  withScanStatePO $ fun sd (st : ScanState sd) =>
+  let fix go is :=
     match is with
     | nil => return_ tt
     | x :: xs =>
@@ -206,19 +208,18 @@ Definition checkActiveIntervals {H} : SState H H SSMorphLen SSMorphLen unit :=
         let i := getInterval (proj1_sig x) in
         let act :=
             if intervalEnd i <? pos
-            then uncurry_sig moveActiveToHandled x
+            then uncurry_sig (moveActiveToHandled' st) x
             else if negb (intervalCoversPos i pos)
-                 then uncurry_sig moveActiveToInactive x
+                 then uncurry_sig (moveActiveToInactive' st) x
                  else return_ tt in
-        act ;;; go xs pos
+        act ;;; go xs
     end in
-  withScanState $ fun sd (st : ScanState sd) =>
-    withLenCursor $ fun cur =>
-    let pos := curPosition cur in
-    go (list_membership (active sd)) pos.
+  go (list_membership (active sd)).
 
-Definition checkInactiveIntervals : SState SSMorphLen SSMorphLen unit :=
-  let fix go sd (st : ScanState sd) is pos :=
+Definition checkInactiveIntervals {pre} (pos : nat)
+  : SState pre SSMorphLen SSMorphLen unit :=
+  withScanStatePO $ fun sd (st : ScanState sd) =>
+  let fix go is :=
     match is with
     | nil => return_ tt
     | x :: xs =>
@@ -230,22 +231,24 @@ Definition checkInactiveIntervals : SState SSMorphLen SSMorphLen unit :=
         let i := getInterval (proj1_sig x) in
         let act :=
             if intervalEnd i <? pos
-            then step (uncurry_sig (moveInactiveToHandled st) x)
+            then uncurry_sig (moveInactiveToHandled' st) x
             else if intervalCoversPos i pos
-                 then step (uncurry_sig (moveInactiveToActive st) x)
+                 then uncurry_sig (moveInactiveToActive' st) x
                  else return_ tt in
-        act ;;; go sd st xs pos
+        act ;;; go xs
     end in
-  withScanState $ fun sd (st : ScanState sd) =>
-    pos <<- cursor (@curPosition) ;
-    go sd st (list_membership (inactive sd)) pos.
+  go (list_membership (inactive sd)).
 
-Definition handleInterval : SState SSMorphLen SSMorphSt (option PhysReg) :=
+Definition handleInterval {pre}
+  : SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
   (* position = start position of current *)
+  withLenCursor $ fun _ cur =>
+  let position := curPosition cur in
+
   (* // check for intervals in active that are handled or inactive *)
-  checkActiveIntervals ;;;
+  liftLen (checkActiveIntervals position) ;;;
   (* // check for intervals in inactive that are handled or active *)
-  checkInactiveIntervals ;;;
+  liftLen (checkInactiveIntervals position) ;;;
 
   (* // find a register for current
      tryAllocateFreeReg
@@ -267,24 +270,13 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
        HANDLE_INTERVAL (current) *)
   match destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
-    let cursor := {| curState  := st
-                   ; curExists := list_cons_nonzero H |} in
-    let next   := {| nextDesc   := sd
-                   ; nextState  := st
-                   ; morphProof := newSSMorphLen sd
+    let ssinfo := {| thisDesc  := sd
+                   ; thisHolds := newSSMorphHasLen sd (list_cons_nonzero H)
+                   ; thisState := st
                    |} in
-    let istate := {| startDesc   := sd
-                   ; startCursor := cursor
-                   ; bridgeState := next
-
-                   ; thisDesc    := sd
-                   ; thisCursor  := cursor
-                   ; resultState := next
-                   |} in
-    match runIState handleInterval istate with
-      (_, istate') =>
-        let next' := resultState istate' in
-        linearScan (nextDesc next') (nextState next')
+    match runIState handleInterval ssinfo with
+      (_, ssinfo') =>
+        linearScan (thisDesc ssinfo') (thisState ssinfo')
     end
   | inright _ => exist _ sd st
   end.
@@ -292,12 +284,10 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
    of the remaining unhandled intervals is less than it was before. *)
 Proof.
   intros.
-  subst. clear H teq teq2 x xs.
-  destruct istate'. simpl.
-  destruct bridgeState0. simpl.
-  destruct morphProof0.
-  crush. assumption.
+  subst. clear teq teq2 H x xs.
+  destruct ssinfo'. simpl.
+  destruct thisHolds0.
   assumption.
- intros; inversion smorph2; assumption. Defined.
+Defined.
 
 End MAllocate.

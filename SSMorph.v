@@ -16,34 +16,40 @@ Generalizable All Variables.
 Open Scope nat_scope.
 Open Scope program_scope.
 
+(* Inductive tlist {a : Type} : list a -> Type := *)
+(*   | tnil : tlist nil *)
+(*   | tcons x xs : tlist xs -> tlist (x :: xs). *)
+
+(* Definition Has {a} (x : a) {xs : list a} (T : tlist xs) := *)
+
+(* Notation " '[ ] " := (tlist nil) (at level 100) : type_scope. *)
+(* Notation "x ':: y" := (tlist (x :: y)) (at level 100) : type_scope. *)
+(* Notation " '[ x ] " := (tlist (x :: nil)) : type_scope. *)
+(* Notation " '[ x ; .. ; y ] " := (tlist (cons x .. (cons y nil) ..)) : type_scope. *)
+
+(* Goal '[true ; false ; true]. *)
+
 Module MSSMorph (M : Machine).
 Include MScanState M.
 
-Record SSInfo (H : ScanStateDesc -> Prop) (P : relation ScanStateDesc) := {
-    startDesc  : ScanStateDesc;
-    startHolds : H startDesc;
-    thisDesc   : ScanStateDesc;
-    thisHolds  : P startDesc thisDesc;
-    thisState  : ScanState thisDesc
+Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
+    thisDesc  : ScanStateDesc;
+    thisHolds : P startDesc thisDesc;
+    thisState : ScanState thisDesc
 }.
 
-Arguments startDesc {H P} _.
-Arguments thisDesc  {H P} _.
-Arguments thisHolds {H P} _.
-Arguments thisState {H P} _.
+(* Arguments startDesc {P} _. *)
+Arguments thisDesc  {_ P} _.
+Arguments thisHolds {_ P} _.
+Arguments thisState {_ P} _.
 
-Definition SState (J K : ScanStateDesc -> Prop) (P Q : relation ScanStateDesc) :=
-  IState (SSInfo J P) (SSInfo K Q).
+Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
+  IState (SSInfo sd P) (SSInfo sd Q).
 
 (* Definition withCursor {P Q a} `{PreOrder _ P} *)
 (*   (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState P Q a) : SState P Q a := *)
 (*   rgets (fun s => exist _ (thisDesc s) (thisCursor s)) *)
 (*     >>= uncurry_sig f. *)
-
-Definition withScanState {J K P Q a}
-  (f : forall sd : ScanStateDesc, ScanState sd -> SState J K P Q a)
-  : SState J K P Q a :=
-  iget >>>= fun i => f (thisDesc i) (thisState i).
 
 (** Given an non-monadic function that returns a [NextScanState], absorb it
     into the indexed monad appropriately. *)
@@ -67,7 +73,6 @@ Defined.
 *)
 
 (* Arguments cursor {P a} f. *)
-Arguments withScanState {J K P Q a} f.
 (* Arguments step {H P _} f. *)
 
 Definition stbind {P Q R a b}
@@ -89,6 +94,20 @@ Notation "A ;;; B" := (_ <<- A ; B)
   (right associativity, at level 84, A1 at next level).
 
 Definition return_ {I X} := @ipure IState _ I X.
+
+(*
+Definition ssput {P : relation ScanStateDesc} `(st : ScanState sd)
+  (H : forall start this : ScanStateDesc, P start this) : SState P P unit.
+Proof.
+  eexists. intros.
+  split. apply tt.
+  destruct H0.
+  specialize (H startDesc0 sd).
+  rapply Build_SSInfo.
+  apply H.
+  assumption.
+Defined.
+*)
 
 (** ** SSMorph *)
 
@@ -116,6 +135,46 @@ Obligation 2.
   transitivity (unhandledExtent y); auto.
   transitivity (length (handled y)); auto.
 Qed.
+
+Definition withSSInfo {P Q : relation ScanStateDesc} {a pre}
+  (f : forall (i : SSInfo pre P), SState pre P Q a)
+  : SState pre P Q a := iget >>>= f.
+
+Arguments withSSInfo {P Q a pre} f.
+
+(*
+Definition slift {pre} `{st : ScanState sub} {a}
+  {P : relation ScanStateDesc} `{T : Transitive _ P}
+  : P pre sub -> SState sub P P a -> SState pre P P a.
+Proof.
+  intros Hp i. destruct i.
+  eexists. intros.
+  destruct H.
+  assert (SSInfo sub P).
+    eapply {| thisDesc  := _
+            ; thisHolds := _
+            |}.
+  pose proof H.
+  destruct H0.
+  apply p in H.
+  destruct H.
+  split. apply a0.
+  destruct s.
+  eexists.
+  apply (transitivity Hp thisHolds2).
+  assumption.
+  Grab Existential Variables.
+  assumption.
+  
+Defined.
+*)
+
+Definition withScanState {P Q : relation ScanStateDesc} {a pre}
+  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a)
+  : SState pre P Q a :=
+  iget >>>= fun i => f (thisDesc i) (thisState i).
+
+Arguments withScanState {P Q a pre} f.
 
 Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
     st_is_SSMorph :> SSMorph sd1 sd2;
@@ -167,10 +226,142 @@ Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
 Proof. intros. constructor; auto. constructor; auto. Defined.
 
 Record > SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    stlen_is_SSMorph    :> SSMorph sd1 sd2;
     stlen_is_SSMorphLen :> SSMorphLen sd1 sd2;
     stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
 }.
 
+Definition withScanStatePO {P a pre} `{PO : PreOrder _ P}
+  (f : forall sd : ScanStateDesc, ScanState sd
+         -> SState sd P P a)
+  : SState pre P P a.
+Proof.
+  exists. intros i.
+  destruct i.
+  specialize (f thisDesc0 thisState0).
+  destruct f.
+  assert (SSInfo thisDesc0 P).
+    eapply {| thisDesc  := _
+            ; thisHolds := _
+            |}.
+  apply p in H.
+  destruct H.
+  split. apply a0.
+  destruct s.
+  eexists.
+  apply (transitivity thisHolds0 thisHolds1).
+  assumption.
+  Grab Existential Variables.
+  apply thisState0.
+  reflexivity.
+Defined.
+
+Arguments withScanStatePO {P a pre _} f.
+
+Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    haslen_is_SSMorph    :> SSMorph sd1 sd2;
+    haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
+
+    first_nonempty : length (unhandled sd1) > 0
+}.
+
+Definition newSSMorphHasLen (sd : ScanStateDesc)
+  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
+Proof. repeat (constructor; auto). Defined.
+
+Definition liftLen {pre a}
+  : SState pre SSMorphLen SSMorphLen a
+      -> SState pre SSMorphHasLen SSMorphHasLen a.
+Proof.
+  intros.
+  destruct X.
+  exists. intros.
+  destruct H.
+  destruct thisHolds0.
+  specialize (p
+    {| thisDesc  := thisDesc0
+     ; thisHolds := haslen_is_SSMorphLen0
+     ; thisState := thisState0
+     |}).
+  destruct p.
+  split. apply a0.
+  eexists.
+  rapply Build_SSMorphHasLen.
+  apply haslen_is_SSMorph0.
+  apply haslen_is_SSMorphLen0.
+  apply first_nonempty0.
+  assumption.
+Defined.
+
+(*
+Record SSMorphHasLenEq (sd0 sd1 sd2 : ScanStateDesc) : Prop := {
+    hasleneq_is_SSMorph       :> SSMorph sd1 sd2;
+    hasleneq_is_SSMorphLen    :> SSMorphLen sd1 sd2;
+    hasleneq_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2;
+
+    is_unchanged : sd0 = sd2
+}.
+
+Definition weakenHasLenEqToHasLen {sd}
+  : SState (SSMorphHasLenEq sd) SSMorphHasLen unit.
+Proof.
+  constructor. intros HS.
+  split. apply tt.
+  destruct HS.
+  rapply Build_SSInfo.
+  - destruct thisHolds0.
+    apply hasleneq_is_SSMorphHasLen0.
+  - assumption.
+Defined.
+
+Definition withScanStateEq {a}
+  (f : forall sd : ScanStateDesc, ScanState sd
+         -> SState SSMorphHasLen (SSMorphHasLenEq sd) a)
+  : SState SSMorphHasLen SSMorphHasLen a :=
+  i <<- iget ;
+  x <<- f (thisDesc i) (thisState i) ;
+  weakenHasLenEqToHasLen ;;;
+  return_ x.
+
+Definition promoteHasLenToEq `(st : ScanState sd) (H : forall sd', sd = sd')
+  : SState SSMorphHasLen (SSMorphHasLenEq sd) unit.
+Proof.
+  exists. intros.
+  split. apply tt.
+  destruct H0.
+  specialize (H thisDesc0). subst.
+  destruct thisHolds0.
+  eexists.
+  rapply Build_SSMorphHasLenEq; auto.
+  apply haslen_is_SSMorph0.
+  assumption.
+  rapply Build_SSMorphHasLen; auto.
+  apply st.
+Defined.
+*)
+
+Program Instance SSMorphHasLen_Trans : Transitive SSMorphHasLen.
+Obligation 1.
+  constructor; destruct H; destruct H0.
+  transitivity y; assumption.
+  transitivity y; assumption.
+  omega.
+Qed.
+
+Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    sthaslen_is_SSMorph       :> SSMorph sd1 sd2;
+    sthaslen_is_SSMorphLen    :> SSMorphLen sd1 sd2;
+    sthaslen_is_SSMorphSt     :> SSMorphSt sd1 sd2;
+    sthaslen_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2
+}.
+
+Program Instance SSMorphStHasLen_Trans : Transitive SSMorphStHasLen.
+Obligation 1.
+  constructor; destruct H; destruct H0;
+  transitivity y; assumption.
+Qed.
+
+(*
 Lemma SSMorphStLen_Len_StLen_transitivity
   `(i : SSMorphLen sd0 sd1)
   `(j : SSMorphStLen  sd1 sd2) : SSMorphStLen sd0 sd2.
@@ -309,17 +500,19 @@ Definition cursorFromMorphStLen `(cur : ScanStateCursor sd)
 
 Definition HasUnhandled := fun sd => length (unhandled sd) > 0.
 Definition MaybeHasUnhandled := fun sd => length (unhandled sd) >= 0.
+*)
 
-Definition withLenCursor {H Q a}
+Definition withLenCursor {Q a pre}
   (f : forall sd : ScanStateDesc, ScanStateCursor sd
-         -> SState HasUnhandled H SSMorphLen Q a)
-  : SState HasUnhandled H SSMorphLen Q a.
+         -> SState pre SSMorphHasLen Q a)
+  : SState pre SSMorphHasLen Q a.
 Proof.
   constructor. intros i.
   destruct i.
-  unfold HasUnhandled in startHolds0.
+  pose proof thisHolds0.
   destruct thisHolds0.
-  pose proof startHolds0.
+  destruct haslen_is_SSMorphLen0.
+  pose proof first_nonempty0.
   apply unhandled_nonempty0 in H0.
   pose {| curState  := thisState0
         ; curExists := H0 |} as p.
@@ -327,19 +520,16 @@ Proof.
   destruct f as [res].
   apply res.
   rapply Build_SSInfo.
-  apply startHolds0.
-  rapply Build_SSMorphLen; auto.
-  apply len_is_SSMorph0.
-  apply thisState0.
+  apply H.
+  assumption.
 Defined.
 
-Definition weakenStLenToSt {H} : SState H H SSMorphStLen SSMorphSt unit.
+Definition weakenStLenToSt {pre} : SState pre SSMorphStLen SSMorphSt unit.
 Proof.
   constructor. intros HS.
   split. constructor.
   destruct HS.
   rapply Build_SSInfo.
-  - apply startHolds0.
   - destruct thisHolds0.
     apply stlen_is_SSMorphSt0.
   - assumption.
@@ -412,27 +602,45 @@ Proof.
 Defined.
 *)
 
-Definition weakenStLenToLen {H} : SState H H SSMorphStLen SSMorphLen unit.
+Definition weakenStLenToLen {pre} : SState pre SSMorphStLen SSMorphLen unit.
 Proof.
   constructor. intros HS.
   split. apply tt.
   destruct HS.
   rapply Build_SSInfo.
-  - apply startHolds0.
   - destruct thisHolds0.
     apply stlen_is_SSMorphLen0.
   - assumption.
 Defined.
 
-Definition weakenHasUnhandled {P}
-  : SState HasUnhandled MaybeHasUnhandled P P unit.
+Definition weakenHasLenToLen {pre} : SState pre SSMorphHasLen SSMorphLen unit.
 Proof.
   constructor. intros HS.
   split. apply tt.
   destruct HS.
   rapply Build_SSInfo.
-  - unfold HasUnhandled in startHolds0.
-    unfold MaybeHasUnhandled. omega.
+  - apply thisHolds0.
+  - assumption.
+Defined.
+
+Definition weakenStHasLenToHasLen {pre}
+  : SState pre SSMorphStHasLen SSMorphHasLen unit.
+Proof.
+  constructor. intros HS.
+  split. apply tt.
+  destruct HS.
+  rapply Build_SSInfo.
+  - apply thisHolds0.
+  - assumption.
+Defined.
+
+Definition weakenStHasLenToSt {pre}
+  : SState pre SSMorphStHasLen SSMorphSt unit.
+Proof.
+  constructor. intros HS.
+  split. apply tt.
+  destruct HS.
+  rapply Build_SSInfo.
   - apply thisHolds0.
   - assumption.
 Defined.
@@ -501,8 +709,8 @@ Proof.
 Qed.
 *)
 
-Definition moveUnhandledToActive (reg : PhysReg)
-  : SState HasUnhandled MaybeHasUnhandled SSMorphLen SSMorphSt unit.
+Definition moveUnhandledToActive {pre} (reg : PhysReg)
+  : SState pre SSMorphHasLen SSMorphSt unit.
 Proof.
 Admitted.
 (*
@@ -595,54 +803,139 @@ Proof.
 Defined.
 *)
 
-Definition moveActiveToHandled {H} `(x : IntervalId sd)
-  : SState (fun sd' => sd = sd' /\ In x (active sd)) H SSMorphLen SSMorphLen unit.
+Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
+  (H: In x (active sd))
+  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  constructor. intros i.
-  split. apply tt.
-  destruct i.
-  intuition.
-  pose (ScanState_moveActiveToInactive thisDesc0 x thisState0 H1). eexists. apply s.
-  destruct sd. simpl.
+  pose (ScanState_moveActiveToInactive sd x st H).
+  eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
 Defined.
 
-Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (active sd)) : NextScanState (SSMorphLen sd).
+Lemma In_transportId : forall {sd sd' x H}
+  (f : forall sd : ScanStateDesc, list (IntervalId sd)),
+  In x (f sd) -> In (transportId H x) (f sd').
 Proof.
-  pose (ScanState_moveActiveToInactive sd x st H). eexists. apply s.
-  destruct sd. simpl.
-  rapply Build_SSMorphLen; auto.
-  rapply Build_SSMorph; auto.
+  intros.
+Admitted.
+
+Definition moveActiveToHandled' `(st : ScanState sd) (x : IntervalId sd)
+  (H: In x (active sd)) : SState sd SSMorphLen SSMorphLen unit.
+Proof.
+  constructor. intros.
+  split. apply tt.
+  destruct H0.
+  pose proof thisHolds0 as TH.
+  destruct thisHolds0.
+  destruct len_is_SSMorph0.
+  pose (moveActiveToHandled thisState0
+          (transportId next_interval_increases0 x)
+          (In_transportId _ H)).
+  destruct s.
+  eapply {| thisDesc  := x0
+          ; thisState := s
+          |}.
+  Grab Existential Variables.
+  transitivity thisDesc0; auto.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (active sd)) : NextScanState (SSMorphLen sd).
+  (H: In x (active sd))
+  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveActiveToInactive sd x st H). eexists. apply s.
-  destruct sd. simpl.
+  pose (ScanState_moveActiveToInactive sd x st H).
+  eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
 Defined.
 
-Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (inactive sd)) : NextScanState (SSMorphLen sd).
+Definition moveActiveToInactive' `(st : ScanState sd) (x : IntervalId sd)
+  (H: In x (active sd)) : SState sd SSMorphLen SSMorphLen unit.
 Proof.
-  pose (ScanState_moveInactiveToActive sd x st H). eexists. apply s.
-  destruct sd. simpl.
+  constructor. intros.
+  split. apply tt.
+  destruct H0.
+  pose proof thisHolds0 as TH.
+  destruct thisHolds0.
+  destruct len_is_SSMorph0.
+  pose (moveActiveToHandled thisState0
+          (transportId next_interval_increases0 x)
+          (In_transportId _ H)).
+  destruct s.
+  eapply {| thisDesc  := x0
+          ; thisState := s
+          |}.
+  Grab Existential Variables.
+  transitivity thisDesc0; auto.
+Defined.
+
+(* Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd) *)
+(*   (H : In x (active sd)) : { sd' : ScanStateDesc | ScanState sd' }. *)
+(* Proof. *)
+(*   pose (ScanState_moveActiveToInactive sd x st H). *)
+(*   eexists. apply s. *)
+(* Defined. *)
+
+Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
+  (H : In x (inactive sd))
+  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
+Proof.
+  pose (ScanState_moveInactiveToActive sd x st H).
+  eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
+Defined.
+
+Definition moveInactiveToActive' `(st : ScanState sd) (x : IntervalId sd)
+  (H: In x (inactive sd)) : SState sd SSMorphLen SSMorphLen unit.
+Proof.
+  constructor. intros.
+  split. apply tt.
+  destruct H0.
+  pose proof thisHolds0 as TH.
+  destruct thisHolds0.
+  destruct len_is_SSMorph0.
+  pose (moveInactiveToActive thisState0
+          (transportId next_interval_increases0 x)
+          (In_transportId _ H)).
+  destruct s.
+  eapply {| thisDesc  := x0
+          ; thisState := s
+          |}.
+  Grab Existential Variables.
+  transitivity thisDesc0; auto.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (inactive sd)) : NextScanState (SSMorphLen sd).
+  (H : In x (inactive sd))
+  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveInactiveToHandled sd x st H). eexists. apply s.
-  destruct sd. simpl.
+  pose (ScanState_moveInactiveToHandled sd x st H).
+  eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
   apply Le.le_n_Sn.
+Defined.
+
+Definition moveInactiveToHandled' `(st : ScanState sd) (x : IntervalId sd)
+  (H: In x (inactive sd)) : SState sd SSMorphLen SSMorphLen unit.
+Proof.
+  constructor. intros.
+  split. apply tt.
+  destruct H0.
+  pose proof thisHolds0 as TH.
+  destruct thisHolds0.
+  destruct len_is_SSMorph0.
+  pose (moveInactiveToHandled thisState0
+          (transportId next_interval_increases0 x)
+          (In_transportId _ H)).
+  destruct s.
+  eapply {| thisDesc  := x0
+          ; thisState := s
+          |}.
+  Grab Existential Variables.
+  transitivity thisDesc0; auto.
 Defined.
 
 End MSSMorph.

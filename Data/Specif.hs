@@ -18,6 +18,10 @@ sig_rec :: (a1 -> () -> a2) -> a1 -> a2
 sig_rec =
   sig_rect
 
+type Coq_sig2 a =
+  a
+  -- singleton inductive, whose constructor was exist2
+  
 data Coq_sigT a p =
    Coq_existT a p
 
