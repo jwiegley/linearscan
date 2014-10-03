@@ -21,7 +21,8 @@ import qualified Data.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
-type IState i o a = i -> (,) a o
+type IState i o a =
+  i -> (,) a o
   -- singleton inductive, whose constructor was mkIState
   
 runIState :: (IState a1 a2 a3) -> a1 -> (,) a3 a2
@@ -36,6 +37,10 @@ coq_IState_IFunctor _ _ _ _ f x st =
 iget :: IState a1 a1 a1
 iget i =
   (,) i i
+
+iput :: a2 -> IState a1 a2 ()
+iput x s =
+  (,) () x
 
 coq_IState_IApplicative :: IApplicative.IApplicative (IState () () ())
 coq_IState_IApplicative =

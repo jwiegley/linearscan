@@ -127,7 +127,7 @@ Data/Main.hs: Main.vo
 	perl -i -pe 's/import qualified Data\.GHC/import qualified GHC/' Data/*.hs
 	perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' Data/*.hs
 	perl -i -pe 's/module (.+?) where/module Data.\1 where/' Data/*.hs
-        perl -i -pe 's/type IState i o a = a -> (,) i o/type IState i o a = i -> (,) a o/' Data/IState.hs
+	perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' Data/IState.hs
 
 spec: $(VIFILES)
 

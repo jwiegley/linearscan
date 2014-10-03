@@ -705,6 +705,13 @@ _LinearScan__coq_SSMorphLen_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphLen_rect sd1 sd2 f
 
+_LinearScan__transportation :: LinearScan__ScanStateDesc ->
+                               LinearScan__ScanStateDesc ->
+                               LinearScan__IntervalId ->
+                               LinearScan__IntervalId
+_LinearScan__transportation sd1 sd2 x =
+  _LinearScan__transportId sd1 sd2 x
+
 _LinearScan__coq_SSMorphStLen_rect :: LinearScan__ScanStateDesc ->
                                       LinearScan__ScanStateDesc -> (() -> ()
                                       -> () -> a1) -> a1
@@ -806,13 +813,6 @@ _LinearScan__moveActiveToHandled sd x =
     (_LinearScan__handled sd) (_LinearScan__intervals sd)
     (_LinearScan__assignments sd) (_LinearScan__fixedIntervals sd)
 
-_LinearScan__moveActiveToHandled' :: LinearScan__ScanStateDesc ->
-                                     LinearScan__IntervalId ->
-                                     LinearScan__SState ()
-_LinearScan__moveActiveToHandled' sd x h0 =
-  (,) ()
-    (_LinearScan__moveActiveToHandled h0 (_LinearScan__transportId sd h0 x))
-
 _LinearScan__moveActiveToInactive :: LinearScan__ScanStateDesc ->
                                      LinearScan__IntervalId ->
                                      Specif.Coq_sig2
@@ -826,13 +826,6 @@ _LinearScan__moveActiveToInactive sd x =
       (_LinearScan__active sd)) ((:) x (_LinearScan__inactive sd))
     (_LinearScan__handled sd) (_LinearScan__intervals sd)
     (_LinearScan__assignments sd) (_LinearScan__fixedIntervals sd)
-
-_LinearScan__moveActiveToInactive' :: LinearScan__ScanStateDesc ->
-                                      LinearScan__IntervalId ->
-                                      LinearScan__SState ()
-_LinearScan__moveActiveToInactive' sd x h0 =
-  (,) ()
-    (_LinearScan__moveActiveToHandled h0 (_LinearScan__transportId sd h0 x))
 
 _LinearScan__moveInactiveToActive :: LinearScan__ScanStateDesc ->
                                      LinearScan__IntervalId ->
@@ -848,13 +841,6 @@ _LinearScan__moveInactiveToActive sd x =
     (_LinearScan__intervals sd) (_LinearScan__assignments sd)
     (_LinearScan__fixedIntervals sd)
 
-_LinearScan__moveInactiveToActive' :: LinearScan__ScanStateDesc ->
-                                      LinearScan__IntervalId ->
-                                      LinearScan__SState ()
-_LinearScan__moveInactiveToActive' sd x h0 =
-  (,) ()
-    (_LinearScan__moveInactiveToActive h0 (_LinearScan__transportId sd h0 x))
-
 _LinearScan__moveInactiveToHandled :: LinearScan__ScanStateDesc ->
                                       LinearScan__IntervalId ->
                                       Specif.Coq_sig2
@@ -868,14 +854,6 @@ _LinearScan__moveInactiveToHandled sd x =
       (_LinearScan__inactive sd)) ((:) x (_LinearScan__handled sd))
     (_LinearScan__intervals sd) (_LinearScan__assignments sd)
     (_LinearScan__fixedIntervals sd)
-
-_LinearScan__moveInactiveToHandled' :: LinearScan__ScanStateDesc ->
-                                       LinearScan__IntervalId ->
-                                       LinearScan__SState ()
-_LinearScan__moveInactiveToHandled' sd x h0 =
-  (,) ()
-    (_LinearScan__moveInactiveToHandled h0
-      (_LinearScan__transportId sd h0 x))
 
 _LinearScan__splitCurrentInterval :: LinearScan__ScanStateDesc ->
                                      (Prelude.Maybe Prelude.Int) ->
@@ -1060,70 +1038,76 @@ _LinearScan__allocateBlockedReg pre =
 _LinearScan__checkActiveIntervals :: LinearScan__ScanStateDesc -> Prelude.Int
                                      -> LinearScan__SState ()
 _LinearScan__checkActiveIntervals pre pos =
+  let {
+   go = let {
+         go sd ss is =
+           case is of {
+            [] -> ss;
+            (:) x xs ->
+             let {
+              st1 = case NPeano.ltb
+                           (Interval.intervalEnd
+                             (
+                               (_LinearScan__V__nth
+                                 (_LinearScan__nextInterval sd)
+                                 (_LinearScan__intervals sd) ( x)))) pos of {
+                     Prelude.True ->
+                      Lib.uncurry_sig (\x0 _ ->
+                        _LinearScan__moveActiveToHandled sd x0) x;
+                     Prelude.False ->
+                      case (Prelude.not)
+                             (Interval.intervalCoversPos
+                               (
+                                 (_LinearScan__V__nth
+                                   (_LinearScan__nextInterval sd)
+                                   (_LinearScan__intervals sd) ( x))) pos) of {
+                       Prelude.True ->
+                        Lib.uncurry_sig (\x0 _ ->
+                          _LinearScan__moveActiveToInactive sd x0) x;
+                       Prelude.False -> ss}}}
+             in
+             go sd st1 xs}}
+        in go}
+  in
   Basics.apply (_LinearScan__withScanStatePO pre) (\sd _ ->
-    let {
-     go is =
-       case is of {
-        [] -> _LinearScan__return_ ();
-        (:) x xs ->
-         let {
-          act = case NPeano.ltb
-                       (Interval.intervalEnd
-                         (
-                           (_LinearScan__V__nth
-                             (_LinearScan__nextInterval sd)
-                             (_LinearScan__intervals sd) ( x)))) pos of {
-                 Prelude.True ->
-                  Lib.uncurry_sig (\x0 _ ->
-                    _LinearScan__moveActiveToHandled' sd x0) x;
-                 Prelude.False ->
-                  case (Prelude.not)
-                         (Interval.intervalCoversPos
-                           (
-                             (_LinearScan__V__nth
-                               (_LinearScan__nextInterval sd)
-                               (_LinearScan__intervals sd) ( x))) pos) of {
-                   Prelude.True ->
-                    Lib.uncurry_sig (\x0 _ ->
-                      _LinearScan__moveActiveToInactive' sd x0) x;
-                   Prelude.False -> _LinearScan__return_ ()}}}
-         in
-         _LinearScan__stbind (\x0 -> go xs) act}}
-    in go (Lib.list_membership (_LinearScan__active sd)))
+    IState.iput (go sd sd (Lib.list_membership (_LinearScan__active sd))))
 
 _LinearScan__checkInactiveIntervals :: LinearScan__ScanStateDesc ->
                                        Prelude.Int -> LinearScan__SState 
                                        ()
 _LinearScan__checkInactiveIntervals pre pos =
+  let {
+   go = let {
+         go sd ss is =
+           case is of {
+            [] -> ss;
+            (:) x xs ->
+             let {
+              st1 = case NPeano.ltb
+                           (Interval.intervalEnd
+                             (
+                               (_LinearScan__V__nth
+                                 (_LinearScan__nextInterval sd)
+                                 (_LinearScan__intervals sd) ( x)))) pos of {
+                     Prelude.True ->
+                      Lib.uncurry_sig (\x0 _ ->
+                        _LinearScan__moveInactiveToHandled sd x0) x;
+                     Prelude.False ->
+                      case Interval.intervalCoversPos
+                             (
+                               (_LinearScan__V__nth
+                                 (_LinearScan__nextInterval sd)
+                                 (_LinearScan__intervals sd) ( x))) pos of {
+                       Prelude.True ->
+                        Lib.uncurry_sig (\x0 _ ->
+                          _LinearScan__moveInactiveToActive sd x0) x;
+                       Prelude.False -> ss}}}
+             in
+             go sd st1 xs}}
+        in go}
+  in
   Basics.apply (_LinearScan__withScanStatePO pre) (\sd _ ->
-    let {
-     go is =
-       case is of {
-        [] -> _LinearScan__return_ ();
-        (:) x xs ->
-         let {
-          act = case NPeano.ltb
-                       (Interval.intervalEnd
-                         (
-                           (_LinearScan__V__nth
-                             (_LinearScan__nextInterval sd)
-                             (_LinearScan__intervals sd) ( x)))) pos of {
-                 Prelude.True ->
-                  Lib.uncurry_sig (\x0 _ ->
-                    _LinearScan__moveInactiveToHandled' sd x0) x;
-                 Prelude.False ->
-                  case Interval.intervalCoversPos
-                         (
-                           (_LinearScan__V__nth
-                             (_LinearScan__nextInterval sd)
-                             (_LinearScan__intervals sd) ( x))) pos of {
-                   Prelude.True ->
-                    Lib.uncurry_sig (\x0 _ ->
-                      _LinearScan__moveInactiveToActive' sd x0) x;
-                   Prelude.False -> _LinearScan__return_ ()}}}
-         in
-         _LinearScan__stbind (\x0 -> go xs) act}}
-    in go (Lib.list_membership (_LinearScan__inactive sd)))
+    IState.iput (go sd sd (Lib.list_membership (_LinearScan__inactive sd))))
 
 _LinearScan__handleInterval :: LinearScan__ScanStateDesc ->
                                LinearScan__SState
