@@ -32,33 +32,6 @@ Open Scope program_scope.
 Module MSSMorph (M : Machine).
 Include MScanState M.
 
-Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
-    thisDesc  : ScanStateDesc;
-    thisHolds : P startDesc thisDesc;
-    thisState : ScanState thisDesc
-}.
-
-Arguments thisDesc  {_ P} _.
-Arguments thisHolds {_ P} _.
-Arguments thisState {_ P} _.
-
-Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
-  IState (SSInfo sd P) (SSInfo sd Q).
-
-Definition stbind {P Q R a b}
-  (f : (a -> IState Q R b)) (x : IState P Q a) : IState P R b :=
-  @ijoin IState _ P Q R b (@imap _ _ P Q _ _ f x).
-
-Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
-
-Notation "X <<- A ; B" := (A >>>= (fun X => B))
-  (right associativity, at level 84, A1 at next level).
-
-Notation "A ;;; B" := (_ <<- A ; B)
-  (right associativity, at level 84, A1 at next level).
-
-Definition return_ {I X} := @ipure IState _ I X.
-
 (** ** SSMorph *)
 
 (** A [SSMorph] is a relation describe a lawful transition between two
@@ -85,13 +58,6 @@ Obligation 2.
   transitivity (unhandledExtent y); auto.
   transitivity (length (handled y)); auto.
 Qed.
-
-Definition withScanState {P Q : relation ScanStateDesc} {a pre}
-  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a)
-  : SState pre P Q a :=
-  iget >>>= fun i => f (thisDesc i) (thisState i).
-
-Arguments withScanState {P Q a pre} f.
 
 Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
     st_is_SSMorph :> SSMorph sd1 sd2;
@@ -129,6 +95,47 @@ Record > SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
     stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
 }.
 
+Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    haslen_is_SSMorph    :> SSMorph sd1 sd2;
+    haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
+
+    first_nonempty : length (unhandled sd1) > 0
+}.
+
+Definition newSSMorphHasLen (sd : ScanStateDesc)
+  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
+Proof. repeat (constructor; auto). Defined.
+
+Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
+    sthaslen_is_SSMorph       :> SSMorph sd1 sd2;
+    sthaslen_is_SSMorphLen    :> SSMorphLen sd1 sd2;
+    sthaslen_is_SSMorphSt     :> SSMorphSt sd1 sd2;
+    sthaslen_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2
+}.
+
+Inductive ScanStateRelation : Prop :=
+  | SSR_Morph : forall sd1 sd2, SSMorph sd1 sd2 -> ScanStateRelation.
+
+Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
+    thisDesc  : ScanStateDesc;
+    thisHolds : P startDesc thisDesc;
+    thisState : ScanState thisDesc
+}.
+
+Arguments thisDesc  {_ P} _.
+Arguments thisHolds {_ P} _.
+Arguments thisState {_ P} _.
+
+Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
+  IState (SSInfo sd P) (SSInfo sd Q).
+
+Definition withScanState {P Q : relation ScanStateDesc} {a pre}
+  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a)
+  : SState pre P Q a :=
+  iget >>>= fun i => f (thisDesc i) (thisState i).
+
+Arguments withScanState {P Q a pre} f.
+
 Definition withScanStatePO {P a pre} `{PO : PreOrder _ P}
   (f : forall sd : ScanStateDesc, ScanState sd
          -> SState sd P P a)
@@ -156,17 +163,6 @@ Defined.
 
 Arguments withScanStatePO {P a pre _} f.
 
-Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
-    haslen_is_SSMorph    :> SSMorph sd1 sd2;
-    haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
-
-    first_nonempty : length (unhandled sd1) > 0
-}.
-
-Definition newSSMorphHasLen (sd : ScanStateDesc)
-  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
-Proof. repeat (constructor; auto). Defined.
-
 Definition liftLen {pre a}
   : SState pre SSMorphLen SSMorphLen a
       -> SState pre SSMorphHasLen SSMorphHasLen a.
@@ -191,12 +187,19 @@ Proof.
   assumption.
 Defined.
 
-Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
-    sthaslen_is_SSMorph       :> SSMorph sd1 sd2;
-    sthaslen_is_SSMorphLen    :> SSMorphLen sd1 sd2;
-    sthaslen_is_SSMorphSt     :> SSMorphSt sd1 sd2;
-    sthaslen_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2
-}.
+Definition stbind {P Q R a b}
+  (f : (a -> IState Q R b)) (x : IState P Q a) : IState P R b :=
+  @ijoin IState _ P Q R b (@imap _ _ P Q _ _ f x).
+
+Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
+
+Notation "X <<- A ; B" := (A >>>= (fun X => B))
+  (right associativity, at level 84, A1 at next level).
+
+Notation "A ;;; B" := (_ <<- A ; B)
+  (right associativity, at level 84, A1 at next level).
+
+Definition return_ {I X} := @ipure IState _ I X.
 
 Definition weakenStHasLenToHasLen {pre}
   : SState pre SSMorphStHasLen SSMorphHasLen unit.

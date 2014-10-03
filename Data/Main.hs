@@ -622,40 +622,6 @@ _LinearScan__coq_NSS_transport :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_NSS_transport sd sd' n =
   _LinearScan__nextDesc n
 
-type LinearScan__SSInfo =
-  LinearScan__ScanStateDesc
-  -- singleton inductive, whose constructor was Build_SSInfo
-  
-_LinearScan__coq_SSInfo_rect :: LinearScan__ScanStateDesc ->
-                                (LinearScan__ScanStateDesc -> () -> () -> a1)
-                                -> LinearScan__SSInfo -> a1
-_LinearScan__coq_SSInfo_rect startDesc f s =
-  f s __ __
-
-_LinearScan__coq_SSInfo_rec :: LinearScan__ScanStateDesc ->
-                               (LinearScan__ScanStateDesc -> () -> () -> a1)
-                               -> LinearScan__SSInfo -> a1
-_LinearScan__coq_SSInfo_rec startDesc =
-  _LinearScan__coq_SSInfo_rect startDesc
-
-_LinearScan__thisDesc :: LinearScan__ScanStateDesc -> LinearScan__SSInfo ->
-                         LinearScan__ScanStateDesc
-_LinearScan__thisDesc startDesc s =
-  s
-
-type LinearScan__SState a =
-  IState.IState LinearScan__SSInfo LinearScan__SSInfo a
-
-_LinearScan__stbind :: (a4 -> IState.IState a2 a3 a5) -> (IState.IState 
-                       a1 a2 a4) -> IState.IState a1 a3 a5
-_LinearScan__stbind f x =
-  IMonad.ijoin (unsafeCoerce IState.coq_IState_IMonad)
-    (IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor) f (unsafeCoerce x))
-
-_LinearScan__return_ :: a2 -> IState.IState a1 a1 a2
-_LinearScan__return_ =
-  IApplicative.ipure (unsafeCoerce IState.coq_IState_IApplicative)
-
 _LinearScan__coq_SSMorph_rect :: LinearScan__ScanStateDesc ->
                                  LinearScan__ScanStateDesc -> (() -> () -> ()
                                  -> a1) -> a1
@@ -667,13 +633,6 @@ _LinearScan__coq_SSMorph_rec :: LinearScan__ScanStateDesc ->
                                 -> a1) -> a1
 _LinearScan__coq_SSMorph_rec sd1 sd2 f =
   _LinearScan__coq_SSMorph_rect sd1 sd2 f
-
-_LinearScan__withScanState :: LinearScan__ScanStateDesc ->
-                              (LinearScan__ScanStateDesc -> () ->
-                              LinearScan__SState a1) -> LinearScan__SState 
-                              a1
-_LinearScan__withScanState pre f =
-  _LinearScan__stbind (\i -> f (_LinearScan__thisDesc pre i) __) IState.iget
 
 _LinearScan__coq_SSMorphSt_rect :: LinearScan__ScanStateDesc ->
                                    LinearScan__ScanStateDesc -> (() -> () ->
@@ -718,13 +677,6 @@ _LinearScan__coq_SSMorphStLen_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphStLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStLen_rect sd1 sd2 f
 
-_LinearScan__withScanStatePO :: LinearScan__ScanStateDesc ->
-                                (LinearScan__ScanStateDesc -> () ->
-                                LinearScan__SState a1) -> LinearScan__SState
-                                a1
-_LinearScan__withScanStatePO pre f i =
-  f i __ i
-
 _LinearScan__coq_SSMorphHasLen_rect :: LinearScan__ScanStateDesc ->
                                        LinearScan__ScanStateDesc -> (() -> ()
                                        -> () -> a1) -> a1
@@ -737,13 +689,6 @@ _LinearScan__coq_SSMorphHasLen_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphHasLen_rect sd1 sd2 f
 
-_LinearScan__liftLen :: LinearScan__ScanStateDesc -> (LinearScan__SState 
-                        a1) -> LinearScan__SState a1
-_LinearScan__liftLen pre x h =
-  let {p = x h} in
-  case p of {
-   (,) a0 s -> (,) a0 h}
-
 _LinearScan__coq_SSMorphStHasLen_rect :: LinearScan__ScanStateDesc ->
                                          LinearScan__ScanStateDesc -> (() ->
                                          () -> () -> () -> a1) -> a1
@@ -755,6 +700,62 @@ _LinearScan__coq_SSMorphStHasLen_rec :: LinearScan__ScanStateDesc ->
                                         () -> () -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStHasLen_rect sd1 sd2 f
+
+type LinearScan__SSInfo =
+  LinearScan__ScanStateDesc
+  -- singleton inductive, whose constructor was Build_SSInfo
+  
+_LinearScan__coq_SSInfo_rect :: LinearScan__ScanStateDesc ->
+                                (LinearScan__ScanStateDesc -> () -> () -> a1)
+                                -> LinearScan__SSInfo -> a1
+_LinearScan__coq_SSInfo_rect startDesc f s =
+  f s __ __
+
+_LinearScan__coq_SSInfo_rec :: LinearScan__ScanStateDesc ->
+                               (LinearScan__ScanStateDesc -> () -> () -> a1)
+                               -> LinearScan__SSInfo -> a1
+_LinearScan__coq_SSInfo_rec startDesc =
+  _LinearScan__coq_SSInfo_rect startDesc
+
+_LinearScan__thisDesc :: LinearScan__ScanStateDesc -> LinearScan__SSInfo ->
+                         LinearScan__ScanStateDesc
+_LinearScan__thisDesc startDesc s =
+  s
+
+type LinearScan__SState a =
+  IState.IState LinearScan__SSInfo LinearScan__SSInfo a
+
+_LinearScan__withScanState :: LinearScan__ScanStateDesc ->
+                              (LinearScan__ScanStateDesc -> () ->
+                              LinearScan__SState a1) -> LinearScan__SState 
+                              a1
+_LinearScan__withScanState pre f =
+  IMonad.ibind (unsafeCoerce IState.coq_IState_IMonad) (\i ->
+    f (_LinearScan__thisDesc pre i) __) (unsafeCoerce IState.iget)
+
+_LinearScan__withScanStatePO :: LinearScan__ScanStateDesc ->
+                                (LinearScan__ScanStateDesc -> () ->
+                                LinearScan__SState a1) -> LinearScan__SState
+                                a1
+_LinearScan__withScanStatePO pre f i =
+  f i __ i
+
+_LinearScan__liftLen :: LinearScan__ScanStateDesc -> (LinearScan__SState 
+                        a1) -> LinearScan__SState a1
+_LinearScan__liftLen pre x h =
+  let {p = x h} in
+  case p of {
+   (,) a0 s -> (,) a0 h}
+
+_LinearScan__stbind :: (a4 -> IState.IState a2 a3 a5) -> (IState.IState 
+                       a1 a2 a4) -> IState.IState a1 a3 a5
+_LinearScan__stbind f x =
+  IMonad.ijoin (unsafeCoerce IState.coq_IState_IMonad)
+    (IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor) f (unsafeCoerce x))
+
+_LinearScan__return_ :: a2 -> IState.IState a1 a1 a2
+_LinearScan__return_ =
+  IApplicative.ipure (unsafeCoerce IState.coq_IState_IApplicative)
 
 _LinearScan__weakenStHasLenToHasLen :: LinearScan__ScanStateDesc ->
                                        LinearScan__SState ()

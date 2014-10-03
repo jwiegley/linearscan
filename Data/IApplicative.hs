@@ -28,8 +28,13 @@ data IApplicative f =
                                                                -> f -> f ->
                                                                f)
 
+is_ifunctor :: (IApplicative a1) -> IEndo.IFunctor a1
+is_ifunctor iApplicative =
+  case iApplicative of {
+   Build_IApplicative is_ifunctor0 ipure0 iap -> is_ifunctor0}
+
 ipure :: (IApplicative a1) -> a3 -> a1
 ipure iApplicative x =
   case iApplicative of {
-   Build_IApplicative is_ifunctor ipure0 iap -> unsafeCoerce ipure0 __ __ x}
+   Build_IApplicative is_ifunctor0 ipure0 iap -> unsafeCoerce ipure0 __ __ x}
 
