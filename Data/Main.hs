@@ -646,6 +646,17 @@ _LinearScan__coq_SSMorphSt_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphSt_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphSt_rect sd1 sd2 f
 
+data LinearScan__ReducesWork =
+   LinearScan__Build_ReducesWork
+
+_LinearScan__coq_ReducesWork_rect :: (() -> a1) -> a1
+_LinearScan__coq_ReducesWork_rect f =
+  f __
+
+_LinearScan__coq_ReducesWork_rec :: (() -> a1) -> a1
+_LinearScan__coq_ReducesWork_rec f =
+  _LinearScan__coq_ReducesWork_rect f
+
 _LinearScan__coq_SSMorphLen_rect :: LinearScan__ScanStateDesc ->
                                     LinearScan__ScanStateDesc -> (() -> () ->
                                     a1) -> a1
@@ -664,6 +675,17 @@ _LinearScan__transportation :: LinearScan__ScanStateDesc ->
                                LinearScan__IntervalId
 _LinearScan__transportation sd1 sd2 x =
   _LinearScan__transportId sd1 sd2 x
+
+data LinearScan__MaintainsWork =
+   LinearScan__Build_MaintainsWork
+
+_LinearScan__coq_MaintainsWork_rect :: (() -> a1) -> a1
+_LinearScan__coq_MaintainsWork_rect f =
+  f __
+
+_LinearScan__coq_MaintainsWork_rec :: (() -> a1) -> a1
+_LinearScan__coq_MaintainsWork_rec f =
+  _LinearScan__coq_MaintainsWork_rect f
 
 _LinearScan__coq_SSMorphStLen_rect :: LinearScan__ScanStateDesc ->
                                       LinearScan__ScanStateDesc -> (() -> ()
@@ -688,6 +710,17 @@ _LinearScan__coq_SSMorphHasLen_rec :: LinearScan__ScanStateDesc ->
                                       -> () -> a1) -> a1
 _LinearScan__coq_SSMorphHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphHasLen_rect sd1 sd2 f
+
+data LinearScan__HasWork =
+   LinearScan__Build_HasWork
+
+_LinearScan__coq_HasWork_rect :: (() -> a1) -> a1
+_LinearScan__coq_HasWork_rect f =
+  f __
+
+_LinearScan__coq_HasWork_rec :: (() -> a1) -> a1
+_LinearScan__coq_HasWork_rec f =
+  _LinearScan__coq_HasWork_rect f
 
 _LinearScan__coq_SSMorphStHasLen_rect :: LinearScan__ScanStateDesc ->
                                          LinearScan__ScanStateDesc -> (() ->
@@ -757,29 +790,24 @@ _LinearScan__return_ :: a2 -> IState.IState a1 a1 a2
 _LinearScan__return_ =
   IApplicative.ipure (unsafeCoerce IState.coq_IState_IApplicative)
 
-_LinearScan__weakenStHasLenToHasLen :: LinearScan__ScanStateDesc ->
-                                       LinearScan__SState ()
-_LinearScan__weakenStHasLenToHasLen pre hS =
-  (,) () hS
-
 _LinearScan__weakenStHasLenToSt :: LinearScan__ScanStateDesc ->
                                    LinearScan__SState ()
 _LinearScan__weakenStHasLenToSt pre hS =
   (,) () hS
 
-_LinearScan__withLenCursor :: LinearScan__ScanStateDesc ->
-                              (LinearScan__ScanStateDesc -> () ->
-                              LinearScan__SState a1) -> LinearScan__SState 
-                              a1
-_LinearScan__withLenCursor pre f i =
+_LinearScan__withCursor :: LinearScan__ScanStateDesc ->
+                           (LinearScan__ScanStateDesc -> () ->
+                           LinearScan__SState a1) -> LinearScan__SState 
+                           a1
+_LinearScan__withCursor pre f i =
   f i __ i
 
 _LinearScan__moveUnhandledToActive :: LinearScan__ScanStateDesc ->
                                       LinearScan__PhysReg ->
                                       LinearScan__SState ()
-_LinearScan__moveUnhandledToActive pre reg h =
+_LinearScan__moveUnhandledToActive pre reg h0 =
   (,) ()
-    (case h of {
+    (case h0 of {
       LinearScan__Build_ScanStateDesc nextInterval0 unhandled0 active0
        inactive0 handled0 intervals0 assignments0 fixedIntervals0 ->
        case unhandled0 of {
@@ -867,7 +895,7 @@ _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc ->
                                    (Prelude.Maybe
                                    (LinearScan__SState LinearScan__PhysReg))
 _LinearScan__tryAllocateFreeReg pre =
-  Basics.apply (_LinearScan__withLenCursor pre) (\sd _ ->
+  Basics.apply (_LinearScan__withCursor pre) (\sd _ ->
     let {sd0 = _LinearScan__curStateDesc sd} in
     let {
      go = \n ->
@@ -918,10 +946,8 @@ _LinearScan__tryAllocateFreeReg pre =
                        Prelude.False ->
                         _LinearScan__stbind (\x ->
                           _LinearScan__stbind (\x0 ->
-                            _LinearScan__stbind (\x1 ->
-                              _LinearScan__return_ reg)
-                              (_LinearScan__moveUnhandledToActive pre reg))
-                            (_LinearScan__weakenStHasLenToHasLen pre))
+                            _LinearScan__return_ reg)
+                            (_LinearScan__moveUnhandledToActive pre reg))
                           (_LinearScan__splitCurrentInterval pre
                             (Prelude.Just n))})};
                   Prelude.Nothing -> Prelude.Just success}}
@@ -954,7 +980,7 @@ _LinearScan__allocateBlockedReg :: LinearScan__ScanStateDesc ->
                                    LinearScan__SState
                                    (Prelude.Maybe LinearScan__PhysReg)
 _LinearScan__allocateBlockedReg pre =
-  Basics.apply (_LinearScan__withLenCursor pre) (\sd _ ->
+  Basics.apply (_LinearScan__withCursor pre) (\sd _ ->
     let {start = Interval.intervalStart ( (_LinearScan__curIntDetails sd))}
     in
     let {pos = _LinearScan__curPosition sd} in
@@ -997,9 +1023,7 @@ _LinearScan__allocateBlockedReg pre =
                   (_LinearScan__weakenStHasLenToSt pre))
                 (case mloc of {
                   Prelude.Just n ->
-                   _LinearScan__stbind (\x1 ->
-                     _LinearScan__splitCurrentInterval pre (Prelude.Just n))
-                     (_LinearScan__weakenStHasLenToHasLen pre);
+                   _LinearScan__splitCurrentInterval pre (Prelude.Just n);
                   Prelude.Nothing -> _LinearScan__return_ ()}))
               (_LinearScan__intersectsWithFixedInterval pre reg))
             (_LinearScan__splitCurrentInterval pre
@@ -1011,15 +1035,14 @@ _LinearScan__allocateBlockedReg pre =
           _LinearScan__stbind (\x0 ->
             _LinearScan__stbind (\mloc ->
               _LinearScan__stbind (\x1 ->
-                _LinearScan__stbind (\x2 ->
-                  _LinearScan__return_ (Prelude.Just reg))
-                  (_LinearScan__moveUnhandledToActive pre reg))
+                _LinearScan__return_ (Prelude.Just reg))
                 (case mloc of {
                   Prelude.Just n ->
                    _LinearScan__stbind (\x1 ->
-                     _LinearScan__weakenStHasLenToHasLen pre)
+                     _LinearScan__moveUnhandledToActive pre reg)
                      (_LinearScan__splitCurrentInterval pre (Prelude.Just n));
-                  Prelude.Nothing -> _LinearScan__return_ ()}))
+                  Prelude.Nothing ->
+                   _LinearScan__moveUnhandledToActive pre reg}))
               (_LinearScan__intersectsWithFixedInterval pre reg))
             (_LinearScan__splitAnyInactiveIntervalForReg pre reg))
           (_LinearScan__splitActiveIntervalForReg pre reg pos)}})
@@ -1102,16 +1125,17 @@ _LinearScan__handleInterval :: LinearScan__ScanStateDesc ->
                                LinearScan__SState
                                (Prelude.Maybe LinearScan__PhysReg)
 _LinearScan__handleInterval pre =
-  Basics.apply (_LinearScan__withLenCursor pre) (\sd _ ->
+  Basics.apply (unsafeCoerce (_LinearScan__withCursor pre)) (\sd _ ->
     let {position = _LinearScan__curPosition sd} in
     _LinearScan__stbind (\x ->
       _LinearScan__stbind (\x0 ->
         _LinearScan__stbind (\mres ->
           case mres of {
            Prelude.Just x1 ->
-            _LinearScan__stbind (\reg ->
-              _LinearScan__return_ (Prelude.Just reg)) x1;
-           Prelude.Nothing -> _LinearScan__allocateBlockedReg pre})
+            IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor) (\x2 ->
+              Prelude.Just x2) x1;
+           Prelude.Nothing ->
+            unsafeCoerce (_LinearScan__allocateBlockedReg pre)})
           (_LinearScan__tryAllocateFreeReg pre))
         (_LinearScan__liftLen pre
           (_LinearScan__checkInactiveIntervals pre position)))

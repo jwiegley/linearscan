@@ -66,6 +66,12 @@ Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
       unhandledExtent sd2 < unhandledExtent sd1
 }.
 
+Class ReducesWork (P : relation ScanStateDesc) := {
+    ssMorphSt : forall sd1 sd2, P sd1 sd2 -> SSMorphSt sd1 sd2
+}.
+
+Program Instance SSMorphHasLen_ReducesWork : ReducesWork SSMorphSt.
+
 Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
@@ -75,6 +81,12 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     unhandled_nonempty :
       length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
 }.
+
+Class MaintainsWork (P : relation ScanStateDesc) := {
+    ssMorphLen : forall sd1 sd2, P sd1 sd2 -> SSMorphLen sd1 sd2
+}.
+
+Program Instance SSMorphLen_MaintainsWork : MaintainsWork SSMorphLen.
 
 Program Instance SSMorphLen_PO : PreOrder SSMorphLen.
 Obligation 1.
@@ -102,6 +114,12 @@ Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     first_nonempty : length (unhandled sd1) > 0
 }.
 
+Class HasWork (P : relation ScanStateDesc) := {
+    ssMorphHasLen : forall sd1 sd2, P sd1 sd2 -> SSMorphHasLen sd1 sd2
+}.
+
+Program Instance SSMorphHasLen_MaintainsWork : HasWork SSMorphHasLen.
+
 Definition newSSMorphHasLen (sd : ScanStateDesc)
   (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
 Proof. repeat (constructor; auto). Defined.
@@ -113,8 +131,8 @@ Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     sthaslen_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2
 }.
 
-Inductive ScanStateRelation : Prop :=
-  | SSR_Morph : forall sd1 sd2, SSMorph sd1 sd2 -> ScanStateRelation.
+Program Instance SSMorphStHasLen_HasWork : HasWork SSMorphStHasLen.
+Obligation 1. destruct H. auto. Defined.
 
 Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
     thisDesc  : ScanStateDesc;
@@ -129,14 +147,14 @@ Arguments thisState {_ P} _.
 Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
   IState (SSInfo sd P) (SSInfo sd Q).
 
-Definition withScanState {P Q : relation ScanStateDesc} {a pre}
+Definition withScanState {a pre} {P Q : relation ScanStateDesc}
   (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a)
   : SState pre P Q a :=
   iget >>>= fun i => f (thisDesc i) (thisState i).
 
-Arguments withScanState {P Q a pre} f.
+Arguments withScanState {a pre P Q} f.
 
-Definition withScanStatePO {P a pre} `{PO : PreOrder _ P}
+Definition withScanStatePO {a pre P} `{PO : PreOrder _ P}
   (f : forall sd : ScanStateDesc, ScanState sd
          -> SState sd P P a)
   : SState pre P P a.
@@ -161,7 +179,7 @@ Proof.
   reflexivity.
 Defined.
 
-Arguments withScanStatePO {P a pre _} f.
+Arguments withScanStatePO {a pre P _} f.
 
 Definition liftLen {pre a}
   : SState pre SSMorphLen SSMorphLen a
@@ -201,6 +219,7 @@ Notation "A ;;; B" := (_ <<- A ; B)
 
 Definition return_ {I X} := @ipure IState _ I X.
 
+(*
 Definition weakenStHasLenToHasLen {pre}
   : SState pre SSMorphStHasLen SSMorphHasLen unit.
 Proof.
@@ -211,6 +230,7 @@ Proof.
   - apply thisHolds0.
   - assumption.
 Defined.
+*)
 
 Definition weakenStHasLenToSt {pre}
   : SState pre SSMorphStHasLen SSMorphSt unit.
@@ -223,15 +243,16 @@ Proof.
   - assumption.
 Defined.
 
-Definition withLenCursor {Q a pre}
-  (f : forall sd : ScanStateDesc, ScanStateCursor sd
-         -> SState pre SSMorphHasLen Q a)
-  : SState pre SSMorphHasLen Q a.
+Definition withCursor {P Q a pre} `{HasWork P}
+  (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState pre P Q a)
+  : SState pre P Q a.
 Proof.
   constructor. intros i.
   destruct i.
-  pose proof thisHolds0.
-  destruct thisHolds0.
+  destruct H.
+  specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
+  pose proof ssMorphHasLen0.
+  destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   pose proof first_nonempty0.
   apply unhandled_nonempty0 in H0.
@@ -241,18 +262,20 @@ Proof.
   destruct f as [res].
   apply res.
   rapply Build_SSInfo.
-  apply H.
+  apply thisHolds0.
   assumption.
 Defined.
 
-Definition moveUnhandledToActive {pre} (reg : PhysReg)
-  : SState pre SSMorphHasLen SSMorphSt unit.
+Definition moveUnhandledToActive {pre P} `{HasWork P}
+  (reg : PhysReg) : SState pre P SSMorphSt unit.
 Proof.
   constructor. intros.
   split. apply tt.
   destruct H.
+  destruct H0.
+  specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
   destruct thisDesc0.
-  destruct thisHolds0.
+  destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   destruct unhandled0; simpl in *. omega.
   pose (ScanState_moveUnhandledToActive nextInterval0 unhandled0
@@ -260,8 +283,7 @@ Proof.
           active0 inactive0 handled0 intervals0 assignments0
           fixedIntervals0 i reg lists_are_unique0).
   specialize (s thisState0).
-  eapply {| thisState := s
-          |}.
+  eapply {| thisState := s |}.
   Grab Existential Variables.
   pose (NoDup_unhandledExtent_cons nextInterval0 i unhandled0 intervals0
          (V.replace assignments0 i (Some reg)) assignments0 fixedIntervals0
