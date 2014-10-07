@@ -16,19 +16,6 @@ Generalizable All Variables.
 Open Scope nat_scope.
 Open Scope program_scope.
 
-(* Inductive tlist {a : Type} : list a -> Type := *)
-(*   | tnil : tlist nil *)
-(*   | tcons x xs : tlist xs -> tlist (x :: xs). *)
-
-(* Definition Has {a} (x : a) {xs : list a} (T : tlist xs) := *)
-
-(* Notation " '[ ] " := (tlist nil) (at level 100) : type_scope. *)
-(* Notation "x ':: y" := (tlist (x :: y)) (at level 100) : type_scope. *)
-(* Notation " '[ x ] " := (tlist (x :: nil)) : type_scope. *)
-(* Notation " '[ x ; .. ; y ] " := (tlist (cons x .. (cons y nil) ..)) : type_scope. *)
-
-(* Goal '[true ; false ; true]. *)
-
 Module MSSMorph (M : Machine).
 Include MScanState M.
 
@@ -66,12 +53,6 @@ Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
       unhandledExtent sd2 < unhandledExtent sd1
 }.
 
-Class ReducesWork (P : relation ScanStateDesc) := {
-    ssMorphSt : forall sd1 sd2, P sd1 sd2 -> SSMorphSt sd1 sd2
-}.
-
-Program Instance SSMorphHasLen_ReducesWork : ReducesWork SSMorphSt.
-
 Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
@@ -81,12 +62,6 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     unhandled_nonempty :
       length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
 }.
-
-Class MaintainsWork (P : relation ScanStateDesc) := {
-    ssMorphLen : forall sd1 sd2, P sd1 sd2 -> SSMorphLen sd1 sd2
-}.
-
-Program Instance SSMorphLen_MaintainsWork : MaintainsWork SSMorphLen.
 
 Program Instance SSMorphLen_PO : PreOrder SSMorphLen.
 Obligation 1.
@@ -114,15 +89,15 @@ Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     first_nonempty : length (unhandled sd1) > 0
 }.
 
+Definition newSSMorphHasLen (sd : ScanStateDesc)
+  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
+Proof. repeat (constructor; auto). Defined.
+
 Class HasWork (P : relation ScanStateDesc) := {
     ssMorphHasLen : forall sd1 sd2, P sd1 sd2 -> SSMorphHasLen sd1 sd2
 }.
 
-Program Instance SSMorphHasLen_MaintainsWork : HasWork SSMorphHasLen.
-
-Definition newSSMorphHasLen (sd : ScanStateDesc)
-  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
-Proof. repeat (constructor; auto). Defined.
+Program Instance SSMorphHasLen_HasWork : HasWork SSMorphHasLen.
 
 Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     sthaslen_is_SSMorph       :> SSMorph sd1 sd2;
@@ -165,8 +140,7 @@ Proof.
   destruct f.
   assert (SSInfo thisDesc0 P).
     eapply {| thisDesc  := _
-            ; thisHolds := _
-            |}.
+            ; thisHolds := _ |}.
   apply p in H.
   destruct H.
   split. apply a0.
@@ -218,19 +192,6 @@ Notation "A ;;; B" := (_ <<- A ; B)
   (right associativity, at level 84, A1 at next level).
 
 Definition return_ {I X} := @ipure IState _ I X.
-
-(*
-Definition weakenStHasLenToHasLen {pre}
-  : SState pre SSMorphStHasLen SSMorphHasLen unit.
-Proof.
-  constructor. intros HS.
-  split. apply tt.
-  destruct HS.
-  rapply Build_SSInfo.
-  - apply thisHolds0.
-  - assumption.
-Defined.
-*)
 
 Definition weakenStHasLenToSt {pre}
   : SState pre SSMorphStHasLen SSMorphSt unit.

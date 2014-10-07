@@ -646,17 +646,6 @@ _LinearScan__coq_SSMorphSt_rec :: LinearScan__ScanStateDesc ->
 _LinearScan__coq_SSMorphSt_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphSt_rect sd1 sd2 f
 
-data LinearScan__ReducesWork =
-   LinearScan__Build_ReducesWork
-
-_LinearScan__coq_ReducesWork_rect :: (() -> a1) -> a1
-_LinearScan__coq_ReducesWork_rect f =
-  f __
-
-_LinearScan__coq_ReducesWork_rec :: (() -> a1) -> a1
-_LinearScan__coq_ReducesWork_rec f =
-  _LinearScan__coq_ReducesWork_rect f
-
 _LinearScan__coq_SSMorphLen_rect :: LinearScan__ScanStateDesc ->
                                     LinearScan__ScanStateDesc -> (() -> () ->
                                     a1) -> a1
@@ -675,17 +664,6 @@ _LinearScan__transportation :: LinearScan__ScanStateDesc ->
                                LinearScan__IntervalId
 _LinearScan__transportation sd1 sd2 x =
   _LinearScan__transportId sd1 sd2 x
-
-data LinearScan__MaintainsWork =
-   LinearScan__Build_MaintainsWork
-
-_LinearScan__coq_MaintainsWork_rect :: (() -> a1) -> a1
-_LinearScan__coq_MaintainsWork_rect f =
-  f __
-
-_LinearScan__coq_MaintainsWork_rec :: (() -> a1) -> a1
-_LinearScan__coq_MaintainsWork_rec f =
-  _LinearScan__coq_MaintainsWork_rect f
 
 _LinearScan__coq_SSMorphStLen_rect :: LinearScan__ScanStateDesc ->
                                       LinearScan__ScanStateDesc -> (() -> ()
