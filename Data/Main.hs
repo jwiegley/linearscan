@@ -1115,9 +1115,9 @@ _LinearScan__handleInterval pre =
            Prelude.Nothing ->
             unsafeCoerce (_LinearScan__allocateBlockedReg pre)})
           (_LinearScan__tryAllocateFreeReg pre))
-        (_LinearScan__liftLen pre
+        (Basics.apply (_LinearScan__liftLen pre)
           (_LinearScan__checkInactiveIntervals pre position)))
-      (_LinearScan__liftLen pre
+      (Basics.apply (_LinearScan__liftLen pre)
         (_LinearScan__checkActiveIntervals pre position)))
 
 _LinearScan__linearScan_F :: (LinearScan__ScanStateDesc -> () ->

@@ -169,7 +169,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
       assignSpillSlotToCurrent ;;;
       splitCurrentInterval (firstUseReqReg current) ;;;
 
-      mloc <<- intersectsWithFixedInterval reg ;
+      mloc <<- intersectsWithFixedInterval reg ;;
       match mloc with
       | Some n => splitCurrentInterval (Some n)
       | None   => return_ tt
@@ -180,7 +180,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
       splitActiveIntervalForReg reg pos ;;;
       splitAnyInactiveIntervalForReg reg ;;;
 
-      mloc <<- intersectsWithFixedInterval reg ;
+      mloc <<- intersectsWithFixedInterval reg ;;
       match mloc
       with
       | Some n => splitCurrentInterval (Some n) ;;;
@@ -252,9 +252,9 @@ Definition handleInterval {pre}
     let position := curPosition cur in
 
     (* // check for intervals in active that are handled or inactive *)
-    liftLen (checkActiveIntervals position) ;;;
+    liftLen $ checkActiveIntervals position ;;;
     (* // check for intervals in inactive that are handled or active *)
-    liftLen (checkInactiveIntervals position) ;;;
+    liftLen $ checkInactiveIntervals position ;;;
 
     (* // find a register for current
        tryAllocateFreeReg
@@ -262,7 +262,7 @@ Definition handleInterval {pre}
          allocateBlockedReg
        if current has a register assigned then
          add current to active (done by the helper functions) *)
-    mres <<- tryAllocateFreeReg ;
+    mres <<- tryAllocateFreeReg ;;
     match mres with
     | Some x => imap (@Some _) x
     | None   => allocateBlockedReg
@@ -287,12 +287,6 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   end.
 (* We must prove that after every call to handleInterval, the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof.
-  intros.
-  subst. clear teq teq2 H x xs.
-  destruct ssinfo'. simpl.
-  destruct thisHolds0.
-  assumption.
-Defined.
+Proof. destruct ssinfo'; destruct thisHolds0; auto. Qed.
 
 End MAllocate.

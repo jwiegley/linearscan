@@ -185,10 +185,10 @@ Definition stbind {P Q R a b}
 
 Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
 
-Notation "X <<- A ; B" := (A >>>= (fun X => B))
+Notation "X <<- A ;; B" := (A >>>= (fun X => B))
   (right associativity, at level 84, A1 at next level).
 
-Notation "A ;;; B" := (_ <<- A ; B)
+Notation "A ;;; B" := (_ <<- A ;; B)
   (right associativity, at level 84, A1 at next level).
 
 Definition return_ {I X} := @ipure IState _ I X.
