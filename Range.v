@@ -23,8 +23,82 @@ Record UsePos : Set := {
 Definition upos_le (x y : UsePos) := uloc x <= uloc y.
 Definition upos_lt (x y : UsePos) := uloc x < uloc y.
 
+Program Instance upos_le_PO : PreOrder upos_le.
+Obligation 1. constructor. Qed.
+Obligation 2.
+  unfold Transitive. intros.
+  unfold upos_le in *. omega.
+Qed.
+
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. unfold upos_lt in *. omega. Qed.
+
+Lemma NE_Forall_upos_lt_le_impl : forall x xs,
+  NE_Forall UsePos (upos_lt x) xs -> NE_Forall UsePos (upos_le x) xs.
+Proof.
+  intros.
+  induction xs;
+  constructor;
+  inversion H;
+  unfold upos_lt, upos_le in *;
+  try omega.
+  apply IHxs.
+  inversion H.
+  assumption.
+Qed.
+
+Lemma NE_StronglySorted_UsePos_connected : forall l1 l2,
+  NE_StronglySorted UsePos upos_lt (NE_append l1 l2)
+    -> S (uloc (NE_last l1)) ≤ uloc (NE_head l2).
+Proof.
+  intros.
+  induction l1; simpl in *;
+  apply NE_StronglySorted_inv in H; inversion H;
+  [ apply NE_Forall_head in H1
+  | apply NE_Forall_append in H1 ];
+  intuition.
+Qed.
+
+Lemma NE_StronglySorted_UsePos_impl : forall xs,
+  NE_StronglySorted UsePos upos_lt xs -> upos_le (NE_head xs) (NE_last xs).
+Proof.
+  intros.
+  induction xs; simpl in *.
+    unfold upos_le. trivial.
+  apply NE_StronglySorted_inv in H; inversion H.
+  apply NE_Forall_last in H1.
+  unfold upos_lt, upos_le in *. omega.
+Qed.
+
+Lemma NE_StronglySorted_UsePos_impl_app : forall l1 l2,
+  NE_StronglySorted UsePos upos_lt (NE_append l1 l2)
+    ->    upos_le (NE_head l1) (NE_last l1)
+       /\ upos_le (NE_head l1) (NE_head l2)
+       /\ upos_le (NE_head l1) (NE_last l2)
+       /\ upos_le (NE_last l1) (NE_last l1)
+       /\ upos_le (NE_last l1) (NE_head l2)
+       /\ upos_le (NE_last l1) (NE_last l2).
+Proof.
+  intros.
+  induction l1; simpl in *;
+  apply NE_StronglySorted_inv in H; inversion H.
+    pose proof H1 as H1'.
+    apply NE_Forall_head in H1.
+    apply NE_Forall_last in H1'.
+    unfold upos_lt, upos_le in *.
+    intuition.
+  apply NE_Forall_append in H1; inversion H1.
+  pose proof H2 as H2'.
+  pose proof H2 as H2''.
+  apply NE_Forall_head in H2'.
+  apply NE_Forall_last in H2''.
+  pose proof H3 as H3'.
+  pose proof H3 as H3''.
+  apply NE_Forall_head in H3'.
+  apply NE_Forall_last in H3''.
+  unfold upos_lt, upos_le in *.
+  intuition.
+Qed.
 
 (** ** RangeDesc *)
 
@@ -54,12 +128,32 @@ Record RangeDesc := {
     range_nonempty : rbeg < rend         (* this comes in handy *)
 }.
 
+Definition RangeDesc_append (l r : RangeDesc) (H : rend l <= rbeg r) : RangeDesc :=
+  {| rbeg := rbeg l
+   ; rend := rend r
+   ; ups  := NE_append (ups l) (ups r)
+
+   ; ups_head   := eq_ind_r (fun u => rbeg l ≤ uloc u)
+                            (ups_head l) NE_head_append_spec
+   ; ups_last   := eq_ind_r (fun u => uloc u < rend r)
+                            (ups_last r) NE_last_append_spec
+   ; ups_sorted := NE_StronglySorted_append _ _ _ _
+        (lt_le_trans _ _ _ (ups_last l) (le_trans _ _ _ H (ups_head r)))
+        (ups_sorted l) (ups_sorted r)
+
+   ; range_nonempty :=
+       lt_le_shuffle (range_nonempty l) H (range_nonempty r)
+   |}.
+
 (** ** Range *)
 
 (** A [Range] constrains how a [RangeDesc] may be constructed, and maintains
     any invariants. *)
 
 Inductive Range : RangeDesc -> Prop :=
+  (** A [Range] built from a single use position covers that use positions, so
+      that it begins at the use position, and ends one step after it (range
+      ends are always exclusive). *)
   | R_Sing u :
     Range {| rbeg := uloc u
            ; rend := S (uloc u)
@@ -72,6 +166,8 @@ Inductive Range : RangeDesc -> Prop :=
            ; range_nonempty := le_n (S (uloc u))
            |}
 
+  (** A [Range] can be extended by adding a use position to the beginning.
+      This means that they must be built up in reverse. *)
   | R_Cons u x : Range x -> forall (H : uloc u < rbeg x),
     Range {| rbeg := uloc u
            ; rend := rend x
@@ -85,25 +181,15 @@ Inductive Range : RangeDesc -> Prop :=
            ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
            |}
 
-(*
+  (** Two ranges may be appended together, so that their total extent ranges
+      from the beginning of the first to the end of the second. *)
   | R_Append l r : Range l -> Range r -> forall (H : rend l <= rbeg r),
-    Range {| rbeg := rbeg l
-           ; rend := rend r
-           ; ups  := NE_append (ups l) (ups r)
+    Range (RangeDesc_append l r H)
 
-           ; ups_head   := eq_ind_r (fun u => rbeg l ≤ uloc u)
-                                    (ups_head l) NE_head_append_spec
-           ; ups_last   := eq_ind_r (fun u => uloc u < rend r)
-                                    (ups_last r) NE_last_append_spec
-           ; ups_sorted := NE_StronglySorted_append _ _ _ _
-                (lt_le_trans _ _ _ (ups_last l) (le_trans _ _ _ H (ups_head r)))
-                (ups_sorted l) (ups_sorted r)
-
-           ; range_nonempty :=
-               lt_le_shuffle (range_nonempty l) H (range_nonempty r)
-           |}
-*)
-
+  (** The address bounds of a [Range] may be arbitrarily extended, without
+      reference to use positions.  This is useful when all of the use
+      positions occur in a loop, for example, and you wish for the [Range] to
+      bound the entire loop. *)
   | R_Extend x b' e' : Range x ->
     Range {| rbeg := min b' (rbeg x)
            ; rend := Peano.max e' (rend x)
@@ -114,7 +200,35 @@ Inductive Range : RangeDesc -> Prop :=
            ; ups_sorted := ups_sorted x
 
            ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
+           |}
+
+  (** A [Range] can be bootstrapped by providing a properly sorted list of use
+      positions, and all of its details, so long as the laws are fulfilled
+      upon doing so. *)
+  | R_FromList b e us :
+    forall ups_head' : b <= uloc (NE_head us),
+    forall ups_last' : uloc (NE_last us) < e,
+    forall ups_sorted' : NE_StronglySorted UsePos upos_lt us,
+    forall range_nonempty' : b < e,
+    Range {| rbeg := b
+           ; rend := e
+           ; ups  := us
+
+           ; ups_head   := ups_head'
+           ; ups_last   := ups_last'
+           ; ups_sorted := ups_sorted'
+
+           ; range_nonempty := range_nonempty'
            |}.
+
+Tactic Notation "Range_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "R_Sing"
+  | Case_aux c "R_Cons"
+  | Case_aux c "R_Append"
+  | Case_aux c "R_Extend"
+  | Case_aux c "R_FromList"
+  ].
 
 Definition getRangeDesc `(r : Range d) := d.
 
@@ -140,58 +254,196 @@ Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
       end in
   go (ups r).
 
-Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos)
-  : (option (NonEmpty UsePos) * option (NonEmpty UsePos)) :=
-  match l with
-    | NE_Sing u =>
-        if f u
-        then (Some l, None)
-        else (None, Some l)
-    | NE_Cons u us' =>
-        let (xl, xr) := usePosSpan f us' in
-        if f u
-        then match xl with
-               | Some xl' => (Some (NE_Cons u xl'), xr)
-               | None => (Some (NE_Sing u), xr)
-             end
-        else match xr with
-               | Some xr' => (xl, Some (NE_Cons u xr'))
-               | None => (xl, Some (NE_Sing u))
-             end
-  end.
+Definition UsePosSublist (l : NonEmpty UsePos) :=
+  option { us : NonEmpty UsePos
+         | NE_StronglySorted UsePos upos_lt us
+         & upos_le (NE_head l) (NE_head us)
+         }.
 
-Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
-  : (option { rd1 : RangeDesc | Range rd1 } *
-     option { rd2 : RangeDesc | Range rd2 }).
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition UsePosSublistsOf (l : NonEmpty UsePos) :=
+  { p : (UsePosSublist l * UsePosSublist l)
+  | match p with
+    | (Some l1, Some l2) => l = NE_append (proj1_sigg l1) (proj1_sigg l2)
+    | (Some l1, None)    => l = proj1_sigg l1
+    | (None, Some l2)    => l = proj1_sigg l2
+    | (None, None)       => False
+    end
+  }.
+
+(** Return two sublists of [l] such that for every element in the first
+    sublist, [f elem] return [true]. *)
+Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos)
+  (H : NE_StronglySorted UsePos upos_lt l) : UsePosSublistsOf l.
+Proof.
+  induction l as [x|x xs] eqn:Heqe.
+    destruct (f x).
+      exists (Some (exist2 _ _ (NE_Sing x) H (le_n _)), None). auto.
+    exists (None, Some (exist2 _ _ (NE_Sing x) H (le_n _))). auto.
+
+  { destruct (f x).
+    - apply NE_StronglySorted_inv in H.
+      inversion H as [H1 ?].
+      specialize (usePosSpan f xs H1).
+      destruct usePosSpan as [sublists Hsublists].
+
+      destruct sublists as [[[l1 Hsorted1 Hle1]| ] [[l2 Hsorted2 Hle2]| ]];
+      unfold UsePosSublistsOf, UsePosSublist in *; simpl in *.
+      + Case "f x = true; sublists = (Some, Some)".
+        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _),
+                 Some (exist2 _ _ l2 _ _)).
+        simpl. f_equal. assumption.
+
+      + Case "f x = true; sublists = (Some, None)".
+        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _), None).
+        simpl. f_equal. assumption.
+
+      + Case "f x = true; sublists = (None, Some)".
+        eexists (Some (exist2 _ _ (NE_Sing x) _ _),
+                 Some (exist2 _ _ l2 _ _)).
+        simpl. f_equal. assumption.
+
+      + Case "f x = true; sublists = (None, None)".
+        contradiction.
+
+    - eexists (None, Some (exist2 _ _ (NE_Cons x xs) _ _)).
+      reflexivity.
+  }
+
+  Grab Existential Variables.
+  - unfold upos_le. auto.
+  - assumption.
+  - subst. apply NE_Forall_head in H0.
+    unfold upos_lt, upos_le in *. omega.
+  - auto.
+  - unfold upos_le. auto.
+  - constructor.
+  - unfold upos_le. auto.
+  - constructor; subst; assumption.
+  - subst. apply NE_Forall_append in H0.
+    intuition. apply NE_Forall_head in H4.
+    unfold upos_lt, upos_le in *. omega.
+  - subst. apply NE_StronglySorted_inv_app in H1. auto.
+  - unfold upos_le. auto.
+  - subst. apply NE_StronglySorted_inv_app in H1.
+    intuition.
+    constructor; subst.
+      assumption.
+    apply NE_Forall_append in H3.
+    intuition.
+Defined.
+
+Definition SubRange `(r : Range rd) :=
+  option { rd' : RangeDesc
+         | Range rd'
+         & rbeg rd <= rbeg rd' /\ rend rd' <= rend rd
+         }.
+
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition SubRangesOf `(r : Range rd) :=
+  { ev : { p : (SubRange r * SubRange r)
+         | match p with
+           | (Some r1, Some r2) =>
+               rend (proj1_sigg r1) <= rbeg (proj1_sigg r2)
+
+           | (Some _, None) => True
+           | (None, Some _) => True
+           | (None, None)   => False
+           end
+         }
+  | match ev with
+    | (exist (Some r1, Some r2) H) =>
+        rd = RangeDesc_append (proj1_sigg r1) (proj1_sigg r2) H
+
+    | (exist (Some r1, None) _) => rd = proj1_sigg r1
+    | (exist (None, Some r2) _) => rd = proj1_sigg r2
+    | (exist (None, None) _)    => False
+    end
+  }.
+
+Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) : SubRangesOf r.
 Proof.
   destruct rd.
-  pose proof ups0 as ups1.
-  apply (usePosSpan f) in ups1.
-  destruct ups1.
-(*
-  let maybeAppend `(x : Range d) (mr : option { d : RangeDesc | Range d })
-        : option { d : RangeDesc | Range d } :=
-      match mr with
-        | Some (exist rd' r') =>
-            let res := R_Append d rd' x r' _ in
-            Some (exist _ (getRangeDesc res) res)
-        | None => Some (exist _ d x)
-      end in
-  let (xl, xr) := usePosSpan f (ups rd) in
-  let xl' := match xl with
-               | Some xl' => R_Extend (R_Sing x) (rbeg r) (rbeg r)
-  match ups rd with
-    | NE_Sing x =>
-        if f x
-        then (Some (exist _ rd r), None)
-        else (None, Some (exist _ rd r))
-    | NE_Cons x xs =>
-        let (xl, xr) := rangeSpan f xs in
-        if f x
-        then let r' :=  in
-             (maybeAppend r' xl, xr)
-        else let r' := R_Extend (R_Sing x) (rend r) (rend r) in
-             (xl, maybeAppend r' xr)
-  end.
-*)
-Admitted.
+
+  pose (usePosSpan f ups0 ups_sorted0) as u.
+
+  { destruct u
+      as [[[[l1 Hsorted1 Hle1]| ] [[l2 Hsorted2 Hle2]| ]] Hu] eqn:Heqe;
+    unfold SubRangesOf, SubRange; simpl in *;
+    remember {| rbeg           := rbeg0
+              ; rend           := rend0
+              ; ups            := ups0
+              ; ups_head       := ups_head0
+              ; ups_last       := ups_last0
+              ; ups_sorted     := ups_sorted0
+              ; range_nonempty := range_nonempty0
+              |} as rd.
+
+    - Case "sublists = (Some, Some)".
+      eexists (exist _
+        (Some (exist2 _ _
+           {| rbeg           := rbeg0
+            ; rend           := S (uloc (NE_last l1))
+            ; ups            := l1
+            |} _ _),
+         Some (exist2 _ _
+           {| rbeg           := uloc (NE_head l2)
+            ; rend           := rend0
+            ; ups            := l2
+            |} _ _)) _).
+      subst. simpl.
+      unfold RangeDesc_append. simpl.
+      f_equal; apply proof_irrelevance.
+
+    - Case "sublists = (Some, None)".
+      eexists (exist _ (Some (exist2 _ _ rd _ _), None) _).
+      reflexivity.
+
+    - Case "sublists = (None, Some)".
+      eexists (exist _ (None, Some (exist2 _ _ rd _ _)) _).
+      reflexivity.
+
+    - Case "sublists = (None, None)".
+      contradiction.
+  }
+
+  Grab Existential Variables.
+  - simpl. trivial.
+  - destruct rd. simpl.
+    inversion Heqrd. auto.
+  - apply r.
+
+  - simpl. trivial.
+  - destruct rd. simpl.
+    inversion Heqrd. auto.
+  - apply r.
+
+  (* These proofs all relate to the (Some, Some) existentials. *)
+  - apply NE_StronglySorted_UsePos_connected.
+    subst. assumption.
+
+  - simpl. subst. intuition.
+    rewrite NE_head_append_spec in ups_head0.
+    rewrite NE_last_append_spec in ups_last0.
+    clear Heqe.
+    apply NE_StronglySorted_UsePos_impl_app in ups_sorted0.
+    unfold upos_le in ups_sorted0.
+    omega.
+
+  - constructor.
+  - simpl. admit.
+  - simpl. admit.
+  - simpl. admit.
+  - simpl. admit.
+  - simpl. admit.
+
+  - constructor.
+  - simpl. admit.
+  - simpl. admit.
+  - simpl. admit.
+  - simpl. admit.
+Defined.

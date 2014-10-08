@@ -70,6 +70,13 @@ Inductive Interval : IntervalDesc -> Prop :=
                 ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
                 |}.
 
+Tactic Notation "Interval_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "I_Sing"
+  | Case_aux c "I_Cons1"
+  | Case_aux c "I_Consn"
+  ].
+
 Definition getIntervalDesc `(i : Interval d) := d.
 
 Coercion getIntervalDesc : Interval >-> IntervalDesc.
@@ -121,7 +128,8 @@ Lemma Interval_nonempty : forall `(i : Interval d),
 Proof.
   intros. unfold intervalStart, intervalEnd.
   induction i; simpl in *;
-  induction r; simpl in *; min_max.
+  induction r; simpl in *; min_max;
+  destruct l; destruct r1; simpl in *; omega.
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d),
