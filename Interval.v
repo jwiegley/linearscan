@@ -1,6 +1,9 @@
 Require Import Lib.
 Require Import NonEmpty.
 Require Import Range.
+Require Import Hask.Alternative.
+
+Open Scope nat_scope.
 
 Generalizable All Variables.
 
@@ -80,6 +83,39 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
 Definition intervalExtent `(i : Interval d) :=
   intervalEnd i - intervalStart i.
 
+Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
+  let f x y := rangesIntersect (proj2_sig x) (proj2_sig y) in
+  fold_right
+    (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
+    false (NE_to_list (rds i)).
+
+Definition intervalIntersectionPoint `(Interval i) `(Interval j) : option nat :=
+  NE_fold_left
+    (fun acc rd =>
+       match acc with
+       | Some x => Some x
+       | None =>
+         NE_fold_left
+           (fun acc' rd' =>
+              match acc' with
+              | Some x => Some x
+              | None => rangeIntersectionPoint (proj2_sig rd) (proj2_sig rd')
+              end) (rds j) None
+       end) (rds i) None.
+
+Definition findUsePos `(Interval i) (f : UsePos -> bool) : option UsePos :=
+  let fix go rs := match rs with
+      | NE_Sing (exist _ r)     => findRangeUsePos r f
+      | NE_Cons (exist _ r) rs' => findRangeUsePos r f <|> go rs'
+      end in
+  go (rds i).
+
+Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
+  fmap uloc (findUsePos i (fun u => pos <? uloc u)).
+
+Definition firstUseReqReg `(i : Interval d) : option nat :=
+  fmap uloc (findUsePos i regReq).
+
 Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
 Proof.
@@ -96,26 +132,6 @@ Proof.
   pose (Interval_nonempty i).
   apply lt_minus in l. assumption.
 Qed.
-
-Definition anyRangeIntersects `(Interval i) `(Interval j) : bool :=
-  let f x y := rangesIntersect (proj2_sig x) (proj2_sig y) in
-  fold_right
-    (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
-    false (NE_to_list (rds i)).
-
-Definition firstIntersectionPoint `(Interval i) `(Interval j) : option nat :=
-  NE_fold_left
-    (fun acc rd =>
-       match acc with
-       | Some x => Some x
-       | None =>
-         NE_fold_left
-           (fun acc' rd' =>
-              match acc' with
-              | Some x => Some x
-              | None => rangesIntersectionPoint (proj2_sig rd) (proj2_sig rd')
-              end) (rds j) None
-       end) (rds i) None.
 
 (** Fixed Intervals
 

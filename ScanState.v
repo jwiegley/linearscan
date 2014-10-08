@@ -82,8 +82,7 @@ Record ScanStateDesc := {
 Definition getInterval `(i : IntervalId sd) :=
   proj2_sig (V.nth (intervals sd) i).
 
-Definition getAssignment `(i : IntervalId sd) :=
-  V.nth (assignments sd) i.
+Definition getAssignment `(i : IntervalId sd) := V.nth (assignments sd) i.
 
 (** Given an [IntervalId] from one [ScanStateDesc], promote it to an
     [IntervalId] within another [ScanStateDesc], provided we can demonstrate

@@ -1,4 +1,5 @@
 Require Import Coq.Structures.Orders.
+Require Import Range.
 Require Import Interval.
 Require Import Lib.
 Require Import ScanState.
@@ -26,6 +27,8 @@ Include MSSMorph M.
 
     jww (2014-10-01): Prove that it always succeeds. *)
 
+(* Definition splitInterval `(i : Interval d) (before : option nat) *)
+
 Definition splitCurrentInterval {pre P} `{HasWork P} (before : option nat)
   : SState pre P SSMorphStHasLen unit.
   (* jww (2014-09-26): NYI *)
@@ -38,6 +41,17 @@ Admitted.
 
 Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg)
   : SState pre P P unit.
+  (* jww (2014-10-01): NYI *)
+Admitted.
+
+Definition assignSpillSlotToCurrent {pre P} `{HasWork P}
+  : SState pre P P unit.
+  (* jww (2014-09-26): NYI *)
+Admitted.
+
+Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg)
+  (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
+  : SState pre P P (option nat).
   (* jww (2014-10-01): NYI *)
 Admitted.
 
@@ -59,10 +73,10 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P}
     let freeUntilPos' := go (fun _ => Some 0)
                             (active sd) (V.const None maxReg) in
     let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects current (getInterval x))
+        filter (fun x => intervalsIntersect current (getInterval x))
                (inactive sd) in
     let freeUntilPos :=
-        go (fun i => firstIntersectionPoint (getInterval i) current)
+        go (fun i => intervalIntersectionPoint (getInterval i) current)
            intersectingIntervals freeUntilPos' in
 
     (* reg = register with highest freeUntilPos *)
@@ -99,25 +113,6 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P}
         end in
     return_ maction.
 
-Definition nextUseAfter `(curId : Interval desc) (pos : nat) : option nat.
-  (* jww (2014-09-26): NYI *)
-Admitted.
-
-Definition firstUseReqReg `(curId : Interval desc) : option nat.
-  (* jww (2014-10-01): NYI *)
-Admitted.
-
-Definition assignSpillSlotToCurrent {pre P} `{HasWork P}
-  : SState pre P P unit.
-  (* jww (2014-09-26): NYI *)
-Admitted.
-
-Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg)
-  (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
-  : SState pre P P (option nat).
-  (* jww (2014-10-01): NYI *)
-Admitted.
-
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
     the change to the [ScanState] must be a productive one. *)
@@ -138,7 +133,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
                 atIntervalReg i v (nextUseAfter (getInterval i) start)) in
     let nextUsePos' := go (active sd) (V.const None maxReg) in
     let intersectingIntervals :=
-        filter (fun x => anyRangeIntersects current (getInterval x))
+        filter (fun x => intervalsIntersect current (getInterval x))
                (inactive sd) in
     let nextUsePos := go intersectingIntervals nextUsePos' in
 

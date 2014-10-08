@@ -868,6 +868,18 @@ _LinearScan__splitAnyInactiveIntervalForReg :: LinearScan__ScanStateDesc ->
 _LinearScan__splitAnyInactiveIntervalForReg =
   Prelude.error "AXIOM TO BE REALIZED"
 
+_LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
+                                         LinearScan__SState ()
+_LinearScan__assignSpillSlotToCurrent =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+_LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
+                                            LinearScan__PhysReg ->
+                                            LinearScan__SState
+                                            (Prelude.Maybe Prelude.Int)
+_LinearScan__intersectsWithFixedInterval =
+  Prelude.error "AXIOM TO BE REALIZED"
+
 _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc ->
                                    LinearScan__SState
                                    (Prelude.Maybe
@@ -887,7 +899,7 @@ _LinearScan__tryAllocateFreeReg pre =
     in
     let {
      intersectingIntervals = (Prelude.filter) (\x ->
-                               Interval.anyRangeIntersects
+                               Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
                                    (_LinearScan__V__nth
@@ -897,7 +909,7 @@ _LinearScan__tryAllocateFreeReg pre =
     in
     let {
      freeUntilPos = go (\i ->
-                      Interval.firstIntersectionPoint
+                      Interval.intervalIntersectionPoint
                         (
                           (_LinearScan__V__nth
                             (_LinearScan__nextInterval sd0)
@@ -932,28 +944,6 @@ _LinearScan__tryAllocateFreeReg pre =
       in
       _LinearScan__return_ maction})
 
-_LinearScan__nextUseAfter :: Interval.IntervalDesc -> Prelude.Int ->
-                             Prelude.Maybe Prelude.Int
-_LinearScan__nextUseAfter =
-  Prelude.error "AXIOM TO BE REALIZED"
-
-_LinearScan__firstUseReqReg :: Interval.IntervalDesc -> Prelude.Maybe
-                               Prelude.Int
-_LinearScan__firstUseReqReg =
-  Prelude.error "AXIOM TO BE REALIZED"
-
-_LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
-                                         LinearScan__SState ()
-_LinearScan__assignSpillSlotToCurrent =
-  Prelude.error "AXIOM TO BE REALIZED"
-
-_LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
-                                            LinearScan__PhysReg ->
-                                            LinearScan__SState
-                                            (Prelude.Maybe Prelude.Int)
-_LinearScan__intersectsWithFixedInterval =
-  Prelude.error "AXIOM TO BE REALIZED"
-
 _LinearScan__allocateBlockedReg :: LinearScan__ScanStateDesc ->
                                    LinearScan__SState
                                    (Prelude.Maybe LinearScan__PhysReg)
@@ -965,7 +955,7 @@ _LinearScan__allocateBlockedReg pre =
     let {
      go = (\f -> Prelude.flip (Data.List.foldl' f)) (\v i ->
             _LinearScan__atIntervalReg sd i v
-              (_LinearScan__nextUseAfter
+              (Interval.nextUseAfter
                 (
                   (_LinearScan__V__nth (_LinearScan__nextInterval sd)
                     (_LinearScan__intervals sd) i)) start))}
@@ -977,7 +967,7 @@ _LinearScan__allocateBlockedReg pre =
     in
     let {
      intersectingIntervals = (Prelude.filter) (\x ->
-                               Interval.anyRangeIntersects
+                               Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
                                    (_LinearScan__V__nth
@@ -1005,8 +995,7 @@ _LinearScan__allocateBlockedReg pre =
                   Prelude.Nothing -> _LinearScan__return_ ()}))
               (_LinearScan__intersectsWithFixedInterval pre reg))
             (_LinearScan__splitCurrentInterval pre
-              (_LinearScan__firstUseReqReg
-                ( (_LinearScan__curIntDetails sd)))))
+              (Interval.firstUseReqReg ( (_LinearScan__curIntDetails sd)))))
           (_LinearScan__assignSpillSlotToCurrent pre);
        Prelude.False ->
         _LinearScan__stbind (\x ->
