@@ -393,6 +393,46 @@ Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
       end in
   go (ups r).
 
+Record SplittableUsePos `(Range r) := {
+    splittable_UsePos : UsePos;
+    splittable_WithinRange :
+         upos_lt (NE_head (ups r)) splittable_UsePos
+      /\ upos_lt splittable_UsePos (NE_last (ups r))
+}.
+
+(*
+Definition findRangeSplittableUsePos `(r : Range rd) (f : UsePos -> bool)
+  : option (SplittableUsePos r) :=
+  let fix go us Hbeg Hend :=
+      let check u :=
+          if f u
+          then Some {| splittable_UsePos      := u
+                     ; splittable_WithinRange := conj Hbeg Hend
+                     |}
+          else None in
+      match us with
+      | NE_Sing u     => check u
+      | NE_Cons u us' => check u <|> go us'
+      end in
+  match ups rd with
+  | NE_Sing _ => None
+  | NE_Cons x xs =>
+      if f x
+      then None
+      else go xs _ _
+  end.
+Proof.
+  destruct r.
+  induction ups0; simpl in *.
+    apply None.
+  
+  apply Some.
+  eapply
+    .
+   upos_lt (NE_head (ups splittable_RangeDesc)) splittable_UsePos
+      /\ upos_lt splittable_UsePos (NE_last (ups splittable_RangeDesc))
+*)
+
 Definition SubRange `(r : Range rd) :=
   { rd' : RangeDesc
   | Range rd'
