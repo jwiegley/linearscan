@@ -141,6 +141,41 @@ Proof.
   apply lt_minus in l. assumption.
 Qed.
 
+(*
+Definition SubInterval `(i : Interval d) :=
+  option { d' : IntervalDesc
+         | Interval d'
+         (* & rbeg rd <= rbeg rd' /\ rend rd' <= rend rd *)
+         }.
+
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition SubIntervalsOf `(i : Interval d) :=
+  { ev : { p : (SubInterval i * SubInterval i)
+         (* | match p with *)
+         (*   | (Some r1, Some r2) => *)
+         (*       rend (proj1_sigg r1) <= rbeg (proj1_sigg r2) *)
+
+         (*   | (Some _, None) => True *)
+         (*   | (None, Some _) => True *)
+         (*   | (None, None)   => False *)
+         (*   end *)
+         }
+  | match ev with
+    | (exist (Some r1, Some r2) H) =>
+        rd = IntervalDesc_append (proj1_sigg r1) (proj1_sigg r2) H
+
+    | (exist (Some r1, None) _) => rd = proj1_sigg r1
+    | (exist (None, Some r2) _) => rd = proj1_sigg r2
+    | (exist (None, None) _)    => False
+    end
+  }.
+
+Definition splitInterval `(i : Interval d) (before : option nat)
+  : { d' : IntervalDesc & Interval d' }.
+*)
+
 (** Fixed Intervals
 
     Some machine instructions require their operands in fixed

@@ -1,3 +1,4 @@
+Require Export Coq.Bool.Bool.
 Require Export Coq.Lists.List.
 Require Export Coq.Numbers.Natural.Peano.NPeano.
 Require Export Coq.omega.Omega.
@@ -9,6 +10,9 @@ Module Import LN := ListNotations.
 (** The following are extensions to the Coq standard library. *)
 
 Definition undefined {a : Type} : a. Admitted.
+
+Definition predicate {a} (f : a -> bool) : a -> Prop :=
+  fun x => Is_true (f x).
 
 Notation "x .1" := (proj1_sig x) (at level 3).
 Notation "x .2" := (proj1_sig x) (at level 3).

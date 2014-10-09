@@ -47,6 +47,28 @@ Proof.
   assumption.
 Qed.
 
+Lemma NE_Forall_UsePos_lt_impl : forall x xs,
+  NE_Forall UsePos (upos_lt x) xs
+    -> upos_lt x (NE_head xs) /\ upos_lt x (NE_last xs).
+Proof.
+  intros. split;
+  [ apply NE_Forall_head in H
+  | apply NE_Forall_last in H ];
+  assumption.
+Qed.
+
+Lemma NE_Forall_UsePos_lt_impl_app : forall x l1 l2,
+  NE_Forall UsePos (upos_lt x) (NE_append l1 l2)
+    ->    upos_lt x (NE_head l1) /\ upos_lt x (NE_last l1)
+       /\ upos_lt x (NE_head l2) /\ upos_lt x (NE_last l2).
+Proof.
+  intros.
+  apply NE_Forall_append in H. inversion H.
+  apply NE_Forall_UsePos_lt_impl in H0.
+  apply NE_Forall_UsePos_lt_impl in H1.
+  intuition.
+Qed.
+
 Lemma NE_StronglySorted_UsePos_connected : forall l1 l2,
   NE_StronglySorted UsePos upos_lt (NE_append l1 l2)
     -> S (uloc (NE_last l1)) ≤ uloc (NE_head l2).
@@ -60,7 +82,8 @@ Proof.
 Qed.
 
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
-  NE_StronglySorted UsePos upos_lt xs -> upos_le (NE_head xs) (NE_last xs).
+  NE_StronglySorted UsePos upos_lt xs
+    -> upos_le (NE_head xs) (NE_last xs).
 Proof.
   intros.
   induction xs; simpl in *.
@@ -75,7 +98,6 @@ Lemma NE_StronglySorted_UsePos_impl_app : forall l1 l2,
     ->    upos_le (NE_head l1) (NE_last l1)
        /\ upos_le (NE_head l1) (NE_head l2)
        /\ upos_le (NE_head l1) (NE_last l2)
-       /\ upos_le (NE_last l1) (NE_last l1)
        /\ upos_le (NE_last l1) (NE_head l2)
        /\ upos_le (NE_last l1) (NE_last l2)
        /\ upos_le (NE_head l2) (NE_last l2).
@@ -101,6 +123,126 @@ Proof.
   unfold upos_lt, upos_le in *.
   intuition.
 Qed.
+
+Definition UsePosSublist (l : NonEmpty UsePos) :=
+  { us : NonEmpty UsePos
+  | NE_StronglySorted UsePos upos_lt us
+  & upos_le (NE_head l) (NE_head us)
+  }.
+
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
+  { p : (option (UsePosSublist l) * option (UsePosSublist l))
+  | match p with
+    | (Some l1, Some l2) =>
+        let l1' := proj1_sigg l1 in
+        let l2' := proj1_sigg l2 in
+        l = NE_append l1' l2' /\ NE_all_true f l1' /\ f (NE_head l2') = false
+
+    | (Some l1, None) =>
+        let l1' := proj1_sigg l1 in l = l1' /\ NE_all_true f l1'
+    | (None, Some l2) =>
+        let l2' := proj1_sigg l2 in l = l2' /\ f (NE_head l2') = false
+
+    | (None, None) => False
+    end
+  }.
+
+(** Return two sublists of [l] such that for every element in the first
+    sublist, [f elem] return [true]. *)
+Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos)
+  (H : NE_StronglySorted UsePos upos_lt l) : UsePosSublistsOf f l.
+Proof.
+  induction l as [x|x xs] eqn:Heqe.
+    destruct (f x) eqn:Heqef.
+      exists (Some (exist2 _ _ (NE_Sing x) H (le_n _)), None).
+      simpl. intuition.
+      constructor. assumption.
+    exists (None, Some (exist2 _ _ (NE_Sing x) H (le_n _))). auto.
+
+  { destruct (f x) eqn:Heqef.
+    - Case "f x = true".
+      apply NE_StronglySorted_inv in H.
+      inversion H as [H1 ?].
+      specialize (usePosSpan f xs H1).
+      destruct usePosSpan as [sublists Hsublists].
+
+      destruct sublists as [[[l1 Hsorted1 Hle1]| ] [[l2 Hsorted2 Hle2]| ]];
+      unfold UsePosSublistsOf, UsePosSublist in *; simpl in *;
+      inversion Hsublists;
+      [ SCase "sublists = (Some, Some)";
+        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _),
+                 Some (exist2 _ _ l2 _ _))
+      | SCase "sublists = (Some, None)";
+        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _), None)
+      | SCase "sublists = (None, Some)";
+        eexists (Some (exist2 _ _ (NE_Sing x) _ _),
+                 Some (exist2 _ _ l2 _ _)) ];
+      simpl; split; f_equal; try assumption;
+      intuition; constructor; assumption.
+
+    - Case "f x = false".
+      eexists (None, Some (exist2 _ _ (NE_Cons x xs) _ _)).
+      split; subst; auto.
+  }
+
+  Grab Existential Variables.
+
+  - unfold upos_le. auto.
+  - assumption.
+  - subst. apply NE_Forall_head in H0.
+    unfold upos_lt, upos_le in *.
+    simpl. omega.
+  - auto.
+  - unfold upos_le. auto.
+  - subst. constructor; assumption.
+
+  - unfold upos_le. auto.
+  - constructor; subst; assumption.
+  - apply NE_Forall_UsePos_lt_impl in H0.
+    unfold upos_lt, upos_le in *. omega.
+  - subst. apply NE_StronglySorted_inv_app in H1. auto.
+  - unfold upos_le. auto.
+  - constructor. assumption.
+    subst. apply NE_Forall_append in H0.
+    intuition.
+Defined.
+
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition UsePosDefiniteSublistsOf (l : NonEmpty UsePos) :=
+  { p : (UsePosSublist l * UsePosSublist l)
+  | l = NE_append (proj1_sigg (fst p)) (proj1_sigg (snd p))
+  }.
+
+Definition usePosSplit (f : UsePos -> bool)
+  (l : NonEmpty UsePos) (Hlen : NE_length l > 1)
+  (Hfirst_true : f (NE_head l) = true)
+  (Hlast_false : f (NE_last l) = false)
+  (Hsorted : NE_StronglySorted UsePos upos_lt l) :
+  UsePosDefiniteSublistsOf l.
+Proof.
+  pose (usePosSpan f l Hsorted). destruct u.
+  unfold UsePosDefiniteSublistsOf.
+  induction l; simpl in *. intuition.
+  destruct x.
+
+  destruct o; destruct o0; intuition.
+  - Case "(Some, Some)".
+    exists (u, u0). assumption.
+
+  - Case "(Some, None)".
+    apply NE_Forall_last in H0.
+    rewrite <- H in *. simpl in H0. exfalso.
+    apply (eq_true_false_abs (f (NE_last l))); assumption.
+
+  - Case "(None, Some)".
+    rewrite <- H in *. simpl in H0. exfalso.
+    apply (eq_true_false_abs (f a)); assumption.
+Defined.
 
 (** ** RangeDesc *)
 
@@ -256,87 +398,6 @@ Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
       end in
   go (ups r).
 
-Definition UsePosSublist (l : NonEmpty UsePos) :=
-  option { us : NonEmpty UsePos
-         | NE_StronglySorted UsePos upos_lt us
-         & upos_le (NE_head l) (NE_head us)
-         }.
-
-(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
-    point, the result type must be able to relate the sublists to the original
-    list. *)
-Definition UsePosSublistsOf (l : NonEmpty UsePos) :=
-  { p : (UsePosSublist l * UsePosSublist l)
-  | match p with
-    | (Some l1, Some l2) => l = NE_append (proj1_sigg l1) (proj1_sigg l2)
-    | (Some l1, None)    => l = proj1_sigg l1
-    | (None, Some l2)    => l = proj1_sigg l2
-    | (None, None)       => False
-    end
-  }.
-
-(** Return two sublists of [l] such that for every element in the first
-    sublist, [f elem] return [true]. *)
-Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos)
-  (H : NE_StronglySorted UsePos upos_lt l) : UsePosSublistsOf l.
-Proof.
-  induction l as [x|x xs] eqn:Heqe.
-    destruct (f x).
-      exists (Some (exist2 _ _ (NE_Sing x) H (le_n _)), None). auto.
-    exists (None, Some (exist2 _ _ (NE_Sing x) H (le_n _))). auto.
-
-  { destruct (f x).
-    - apply NE_StronglySorted_inv in H.
-      inversion H as [H1 ?].
-      specialize (usePosSpan f xs H1).
-      destruct usePosSpan as [sublists Hsublists].
-
-      destruct sublists as [[[l1 Hsorted1 Hle1]| ] [[l2 Hsorted2 Hle2]| ]];
-      unfold UsePosSublistsOf, UsePosSublist in *; simpl in *.
-      + Case "f x = true; sublists = (Some, Some)".
-        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _),
-                 Some (exist2 _ _ l2 _ _)).
-        simpl. f_equal. assumption.
-
-      + Case "f x = true; sublists = (Some, None)".
-        eexists (Some (exist2 _ _ (NE_Cons x l1) _ _), None).
-        simpl. f_equal. assumption.
-
-      + Case "f x = true; sublists = (None, Some)".
-        eexists (Some (exist2 _ _ (NE_Sing x) _ _),
-                 Some (exist2 _ _ l2 _ _)).
-        simpl. f_equal. assumption.
-
-      + Case "f x = true; sublists = (None, None)".
-        contradiction.
-
-    - eexists (None, Some (exist2 _ _ (NE_Cons x xs) _ _)).
-      reflexivity.
-  }
-
-  Grab Existential Variables.
-  - unfold upos_le. auto.
-  - assumption.
-  - subst. apply NE_Forall_head in H0.
-    unfold upos_lt, upos_le in *. omega.
-  - auto.
-  - unfold upos_le. auto.
-  - constructor.
-  - unfold upos_le. auto.
-  - constructor; subst; assumption.
-  - subst. apply NE_Forall_append in H0.
-    intuition. apply NE_Forall_head in H4.
-    unfold upos_lt, upos_le in *. omega.
-  - subst. apply NE_StronglySorted_inv_app in H1. auto.
-  - unfold upos_le. auto.
-  - subst. apply NE_StronglySorted_inv_app in H1.
-    intuition.
-    constructor; subst.
-      assumption.
-    apply NE_Forall_append in H3.
-    intuition.
-Defined.
-
 Definition SubRange `(r : Range rd) :=
   option { rd' : RangeDesc
          | Range rd'
@@ -367,18 +428,6 @@ Definition SubRangesOf `(r : Range rd) :=
     end
   }.
 
-Ltac ups_sorted Heqe Hsorted Hhead Hlast :=
-  subst; simpl in *; clear Heqe;
-  apply NE_StronglySorted_UsePos_impl_app in Hsorted;
-  rewrite NE_head_append_spec in Hhead;
-  rewrite NE_last_append_spec in Hlast;
-  unfold upos_lt, upos_le in *; intuition.
-
-Ltac ups_finish Heqe ups_sorted0 ups_head0 ups_last0 :=
-  first [ now constructor
-        | now easy
-        | ups_sorted Heqe ups_sorted0 ups_head0 ups_last0 ].
-
 Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) : SubRangesOf r.
 Proof.
   destruct rd.
@@ -387,7 +436,8 @@ Proof.
 
   { destruct u
       as [[[[l1 Hsorted1 Hle1]| ] [[l2 Hsorted2 Hle2]| ]] Hu] eqn:Heqe;
-    unfold SubRangesOf, SubRange; simpl in *;
+    unfold SubRangesOf, SubRange;
+    inversion Hu; simpl in *;
     remember {| rbeg           := rbeg0
               ; rend           := rend0
               ; ups            := ups0
@@ -398,18 +448,32 @@ Proof.
               |} as rd.
 
     - Case "sublists = (Some, Some)".
+      clear Heqe. subst.
+      pose proof ups_sorted0 as ups_sorted0'.
+      pose proof ups_head0 as ups_head0'.
+      pose proof ups_last0 as ups_last0'.
+      apply NE_StronglySorted_UsePos_impl_app in ups_sorted0'.
+      rewrite NE_head_append_spec in ups_head0'.
+      rewrite NE_last_append_spec in ups_last0'.
+      rewrite NE_head_append_spec in Hle1.
+      rewrite NE_head_append_spec in Hle2.
+      intuition. unfold upos_le, upos_lt in *.
       eexists (exist _
         (Some (exist2 _ _
-           {| rbeg           := rbeg0
-            ; rend           := S (uloc (NE_last l1))
-            ; ups            := l1
+           {| rbeg := rbeg0
+            ; rend := S (uloc (NE_last l1))
+            ; ups  := l1
+
+            ; range_nonempty :=
+                le_lt_trans _ _ _ ups_head0' (le_lt_n_Sm _ _ H3)
             |} _ _),
          Some (exist2 _ _
-           {| rbeg           := uloc (NE_head l2)
-            ; rend           := rend0
-            ; ups            := l2
+           {| rbeg := uloc (NE_head l2)
+            ; rend := rend0
+            ; ups  := l2
+
+            ; range_nonempty := le_lt_trans _ _ _ H10 ups_last0'
             |} _ _)) _).
-      subst. simpl.
       unfold RangeDesc_append. simpl.
       f_equal; apply proof_irrelevance.
 
@@ -420,39 +484,30 @@ Proof.
     - Case "sublists = (None, Some)".
       eexists (exist _ (None, Some (exist2 _ _ rd _ _)) _).
       reflexivity.
-
-    - Case "sublists = (None, None)".
-      contradiction.
   }
 
   Grab Existential Variables.
 
-  - now easy.
-  - destruct rd. simpl.
-    inversion Heqrd.
-    now easy.
-  - now easy.
+  - simpl. trivial.
+  - destruct rd. simpl. inversion Heqrd. auto.
+  - auto.
 
-  - now easy.
-  - destruct rd. simpl.
-    inversion Heqrd.
-    now easy.
-  - now easy.
+  - simpl. trivial.
+  - destruct rd. simpl. inversion Heqrd. auto.
+  - auto.
 
   (* These proofs all relate to the (Some, Some) existentials. *)
-  - apply NE_StronglySorted_UsePos_connected. subst.
-    now easy.
+  - apply NE_StronglySorted_UsePos_connected. auto.
 
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
-  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - simpl. intuition.
+  - constructor.
+  - assumption.
+  - auto.
+  - auto.
+
+  - simpl. intuition.
+  - constructor.
+  - assumption.
+  - auto.
+  - auto.
 Defined.

@@ -27,8 +27,6 @@ Include MSSMorph M.
 
     jww (2014-10-01): Prove that it always succeeds. *)
 
-(* Definition splitInterval `(i : Interval d) (before : option nat) *)
-
 Definition splitCurrentInterval {pre P} `{HasWork P} (before : option nat)
   : SState pre P SSMorphStHasLen unit.
   (* jww (2014-09-26): NYI *)

@@ -13,6 +13,12 @@ Inductive NonEmpty (a : Set) : Set :=
 Arguments NE_Sing [_] _.
 Arguments NE_Cons [_] _ _.
 
+Fixpoint NE_length {a} (ne : NonEmpty a) : nat :=
+  match ne with
+    | NE_Sing x => 1
+    | NE_Cons x xs => 1 + NE_length xs
+  end.
+
 Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
   match ne with
     | NE_Sing x => cons x nil
@@ -151,6 +157,9 @@ Inductive NE_Forall (P : A -> Prop) : NonEmpty A -> Prop :=
 
 Hint Constructors NE_Forall.
 
+Definition NE_all_true  (f : A -> bool) := NE_Forall (fun x => f x = true).
+Definition NE_all_false (f : A -> bool) := NE_Forall (fun x => f x = false).
+
 Lemma NE_Forall_forall : forall P (l : NonEmpty A),
   NE_Forall P l <-> (forall x, NE_In x l -> P x).
 Proof.
@@ -165,8 +174,7 @@ Proof.
   apply H0. right. apply H1.
 Qed.
 
-Lemma NE_Forall_inv : forall P (a : A) l,
-  NE_Forall P (NE_Cons a l) -> P a.
+Lemma NE_Forall_inv : forall P (a : A) l, NE_Forall P (NE_Cons a l) -> P a.
 Proof. intros; inversion H0; trivial. Defined.
 
 Lemma NE_Forall_rect : forall (P : A -> Prop) (Q : NonEmpty A -> Type),
@@ -186,12 +194,12 @@ Proof.
   induction H1; firstorder.
 Qed.
 
-Lemma NE_Forall_head : forall x (xs : NonEmpty A),
-  NE_Forall (R x) xs -> R x (NE_head xs).
+Lemma NE_Forall_head : forall P (xs : NonEmpty A),
+  NE_Forall P xs -> P (NE_head xs).
 Proof. induction xs; intros; inversion H0; assumption. Qed.
 
-Lemma NE_Forall_last : forall x (xs : NonEmpty A),
-  NE_Forall (R x) xs -> R x (NE_last xs).
+Lemma NE_Forall_last : forall P (xs : NonEmpty A),
+  NE_Forall P xs -> P (NE_last xs).
 Proof.
   intros. induction xs; simpl in *.
     inversion H0. assumption.
@@ -337,3 +345,6 @@ Proof.
 Qed.
 
 End Sorted.
+
+Arguments NE_all_true  [A] f _.
+Arguments NE_all_false [A] f _.
