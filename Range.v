@@ -77,7 +77,8 @@ Lemma NE_StronglySorted_UsePos_impl_app : forall l1 l2,
        /\ upos_le (NE_head l1) (NE_last l2)
        /\ upos_le (NE_last l1) (NE_last l1)
        /\ upos_le (NE_last l1) (NE_head l2)
-       /\ upos_le (NE_last l1) (NE_last l2).
+       /\ upos_le (NE_last l1) (NE_last l2)
+       /\ upos_le (NE_head l2) (NE_last l2).
 Proof.
   intros.
   induction l1; simpl in *;
@@ -87,6 +88,7 @@ Proof.
     apply NE_Forall_last in H1'.
     unfold upos_lt, upos_le in *.
     intuition.
+  apply NE_StronglySorted_UsePos_impl in H2. auto.
   apply NE_Forall_append in H1; inversion H1.
   pose proof H2 as H2'.
   pose proof H2 as H2''.
@@ -365,6 +367,18 @@ Definition SubRangesOf `(r : Range rd) :=
     end
   }.
 
+Ltac ups_sorted Heqe Hsorted Hhead Hlast :=
+  subst; simpl in *; clear Heqe;
+  apply NE_StronglySorted_UsePos_impl_app in Hsorted;
+  rewrite NE_head_append_spec in Hhead;
+  rewrite NE_last_append_spec in Hlast;
+  unfold upos_lt, upos_le in *; intuition.
+
+Ltac ups_finish Heqe ups_sorted0 ups_head0 ups_last0 :=
+  first [ now constructor
+        | now easy
+        | ups_sorted Heqe ups_sorted0 ups_head0 ups_last0 ].
+
 Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) : SubRangesOf r.
 Proof.
   destruct rd.
@@ -412,38 +426,33 @@ Proof.
   }
 
   Grab Existential Variables.
-  - simpl. trivial.
-  - destruct rd. simpl.
-    inversion Heqrd. auto.
-  - apply r.
 
-  - simpl. trivial.
+  - now easy.
   - destruct rd. simpl.
-    inversion Heqrd. auto.
-  - apply r.
+    inversion Heqrd.
+    now easy.
+  - now easy.
+
+  - now easy.
+  - destruct rd. simpl.
+    inversion Heqrd.
+    now easy.
+  - now easy.
 
   (* These proofs all relate to the (Some, Some) existentials. *)
-  - apply NE_StronglySorted_UsePos_connected.
-    subst. assumption.
+  - apply NE_StronglySorted_UsePos_connected. subst.
+    now easy.
 
-  - simpl. subst. intuition.
-    rewrite NE_head_append_spec in ups_head0.
-    rewrite NE_last_append_spec in ups_last0.
-    clear Heqe.
-    apply NE_StronglySorted_UsePos_impl_app in ups_sorted0.
-    unfold upos_le in ups_sorted0.
-    omega.
-
-  - constructor.
-  - simpl. admit.
-  - simpl. admit.
-  - simpl. admit.
-  - simpl. admit.
-  - simpl. admit.
-
-  - constructor.
-  - simpl. admit.
-  - simpl. admit.
-  - simpl. admit.
-  - simpl. admit.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
+  - ups_finish Heqe ups_sorted0 ups_head0 ups_last0.
 Defined.
