@@ -7,7 +7,7 @@ Open Scope nat_scope.
 
 Generalizable All Variables.
 
-(** ** Interval *)
+(** * IntervalDesc *)
 
 (** A lifetime interval defines the lifetime of a variable.  It is defined as
     a list of ranges "covered" by that variable in the low-level intermediate
@@ -41,6 +41,8 @@ Record IntervalDesc := {
         it by reduction in some cases. *)
     interval_nonempty : ibeg < iend
 }.
+
+(** * Interval *)
 
 Inductive Interval : IntervalDesc -> Prop :=
   | I_Sing : forall x (r : Range x),
@@ -90,8 +92,18 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
 Definition intervalExtent `(i : Interval d) :=
   intervalEnd i - intervalStart i.
 
+Definition Interval_append `(l : Interval ld) `(r : Interval rd)
+  (H : iend ld <= ibeg rd) : IntervalDesc :=
+  {| ibeg := ibeg ld
+   ; iend := iend rd
+   ; rds  := NE_append (rds ld) (rds rd)
+
+   ; interval_nonempty :=
+       lt_le_shuffle (interval_nonempty ld) H (interval_nonempty rd)
+   |}.
+
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
-  let f x y := rangesIntersect (proj2_sig x) (proj2_sig y) in
+  let f x y := rangesIntersect x.2 y.2 in
   fold_right
     (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
     false (NE_to_list (rds i)).
@@ -106,22 +118,29 @@ Definition intervalIntersectionPoint `(Interval i) `(Interval j) : option nat :=
            (fun acc' rd' =>
               match acc' with
               | Some x => Some x
-              | None => rangeIntersectionPoint (proj2_sig rd) (proj2_sig rd')
+              | None => rangeIntersectionPoint rd.2 rd'.2
               end) (rds j) None
        end) (rds i) None.
 
-Definition findUsePos `(Interval i) (f : UsePos -> bool) : option UsePos :=
+Definition findIntervalUsePos `(Interval i) (f : UsePos -> bool)
+  : option ({ rd : RangeDesc | Range rd } * UsePos) :=
+  let f r := match r with
+      | exist rd r' => match findRangeUsePos r' f with
+          | Some pos => Some (r, pos)
+          | None => None
+          end
+      end in
   let fix go rs := match rs with
-      | NE_Sing (exist _ r)     => findRangeUsePos r f
-      | NE_Cons (exist _ r) rs' => findRangeUsePos r f <|> go rs'
+      | NE_Sing r     => f r
+      | NE_Cons r rs' => f r <|> go rs'
       end in
   go (rds i).
 
 Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
-  fmap uloc (findUsePos i (fun u => pos <? uloc u)).
+  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos <? uloc u)).
 
 Definition firstUseReqReg `(i : Interval d) : option nat :=
-  fmap uloc (findUsePos i regReq).
+  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i regReq).
 
 Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
@@ -141,40 +160,44 @@ Proof.
   apply lt_minus in l. assumption.
 Qed.
 
-(*
 Definition SubInterval `(i : Interval d) :=
-  option { d' : IntervalDesc
-         | Interval d'
-         (* & rbeg rd <= rbeg rd' /\ rend rd' <= rend rd *)
-         }.
+  { d' : IntervalDesc
+  | Interval d'
+  & ibeg d <= ibeg d' /\ iend d' <= iend d
+  }.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition SubIntervalsOf `(i : Interval d) :=
   { ev : { p : (SubInterval i * SubInterval i)
-         (* | match p with *)
-         (*   | (Some r1, Some r2) => *)
-         (*       rend (proj1_sigg r1) <= rbeg (proj1_sigg r2) *)
-
-         (*   | (Some _, None) => True *)
-         (*   | (None, Some _) => True *)
-         (*   | (None, None)   => False *)
-         (*   end *)
+         | iend (proj1_sigg (fst p)) <= ibeg (proj1_sigg (snd p))
          }
   | match ev with
-    | (exist (Some r1, Some r2) H) =>
-        rd = IntervalDesc_append (proj1_sigg r1) (proj1_sigg r2) H
-
-    | (exist (Some r1, None) _) => rd = proj1_sigg r1
-    | (exist (None, Some r2) _) => rd = proj1_sigg r2
-    | (exist (None, None) _)    => False
+    | (exist (i1, i2) H) =>
+        d = Interval_append (proj2_sigg i1) (proj2_sigg i2) H
     end
   }.
 
+(** Split the current interval before the position [before].  This must
+    succeed, which means there must be use positions within the interval prior
+    to [before].  If [before] is [None], splitting is done before the first
+    use position that does not require a register. *)
 Definition splitInterval `(i : Interval d) (before : option nat)
-  : { d' : IntervalDesc & Interval d' }.
-*)
+  : SubIntervalsOf i.
+Proof.
+  destruct d.
+
+  (* Determine the position to split before. *)
+  pose (fromMaybe (uloc (NE_head (ups (NE_head rds0).1)))
+                  (before <|> firstUseReqReg i)).
+
+  (* Find the [Range] to split. *)
+  unfold SubIntervalsOf.
+
+  (* Assemble the two subintervals. *)
+  admit.
+Defined.
 
 (** Fixed Intervals
 

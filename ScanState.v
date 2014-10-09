@@ -80,7 +80,7 @@ Record ScanStateDesc := {
 }.
 
 Definition getInterval `(i : IntervalId sd) :=
-  proj2_sig (V.nth (intervals sd) i).
+ (V.nth (intervals sd) i).2.
 
 Definition getAssignment `(i : IntervalId sd) := V.nth (assignments sd) i.
 
@@ -112,8 +112,8 @@ Defined.
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandled sd with
   | nil => 0
-  | [i] => intervalExtent (proj2_sig (V.nth (intervals sd) i))
-  | xs  => let f n x := n + intervalExtent (proj2_sig (V.nth (intervals sd) x)) in
+  | [i] => intervalExtent (V.nth (intervals sd) i).2
+  | xs  => let f n x := n + intervalExtent (V.nth (intervals sd) x).2 in
            fold_left f xs 0
   end.
 
@@ -147,7 +147,7 @@ Lemma NoDup_unhandledExtent_cons
 Proof.
   intros.
   induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (proj2_sig (V.nth ints i))). omega.
+  pose (Interval_extent_nonzero (V.nth ints i).2). omega.
   destruct unh; simpl. omega.
   apply fold_fold_lt. omega.
 Qed.
@@ -456,8 +456,8 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let ue := unhandledExtent sd in
   match unhandled sd with
   | nil    => ue = 0
-  | [i]    => ue = intervalExtent (proj2_sig (V.nth (intervals sd) i))
-  | i :: _ => ue > intervalExtent (proj2_sig (V.nth (intervals sd) i))
+  | [i]    => ue = intervalExtent (V.nth (intervals sd) i).2
+  | i :: _ => ue > intervalExtent (V.nth (intervals sd) i).2
   end.
 Proof.
   destruct sd.
@@ -467,7 +467,7 @@ Proof.
   destruct l eqn:Heqe2; simpl.
     reflexivity.
   apply fold_gt.
-  pose (Interval_extent_nonzero (proj2_sig (V.nth intervals0 i0))).
+  pose (Interval_extent_nonzero (V.nth intervals0 i0).2).
   omega.
 Qed.
 
@@ -491,12 +491,8 @@ Arguments curId {sd} _.
 Arguments curIntDetails {sd} _.
 
 Definition curStateDesc `(cur : ScanStateCursor sd) := sd.
-
-Definition curIntDesc `(cur : ScanStateCursor sd) :=
-  proj1_sig (curIntDetails cur).
-
-Definition curInterval `(cur : ScanStateCursor sd) :=
-  proj2_sig (curIntDetails cur).
+Definition curIntDesc   `(cur : ScanStateCursor sd) := (curIntDetails cur).1.
+Definition curInterval  `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
 
 Definition curPosition `(cur : ScanStateCursor sd) :=
   intervalStart (curInterval cur).

@@ -16,6 +16,11 @@ nat_rec :: a1 -> (Prelude.Int -> a1 -> a1) -> Prelude.Int -> a1
 nat_rec =
   nat_rect
 
+snd :: ((,) a1 a2) -> a2
+snd p =
+  case p of {
+   (,) x y -> y}
+
 list_rect :: a2 -> (a1 -> ([] a1) -> a2 -> a2) -> ([] a1) -> a2
 list_rect f f0 l =
   case l of {

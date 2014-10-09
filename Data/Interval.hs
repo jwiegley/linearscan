@@ -6,6 +6,8 @@ module Data.Interval where
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Alternative as Alternative
+import qualified Data.Basics as Basics
+import qualified Data.Datatypes as Datatypes
 import qualified Data.Endo as Endo
 import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
@@ -80,25 +82,34 @@ intervalIntersectionPoint i j =
          Prelude.Nothing -> Range.rangeIntersectionPoint ( rd) ( rd')})
         (rds j) Prelude.Nothing}) (rds i) Prelude.Nothing
 
-findUsePos :: IntervalDesc -> (Range.UsePos -> Prelude.Bool) -> Prelude.Maybe
-              Range.UsePos
-findUsePos i f =
+findIntervalUsePos :: IntervalDesc -> (Range.UsePos -> Prelude.Bool) ->
+                      Prelude.Maybe ((,) Range.RangeDesc Range.UsePos)
+findIntervalUsePos i f =
+  let {
+   f0 = \r ->
+    case Range.findRangeUsePos r f of {
+     Prelude.Just pos -> Prelude.Just ((,) r pos);
+     Prelude.Nothing -> Prelude.Nothing}}
+  in
   let {
    go rs =
      case rs of {
-      NonEmpty0.NE_Sing y -> Range.findRangeUsePos y f;
-      NonEmpty0.NE_Cons y rs' ->
+      NonEmpty0.NE_Sing r -> f0 r;
+      NonEmpty0.NE_Cons r rs' ->
        Alternative.choose (unsafeCoerce Alternative.option_Alternative)
-         (Range.findRangeUsePos y f) (go rs')}}
+         (f0 r) (go rs')}}
   in go (rds i)
 
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
-  Endo.fmap (unsafeCoerce Endo.option_Functor) Range.uloc
-    (unsafeCoerce (findUsePos d (\u -> NPeano.ltb pos (Range.uloc u))))
+  Endo.fmap (unsafeCoerce Endo.option_Functor)
+    (Basics.compose Range.uloc Datatypes.snd)
+    (unsafeCoerce
+      (findIntervalUsePos d (\u -> NPeano.ltb pos (Range.uloc u))))
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
-  Endo.fmap (unsafeCoerce Endo.option_Functor) Range.uloc
-    (unsafeCoerce (findUsePos d Range.regReq))
+  Endo.fmap (unsafeCoerce Endo.option_Functor)
+    (Basics.compose Range.uloc Datatypes.snd)
+    (unsafeCoerce (findIntervalUsePos d Range.regReq))
 

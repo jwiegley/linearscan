@@ -16,17 +16,6 @@ Generalizable All Variables.
 Module MAllocate (M : Machine).
 Include MSSMorph M.
 
-(** Split the current interval before the position [before].  This must
-    succeed, which means there must be use positions within the interval prior
-    to [before].  If [before] is [None], then splitting is done before the
-    first use position that does not require a register.
-
-    The resulting intervals are sorted back into the unhandled
-    list, so that the next interval to be processed may not be the remainder
-    of the split interval.
-
-    jww (2014-10-01): Prove that it always succeeds. *)
-
 Definition splitCurrentInterval {pre P} `{HasWork P} (before : option nat)
   : SState pre P SSMorphStHasLen unit.
   (* jww (2014-09-26): NYI *)
@@ -193,7 +182,7 @@ Definition checkActiveIntervals {pre} (pos : nat)
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
-        let i := getInterval (proj1_sig x) in
+        let i := getInterval x.1 in
         let st1 :=
             if intervalEnd i <? pos
             then uncurry_sig (moveActiveToHandled st) x
@@ -221,7 +210,7 @@ Definition checkInactiveIntervals {pre} (pos : nat)
                move it from inactive to handled
              else if it covers position then
                move it from inactive to active *)
-        let i := getInterval (proj1_sig x) in
+        let i := getInterval x.1 in
         let st1 :=
             if intervalEnd i <? pos
             then uncurry_sig (moveInactiveToHandled st) x

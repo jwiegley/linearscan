@@ -272,23 +272,6 @@ Record RangeDesc := {
     range_nonempty : rbeg < rend         (* this comes in handy *)
 }.
 
-Definition RangeDesc_append (l r : RangeDesc) (H : rend l <= rbeg r) : RangeDesc :=
-  {| rbeg := rbeg l
-   ; rend := rend r
-   ; ups  := NE_append (ups l) (ups r)
-
-   ; ups_head   := eq_ind_r (fun u => rbeg l ≤ uloc u)
-                            (ups_head l) NE_head_append_spec
-   ; ups_last   := eq_ind_r (fun u => uloc u < rend r)
-                            (ups_last r) NE_last_append_spec
-   ; ups_sorted := NE_StronglySorted_append _ _ _ _
-        (lt_le_trans _ _ _ (ups_last l) (le_trans _ _ _ H (ups_head r)))
-        (ups_sorted l) (ups_sorted r)
-
-   ; range_nonempty :=
-       lt_le_shuffle (range_nonempty l) H (range_nonempty r)
-   |}.
-
 (** ** Range *)
 
 (** A [Range] constrains how a [RangeDesc] may be constructed, and maintains
@@ -324,11 +307,6 @@ Inductive Range : RangeDesc -> Prop :=
 
            ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x)
            |}
-
-  (** Two ranges may be appended together, so that their total extent ranges
-      from the beginning of the first to the end of the second. *)
-  | R_Append l r : Range l -> Range r -> forall (H : rend l <= rbeg r),
-    Range (RangeDesc_append l r H)
 
   (** The address bounds of a [Range] may be arbitrarily extended, without
       reference to use positions.  This is useful when all of the use
@@ -369,7 +347,6 @@ Tactic Notation "Range_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "R_Sing"
   | Case_aux c "R_Cons"
-  | Case_aux c "R_Append"
   | Case_aux c "R_Extend"
   | Case_aux c "R_FromList"
   ].
@@ -379,6 +356,24 @@ Definition getRangeDesc `(r : Range d) := d.
 Coercion getRangeDesc : Range >-> RangeDesc.
 
 Definition rangeExtent `(Range r) := rend r - rbeg r.
+
+Definition Range_append `(l : Range ld) `(r : Range rd)
+  (H : rend ld <= rbeg rd) : RangeDesc :=
+  {| rbeg := rbeg ld
+   ; rend := rend rd
+   ; ups  := NE_append (ups ld) (ups rd)
+
+   ; ups_head   := eq_ind_r (fun u => rbeg ld ≤ uloc u)
+                            (ups_head ld) NE_head_append_spec
+   ; ups_last   := eq_ind_r (fun u => uloc u < rend rd)
+                            (ups_last rd) NE_last_append_spec
+   ; ups_sorted := NE_StronglySorted_append _ _ _ _
+        (lt_le_trans _ _ _ (ups_last ld) (le_trans _ _ _ H (ups_head rd)))
+        (ups_sorted ld) (ups_sorted rd)
+
+   ; range_nonempty :=
+       lt_le_shuffle (range_nonempty ld) H (range_nonempty rd)
+   |}.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x <? rbeg y
@@ -420,17 +415,17 @@ Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd) :=
          }
   | match ev with
     | (exist (Some r1, Some r2) H) =>
-        let r1' := proj1_sigg r1 in
-        let r2' := proj1_sigg r2 in
-        rd = RangeDesc_append r1' r2' H
+        let r1' := proj2_sigg r1 in
+        let r2' := proj2_sigg r2 in
+        rd = Range_append r1' r2' H
           /\ NE_all_true f (ups r1') /\ f (NE_head (ups r2')) = false
 
     | (exist (Some r1, None) _) =>
-        let r1' := proj1_sigg r1 in
-        rd = r1' /\ NE_all_true f (ups r1')
+        let rd1' := proj1_sigg r1 in
+        rd = rd1' /\ NE_all_true f (ups rd1')
     | (exist (None, Some r2) _) =>
-        let r2' := proj1_sigg r2 in
-        rd = r2' /\ f (NE_head (ups r2')) = false
+        let rd2' := proj1_sigg r2 in
+        rd = rd2' /\ f (NE_head (ups rd2')) = false
 
     | (exist (None, None) _) => False
     end
@@ -482,7 +477,7 @@ Proof.
 
             ; range_nonempty := le_lt_trans _ _ _ H10 ups_last0'
             |} _ _)) _).
-      unfold RangeDesc_append. simpl. intuition.
+      unfold Range_append. simpl. intuition.
       f_equal; apply proof_irrelevance.
 
     - Case "sublists = (Some, None)".
@@ -533,11 +528,11 @@ Definition DefiniteSubRangesOf `(r : Range rd) :=
          }
   | match ev with
     | exist (r1, r2) H =>
-        rd = RangeDesc_append (proj1_sigg r1) (proj1_sigg r2) H
+        rd = Range_append (proj2_sigg r1) (proj2_sigg r2) H
     end
   }.
 
-Definition rangeSplit (f : UsePos -> bool)
+Definition splitRange (f : UsePos -> bool)
   `(r : Range rd)
   (Hfirst_true : f (NE_head (ups rd)) = true)
   (Hlast_false : f (NE_last (ups rd)) = false)

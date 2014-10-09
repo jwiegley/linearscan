@@ -15,7 +15,7 @@ Definition predicate {a} (f : a -> bool) : a -> Prop :=
   fun x => Is_true (f x).
 
 Notation "x .1" := (proj1_sig x) (at level 3).
-Notation "x .2" := (proj1_sig x) (at level 3).
+Notation "x .2" := (proj2_sig x) (at level 3).
 Notation "( x ; y )" := (exist _ x y).
 
 Definition uncurry_sig {A C} {B : A -> Prop}
