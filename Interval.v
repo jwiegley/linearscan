@@ -185,8 +185,6 @@ Definition SubIntervalsOf `(i : Interval d) :=
     use position that does not require a register. *)
 Definition splitInterval `(i : Interval d) (before : option nat)
   : SubIntervalsOf i.
-Admitted.
-(*
 Proof.
   destruct d.
 
@@ -198,16 +196,21 @@ Proof.
   pose (@findIntervalUsePos _ i (fun u => uloc u <? n)).
   destruct o.
     destruct p. destruct s.
-    pose (@splitRange (fun u => uloc u <? n) x r).
-    destruct x. simpl in *.
+    pose (@rangeSpan (fun u => uloc u <? n) x r) as rs.
+    destruct rs.
+    destruct x0.
+    destruct x0.
+    simpl in *.
+    destruct o. destruct o0.
 
     (* Assemble the two subintervals. *)
     unfold SubIntervalsOf.
     admit.
 
   admit.
+  admit.
+  admit.
 Defined.
-*)
 
 (** Fixed Intervals
 

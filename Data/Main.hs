@@ -868,16 +868,16 @@ _LinearScan__splitAnyInactiveIntervalForReg :: LinearScan__ScanStateDesc ->
 _LinearScan__splitAnyInactiveIntervalForReg =
   Prelude.error "AXIOM TO BE REALIZED"
 
-_LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
-                                         LinearScan__SState ()
-_LinearScan__assignSpillSlotToCurrent =
-  Prelude.error "AXIOM TO BE REALIZED"
-
 _LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
                                             LinearScan__PhysReg ->
                                             LinearScan__SState
                                             (Prelude.Maybe Prelude.Int)
 _LinearScan__intersectsWithFixedInterval =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+_LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
+                                         LinearScan__SState ()
+_LinearScan__assignSpillSlotToCurrent =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc ->

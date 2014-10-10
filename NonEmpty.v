@@ -219,9 +219,9 @@ Proof.
 Qed.
 
 Inductive NE_StronglySorted : NonEmpty A -> Prop :=
-  | SSorted_sing a   : NE_StronglySorted (NE_Sing a)
-  | SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
-                         -> NE_StronglySorted (NE_Cons a l).
+  | NE_SSorted_sing a   : NE_StronglySorted (NE_Sing a)
+  | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
+                            -> NE_StronglySorted (NE_Cons a l).
 
 Lemma NE_StronglySorted_inv : forall a l, NE_StronglySorted (NE_Cons a l) ->
   NE_StronglySorted l /\ NE_Forall (R a) l.
@@ -317,7 +317,7 @@ Proof.
   assumption.
 Qed.
 
-Fixpoint NE_StronglySorted_append (xs ys : NonEmpty A)
+Fixpoint NE_StronglySorted_append {xs ys : NonEmpty A}
   : R (NE_last xs) (NE_head ys)
     -> NE_StronglySorted xs
     -> NE_StronglySorted ys
@@ -348,3 +348,12 @@ End Sorted.
 
 Arguments NE_all_true  [A] f _.
 Arguments NE_all_false [A] f _.
+
+Module NonEmptyNotations.
+
+Notation " [ x ] " := (NE_Sing x) : list_scope.
+Notation " [ x ; y ] " := (NE_Cons x (NE_Sing y)) : list_scope.
+
+Infix "++" := NE_append.
+
+End NonEmptyNotations.

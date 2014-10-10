@@ -11,6 +11,12 @@ Module Import LN := ListNotations.
 
 Definition undefined {a : Type} : a. Admitted.
 
+Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
+Proof.
+  intros P contra.
+  inversion contra.
+Defined.
+
 Definition predicate {a} (f : a -> bool) : a -> Prop :=
   fun x => Is_true (f x).
 
@@ -122,6 +128,9 @@ Lemma gt_one_gt_zero : forall n, n > 1 -> n > 0.
 Proof. intros. omega. Qed.
 
 Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
+Proof. intros. omega. Qed.
+
+Lemma lt_le_le_shuffle : forall {x y z w}, x < y -> y <= z -> z <= w -> x < w.
 Proof. intros. omega. Qed.
 
 Lemma plus_eq_zero : forall n m, n + m = n -> m = 0.
