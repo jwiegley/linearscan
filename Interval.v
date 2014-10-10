@@ -199,9 +199,9 @@ Proof.
     pose (@rangeSpan (fun u => uloc u <? n) x r) as rs.
     destruct rs.
     destruct x0.
-    destruct x0.
     simpl in *.
-    destruct o. destruct o0.
+    destruct o as [o| ].
+    destruct o0 as [o0| ].
 
     (* Assemble the two subintervals. *)
     unfold SubIntervalsOf.

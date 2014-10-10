@@ -6,6 +6,7 @@ module Data.Range where
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Alternative as Alternative
+import qualified Data.Logic as Logic
 import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
@@ -22,6 +23,9 @@ import qualified Data.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
+__ :: any
+__ = Prelude.error "Logical or arity value used"
+
 data UsePos =
    Build_UsePos Prelude.Int Prelude.Bool
 
@@ -34,6 +38,42 @@ regReq :: UsePos -> Prelude.Bool
 regReq u =
   case u of {
    Build_UsePos uloc0 regReq0 -> regReq0}
+
+type UsePosSublistsOf =
+  ((,) (Prelude.Maybe (NonEmpty0.NonEmpty UsePos))
+  (Prelude.Maybe (NonEmpty0.NonEmpty UsePos)))
+
+usePosSpan :: (UsePos -> Prelude.Bool) -> (NonEmpty0.NonEmpty UsePos) ->
+              UsePosSublistsOf
+usePosSpan f l =
+  case l of {
+   NonEmpty0.NE_Sing x ->
+    let {b = f x} in
+    case b of {
+     Prelude.True -> (,) (Prelude.Just (NonEmpty0.NE_Sing x)) Prelude.Nothing;
+     Prelude.False -> (,) Prelude.Nothing (Prelude.Just (NonEmpty0.NE_Sing
+      x))};
+   NonEmpty0.NE_Cons x xs ->
+    let {b = f x} in
+    case b of {
+     Prelude.True ->
+      let {u = usePosSpan f xs} in
+      case u of {
+       (,) o x0 ->
+        case o of {
+         Prelude.Just l1 ->
+          case x0 of {
+           Prelude.Just l2 -> (,) (Prelude.Just (NonEmpty0.NE_Cons x l1))
+            (Prelude.Just l2);
+           Prelude.Nothing -> (,) (Prelude.Just (NonEmpty0.NE_Cons x l1))
+            Prelude.Nothing};
+         Prelude.Nothing ->
+          case x0 of {
+           Prelude.Just l2 -> (,) (Prelude.Just (NonEmpty0.NE_Sing x))
+            (Prelude.Just l2);
+           Prelude.Nothing -> Prelude.error "absurd case"}}};
+     Prelude.False -> (,) Prelude.Nothing (Prelude.Just (NonEmpty0.NE_Cons x
+      xs))}}
 
 data RangeDesc =
    Build_RangeDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty UsePos)
@@ -82,4 +122,59 @@ findRangeUsePos r f =
        Alternative.choose (unsafeCoerce Alternative.option_Alternative)
          (check u) (go us')}}
   in go (ups r)
+
+type RangeSig = RangeDesc
+
+rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
+             ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
+rangeSpan f rd =
+  case rd of {
+   Build_RangeDesc rbeg0 rend0 ups0 ->
+    let {u = usePosSpan f ups0} in
+    case u of {
+     (,) o x ->
+      case o of {
+       Prelude.Just l1 ->
+        case x of {
+         Prelude.Just l2 ->
+          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
+          Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ _ _ _ _ ->
+            Logic.eq_rec_r (Build_RangeDesc rbeg0 rend0
+              (NonEmpty0.coq_NE_append l1 l2)) (\_ ->
+              Logic.and_rec (\_ _ ->
+                Logic.and_rec (\_ _ ->
+                  Logic.and_rec (\_ _ ->
+                    Logic.and_rec (\_ _ ->
+                      Logic.and_rec (\_ _ ->
+                        Logic.and_rec (\_ _ ->
+                          Logic.and_rec (\_ _ ->
+                            Logic.and_rec (\_ _ -> (,) (Prelude.Just
+                              (Build_RangeDesc rbeg0 (Prelude.succ
+                              (uloc (NonEmpty0.coq_NE_last l1))) l1))
+                              (Prelude.Just (Build_RangeDesc
+                              (uloc (NonEmpty0.coq_NE_head l2)) rend0 l2)))))))))))
+              rd0 __) ups0 __ __ __ __ __;
+         Prelude.Nothing ->
+          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
+          (,) (Prelude.Just rd0) Prelude.Nothing};
+       Prelude.Nothing ->
+        case x of {
+         Prelude.Just l2 ->
+          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
+          (,) Prelude.Nothing (Prelude.Just rd0);
+         Prelude.Nothing -> Logic.coq_False_rec}}}}
+
+type DefiniteSubRangesOf = ((,) RangeSig RangeSig)
+
+splitRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> DefiniteSubRangesOf
+splitRange f rd =
+  let {s = rangeSpan f rd} in
+  case s of {
+   (,) o o0 ->
+    case o of {
+     Prelude.Just o1 ->
+      case o0 of {
+       Prelude.Just o2 -> (,) o1 o2;
+       Prelude.Nothing -> Logic.coq_False_rec};
+     Prelude.Nothing -> Logic.coq_False_rec}}
 

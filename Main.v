@@ -10,6 +10,7 @@ Require Import Coq.Bool.Bool.
 Require Import Coq.Lists.List.
 Require Import Machine.
 Require Import Graph.
+Require Import Range.           (* jww (2014-10-10): REMOVE *)
 
 Module MyMachine <: Machine.
 
@@ -59,4 +60,4 @@ Extract Inlined Constant proj1_sig  => "".
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction LinearScan.allocateRegisters.
+Separate Extraction LinearScan.allocateRegisters splitRange.
