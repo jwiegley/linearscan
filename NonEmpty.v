@@ -31,16 +31,16 @@ Definition NE_head {a} (ne : NonEmpty a) : a :=
     | NE_Cons x _ => x
   end.
 
-Fixpoint NE_map {a b : Set} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
-  match ne with
-    | NE_Sing x => NE_Sing (f x)
-    | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
-  end.
-
 Fixpoint NE_last {a} (ne : NonEmpty a) : a :=
   match ne with
     | NE_Sing x => x
     | NE_Cons x xs => NE_last xs
+  end.
+
+Fixpoint NE_map {a b : Set} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
+  match ne with
+    | NE_Sing x => NE_Sing (f x)
+    | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
   end.
 
 Lemma NE_map_head_spec : forall {a b : Set} (f : a -> b) (xs : NonEmpty a),
@@ -63,6 +63,10 @@ Fixpoint NE_append {a : Set} (l1 l2 : NonEmpty a) : NonEmpty a :=
     | NE_Cons x xs => NE_Cons x (NE_append xs l2)
   end.
 
+Lemma NE_append_spec : forall {a : Set} {x} {xs ys : NonEmpty a},
+  NE_Sing x = NE_append xs ys -> False.
+Proof. intros. induction xs; destruct ys; simpl in *; inversion H. Qed.
+
 Lemma NE_map_append_spec : forall {a b : Set} (f : a -> b) {xs ys : NonEmpty a},
   NE_map f (NE_append xs ys) = NE_append (NE_map f xs) (NE_map f ys).
 Proof.
@@ -77,6 +81,83 @@ Proof. induction xs; auto. Qed.
 Lemma NE_last_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_last (NE_append xs ys) = NE_last ys.
 Proof. induction xs; auto. Qed.
+
+Fixpoint NE_reverse {a} (ne : NonEmpty a) : NonEmpty a :=
+  match ne with
+    | NE_Sing x => NE_Sing x
+    | NE_Cons x xs => NE_append (NE_reverse xs) (NE_Sing x)
+  end.
+
+Lemma NE_distr_reverse : forall {a} (x y : NonEmpty a),
+  NE_reverse (NE_append x y) = NE_append (NE_reverse y) (NE_reverse x).
+Admitted.
+
+Remark NE_reverse_sing_unit : forall {a} (l : NonEmpty a) (x : a),
+  NE_reverse (NE_Sing x) = NE_Sing x.
+Proof. auto. Qed.
+
+Remark NE_reverse_unit : forall {a} (l : NonEmpty a) (x : a),
+  NE_reverse (NE_append l (NE_Sing x)) = NE_append (NE_Sing x) (NE_reverse l).
+Admitted.
+
+Lemma NE_reverse_involutive : forall {a} (l : NonEmpty a),
+  NE_reverse (NE_reverse l) = l.
+Proof.
+  induction l; auto.
+  simpl. rewrite NE_distr_reverse.
+  rewrite IHl. reflexivity.
+Qed.
+
+Lemma NE_length_plus_1 : forall {a} x (xs : NonEmpty a),
+  NE_length (NE_append xs (NE_Sing x)) = S (NE_length xs).
+Proof. induction xs; simpl; auto. Qed.
+
+Lemma NE_length_1_plus : forall {a} x (xs : NonEmpty a),
+  NE_length (NE_append (NE_Sing x) xs) = S (NE_length xs).
+Proof. induction xs; simpl; auto. Qed.
+
+Lemma NE_reverse_length : forall {a} (l : NonEmpty a),
+  NE_length (NE_reverse l) = NE_length l.
+Proof.
+  induction l; auto. simpl.
+  rewrite NE_length_plus_1. auto.
+Qed.
+
+Section Reverse_Induction.
+
+Variable A : Set.
+
+Unset Implicit Arguments.
+
+Lemma NE_reverse_list_ind : forall P : NonEmpty A -> Prop,
+  (forall (a : A), P (NE_reverse (NE_Sing a)))
+    -> (forall (a : A) (l : NonEmpty A), P (NE_reverse l)
+          -> P (NE_reverse (NE_Cons a l)))
+    -> forall l : NonEmpty A, P (NE_reverse l).
+Proof.
+  induction l; auto.
+Qed.
+
+Set Implicit Arguments.
+
+Theorem NE_reverse_ind : forall P : NonEmpty A -> Prop,
+  (forall (x : A), P (NE_Sing x))
+    -> (forall (x : A) (l : NonEmpty A), P l -> P (NE_append l (NE_Sing x)))
+    -> forall l : NonEmpty A, P l.
+Proof.
+  intros.
+  generalize (NE_reverse_involutive l).
+  intros E; rewrite <- E.
+  apply (NE_reverse_list_ind P).
+  auto.
+
+  simpl in |- *.
+  intros.
+  apply (H0 a (NE_reverse l0)).
+  auto.
+Qed.
+
+End Reverse_Induction.
 
 Fixpoint NE_span {a : Set} (f : a -> bool) (l : NonEmpty a)
   : (option (NonEmpty a) * option (NonEmpty a)) :=
@@ -175,7 +256,7 @@ Proof.
 Qed.
 
 Lemma NE_Forall_inv : forall P (a : A) l, NE_Forall P (NE_Cons a l) -> P a.
-Proof. intros; inversion H0; trivial. Defined.
+Proof. intros; inversion H0; trivial. Qed.
 
 Lemma NE_Forall_rect : forall (P : A -> Prop) (Q : NonEmpty A -> Type),
   (forall b, P b -> Q (NE_Sing b))
@@ -185,7 +266,7 @@ Proof.
   [|eapply H2, NE_Forall_inv].
     apply H1. inversion H0. assumption.
     apply H0.
-Defined.
+Qed.
 
 Lemma NE_Forall_impl : forall (P Q : A -> Prop), (forall a, P a -> Q a) ->
   forall l, NE_Forall P l -> NE_Forall Q l.
@@ -223,9 +304,10 @@ Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
                             -> NE_StronglySorted (NE_Cons a l).
 
-Lemma NE_StronglySorted_inv : forall a l, NE_StronglySorted (NE_Cons a l) ->
-  NE_StronglySorted l /\ NE_Forall (R a) l.
-Proof. intros; inversion H0; auto. Defined.
+Lemma NE_StronglySorted_inv : forall a l,
+  NE_StronglySorted (NE_Cons a l)
+    -> NE_StronglySorted l /\ NE_Forall (R a) l.
+Proof. intros; inversion H0; auto. Qed.
 
 Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2)
@@ -249,7 +331,7 @@ Lemma NE_StronglySorted_rect :
     forall l, NE_StronglySorted l -> P l.
 Proof.
   induction l; firstorder using NE_StronglySorted_inv.
-Defined.
+Qed.
 
 Lemma NE_StronglySorted_rec :
   forall P : NonEmpty A -> Type,
@@ -269,8 +351,7 @@ Proof.
 Qed.
 
 Lemma NE_StronglySorted_cons : forall x (xs : NonEmpty A),
-  R x (NE_head xs) -> NE_StronglySorted xs
-    -> NE_StronglySorted (NE_Cons x xs).
+  R x (NE_head xs) -> NE_StronglySorted xs -> NE_StronglySorted (NE_Cons x xs).
 Proof.
   intros.
   induction xs; simpl in *;
@@ -342,6 +423,16 @@ Proof.
   apply NE_Forall_append.
   intuition.
   apply NE_Forall_Sorted with (xs := xs); assumption.
+Qed.
+
+Lemma NE_StronglySorted_impl `{Reflexive _ R} : forall xs,
+  NE_StronglySorted xs -> R (NE_head xs) (NE_last xs).
+Proof.
+  intros.
+  induction xs; simpl in *. reflexivity.
+  apply NE_StronglySorted_inv in H1; inversion H1.
+  apply NE_Forall_last in H3.
+  assumption.
 Qed.
 
 End Sorted.

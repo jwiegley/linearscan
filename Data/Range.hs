@@ -93,6 +93,8 @@ ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
 
+type RangeSig = RangeDesc
+
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
   case NPeano.ltb (rbeg x) (rbeg y) of {
@@ -123,8 +125,6 @@ findRangeUsePos r f =
          (check u) (go us')}}
   in go (ups r)
 
-type RangeSig = RangeDesc
-
 rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
              ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
 rangeSpan f rd =
@@ -138,22 +138,16 @@ rangeSpan f rd =
         case x of {
          Prelude.Just l2 ->
           let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
-          Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ _ _ _ _ ->
+          Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ _ ->
             Logic.eq_rec_r (Build_RangeDesc rbeg0 rend0
               (NonEmpty0.coq_NE_append l1 l2)) (\_ ->
               Logic.and_rec (\_ _ ->
                 Logic.and_rec (\_ _ ->
-                  Logic.and_rec (\_ _ ->
-                    Logic.and_rec (\_ _ ->
-                      Logic.and_rec (\_ _ ->
-                        Logic.and_rec (\_ _ ->
-                          Logic.and_rec (\_ _ ->
-                            Logic.and_rec (\_ _ -> (,) (Prelude.Just
-                              (Build_RangeDesc rbeg0 (Prelude.succ
-                              (uloc (NonEmpty0.coq_NE_last l1))) l1))
-                              (Prelude.Just (Build_RangeDesc
-                              (uloc (NonEmpty0.coq_NE_head l2)) rend0 l2)))))))))))
-              rd0 __) ups0 __ __ __ __ __;
+                  Logic.and_rec (\_ _ -> (,) (Prelude.Just (Build_RangeDesc
+                    rbeg0 (Prelude.succ (uloc (NonEmpty0.coq_NE_last l1)))
+                    l1)) (Prelude.Just (Build_RangeDesc
+                    (uloc (NonEmpty0.coq_NE_head l2)) rend0 l2)))))) rd0 __)
+            ups0 __ __;
          Prelude.Nothing ->
           let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
           (,) (Prelude.Just rd0) Prelude.Nothing};

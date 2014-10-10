@@ -153,10 +153,13 @@ Lemma lt_minus : forall n m, n > m -> n - m > 0.
 Proof. intros; omega. Qed.
 
 Lemma le_min : forall m n p, n <= p -> min m n <= p.
-Proof. intros. apply Nat.min_le_iff. right. assumption. Defined.
+Proof. intros. apply Nat.min_le_iff. right. assumption. Qed.
+
+Lemma lt_min : forall m n p, n < p -> min m n < p.
+Proof. intros. apply Nat.min_lt_iff. right. assumption. Qed.
 
 Lemma lt_max : forall m n p, p < n -> p < max m n.
-Proof. intros. apply Nat.max_lt_iff. right. assumption. Defined.
+Proof. intros. apply Nat.max_lt_iff. right. assumption. Qed.
 
 Lemma min_max_minus : forall n m b e, n - m > 0 -> Peano.max e n - min b m > 0.
 Proof.

@@ -35,11 +35,11 @@ Generalizable All Variables.
 Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
-    rds  : NonEmpty { r : RangeDesc | Range r };
+    rds  : NonEmpty { r : RangeDesc | Range r }
 
     (** Caching this property comes in handy, as it can be tricky to determine
         it by reduction in some cases. *)
-    interval_nonempty : ibeg < iend
+    (* interval_nonempty : ibeg < iend *)
 }.
 
 (** * Interval *)
@@ -49,27 +49,33 @@ Inductive Interval : IntervalDesc -> Prop :=
       Interval {| ibeg := rbeg x
                 ; iend := rend x
                 ; rds  := NE_Sing (exist _ x r)
-                ; interval_nonempty := range_nonempty x
+                (* ; interval_nonempty := range_nonempty x *)
                 |}
 
-  | I_Cons1 : forall y ib ie ne,
-      Interval {| ibeg := ib; iend := ie; rds := NE_Sing y;
-                  interval_nonempty := ne |}
+  | I_Cons1 : forall y ib ie (* ne *),
+      Interval {| ibeg := ib
+                ; iend := ie
+                ; rds  := NE_Sing y
+                (* ; interval_nonempty := ne *)
+                |}
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons (exist _ x r) (NE_Sing y)
-                ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
+                (* ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne *)
                 |}
 
-  | I_Consn : forall y xs ib ie ne,
-      Interval {| ibeg := ib; iend := ie; rds := NE_Cons y xs;
-                  interval_nonempty := ne |}
+  | I_Consn : forall y xs ib ie (* ne *),
+      Interval {| ibeg := ib
+                ; iend := ie
+                ; rds  := NE_Cons y xs
+                (* ; interval_nonempty := ne *)
+                |}
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons (exist _ x r) (NE_Cons y xs)
-                ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne
+                (* ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne *)
                 |}.
 
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=
@@ -98,8 +104,8 @@ Definition Interval_append `(l : Interval ld) `(r : Interval rd)
    ; iend := iend rd
    ; rds  := NE_append (rds ld) (rds rd)
 
-   ; interval_nonempty :=
-       lt_le_shuffle (interval_nonempty ld) H (interval_nonempty rd)
+   (* ; interval_nonempty := *)
+   (*     lt_le_shuffle (interval_nonempty ld) H (interval_nonempty rd) *)
    |}.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
@@ -145,10 +151,10 @@ Definition firstUseReqReg `(i : Interval d) : option nat :=
 Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
 Proof.
-  intros. unfold intervalStart, intervalEnd.
+  intros.
+  unfold intervalStart, intervalEnd.
   induction i; simpl in *;
-  induction r; simpl in *; min_max;
-  destruct l; destruct r1; simpl in *; omega.
+  apply Range_bounded in r; omega.
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d),
