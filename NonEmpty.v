@@ -88,9 +88,22 @@ Fixpoint NE_reverse {a} (ne : NonEmpty a) : NonEmpty a :=
     | NE_Cons x xs => NE_append (NE_reverse xs) (NE_Sing x)
   end.
 
+Lemma NE_append_assoc : forall {a} (x y z : NonEmpty a),
+  NE_append x (NE_append y z) = NE_append (NE_append x y) z.
+Proof.
+  induction x; intros; simpl.
+    reflexivity.
+  f_equal. apply IHx.
+Qed.
+
 Lemma NE_distr_reverse : forall {a} (x y : NonEmpty a),
   NE_reverse (NE_append x y) = NE_append (NE_reverse y) (NE_reverse x).
-Admitted.
+Proof.
+  intros.
+  induction x; simpl. reflexivity.
+  rewrite IHx. rewrite NE_append_assoc.
+  reflexivity.
+Qed.
 
 Remark NE_reverse_sing_unit : forall {a} (l : NonEmpty a) (x : a),
   NE_reverse (NE_Sing x) = NE_Sing x.
@@ -98,7 +111,7 @@ Proof. auto. Qed.
 
 Remark NE_reverse_unit : forall {a} (l : NonEmpty a) (x : a),
   NE_reverse (NE_append l (NE_Sing x)) = NE_append (NE_Sing x) (NE_reverse l).
-Admitted.
+Proof. intros. rewrite NE_distr_reverse. reflexivity. Qed.
 
 Lemma NE_reverse_involutive : forall {a} (l : NonEmpty a),
   NE_reverse (NE_reverse l) = l.

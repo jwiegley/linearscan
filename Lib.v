@@ -110,6 +110,19 @@ Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
 Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
   : Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
 
+Lemma ltb_gt : forall n m : nat, (n <? m) = false <-> m <= n.
+Proof.
+  split; intros;
+  generalize dependent m;
+  induction n; destruct m;
+  intros; simpl in *; auto.
+  - inversion H.
+  - apply le_n_S; apply IHn.
+    apply H.
+  - inversion H.
+  - apply IHn. omega.
+Qed.
+
 Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
 Proof. intros. exists (m - n). reflexivity. Defined.
 

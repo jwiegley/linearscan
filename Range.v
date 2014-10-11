@@ -418,14 +418,14 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
       dividedRange f r l1 l2 Heqe Hu1 Hu2
 
   | exist (Some _, None) (conj Heqe Hu) =>
-    exist (SubRangesOf f r)
-      (Some (exist Range rd r), None)
-      (conj eq_refl (rew <- Heqe in Hu))
+      exist (SubRangesOf f r)
+        (Some (exist Range rd r), None)
+        (conj eq_refl (rew <- Heqe in Hu))
 
   | exist (None, Some _) (conj Heqe Hu) =>
-    exist (SubRangesOf f r)
-      (None, Some (exist Range rd r))
-      (conj eq_refl (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
+      exist (SubRangesOf f r)
+        (None, Some (exist Range rd r))
+        (conj eq_refl (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.

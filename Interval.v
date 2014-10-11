@@ -160,33 +160,40 @@ Definition SubIntervalsOf `(i : Interval d) :=
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Definition splitInterval `(i : Interval d) (before : option nat)
-  : SubIntervalsOf i.
+Definition splitInterval `(i : Interval d) (before : option nat) {pos b e} :
+  b = uloc (NE_head (ups (NE_head (rds d)).1)) ->
+  e = uloc (NE_last (ups (NE_last (rds d)).1)) ->
+  pos = fromMaybe e (before <|> firstUseReqReg i) ->
+  b < pos -> pos <= e -> SubIntervalsOf i.
 Proof.
-  destruct d.
+  intros Hbeg Hend Hpos Hblim Helim.
+  destruct d. simpl in *.
 
-  (* Determine the position to split before. *)
-  pose (fromMaybe (uloc (NE_head (ups (NE_head rds0).1)))
-                  (before <|> firstUseReqReg i)).
+  induction rds0.
+    (* Find the [Range] to split.  If this is the last [Range], then it must
+       be splittable. *)
+    destruct a as [rd r]. simpl in *.
+    assert (uloc (NE_head (ups rd)) <? pos = true) as H1.
+      apply ltb_lt. rewrite <- Hbeg. assumption.
+    assert (uloc (NE_last (ups rd)) <? pos = false) as H2.
+      rewrite <- Hend. apply ltb_gt. assumption.
+    pose (@splitRange (fun u => uloc u <? pos) rd r H1 H2).
+    simpl in *. destruct d.
+    unfold SubIntervalsOf. destruct x.
+    eexists (({| ibeg := rbeg r0.1
+               ; iend := rend r0.1
+               ; rds  := NE_Sing r0 |}; _),
+             ({| ibeg := rbeg r1.1
+               ; iend := rend r1.1
+               ; rds  := NE_Sing r1 |}; _)); auto.
 
-  (* Find the [Range] to split. *)
-  pose (@findIntervalUsePos _ i (fun u => uloc u <? n)).
-  destruct o.
-    destruct p. destruct r.
-    pose (@rangeSpan (fun u => uloc u <? n) x r) as rs.
-    destruct rs.
-    destruct x0.
-    simpl in *.
-    destruct o as [o| ].
-    destruct o0 as [o0| ].
-
-    (* Assemble the two subintervals. *)
-    unfold SubIntervalsOf.
-    admit.
-
+  (* Otherwise we must split some other [Range], but there must be one. *)
   admit.
-  admit.
-  admit.
+
+  Grab Existential Variables.
+
+  - destruct r1. apply I_Sing.
+  - destruct r0. apply I_Sing.
 Defined.
 
 (** * Fixed Intervals *)
