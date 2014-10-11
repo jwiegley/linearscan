@@ -6,6 +6,7 @@ module Data.Range where
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Alternative as Alternative
+import qualified Data.Lib as Lib
 import qualified Data.Logic as Logic
 import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
@@ -125,38 +126,31 @@ findRangeUsePos r f =
          (check u) (go us')}}
   in go (ups r)
 
+dividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> (NonEmpty0.NonEmpty
+                UsePos) -> (NonEmpty0.NonEmpty UsePos) ->
+                ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
+dividedRange f rd l1 l2 =
+  case rd of {
+   Build_RangeDesc rbeg0 rend0 ups0 ->
+    Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ -> (,) (Prelude.Just
+      (Build_RangeDesc rbeg0 (Prelude.succ (uloc (NonEmpty0.coq_NE_last l1)))
+      l1)) (Prelude.Just (Build_RangeDesc (uloc (NonEmpty0.coq_NE_head l2))
+      rend0 l2))) ups0 __}
+
 rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
              ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
 rangeSpan f rd =
-  case rd of {
-   Build_RangeDesc rbeg0 rend0 ups0 ->
-    let {u = usePosSpan f ups0} in
-    case u of {
-     (,) o x ->
-      case o of {
-       Prelude.Just l1 ->
-        case x of {
-         Prelude.Just l2 ->
-          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
-          Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ _ ->
-            Logic.eq_rec_r (Build_RangeDesc rbeg0 rend0
-              (NonEmpty0.coq_NE_append l1 l2)) (\_ ->
-              Logic.and_rec (\_ _ ->
-                Logic.and_rec (\_ _ ->
-                  Logic.and_rec (\_ _ -> (,) (Prelude.Just (Build_RangeDesc
-                    rbeg0 (Prelude.succ (uloc (NonEmpty0.coq_NE_last l1)))
-                    l1)) (Prelude.Just (Build_RangeDesc
-                    (uloc (NonEmpty0.coq_NE_head l2)) rend0 l2)))))) rd0 __)
-            ups0 __ __;
-         Prelude.Nothing ->
-          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
-          (,) (Prelude.Just rd0) Prelude.Nothing};
-       Prelude.Nothing ->
-        case x of {
-         Prelude.Just l2 ->
-          let {rd0 = Build_RangeDesc rbeg0 rend0 ups0} in
-          (,) Prelude.Nothing (Prelude.Just rd0);
-         Prelude.Nothing -> Logic.coq_False_rec}}}}
+  case usePosSpan f (ups rd) of {
+   (,) o o0 ->
+    case o of {
+     Prelude.Just l1 ->
+      case o0 of {
+       Prelude.Just l2 -> dividedRange f rd l1 l2;
+       Prelude.Nothing -> (,) (Prelude.Just rd) Prelude.Nothing};
+     Prelude.Nothing ->
+      case o0 of {
+       Prelude.Just n -> (,) Prelude.Nothing (Prelude.Just rd);
+       Prelude.Nothing -> Lib.ex_falso_quodlibet}}}
 
 type DefiniteSubRangesOf = ((,) RangeSig RangeSig)
 

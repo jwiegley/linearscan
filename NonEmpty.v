@@ -444,6 +444,11 @@ Module NonEmptyNotations.
 
 Notation " [ x ] " := (NE_Sing x) : list_scope.
 Notation " [ x ; y ] " := (NE_Cons x (NE_Sing y)) : list_scope.
+Notation " [ x ; y ; z ] " := (NE_Cons x (NE_Cons y (NE_Sing z))) : list_scope.
+Notation " [ x ; y ; z ; w ] " :=
+  (NE_Cons x (NE_Cons y (NE_Cons z (NE_Sing w)))) : list_scope.
+Notation " [ x ; y ; z ; w ; v ] " :=
+  (NE_Cons x (NE_Cons y (NE_Cons z (NE_Cons w (NE_Sing v))))) : list_scope.
 
 Infix "++" := NE_append.
 

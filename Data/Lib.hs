@@ -8,6 +8,10 @@ import qualified Data.Peano as Peano
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
+ex_falso_quodlibet :: a1
+ex_falso_quodlibet =
+  Prelude.error "absurd case"
+
 uncurry_sig :: (a1 -> () -> a2) -> a1 -> a2
 uncurry_sig f p =
   f p __

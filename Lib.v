@@ -22,7 +22,6 @@ Definition predicate {a} (f : a -> bool) : a -> Prop :=
 
 Notation "x .1" := (proj1_sig x) (at level 3).
 Notation "x .2" := (proj2_sig x) (at level 3).
-Notation "( x ; y )" := (exist _ x y).
 
 Definition uncurry_sig {A C} {B : A -> Prop}
   (f : forall x : A, B x -> C) (p : { x : A | B x }) : C :=
@@ -252,12 +251,12 @@ Proof.
   rewrite (Plus.plus_comm n) at 1. reflexivity.
 Qed.
 
-(*
-Definition find_in {a} (n : a) (l : list a) : {In n l} + {~ In n l}.
+Definition find_in {a} (eq_dec : forall x y : a, { x = y } + { x <> y })
+  (n : a) (l : list a) : {In n l} + {~ In n l}.
 Proof.
   induction l as [| x xs].
     right. auto.
-  destruct (cmp_eq_dec n x).
+  destruct (eq_dec n x).
     subst. left. apply in_eq.
   inversion IHxs.
     left. apply in_cons.
@@ -270,7 +269,6 @@ Proof.
 Defined.
 
 Arguments find_in [_] _ _ _.
-*)
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
