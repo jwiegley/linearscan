@@ -35,7 +35,7 @@ Generalizable All Variables.
 Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
-    rds  : NonEmpty { r : RangeDesc | Range r }
+    rds  : NonEmpty RangeSig
 }.
 
 (** * Interval *)
@@ -44,7 +44,7 @@ Inductive Interval : IntervalDesc -> Prop :=
   | I_Sing : forall x (r : Range x),
       Interval {| ibeg := rbeg x
                 ; iend := rend x
-                ; rds  := NE_Sing (exist _ x r)
+                ; rds  := NE_Sing (x; r)
                 |}
 
   | I_Cons1 : forall y ib ie,
@@ -55,7 +55,7 @@ Inductive Interval : IntervalDesc -> Prop :=
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons (exist _ x r) (NE_Sing y)
+                ; rds  := NE_Cons (x; r) (NE_Sing y)
                 |}
 
   | I_Consn : forall y xs ib ie,
@@ -66,7 +66,7 @@ Inductive Interval : IntervalDesc -> Prop :=
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
-                ; rds  := NE_Cons (exist _ x r) (NE_Cons y xs)
+                ; rds  := NE_Cons (x; r) (NE_Cons y xs)
                 |}.
 
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=
@@ -86,15 +86,7 @@ Definition intervalEnd   `(Interval i) : nat := iend i.
 Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
   andb (intervalStart i <=? pos) (pos <? intervalEnd i).
 
-Definition intervalExtent `(i : Interval d) :=
-  intervalEnd i - intervalStart i.
-
-Definition Interval_append `(l : Interval ld) `(r : Interval rd)
-  (H : iend ld <= ibeg rd) : IntervalDesc :=
-  {| ibeg := ibeg ld
-   ; iend := iend rd
-   ; rds  := NE_append (rds ld) (rds rd)
-   |}.
+Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
   let f x y := rangesIntersect x.2 y.2 in
@@ -117,7 +109,7 @@ Definition intervalIntersectionPoint `(Interval i) `(Interval j) : option nat :=
        end) (rds i) None.
 
 Definition findIntervalUsePos `(Interval i) (f : UsePos -> bool)
-  : option ({ rd : RangeDesc | Range rd } * UsePos) :=
+  : option (RangeSig * UsePos) :=
   let f r := match r with
       | exist rd r' => match findRangeUsePos r' f with
           | Some pos => Some (r, pos)
@@ -154,23 +146,14 @@ Proof.
   apply lt_minus in l. assumption.
 Qed.
 
-Definition SubInterval `(i : Interval d) :=
-  { d' : IntervalDesc
-  | Interval d'
-  & ibeg d <= ibeg d' /\ iend d' <= iend d
-  }.
+Definition IntervalSig := { d : IntervalDesc | Interval d }.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition SubIntervalsOf `(i : Interval d) :=
-  { ev : { p : (SubInterval i * SubInterval i)
-         | iend (proj1_sigg (fst p)) <= ibeg (proj1_sigg (snd p))
-         }
-  | match ev with
-    | (exist (i1, i2) H) =>
-        d = Interval_append (proj2_sigg i1) (proj2_sigg i2) H
-    end
+  { p : (IntervalSig * IntervalSig)
+  | True
   }.
 
 (** Split the current interval before the position [before].  This must
@@ -189,7 +172,7 @@ Proof.
   (* Find the [Range] to split. *)
   pose (@findIntervalUsePos _ i (fun u => uloc u <? n)).
   destruct o.
-    destruct p. destruct s.
+    destruct p. destruct r.
     pose (@rangeSpan (fun u => uloc u <? n) x r) as rs.
     destruct rs.
     destruct x0.
@@ -206,25 +189,24 @@ Proof.
   admit.
 Defined.
 
-(** Fixed Intervals
+(** * Fixed Intervals *)
 
-    Some machine instructions require their operands in fixed
-    registers. Such constraints are already considered during the
-    construction of the LIR by emitting physical register operands instead
-    of virtual register operands. Although the register allocator must
-    leave these operands unchanged, they must be considered during
-    register allocation because they limit the number of available
-    registers. Information about physical registers is collected in fixed
-    intervals.
+(** Some machine instructions require their operands in fixed registers. Such
+    constraints are already considered during the construction of the LIR by
+    emitting physical register operands instead of virtual register
+    operands. Although the register allocator must leave these operands
+    unchanged, they must be considered during register allocation because they
+    limit the number of available registers. Information about physical
+    registers is collected in fixed intervals.
 
-    For each physical register, one fixed interval stores where the
-    register is not available for allocation. Use positions are not needed
-    for fixed intervals because they are never split and spilled. Register
-    constraints at method calls are also modeled using fixed intervals:
-    Because all registers are destroyed when the call is executed, ranges
-    of length 1 are added to all fixed intervals at the call
-    site. Therefore, the allocation pass cannot assign a register to any
-    interval there, and all intervals are spilled before the call.
+    For each physical register, one fixed interval stores where the register
+    is not available for allocation. Use positions are not needed for fixed
+    intervals because they are never split and spilled. Register constraints
+    at method calls are also modeled using fixed intervals: Because all
+    registers are destroyed when the call is executed, ranges of length 1 are
+    added to all fixed intervals at the call site. Therefore, the allocation
+    pass cannot assign a register to any interval there, and all intervals are
+    spilled before the call.
 
     Note that we do not distinguish between the two types of intervals in this
     code, and in fact make use of the use positions to track the locations of

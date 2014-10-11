@@ -372,7 +372,7 @@ Record SplittableUsePos `(Range r) := {
       /\ upos_lt splittable_UsePos (NE_last (ups r))
 }.
 
-Definition SubRangesOfEvidence (f : UsePos -> bool) `(r : Range rd)
+Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
   (p : (option RangeSig * option RangeSig)) :=
   match p with
   | (Some r1, Some r2) =>
@@ -392,15 +392,15 @@ Definition dividedRange (f : UsePos -> bool) `(r : Range rd)
   (Heqe : ups rd = NE_append l1 l2)
   (Hu1 : NE_all_true f l1)
   (Hu2 : f (NE_head l2) = false)
-  : { p : (option RangeSig * option RangeSig) | SubRangesOfEvidence f r p }.
+  : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p }.
 Proof.
   destruct rd. simpl in *. subst.
-  eexists (Some (exist _ {| rbeg := rbeg0
-                          ; rend := S (uloc (NE_last l1))
-                          ; ups  := l1 |} _),
-           Some (exist _ {| rbeg := uloc (NE_head l2)
-                          ; rend := rend0
-                          ; ups  := l2 |} _)).
+  eexists (Some ({| rbeg := rbeg0
+                  ; rend := S (uloc (NE_last l1))
+                  ; ups  := l1 |}; _),
+           Some ({| rbeg := uloc (NE_head l2)
+                  ; rend := rend0
+                  ; ups  := l2 |}; _)).
   simpl. intuition.
 
   Grab Existential Variables.
@@ -412,18 +412,18 @@ Defined.
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
-  : { p : (option RangeSig * option RangeSig) | SubRangesOfEvidence f r p } :=
+  : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
   match usePosSpan f (ups rd) with
   | exist (Some l1, Some l2) (conj Heqe (conj Hu1 Hu2)) =>
       dividedRange f r l1 l2 Heqe Hu1 Hu2
 
   | exist (Some _, None) (conj Heqe Hu) =>
-    exist (SubRangesOfEvidence f r)
+    exist (SubRangesOf f r)
       (Some (exist Range rd r), None)
       (conj eq_refl (rew <- Heqe in Hu))
 
   | exist (None, Some _) (conj Heqe Hu) =>
-    exist (SubRangesOfEvidence f r)
+    exist (SubRangesOf f r)
       (None, Some (exist Range rd r))
       (conj eq_refl (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
 

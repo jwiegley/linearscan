@@ -28,7 +28,7 @@ unsafeCoerce = IOExts.unsafeCoerce
 
 data IntervalDesc =
    Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty
-                                              Range.RangeDesc)
+                                              Range.RangeSig)
 
 ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
@@ -40,7 +40,7 @@ iend i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
 
-rds :: IntervalDesc -> NonEmpty0.NonEmpty Range.RangeDesc
+rds :: IntervalDesc -> NonEmpty0.NonEmpty Range.RangeSig
 rds i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> rds0}
@@ -83,7 +83,7 @@ intervalIntersectionPoint i j =
         (rds j) Prelude.Nothing}) (rds i) Prelude.Nothing
 
 findIntervalUsePos :: IntervalDesc -> (Range.UsePos -> Prelude.Bool) ->
-                      Prelude.Maybe ((,) Range.RangeDesc Range.UsePos)
+                      Prelude.Maybe ((,) Range.RangeSig Range.UsePos)
 findIntervalUsePos i f =
   let {
    f0 = \r ->
