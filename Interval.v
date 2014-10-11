@@ -36,10 +36,6 @@ Record IntervalDesc := {
     ibeg : nat;
     iend : nat;
     rds  : NonEmpty { r : RangeDesc | Range r }
-
-    (** Caching this property comes in handy, as it can be tricky to determine
-        it by reduction in some cases. *)
-    (* interval_nonempty : ibeg < iend *)
 }.
 
 (** * Interval *)
@@ -49,33 +45,28 @@ Inductive Interval : IntervalDesc -> Prop :=
       Interval {| ibeg := rbeg x
                 ; iend := rend x
                 ; rds  := NE_Sing (exist _ x r)
-                (* ; interval_nonempty := range_nonempty x *)
                 |}
 
-  | I_Cons1 : forall y ib ie (* ne *),
+  | I_Cons1 : forall y ib ie,
       Interval {| ibeg := ib
                 ; iend := ie
                 ; rds  := NE_Sing y
-                (* ; interval_nonempty := ne *)
                 |}
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons (exist _ x r) (NE_Sing y)
-                (* ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne *)
                 |}
 
-  | I_Consn : forall y xs ib ie (* ne *),
+  | I_Consn : forall y xs ib ie,
       Interval {| ibeg := ib
                 ; iend := ie
                 ; rds  := NE_Cons y xs
-                (* ; interval_nonempty := ne *)
                 |}
         -> forall x (r : Range x) (H : rend x <= ib),
       Interval {| ibeg := rbeg x
                 ; iend := ie
                 ; rds  := NE_Cons (exist _ x r) (NE_Cons y xs)
-                (* ; interval_nonempty := lt_le_shuffle (range_nonempty x) H ne *)
                 |}.
 
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=
@@ -103,9 +94,6 @@ Definition Interval_append `(l : Interval ld) `(r : Interval rd)
   {| ibeg := ibeg ld
    ; iend := iend rd
    ; rds  := NE_append (rds ld) (rds rd)
-
-   (* ; interval_nonempty := *)
-   (*     lt_le_shuffle (interval_nonempty ld) H (interval_nonempty rd) *)
    |}.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=

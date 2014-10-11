@@ -272,12 +272,6 @@ Record RangeDesc := {
     rbeg : nat;
     rend : nat;                 (* 1 past the last use position *)
     ups  : NonEmpty UsePos
-
-    (* ups_head : rbeg <= uloc (NE_head ups); *)
-    (* ups_last : uloc (NE_last ups) < rend; *)
-    (* ups_sorted : NE_StronglySorted UsePos upos_lt ups; *)
-
-    (* range_nonempty : rbeg < rend         (* this comes in handy *) *)
 }.
 
 (** ** Range *)
@@ -293,12 +287,6 @@ Inductive Range : RangeDesc -> Prop :=
     Range {| rbeg := uloc u
            ; rend := S (uloc u)
            ; ups  := NE_Sing u
-
-           (* ; ups_head   := le_n (uloc u) *)
-           (* ; ups_last   := lt_n_Sn (uloc u) *)
-           (* ; ups_sorted := NE_SSorted_sing _ _ u *)
-
-           (* ; range_nonempty := le_n (S (uloc u)) *)
            |}
 
   (** A [Range] can be extended by adding a use position to the beginning.
@@ -307,16 +295,8 @@ Inductive Range : RangeDesc -> Prop :=
     Range {| rbeg := uloc u
            ; rend := rend x
            ; ups  := NE_Cons u (ups x)
-
-           (* ; ups_head   := le_n (uloc u) *)
-           (* ; ups_last   := ups_last x *)
-           (* ; ups_sorted := NE_StronglySorted_cons _ _ _ _ *)
-           (*     (lt_le_trans _ _ _ H (ups_head x)) (ups_sorted x) *)
-
-           (* ; range_nonempty := Lt.lt_trans _ _ _ H (range_nonempty x) *)
            |}
 
-(*
   (** The address bounds of a [Range] may be arbitrarily extended, without
       reference to use positions.  This is useful when all of the use
       positions occur in a loop, for example, and you wish for the [Range] to
@@ -325,15 +305,7 @@ Inductive Range : RangeDesc -> Prop :=
     Range {| rbeg := min b' (rbeg x)
            ; rend := Peano.max e' (rend x)
            ; ups  := ups x
-
-           (* ; ups_head   := le_min _ _ _ (ups_head x) *)
-           (* ; ups_last   := lt_max _ _ _ (ups_last x) *)
-           (* ; ups_sorted := ups_sorted x *)
-
-           ; range_nonempty := min_lt_max _ _ _ _ (range_nonempty x)
-           |}
-*)
-.
+           |}.
 
 Tactic Notation "Range_cases" tactic(first) ident(c) :=
   first;
@@ -347,67 +319,6 @@ Definition getRangeDesc `(r : Range d) := d.
 Coercion getRangeDesc : Range >-> RangeDesc.
 
 Definition rangeExtent `(Range r) := rend r - rbeg r.
-
-Lemma Range_le_ups_head `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
-Proof.
-  induction r; simpl.
-  - reflexivity.
-  - reflexivity.
-  (* - apply le_min. *)
-  (*   assumption. *)
-Qed.
-
-Theorem Range_sorted `(r : Range rd) : NE_StronglySorted upos_lt (ups rd).
-Proof.
-  induction r; simpl.
-  - constructor.
-  - pose (Range_le_ups_head r).
-    constructor. apply IHr.
-    apply NE_StronglySorted_lt_trans.
-    assumption. assumption.
-  (* - apply IHr. *)
-Qed.
-
-Definition Range_append `(l : Range ld) `(r : Range rd)
-  (H : rend ld <= rbeg rd) : RangeDesc :=
-  {| rbeg := rbeg ld
-   ; rend := rend rd
-   ; ups  := NE_append (ups ld) (ups rd)
-
-   (* ; ups_head   := eq_ind_r (fun u => rbeg ld ≤ uloc u) *)
-   (*                          (ups_head ld) NE_head_append_spec *)
-   (* ; ups_last   := eq_ind_r (fun u => uloc u < rend rd) *)
-   (*                          (ups_last rd) NE_last_append_spec *)
-
-   (* ; ups_sorted := NE_StronglySorted_append _ _ *)
-   (*      (lt_le_trans _ _ _ (ups_last ld) (le_trans _ _ _ H (ups_head rd))) *)
-   (*      (ups_sorted ld) (ups_sorted rd) *)
-
-   (* ; range_nonempty := *)
-   (*     lt_le_shuffle (range_nonempty ld) H (range_nonempty rd) *)
-   |}.
-
-(*
-Fixpoint Range_fromList `(us : NonEmpty UsePos)
-  (** A [Range] can be bootstrapped by providing a properly sorted list of use
-      positions, and all of its details, so long as the laws are fulfilled
-      upon doing so. *)
-  | R_FromList b e us :
-    forall ups_head' : b <= uloc (NE_head us),
-    forall ups_last' : uloc (NE_last us) < e,
-    forall ups_sorted' : NE_StronglySorted UsePos upos_lt us,
-    forall range_nonempty' : b < e,
-    Range {| rbeg := b
-           ; rend := e
-           ; ups  := us
-
-           (* ; ups_head   := ups_head' *)
-           (* ; ups_last   := ups_last' *)
-           (* ; ups_sorted := ups_sorted' *)
-
-           ; range_nonempty := range_nonempty'
-           |}.
-*)
 
 Definition RangeSig := { rd : RangeDesc | Range rd }.
 
@@ -434,64 +345,151 @@ Proof.
   abstract intuition.
 Defined.
 
-Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
+Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
 Proof.
-  induction r; simpl in *. omega.
-  destruct x.
-  destruct ups0; simpl in *; unfold upos_lt in H;
-  inversion r; subst; omega.
-Qed.
-
-Lemma Range_beg_bounded `(r : Range rd) : rbeg rd < S (uloc (NE_head (ups rd))).
-Proof.
-  induction r; simpl in *.
-  - apply lt_n_Sn.
-  - apply lt_n_Sn.
-  (* - apply lt_min. assumption. *)
+  induction r; auto.
+  apply le_min. assumption.
 Qed.
 
 Lemma Range_end_bounded `(r : Range rd) : uloc (NE_last (ups rd)) < rend rd.
 Proof.
-  induction r; simpl in *.
-  - apply lt_n_Sn.
-  - apply IHr.
-  (* - apply lt_max. assumption. *)
+  induction r; auto.
+  apply lt_max. assumption.
 Qed.
+
+Theorem Range_sorted `(r : Range rd) : NE_StronglySorted upos_lt (ups rd).
+Proof.
+  induction r; simpl.
+  - constructor.
+  - pose (Range_beg_bounded r).
+    constructor. apply IHr.
+    apply NE_StronglySorted_lt_trans.
+    assumption. assumption.
+  - assumption.
+Qed.
+
+Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
+Proof.
+  induction r; simpl in *.
+  - omega.
+  - pose (Range_beg_bounded r).
+    pose (Range_end_bounded r).
+    pose (Range_sorted r).
+    apply NE_StronglySorted_UsePos_impl in n.
+    unfold upos_lt, upos_le in *. omega.
+  - apply lt_min. apply lt_max.
+    assumption.
+Qed.
+
+Definition Range_append `(l : Range ld) `(r : Range rd)
+  (H : rend ld <= rbeg rd) : RangeDesc :=
+  {| rbeg := rbeg ld
+   ; rend := rend rd
+   ; ups  := NE_append (ups ld) (ups rd)
+   |}.
+
+Definition Range_fromList `(us : NonEmpty UsePos) :
+  NE_StronglySorted upos_lt us
+    -> Range {| rbeg := uloc (NE_head us)
+              ; rend := S (uloc (NE_last us))
+              ; ups  := us
+              |}.
+Proof.
+  intros.
+  induction us.
+    apply R_Sing.
+  inversion H.
+  specialize (IHus H2).
+  apply (R_Cons a IHus).
+    apply IHus.
+  subst. simpl.
+  apply NE_Forall_head in H3.
+  assumption.
+Defined.
+
+Definition Range_weaken_beg : forall b x y xs,
+  Range {| rbeg := x
+         ; rend := y
+         ; ups  := xs |}
+    -> b <= x
+    -> Range {| rbeg := b; rend := y; ups := xs |}.
+Proof.
+  intros.
+  pose (R_Extend {| rbeg := x; rend := y; ups := xs |} b y H).
+  simpl in *.
+  rewrite Max.max_idempotent in r.
+  pose (Min.min_spec b x) as m.
+  destruct (le_lt_eq_dec b x).
+  - assumption.
+  - intuition. rewrite <- H3. assumption.
+  - intuition. rewrite e. rewrite <- H3. assumption.
+Defined.
 
 Definition Range_append_fst
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups := l1 ++ l2
-               (* ; range_nonempty := range_nonempty0 *)
                |}) :
   Range {| rbeg := rbeg0
          ; rend := S (uloc (NE_last l1))
          ; ups := l1
-         (* ; range_nonempty := *)
-         (*     NE_append_UsePos_lt_head_last *)
-         (*       (Range_sorted r) *)
-         (*       (Range_beg_bounded r) *)
          |}.
 Proof.
-  dependent induction r.
-    apply NE_append_spec in x. contradiction.
-  induction l1 using NE_reverse_ind; simpl in *.
-    inversion x. subst. constructor.
-  admit.
-Admitted.
+  pose (Range_sorted r) as Hsorted.
+  apply NE_StronglySorted_inv_app in Hsorted.
+  inversion Hsorted as [Hsortedl ?].
+
+  pose (Range_beg_bounded r) as Hbeg.
+  simpl in Hbeg.
+  rewrite NE_head_append_spec in Hbeg.
+
+  pose (Range_fromList l1 Hsortedl) as r'.
+  apply Range_weaken_beg with (x := uloc (NE_head l1)).
+  apply r'.
+  assumption.
+Defined.
+
+Definition Range_weaken_end : forall e x y xs,
+  Range {| rbeg := x
+         ; rend := y
+         ; ups  := xs |}
+    -> y <= e
+    -> Range {| rbeg := x; rend := e; ups := xs |}.
+Proof.
+  intros.
+  pose (R_Extend {| rbeg := x; rend := y; ups := xs |} x e H).
+  simpl in *.
+  rewrite Min.min_idempotent in r.
+  pose (Max.max_spec e y) as m.
+  destruct (le_lt_eq_dec y e).
+  - assumption.
+  - intuition. rewrite <- H3. assumption.
+  - intuition. rewrite <- H3. assumption.
+Defined.
 
 Definition Range_append_snd
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups := l1 ++ l2
-               (* ; range_nonempty := range_nonempty0 *)
                |}) :
   Range {| rbeg := uloc (NE_head l2)
          ; rend := rend0
          ; ups := l2
-         (* ; range_nonempty := NE_append_UsePos_lt_last_head (Range_end_bounded r) *)
          |}.
-Admitted.
+Proof.
+  pose (Range_sorted r) as Hsorted.
+  apply NE_StronglySorted_inv_app in Hsorted.
+  inversion Hsorted as [? Hsortedr].
+
+  pose (Range_end_bounded r) as Hend.
+  simpl in Hend.
+  rewrite NE_last_append_spec in Hend.
+
+  pose (Range_fromList l2 Hsortedr) as r'.
+  apply Range_weaken_end with (y := S (uloc (NE_last l2))).
+  apply r'.
+  assumption.
+Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x <? rbeg y
@@ -546,21 +544,11 @@ Proof.
     remember {| rbeg           := rbeg0
               ; rend           := rend0
               ; ups            := ups0
-              (* ; ups_head       := ups_head0 *)
-              (* ; ups_last       := ups_last0 *)
-              (* ; ups_sorted     := ups_sorted0 *)
-              (* ; range_nonempty := range_nonempty0 *)
               |} as rd.
 
     - Case "sublists = (Some, Some)".
       inversion Hu; simpl in *.
       clear Heqe. subst.
-      (* pose proof ups_sorted0 as ups_sorted0'. *)
-      (* pose proof ups_head0 as ups_head0'. *)
-      (* pose proof ups_last0 as ups_last0'. *)
-      (* apply NE_StronglySorted_UsePos_impl_app in ups_sorted0'. *)
-      (* rewrite NE_head_append_spec in ups_head0'. *)
-      (* rewrite NE_last_append_spec in ups_last0'. *)
       intuition.
 
       eexists
