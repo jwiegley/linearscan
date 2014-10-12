@@ -6,10 +6,10 @@ Require Export List.
 Require Export Omega.
 Require Export Tactics.
 
-(* Require Export Ssreflect.eqtype. *)
-(* Require Export Ssreflect.seq. *)
-(* Require Export Ssreflect.ssrbool. *)
-(* Require Export Ssreflect.ssreflect. *)
+Require Export Ssreflect.eqtype.
+Require Export Ssreflect.seq.
+Require Export Ssreflect.ssrbool.
+Require Export Ssreflect.ssreflect.
 (* Require Export Ssreflect.ssrfun. *)
 
 Set Implicit Arguments.

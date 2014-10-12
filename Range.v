@@ -277,15 +277,8 @@ Definition Range_weaken_beg : forall b x y xs,
     -> b <= x
     -> Range {| rbeg := b; rend := y; ups := xs |}.
 Proof.
-  intros.
-  pose (R_Extend b y H).
-  simpl in *.
-  rewrite Max.max_idempotent in r.
-  pose (Min.min_spec b x) as m.
-  destruct (le_lt_eq_dec b x).
-  - assumption.
-  - intuition. rewrite <- H3. assumption.
-  - intuition. rewrite e. rewrite <- H3. assumption.
+  move=> b x y ? H ?. move: Max.max_idempotent (R_Extend b y H) => /= ->.
+  by move: (Min.min_spec b x) (le_antisym b x) => [[? -> ?]|[? ? ->] ].
 Defined.
 
 Definition Range_append_fst
@@ -296,18 +289,9 @@ Definition Range_append_fst
          ; rend := S (uloc (NE_last l1))
          ; ups  := l1 |}.
 Proof.
-  pose (Range_sorted r) as Hsorted.
-  apply NE_StronglySorted_inv_app in Hsorted.
-  inversion Hsorted as [Hsortedl ?].
-
-  pose (Range_beg_bounded r) as Hbeg.
-  simpl in Hbeg.
-  rewrite NE_head_append_spec in Hbeg.
-
-  pose (Range_fromList Hsortedl) as r'.
-  apply Range_weaken_beg with (x := uloc (NE_head l1)).
-  apply r'.
-  assumption.
+  move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
+  move: (Range_beg_bounded r). rewrite NE_head_append_spec.
+  move/Range_weaken_beg: (Range_fromList Hsortedl). by apply.
 Defined.
 
 Definition Range_weaken_end : forall e x y xs,
@@ -317,15 +301,8 @@ Definition Range_weaken_end : forall e x y xs,
     -> y <= e
     -> Range {| rbeg := x; rend := e; ups := xs |}.
 Proof.
-  intros.
-  pose (R_Extend x e H).
-  simpl in *.
-  rewrite Min.min_idempotent in r.
-  pose (Max.max_spec e y) as m.
-  destruct (le_lt_eq_dec y e).
-  - assumption.
-  - intuition. rewrite <- H3. assumption.
-  - intuition. rewrite <- H3. assumption.
+  move=> e x y ? H ?. move: Min.min_idempotent (R_Extend x e H) => /= ->.
+  move: (Max.max_spec e y) (le_not_gt y e) => [[? ->]|[? ->]] //. by contra.
 Defined.
 
 Definition Range_append_snd
@@ -336,17 +313,9 @@ Definition Range_append_snd
          ; rend := rend0
          ; ups  := l2 |}.
 Proof.
-  pose (Range_sorted r) as Hsorted.
-  apply NE_StronglySorted_inv_app in Hsorted.
-  inversion Hsorted as [? Hsortedr].
-
-  pose (Range_end_bounded r) as Hend.
-  simpl in Hend.
-  rewrite NE_last_append_spec in Hend.
-
-  pose (Range_fromList Hsortedr) as r'.
-  apply Range_weaken_end with (y := S (uloc (NE_last l2))).
-  apply r'. assumption.
+  move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
+  move: (Range_end_bounded r). rewrite NE_last_append_spec.
+  move/Range_weaken_end: (Range_fromList Hsortedr). by apply.
 Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
@@ -422,12 +391,12 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
   | exist (Some _, None) (conj Heqe Hu) =>
       exist (SubRangesOf f r)
         (Some (exist Range rd r), None)
-        (conj eq_refl (rew <- Heqe in Hu))
+        (conj refl_equal (rew <- Heqe in Hu))
 
   | exist (None, Some _) (conj Heqe Hu) =>
       exist (SubRangesOf f r)
         (None, Some (exist Range rd r))
-        (conj eq_refl (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
+        (conj refl_equal (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.

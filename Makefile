@@ -34,7 +34,7 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 #                        #
 ##########################
 
-COQLIBS?=-I . -R Hask Hask
+COQLIBS?=-I . -R Hask Hask -R Ssreflect/theories Ssreflect
 COQDOCLIBS?=
 
 ##########################

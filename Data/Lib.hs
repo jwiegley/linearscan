@@ -4,6 +4,7 @@ import qualified Prelude
 import qualified Data.List
 import qualified Data.Logic as Logic
 import qualified Data.Peano as Peano
+import qualified Data.Seq as Seq
 
 
 __ :: any
@@ -27,8 +28,7 @@ list_membership :: ([] a1) -> [] a1
 list_membership l =
   case l of {
    [] -> [];
-   (:) x xs -> (:) x
-    ((Prelude.map) (exist_in_cons x xs) (list_membership xs))}
+   (:) x xs -> (:) x (Seq.map (exist_in_cons x xs) (list_membership xs))}
 
 lt_sub :: Prelude.Int -> Prelude.Int -> Prelude.Int
 lt_sub n m =

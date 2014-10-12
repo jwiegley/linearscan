@@ -25,6 +25,7 @@ import qualified Data.Peano as Peano
 import qualified Data.Plus as Plus
 import qualified Data.Specif as Specif
 import qualified Data.Vector0 as Vector0
+import qualified Data.Seq as Seq
 
 
 
@@ -465,9 +466,9 @@ _LinearScan__fixedIntervals s =
 _LinearScan__all_state_lists :: LinearScan__ScanStateDesc -> []
                                 LinearScan__IntervalId
 _LinearScan__all_state_lists s =
-  (Prelude.++) (_LinearScan__unhandled s)
-    ((Prelude.++) (_LinearScan__active s)
-      ((Prelude.++) (_LinearScan__inactive s) (_LinearScan__handled s)))
+  Seq.cat (_LinearScan__unhandled s)
+    (Seq.cat (_LinearScan__active s)
+      (Seq.cat (_LinearScan__inactive s) (_LinearScan__handled s)))
 
 _LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
                               LinearScan__IntervalId -> Prelude.Maybe
@@ -493,8 +494,13 @@ _LinearScan__transportId sd sd' x =
        LinearScan__Build_ScanStateDesc nextInterval1 unhandled1 active1
         inactive1 handled1 intervals1 assignments1 fixedIntervals1 ->
         let {h0 = Lib.lt_sub nextInterval0 nextInterval1} in
-        Logic.eq_rec ((Prelude.+) h0 nextInterval0)
-          (Fin.coq_R nextInterval0 h0 x) nextInterval1}};
+        let {
+         _evar_0_ = \_ ->
+          Logic.eq_rec ((Prelude.+) h0 nextInterval0)
+            (Fin.coq_R nextInterval0 h0 x) nextInterval1}
+        in
+        Logic.eq_rec_r ((Prelude.+) h0 nextInterval0) _evar_0_
+          ((Prelude.+) nextInterval0 h0) __}};
    Specif.Coq_right ->
     Logic.eq_rec (_LinearScan__nextInterval sd) x
       (_LinearScan__nextInterval sd')}
@@ -898,7 +904,7 @@ _LinearScan__tryAllocateFreeReg pre =
                          _LinearScan__maxReg)}
     in
     let {
-     intersectingIntervals = (Prelude.filter) (\x ->
+     intersectingIntervals = Seq.filter (\x ->
                                Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
@@ -966,7 +972,7 @@ _LinearScan__allocateBlockedReg pre =
                        _LinearScan__maxReg)}
     in
     let {
-     intersectingIntervals = (Prelude.filter) (\x ->
+     intersectingIntervals = Seq.filter (\x ->
                                Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
