@@ -5,6 +5,9 @@ Require Import Hask.Alternative.
 
 Open Scope nat_scope.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 (** * IntervalDesc *)

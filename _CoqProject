@@ -7,6 +7,7 @@ NonEmpty.v
 Range.v
 Interval.v
 NoDup.v
+Tactics.v
 Machine.v
 ScanState.v
 SSMorph.v

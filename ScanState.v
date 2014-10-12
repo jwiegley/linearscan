@@ -11,6 +11,9 @@ Require Coq.Vectors.Vector.
 
 Module Import LN := ListNotations.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Module MScanState (Mach : Machine).
@@ -370,7 +373,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := V.replace assgn x (Some reg)
        ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique := move_unhandled_to_active _ x unh act inact hnd lau
+       ; lists_are_unique := move_unhandled_to_active lau
        |}
 
   | ScanState_moveActiveToInactive sd x :
@@ -385,8 +388,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique :=
-         move_active_to_inactive sd x (lists_are_unique sd) H
+       ; lists_are_unique := move_active_to_inactive (lists_are_unique sd) H
        |}
 
   | ScanState_moveActiveToHandled sd x :
@@ -401,8 +403,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique :=
-         move_active_to_handled sd x (lists_are_unique sd) H
+       ; lists_are_unique := move_active_to_handled (lists_are_unique sd) H
        |}
 
   | ScanState_moveInactiveToActive sd x :
@@ -417,8 +418,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
-       ; lists_are_unique :=
-         move_inactive_to_active sd x (lists_are_unique sd) H
+       ; lists_are_unique := move_inactive_to_active (lists_are_unique sd) H
        |}
 
   | ScanState_moveInactiveToHandled sd x :
@@ -434,7 +434,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique :=
-         move_inactive_to_handled sd x (lists_are_unique sd) H
+         move_inactive_to_handled (lists_are_unique sd) H
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
@@ -481,7 +481,7 @@ Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
     curState  : ScanState sd;
     curExists : length (unhandled sd) > 0;
 
-    curId         := safe_hd (unhandled sd) curExists;
+    curId         := safe_hd curExists;
     curIntDetails := V.nth (intervals sd) curId
 }.
 

@@ -7,6 +7,9 @@ Open Scope nat_scope.
 
 Import EqNotations.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 (** ** UsePos *)
@@ -261,8 +264,7 @@ Proof.
     apply R_Sing.
   inversion H.
   specialize (IHus H2).
-  apply (R_Cons a IHus).
-    apply IHus.
+  apply (R_Cons IHus).
   subst. simpl.
   apply NE_Forall_head in H3.
   assumption.
@@ -415,7 +417,7 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
   : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
   match usePosSpan f (ups rd) with
   | exist (Some l1, Some l2) (conj Heqe (conj Hu1 Hu2)) =>
-      dividedRange f r l1 l2 Heqe Hu1 Hu2
+      dividedRange r Heqe Hu1 Hu2
 
   | exist (Some _, None) (conj Heqe Hu) =>
       exist (SubRangesOf f r)

@@ -11,10 +11,13 @@ Require Import Hask.IApplicative.
 Require Import Hask.IMonad.
 Require Import Hask.IState.
 
-Generalizable All Variables.
-
 Open Scope nat_scope.
 Open Scope program_scope.
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+Generalizable All Variables.
 
 Module MSSMorph (M : Machine).
 Include MScanState M.
@@ -239,18 +242,12 @@ Proof.
   destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   destruct unhandled0; simpl in *. omega.
-  pose (ScanState_moveUnhandledToActive nextInterval0 unhandled0
-          (* unhsort *)
-          active0 inactive0 handled0 intervals0 assignments0
-          fixedIntervals0 i reg lists_are_unique0).
-  specialize (s thisState0).
+  pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
-  pose (NoDup_unhandledExtent_cons nextInterval0 i unhandled0 intervals0
+  pose (NoDup_unhandledExtent_cons intervals0
          (V.replace assignments0 i (Some reg)) assignments0 fixedIntervals0
-         (i :: active0) active0 inactive0 inactive0 handled0 handled0
-         (move_unhandled_to_active _ i unhandled0 active0 inactive0 handled0
-            lists_are_unique0) lists_are_unique0)
+         (move_unhandled_to_active lists_are_unique0) lists_are_unique0)
       as ue_cons.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
@@ -274,7 +271,7 @@ Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (active sd))
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveActiveToInactive sd x st H).
+  pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
@@ -284,7 +281,7 @@ Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
   (H: In x (active sd))
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveActiveToInactive sd x st H).
+  pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
@@ -294,7 +291,7 @@ Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
   (H : In x (inactive sd))
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveInactiveToActive sd x st H).
+  pose (ScanState_moveInactiveToActive st H).
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
@@ -304,7 +301,7 @@ Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
   (H : In x (inactive sd))
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveInactiveToHandled sd x st H).
+  pose (ScanState_moveInactiveToHandled st H).
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.

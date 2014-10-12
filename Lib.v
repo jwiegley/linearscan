@@ -1,27 +1,37 @@
 Require Export Coq.Bool.Bool.
 Require Export Coq.Lists.List.
 Require Export Coq.Numbers.Natural.Peano.NPeano.
-Require Export Coq.omega.Omega.
+Require Export Coq.Sorting.Sorting.
+Require Export List.
+Require Export Omega.
+Require Export Tactics.
 
-Require Import Coq.Sorting.Sorting.
+(* Require Export Ssreflect.eqtype. *)
+(* Require Export Ssreflect.seq. *)
+(* Require Export Ssreflect.ssrbool. *)
+(* Require Export Ssreflect.ssreflect. *)
+(* Require Export Ssreflect.ssrfun. *)
 
-Module Import LN := ListNotations.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Module Export LN := ListNotations.
 
 (** The following are extensions to the Coq standard library. *)
 
 Definition undefined {a : Type} : a. Admitted.
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
-Proof.
-  intros P contra.
-  inversion contra.
-Defined.
+Proof. intros P. by contra. Defined.
 
 Definition predicate {a} (f : a -> bool) : a -> Prop :=
   fun x => Is_true (f x).
 
-Notation "x .1" := (proj1_sig x) (at level 3).
-Notation "x .2" := (proj2_sig x) (at level 3).
+Notation "p .1" := (proj1_sig p)
+  (at level 2, left associativity, format "p .1") : pair_scope.
+Notation "p .2" := (proj2_sig p)
+  (at level 2, left associativity, format "p .2") : pair_scope.
 Notation "( x ; y )" := (exist _ x y).
 
 Definition uncurry_sig {A C} {B : A -> Prop}
@@ -262,7 +272,7 @@ Proof.
   symmetry.
   rewrite IHxs. simpl.
   rewrite <- Plus.plus_assoc.
-  rewrite (Plus.plus_comm n) at 1. reflexivity.
+  rewrite -> (Plus.plus_comm n) at 1. reflexivity.
 Qed.
 
 Definition find_in {a} (eq_dec : forall x y : a, { x = y } + { x <> y })
@@ -273,7 +283,7 @@ Proof.
   destruct (eq_dec n x).
     subst. left. apply in_eq.
   inversion IHxs.
-    left. apply in_cons.
+    left. apply List.in_cons.
     assumption.
   right. unfold not in *.
   intros. apply in_inv in H0.

@@ -173,8 +173,8 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
 
 Definition checkActiveIntervals {pre} (pos : nat)
   : SState pre SSMorphLen SSMorphLen unit :=
-  let fix go sd (st : ScanState sd) ss is :=
-    match is with
+  let fix go sd (st : ScanState sd) ss ints :=
+    match ints with
     | nil => ss
     | x :: xs =>
         (* for each interval it in active do
@@ -201,8 +201,8 @@ Definition checkActiveIntervals {pre} (pos : nat)
 
 Definition checkInactiveIntervals {pre} (pos : nat)
   : SState pre SSMorphLen SSMorphLen unit :=
-  let fix go sd (st : ScanState sd) ss is :=
-    match is with
+  let fix go sd (st : ScanState sd) ss ints :=
+    match ints with
     | nil => ss
     | x :: xs =>
         (* for each interval it in inactive do
@@ -258,7 +258,7 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   match destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
     let ssinfo := {| thisDesc  := sd
-                   ; thisHolds := newSSMorphHasLen sd (list_cons_nonzero H)
+                   ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
     match runIState handleInterval ssinfo with
