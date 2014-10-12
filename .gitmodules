@@ -1,3 +1,6 @@
 [submodule "Hask"]
 	path = Hask
 	url = git://github.com/jwiegley/coq-haskell.git
+[submodule "Ssreflect"]
+	path = Ssreflect
+	url = git://github.com/jwiegley/ssreflect.git

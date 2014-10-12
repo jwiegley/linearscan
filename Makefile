@@ -113,8 +113,11 @@ endif
 #                                     #
 #######################################
 
-all: Hask/State.vo $(VOFILES) Data/Main.hs
+all: Ssreflect/theories/seq.vo Hask/State.vo $(VOFILES) Data/Main.hs
 	egrep -i '(admit|undefined)' *.v | egrep -v 'Definition undefined'
+
+Ssreflect/theories/seq.vo:
+	(cd Ssreflect ; make)
 
 Hask/State.vo:
 	(cd Hask ; make)
