@@ -23,15 +23,15 @@ Module Export LN := ListNotations.
 Definition undefined {a : Type} : a. Admitted.
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
-Proof. intros P. by contra. Defined.
+Proof. intros P. contra. Defined.
 
 Definition predicate {a} (f : a -> bool) : a -> Prop :=
   fun x => Is_true (f x).
 
 Notation "p .1" := (proj1_sig p)
-  (at level 2, left associativity, format "p .1") : pair_scope.
+  (at level 2, left associativity, format "p .1").
 Notation "p .2" := (proj2_sig p)
-  (at level 2, left associativity, format "p .2") : pair_scope.
+  (at level 2, left associativity, format "p .2").
 Notation "( x ; y )" := (exist _ x y).
 
 Definition uncurry_sig {A C} {B : A -> Prop}

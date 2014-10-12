@@ -1019,8 +1019,8 @@ _LinearScan__checkActiveIntervals :: LinearScan__ScanStateDesc -> Prelude.Int
 _LinearScan__checkActiveIntervals pre pos =
   let {
    go = let {
-         go sd ss is =
-           case is of {
+         go sd ss ints =
+           case ints of {
             [] -> ss;
             (:) x xs ->
              let {
@@ -1057,8 +1057,8 @@ _LinearScan__checkInactiveIntervals :: LinearScan__ScanStateDesc ->
 _LinearScan__checkInactiveIntervals pre pos =
   let {
    go = let {
-         go sd ss is =
-           case is of {
+         go sd ss ints =
+           case ints of {
             [] -> ss;
             (:) x xs ->
              let {

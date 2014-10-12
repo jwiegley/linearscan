@@ -278,7 +278,7 @@ Definition Range_weaken_beg : forall b x y xs,
     -> Range {| rbeg := b; rend := y; ups := xs |}.
 Proof.
   intros.
-  pose (R_Extend {| rbeg := x; rend := y; ups := xs |} b y H).
+  pose (R_Extend b y H).
   simpl in *.
   rewrite Max.max_idempotent in r.
   pose (Min.min_spec b x) as m.
@@ -304,7 +304,7 @@ Proof.
   simpl in Hbeg.
   rewrite NE_head_append_spec in Hbeg.
 
-  pose (Range_fromList l1 Hsortedl) as r'.
+  pose (Range_fromList Hsortedl) as r'.
   apply Range_weaken_beg with (x := uloc (NE_head l1)).
   apply r'.
   assumption.
@@ -318,7 +318,7 @@ Definition Range_weaken_end : forall e x y xs,
     -> Range {| rbeg := x; rend := e; ups := xs |}.
 Proof.
   intros.
-  pose (R_Extend {| rbeg := x; rend := y; ups := xs |} x e H).
+  pose (R_Extend x e H).
   simpl in *.
   rewrite Min.min_idempotent in r.
   pose (Max.max_spec e y) as m.
@@ -344,7 +344,7 @@ Proof.
   simpl in Hend.
   rewrite NE_last_append_spec in Hend.
 
-  pose (Range_fromList l2 Hsortedr) as r'.
+  pose (Range_fromList Hsortedr) as r'.
   apply Range_weaken_end with (y := S (uloc (NE_last l2))).
   apply r'. assumption.
 Defined.
@@ -482,7 +482,7 @@ Proof.
   assert (upos_lt (|start|) (|S start|)) as Hlt.
     unfold upos_lt. auto.
   rewrite <- Hr in Hlt.
-  pose (R_Cons (|start|) rd r Hlt) as r'.
+  pose (R_Cons r Hlt) as r'.
   exists (getRangeDesc r'). apply r'. auto.
 Defined.
 
@@ -493,31 +493,29 @@ Proof.
 Defined.
 
 Definition testRangeSpan (start finish n : nat) (H : start < finish) :=
-  let r := (rangeSpan (fun u => uloc u <? n)
-                      (generateRange start finish H).2).1 in
-  (fmap (fun x => ups x.1) (fst r),
-   fmap (fun x => ups x.1) (snd r)).
+  let r := (rangeSpan (fun u => uloc u <? n) (generateRange H).2).1 in
+  (fmap (fun x => ups x.1) (fst r), fmap (fun x => ups x.1) (snd r)).
 
 Example lt_1_5 : 1 < 5. omega. Qed.
 
 Example testRangeSpan_1 :
-  testRangeSpan 1 5 1 lt_1_5 = (None, Some [(|1|); (|2|); (|3|); (|4|)]).
+  testRangeSpan 1 lt_1_5 = (None, Some [(|1|); (|2|); (|3|); (|4|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_2 :
-  testRangeSpan 1 5 2 lt_1_5 = (Some [(|1|)], Some [(|2|); (|3|); (|4|)]).
+  testRangeSpan 2 lt_1_5 = (Some (NE_Sing (|1|)), Some [(|2|); (|3|); (|4|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_3 :
-  testRangeSpan 1 5 3 lt_1_5 = (Some [(|1|); (|2|)], Some [(|3|); (|4|)]).
+  testRangeSpan 3 lt_1_5 = (Some [(|1|); (|2|)], Some [(|3|); (|4|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_4 :
-  testRangeSpan 1 5 4 lt_1_5 = (Some [(|1|); (|2|); (|3|)], Some [(|4|)]).
+  testRangeSpan 4 lt_1_5 = (Some [(|1|); (|2|); (|3|)], Some (NE_Sing (|4|))).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_5 :
-  testRangeSpan 1 5 5 lt_1_5 = (Some [(|1|); (|2|); (|3|); (|4|)], None).
+  testRangeSpan 5 lt_1_5 = (Some [(|1|); (|2|); (|3|); (|4|)], None).
 Proof. reflexivity. Qed.
 
 End RangeTests.

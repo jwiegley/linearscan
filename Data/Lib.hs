@@ -2,6 +2,7 @@ module Data.Lib where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Logic as Logic
 import qualified Data.Peano as Peano
 
 
@@ -10,7 +11,7 @@ __ = Prelude.error "Logical or arity value used"
 
 ex_falso_quodlibet :: a1
 ex_falso_quodlibet =
-  Prelude.error "absurd case"
+  Logic.coq_False_rect
 
 uncurry_sig :: (a1 -> () -> a2) -> a1 -> a2
 uncurry_sig f p =
