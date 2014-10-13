@@ -117,6 +117,13 @@ Proof.
     split. reflexivity. assumption.
 Defined.
 
+Lemma usePosSpan_spec (f : UsePos -> bool) (l : NonEmpty UsePos)
+  : forall res, res = usePosSpan f l -> res.1 <> (None, None).
+Proof.
+  elim: l => [a|a l IHl] res Heqe;
+  case: res Heqe => [[[o| ] [o0| ]] H] //.
+Qed.
+
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
@@ -290,7 +297,7 @@ Definition Range_append_fst
          ; ups  := l1 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
-  move: (Range_beg_bounded r). rewrite NE_head_append_spec.
+  move: (@NE_head_append_spec) (Range_beg_bounded r) => ->.
   move/Range_weaken_beg: (Range_fromList Hsortedl). by apply.
 Defined.
 
@@ -314,7 +321,7 @@ Definition Range_append_snd
          ; ups  := l2 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
-  move: (Range_end_bounded r). rewrite NE_last_append_spec.
+  move: (@NE_last_append_spec) (Range_end_bounded r) => ->.
   move/Range_weaken_end: (Range_fromList Hsortedr). by apply.
 Defined.
 
@@ -400,6 +407,10 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.
+
+Lemma rangeSpan_spec (f : UsePos -> bool) `(r : Range rd)
+  : forall res, res = rangeSpan f r -> res.1 <> (None, None).
+Proof. elim: rd r => rbeg rend ups r [[[o| ] [o0| ]] res] Heq //. Qed.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
