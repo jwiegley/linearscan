@@ -34,7 +34,7 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 #                        #
 ##########################
 
-COQLIBS?=-I . -R Hask Hask -R Ssreflect/theories Ssreflect
+COQLIBS?=-I . -R Hask Hask
 COQDOCLIBS?=
 
 ##########################
@@ -113,11 +113,8 @@ endif
 #                                     #
 #######################################
 
-all: Ssreflect/theories/seq.vo Hask/State.vo $(VOFILES) Data/Main.hs
+all: Hask/State.vo $(VOFILES) Data/Main.hs
 	egrep -i '(admit|undefined)' *.v | egrep -v 'Definition undefined'
-
-Ssreflect/theories/seq.vo:
-	(cd Ssreflect ; make)
 
 Hask/State.vo:
 	(cd Hask ; make)

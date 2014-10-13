@@ -1,4 +1,4 @@
--I . -R Hask Hask -R Ssreflect/theories Ssreflect
+-I . -R Hask Hask
 Compare.v
 Fin.v
 Vector.v
