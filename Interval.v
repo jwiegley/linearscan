@@ -50,33 +50,21 @@ Inductive Interval : IntervalDesc -> Prop :=
                 ; rds  := NE_Sing (x; r)
                 |}
 
-  | I_Cons1 : forall y,
-      Interval {| ibeg := rbeg y.1
-                ; iend := rend y.1
-                ; rds  := NE_Sing y
-                |}
-        -> forall r (H : rend r.1 <= rbeg y.1),
-      Interval {| ibeg := rbeg r.1
-                ; iend := rend y.1
-                ; rds  := NE_Cons r (NE_Sing y)
-                |}
-
-  | I_Consn : forall y xs,
-      Interval {| ibeg := rbeg y.1
+  | I_Cons : forall xs,
+      Interval {| ibeg := rbeg (NE_head xs).1
                 ; iend := rend (NE_last xs).1
-                ; rds  := NE_Cons y xs
+                ; rds  := xs
                 |}
-        -> forall r (H : rend r.1 <= rbeg y.1),
+        -> forall r (H : rend r.1 <= rbeg (NE_head xs).1),
       Interval {| ibeg := rbeg r.1
                 ; iend := rend (NE_last xs).1
-                ; rds  := NE_Cons r (NE_Cons y xs)
+                ; rds  := NE_Cons r xs
                 |}.
 
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "I_Sing"
-  | Case_aux c "I_Cons1"
-  | Case_aux c "I_Consn"
+  | Case_aux c "I_Cons"
   ].
 
 Definition getIntervalDesc `(i : Interval d) := d.
@@ -92,9 +80,13 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 
 Definition intervalUncons
-  `(i : Interval {| ibeg := ib; iend := ie; rds := NE_Cons (rd; r) xs |})
-  : Interval {| ibeg := rbeg (NE_head xs).1; iend := ie; rds := xs |}.
-Proof. move: i. invert as [ |[rd0 r0] i [rd1 r1] H2 H3 | ] => //=. Qed.
+  `(i : Interval {| ibeg := rbeg r.1
+                  ; iend := rend (NE_last (NE_Cons r rs)).1
+                  ; rds := NE_Cons r xs |})
+  : (Interval {| ibeg := rbeg (NE_head xs).1
+               ; iend := rend (NE_last xs).1
+               ; rds := xs |} * (rend r.1 <= rbeg (NE_head xs).1)).
+Proof. move: i. invert as [ [rd0 r0] i [rd1 r1] | ] => //=. Qed.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
   let f x y := rangesIntersect x.2 y.2 in
@@ -146,10 +138,9 @@ Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
 Proof.
   rewrite /intervalStart /intervalEnd.
-  move=> d. elim=> [rd r|[rd r] i H [rd0 r0]|[rd r] rs i H [rd0 r0]] * /=;
-    first (by apply: Range_bounded);
-  pose (Range_bounded r0); pose (Range_bounded r);
-  simpl in *; omega.
+  move=> d. elim=> [rd r|rs i H [rd r]] * /=;
+    first (by apply: Range_bounded).
+  pose (Range_bounded r). simpl in *. omega.
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d),
@@ -178,9 +169,9 @@ Definition splitPosition `(i : Interval d) (before : option nat) : nat :=
 Lemma Interval_beg_bounded `(i : Interval d) : ibeg d <= firstUsePos i.
 Proof.
   rewrite /firstUsePos.
-  elim: i => [rd r|[rd r] i H [rd0 r0]|[rd r] rs i H [rd0 r0]] * /=;
-    first (by apply: (Range_beg_bounded r));
-  pose (Range_beg_bounded r0); pose (Range_beg_bounded r);
+  elim: i => [rd r|rs i H [rd r]] * /=;
+    first (by apply: (Range_beg_bounded r)).
+  pose (Range_beg_bounded r);
   simpl in *; omega.
 Qed.
 
@@ -189,7 +180,7 @@ Proof.
   rewrite /lastUsePos.
   rewrite /lastUsePos in Interval_end_bounded.
   case: d i => ib ie rds /=.
-  invert as [rd r| | ] => /=;
+  invert as [rd r| ] => /=;
     first apply: (Range_end_bounded r);
   rename H1 into i;
   by apply (Interval_end_bounded i).
@@ -250,9 +241,10 @@ Defined.
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Fixpoint intervalSpan (rs : NonEmpty RangeSig) {ib ie} (before : nat)
-  (i : Interval {| ibeg := ib; iend := ie; rds  := rs |}) {struct rs}
-  : SubIntervalsOf i.
+Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
+  (i : Interval {| ibeg := rbeg (NE_head rs).1
+                 ; iend := rend (NE_last rs).1
+                 ; rds  := rs |}) {struct rs} : SubIntervalsOf i.
 Proof.
   set f := (fun u => (uloc u <? before)).
   destruct rs; destruct (@rangeSpan f _ r.2);
@@ -262,7 +254,8 @@ Proof.
 
     (* If this is the only [Range], take its span. *)
   - Case "sublists = (Some, Some)".
-    exists (None, None). auto.
+    eexists (Some (exist _ _ (I_Sing r0.2)),
+             Some (exist _ _ (I_Sing r1.2))). auto.
 
   - Case "sublists = (Some, None)".
     exists (Some (exist _ _ i), None). auto.
@@ -271,14 +264,21 @@ Proof.
 
   (* Otherwise we must split some other [Range], but there must be one. *)
   - Case "(Some, Some)".
-    exists (None, None). auto.
+    destruct (intervalUncons i) as [i' Hi'].
+    eexists (Some (exist _ _ (I_Sing r0.2)),
+             Some (exist _ _ (I_Cons i' Hi'))). auto.
 
   - Case "(Some, None)".
-    destruct r. apply (@intervalSpan rs _ _ before (intervalUncons i)).
+    destruct r. destruct (intervalUncons i) as [i' ?].
+    apply (intervalSpan rs before i').
 
   - Case "(None, Some)".
     exists (None, Some (exist _ _ i)). auto.
 Defined.
+
+(* Lemma intervalSpan_spec (before : nat) `(i : Interval d) *)
+(*   : forall res, res = intervalSpan before i -> res.1 <> (None, None). *)
+(* Proof. elim: rd r => rbeg rend ups r [[[o| ] [o0| ]] res] Heq //. Qed. *)
 
 (*
 (** Split the current interval before the position [before].  This must
