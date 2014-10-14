@@ -35,15 +35,14 @@ Definition upos_le (x y : UsePos) := uloc x <= uloc y.
 Definition upos_lt (x y : UsePos) := uloc x < uloc y.
 
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
-  NE_StronglySorted upos_lt xs
-    -> NE_head xs <= NE_last xs.
+  NE_StronglySorted upos_lt xs -> NE_head xs <= NE_last xs.
 Proof.
   intros.
-  induction xs; simpl in *.
-    unfold upos_le. trivial.
-  apply NE_StronglySorted_inv in H; inversion H.
-  apply NE_Forall_last in H1.
-  unfold upos_lt, upos_le in *. auto.
+  induction xs; simpl in *; first by [].
+  move: H. invert.
+  move/NE_Forall_last: H2.
+  rewrite /upos_lt /upos_le.
+  apply/ltnW.
 Qed.
 
 Lemma NE_StronglySorted_lt_trans
@@ -388,7 +387,8 @@ Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
       [ /\ ups rd = NE_append (ups r1.1) (ups r2.1)
       , NE_all_true f (ups r1.1)
       , f (NE_head (ups r2.1)) = false
-      & rend r1.1 < rbeg r2.1
+      , rend r1.1 < rbeg r2.1
+      & (rbeg r == rbeg r1.1) && (rend r == rend r2.1)
       ]
 
   | (Some r1, None) =>
@@ -414,7 +414,8 @@ Proof.
                   ; rend := rend0
                   ; ups  := l2 |}; _)).
   simpl. constructor; auto.
-  by apply Range_append_spec in r.
+    by apply Range_append_spec in r.
+  by apply/andP.
 
   Grab Existential Variables.
 
