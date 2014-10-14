@@ -24,6 +24,8 @@ Record UsePos : Set := {
     regReq : bool
 }.
 
+Coercion uloc : UsePos >-> nat.
+
 Module UsePosNotations.
 Notation " (| x |) " := {| uloc := x; regReq := false |}.
 Notation " (! x !) " := {| uloc := x; regReq := true |}.
@@ -32,21 +34,9 @@ End UsePosNotations.
 Definition upos_le (x y : UsePos) := uloc x <= uloc y.
 Definition upos_lt (x y : UsePos) := uloc x < uloc y.
 
-(*
-Program Instance upos_le_PO : PreOrder upos_le.
-Obligation 1. constructor. Qed.
-Obligation 2.
-  unfold Transitive. intros.
-  unfold upos_le in *. omega.
-Qed.
-
-Program Instance upos_lt_trans : Transitive upos_lt.
-Obligation 1. unfold upos_lt in *. omega. Qed.
-*)
-
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
   NE_StronglySorted upos_lt xs
-    -> upos_le (NE_head xs) (NE_last xs).
+    -> NE_head xs <= NE_last xs.
 Proof.
   intros.
   induction xs; simpl in *.
@@ -56,8 +46,9 @@ Proof.
   unfold upos_lt, upos_le in *. auto.
 Qed.
 
-Lemma NE_StronglySorted_lt_trans : forall x xs,
-  upos_lt x (NE_head xs)
+Lemma NE_StronglySorted_lt_trans
+  : forall (x : UsePos) (xs : NonEmpty UsePos),
+  x < NE_head xs
     -> NE_StronglySorted upos_lt xs
     -> NE_Forall (upos_lt x) xs.
 Proof.
@@ -79,7 +70,10 @@ Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
   { p : (option (NonEmpty UsePos) * option (NonEmpty UsePos))
   | match p with
     | (Some l1, Some l2) =>
-        l = NE_append l1 l2 /\ NE_all_true f l1 /\ f (NE_head l2) = false
+        [ /\ l = NE_append l1 l2
+        , NE_all_true f l1
+        & f (NE_head l2) = false
+        ]
 
     | (Some l1, None) => l = l1 /\ NE_all_true f l1
     | (None, Some l2) => l = l2 /\ f (NE_head l2) = false
@@ -135,8 +129,8 @@ Definition UsePosDefiniteSublistsOf (l : NonEmpty UsePos) :=
 
 Definition usePosSplit (f : UsePos -> bool)
   (l : NonEmpty UsePos) (Hlen : NE_length l > 1)
-  (Hfirst_true : f (NE_head l) = true)
-  (Hlast_false : f (NE_last l) = false)
+  (Hfirst_true : f (NE_head l))
+  (Hlast_false : ~~ f (NE_last l))
   : UsePosDefiniteSublistsOf l.
 Proof.
   pose (usePosSpan f l). destruct u.
@@ -147,12 +141,13 @@ Proof.
   destruct o as [o| ];
   destruct o0 as [o0| ]; intuition.
   - Case "(Some, Some)".
-    exists (o, o0). assumption.
+    inversion y. exists (o, o0). assumption.
 
   - Case "(Some, None)".
     apply NE_Forall_last in H0.
     rewrite <- H in *. simpl in H0. exfalso.
-    apply (eq_true_false_abs (f (NE_last l))); assumption.
+    apply (eq_true_false_abs (f (NE_last l)));
+      [ by [] | by apply negbTE ].
 
   - Case "(None, Some)".
     rewrite <- H in *. simpl in H0. exfalso.
@@ -190,7 +185,7 @@ Inductive Range : RangeDesc -> Prop :=
   (** A [Range] built from a single use position covers that use positions, so
       that it begins at the use position, and ends one step after it (range
       ends are always exclusive). *)
-  | R_Sing u :
+  | R_Sing u : even (uloc u) ->
     Range {| rbeg := uloc u
            ; rend := S (uloc u)
            ; ups  := NE_Sing u
@@ -198,7 +193,8 @@ Inductive Range : RangeDesc -> Prop :=
 
   (** A [Range] can be extended by adding a use position to the beginning.
       This means that they must be built up in reverse. *)
-  | R_Cons u x : Range x -> forall (H : upos_lt u (NE_head (ups x))),
+  | R_Cons u x : even (uloc u) -> Range x
+      -> forall (H : upos_lt u (NE_head (ups x))),
     Range {| rbeg := uloc u
            ; rend := rend x
            ; ups  := NE_Cons u (ups x)
@@ -247,6 +243,15 @@ Proof.
   - Case "R_Extend". assumption.
 Qed.
 
+Theorem Range_all_even `(r : Range rd) : NE_Forall (even ∘ uloc) (ups rd).
+Proof.
+  Range_cases (induction r) Case; simpl.
+  - Case "R_Sing". by constructor.
+  - Case "R_Cons".
+    constructor. auto. apply IHr.
+  - Case "R_Extend". assumption.
+Qed.
+
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
   Range_cases (induction r) Case; simpl in *.
@@ -257,26 +262,24 @@ Proof.
     pose (Range_sorted r).
     apply NE_StronglySorted_UsePos_impl in n.
     unfold upos_lt, upos_le in *.
-    by apply (lt_le_shuffle H n i0).
+    by apply (lt_le_shuffle H0 n i0).
   - Case "R_Extend".
     by apply /ltn_min /ltn_max.
 Qed.
 
 Definition Range_fromList `(us : NonEmpty UsePos) :
   NE_StronglySorted upos_lt us
+    -> NE_Forall (even ∘ uloc) us
     -> Range {| rbeg := uloc (NE_head us)
               ; rend := S (uloc (NE_last us))
               ; ups  := us |}.
 Proof.
-  intros.
-  induction us.
-    apply R_Sing.
-  inversion H.
-  specialize (IHus H2).
-  apply (R_Cons IHus).
-  subst. simpl.
-  apply NE_Forall_head in H3.
-  assumption.
+  elim: us => [a|a us IHus] Hsorted Hforall //.
+    by apply R_Sing; inv Hforall.
+  inv Hsorted; inv Hforall; simpl in *.
+  specialize (IHus H1 H4).
+  apply (R_Cons H3 IHus). simpl.
+  by inversion H2; auto.
 Defined.
 
 Definition Range_weaken_beg : forall b x y xs,
@@ -301,8 +304,9 @@ Definition Range_append_fst
          ; ups  := l1 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
+  move/NE_Forall_append: (Range_all_even r) => /= [Hforall _].
   move: (@NE_head_append_spec) (Range_beg_bounded r) => ->.
-  move/Range_weaken_beg: (Range_fromList Hsortedl). by apply.
+  move/Range_weaken_beg: (Range_fromList Hsortedl Hforall). by apply.
 Defined.
 
 Definition Range_weaken_end : forall e x y xs,
@@ -327,8 +331,29 @@ Definition Range_append_snd
          ; ups  := l2 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
+  move/NE_Forall_append: (Range_all_even r) => /= [_ Hforall].
   move: (@NE_last_append_spec) (Range_end_bounded r) => ->.
-  move/Range_weaken_end: (Range_fromList Hsortedr). by apply.
+  move/Range_weaken_end: (Range_fromList Hsortedr Hforall). by apply.
+Defined.
+
+Lemma ltn_even : forall n m, even n && even m -> n < m -> n.+1 < m.
+Proof.
+  elim=> // [m|n IHn m] /andP [Hev0 Hevn] Hlt.
+Admitted.
+
+Definition Range_append_spec
+  `(r : Range {| rbeg := rbeg0
+               ; rend := rend0
+               ; ups  := NE_append l1 l2 |}) :
+  S (uloc (NE_last l1)) < uloc (NE_head l2).
+Proof.
+  move/NE_StronglySorted_impl_app: (Range_sorted r) => Hlt.
+  move/NE_Forall_append: (Range_all_even r) => /= [Hfal Hfar].
+  apply NE_Forall_last in Hfal.
+  apply NE_Forall_head in Hfar.
+  rewrite /upos_lt in Hlt.
+  apply ltn_even.
+  by apply/andP. done.
 Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
@@ -360,8 +385,11 @@ Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
   (p : (option RangeSig * option RangeSig)) :=
   match p with
   | (Some r1, Some r2) =>
-      ups rd = NE_append (ups r1.1) (ups r2.1)
-        /\ NE_all_true f (ups r1.1) /\ f (NE_head (ups r2.1)) = false
+      [ /\ ups rd = NE_append (ups r1.1) (ups r2.1)
+      , NE_all_true f (ups r1.1)
+      , f (NE_head (ups r2.1)) = false
+      & rend r1.1 < rbeg r2.1
+      ]
 
   | (Some r1, None) =>
       ups rd = ups r1.1 /\ NE_all_true f (ups r1.1)
@@ -385,9 +413,11 @@ Proof.
            Some ({| rbeg := uloc (NE_head l2)
                   ; rend := rend0
                   ; ups  := l2 |}; _)).
-  simpl. intuition.
+  simpl. constructor; auto.
+  by apply Range_append_spec in r.
 
   Grab Existential Variables.
+
   - apply (Range_append_snd r).
   - apply (Range_append_fst r).
 Defined.
@@ -398,7 +428,7 @@ Defined.
 Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
   : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
   match usePosSpan f (ups rd) with
-  | exist (Some l1, Some l2) (conj Heqe (conj Hu1 Hu2)) =>
+  | exist (Some l1, Some l2) (And3 Heqe Hu1 Hu2) =>
       dividedRange r Heqe Hu1 Hu2
 
   | exist (Some _, None) (conj Heqe Hu) =>
@@ -429,8 +459,8 @@ Definition DefiniteSubRangesOf `(r : Range rd) :=
     must not be eligible for splitting, and therefore the [Range] will always
     be split into two definite sub-ranges. *)
 Definition splitRange (f : UsePos -> bool) `(r : Range rd)
-  (Hfirst_true : f (NE_head (ups rd)) = true)
-  (Hlast_false : f (NE_last (ups rd)) = false)
+  (Hfirst_true : f (NE_head (ups rd)))
+  (Hlast_false : ~~ f (NE_last (ups rd)))
   : DefiniteSubRangesOf r.
 Proof.
   destruct rd. simpl in *.
@@ -447,7 +477,7 @@ Proof.
   rewrite <- H in *; simpl in H0;
   [ apply (eq_true_false_abs (f (NE_last ups0)))
   | apply (eq_true_false_abs (f (NE_head ups0))) ];
-  assumption.
+  auto; by apply negbTE.
 Defined.
 
 (**************************************************************************)
@@ -457,51 +487,60 @@ Module RangeTests.
 Import NonEmptyNotations.
 Import UsePosNotations.
 
-Fixpoint generateRangeBuilder (start index : nat) {struct index}
+Fixpoint generateRangeBuilder
+  (start index : nat) (Heven : even start) {struct index}
   : { rd : RangeDesc | Range rd & uloc (NE_head (ups rd)) = start }.
 Proof.
   destruct index.
-    pose (R_Sing (|start|)).
+    pose (@R_Sing (|start|) Heven).
     exists (getRangeDesc r). apply r. auto.
-  pose (generateRangeBuilder (S start) index) as r.
+  pose (generateRangeBuilder start.+2 index) as r.
   destruct r as [rd r Hr].
-  assert (upos_lt (|start|) (|S start|)) as Hlt.
-    unfold upos_lt. auto.
-  rewrite <- Hr in Hlt.
-  pose (R_Cons r Hlt) as r'.
-  exists (getRangeDesc r'). apply r'. auto.
+    assert (upos_lt (|start|) (|start.+2|)) as Hlt.
+      by unfold upos_lt; auto.
+    by rewrite Nat.even_succ_succ.
+  have: (|start|) < NE_head (ups rd) by rewrite Hr.
+  move=> Hlt.
+  pose (@R_Cons (|start|) rd Heven r Hlt) as r'.
+  exists (getRangeDesc r').
+    apply r'.
+  auto.
 Defined.
 
-Definition generateRange (start finish : nat) (H : start < finish) : RangeSig.
+Definition generateRange (start finish : nat) (Heven : even start)
+  (H : start < finish) : RangeSig.
 Proof.
-  pose (generateRangeBuilder start (finish - start - 1)).
+  pose (@generateRangeBuilder start ((finish - start)./2 - 1) Heven).
   destruct s. exists x. apply r.
 Defined.
 
-Definition testRangeSpan (start finish n : nat) (H : start < finish) :=
-  let r := (rangeSpan (fun u => uloc u < n) (generateRange H).2).1 in
+Definition testRangeSpan (start finish : nat) (Heven : even start)
+  (H : start < finish) (before : nat) :=
+  let r := (rangeSpan (fun u => uloc u < before) (generateRange Heven H).2).1 in
   (fmap (fun x => ups x.1) (fst r), fmap (fun x => ups x.1) (snd r)).
 
-Example lt_1_5 : 1 < 5. done. Qed.
+Example lt_2_10 : 2 < 10. done. Qed.
+
+Definition even_2 := Nat.even_2.
 
 Example testRangeSpan_1 :
-  testRangeSpan 1 lt_1_5 = (None, Some [(|1|); (|2|); (|3|); (|4|)]).
+  testRangeSpan even_2 lt_2_10 2 = (None, Some [(|2|); (|4|); (|6|); (|8|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_2 :
-  testRangeSpan 2 lt_1_5 = (Some (NE_Sing (|1|)), Some [(|2|); (|3|); (|4|)]).
+  testRangeSpan even_2 lt_2_10 4 = (Some (NE_Sing (|2|)), Some [(|4|); (|6|); (|8|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_3 :
-  testRangeSpan 3 lt_1_5 = (Some [(|1|); (|2|)], Some [(|3|); (|4|)]).
+  testRangeSpan even_2 lt_2_10 6 = (Some [(|2|); (|4|)], Some [(|6|); (|8|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_4 :
-  testRangeSpan 4 lt_1_5 = (Some [(|1|); (|2|); (|3|)], Some (NE_Sing (|4|))).
+  testRangeSpan even_2 lt_2_10 8 = (Some [(|2|); (|4|); (|6|)], Some (NE_Sing (|8|))).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_5 :
-  testRangeSpan 5 lt_1_5 = (Some [(|1|); (|2|); (|3|); (|4|)], None).
+  testRangeSpan even_2 lt_2_10 10 = (Some [(|2|); (|4|); (|6|); (|8|)], None).
 Proof. reflexivity. Qed.
 
 End RangeTests.

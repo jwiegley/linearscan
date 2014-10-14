@@ -147,7 +147,7 @@ Ltac ssomega :=
         destruct (@leP N M); last done
     | [ |- is_true (leq (S _) _) ] => apply lt_dec_iff
     | [ |- is_true (leq _ _) ] => apply le_dec_iff
-  end; try omega.
+  end; omega.
 
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.

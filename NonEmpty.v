@@ -67,6 +67,10 @@ Lemma NE_append_spec : forall {a : Set} {x} {xs ys : NonEmpty a},
   NE_Sing x = NE_append xs ys -> False.
 Proof. intros. induction xs; destruct ys; simpl in *; inversion H. Qed.
 
+Lemma NE_append_sing : forall {a : Set} {x} {l1 l2 : NonEmpty a},
+  NE_Sing x = NE_append l1 l2 -> False.
+Proof. intros. induction l1; simpl in H; inversion H. Qed.
+
 Lemma NE_map_append_spec : forall {a b : Set} (f : a -> b) {xs ys : NonEmpty a},
   NE_map f (NE_append xs ys) = NE_append (NE_map f xs) (NE_map f ys).
 Proof.
@@ -445,6 +449,20 @@ Proof.
   induction xs; simpl in *. reflexivity.
   apply NE_StronglySorted_inv in H1; inversion H1.
   apply NE_Forall_last in H3.
+  assumption.
+Qed.
+
+Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A),
+  NE_StronglySorted (NE_append l1 l2)
+    -> R (NE_last l1) (NE_head l2).
+Proof.
+  intros.
+  induction l1; simpl in *.
+    inversion H0; subst.
+    apply NE_Forall_head in H4.
+    assumption.
+  apply IHl1.
+  inversion H0.
   assumption.
 Qed.
 
