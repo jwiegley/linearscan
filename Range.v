@@ -32,6 +32,7 @@ End UsePosNotations.
 Definition upos_le (x y : UsePos) := uloc x <= uloc y.
 Definition upos_lt (x y : UsePos) := uloc x < uloc y.
 
+(*
 Program Instance upos_le_PO : PreOrder upos_le.
 Obligation 1. constructor. Qed.
 Obligation 2.
@@ -41,6 +42,7 @@ Qed.
 
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. unfold upos_lt in *. omega. Qed.
+*)
 
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
   NE_StronglySorted upos_lt xs
@@ -51,7 +53,7 @@ Proof.
     unfold upos_le. trivial.
   apply NE_StronglySorted_inv in H; inversion H.
   apply NE_Forall_last in H1.
-  unfold upos_lt, upos_le in *. omega.
+  unfold upos_lt, upos_le in *. auto.
 Qed.
 
 Lemma NE_StronglySorted_lt_trans : forall x xs,
@@ -65,9 +67,9 @@ Proof.
   apply IHxs.
   apply NE_StronglySorted_inv in H0. inversion H0.
     apply NE_Forall_head in H2.
-    unfold upos_lt in *. omega.
-  inversion H0.
-  assumption.
+    unfold upos_lt in *.
+    by apply (ltn_trans H).
+  inversion H0. assumption.
 Qed.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
@@ -207,8 +209,8 @@ Inductive Range : RangeDesc -> Prop :=
       positions occur in a loop, for example, and you wish for the [Range] to
       bound the entire loop. *)
   | R_Extend x b' e' : Range x ->
-    Range {| rbeg := min b' (rbeg x)
-           ; rend := Peano.max e' (rend x)
+    Range {| rbeg := minn b' (rbeg x)
+           ; rend := maxn e' (rend x)
            ; ups  := ups x
            |}.
 
@@ -228,10 +230,10 @@ Definition rangeExtent `(Range r) := rend r - rbeg r.
 Definition RangeSig := { rd : RangeDesc | Range rd }.
 
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
-Proof. induction r; auto. apply le_min. assumption. Qed.
+Proof. induction r; auto. simpl. apply leq_min. assumption. Qed.
 
 Lemma Range_end_bounded `(r : Range rd) : uloc (NE_last (ups rd)) < rend rd.
-Proof. induction r; auto. apply lt_max. assumption. Qed.
+Proof. induction r; auto. apply ltn_max. assumption. Qed.
 
 Theorem Range_sorted `(r : Range rd) : NE_StronglySorted upos_lt (ups rd).
 Proof.
@@ -248,16 +250,16 @@ Qed.
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
   Range_cases (induction r) Case; simpl in *.
-  - Case "R_Sing". omega.
+  - Case "R_Sing". by [].
   - Case "R_Cons".
     pose (Range_beg_bounded r).
     pose (Range_end_bounded r).
     pose (Range_sorted r).
     apply NE_StronglySorted_UsePos_impl in n.
-    unfold upos_lt, upos_le in *. omega.
+    unfold upos_lt, upos_le in *.
+    by apply (lt_le_shuffle H n i0).
   - Case "R_Extend".
-    apply lt_min. apply lt_max.
-    assumption.
+    by apply /ltn_min /ltn_max.
 Qed.
 
 Definition Range_fromList `(us : NonEmpty UsePos) :
@@ -284,8 +286,10 @@ Definition Range_weaken_beg : forall b x y xs,
     -> b <= x
     -> Range {| rbeg := b; rend := y; ups := xs |}.
 Proof.
-  move=> b x y ? H ?. move: Max.max_idempotent (R_Extend b y H) => /= ->.
-  by move: (Min.min_spec b x) (le_antisym b x) => [[? -> ?]|[? ? ->] ].
+  move=> b x y xs H Hlt.
+  move: (R_Extend b y H) => /=.
+  rewrite (maxnn y).
+  case: (minn_idPl Hlt) => -> //.
 Defined.
 
 Definition Range_append_fst
@@ -308,8 +312,10 @@ Definition Range_weaken_end : forall e x y xs,
     -> y <= e
     -> Range {| rbeg := x; rend := e; ups := xs |}.
 Proof.
-  move=> e x y ? H ?. move: Min.min_idempotent (R_Extend x e H) => /= ->.
-  move: (Max.max_spec e y) (le_not_gt y e) => [[? ->]|[? ->]] //. by contra.
+  move=> e x y xs H Hgt.
+  move: (R_Extend x e H) => /=.
+  rewrite (minnn x).
+  case: (maxn_idPl Hgt) => -> //.
 Defined.
 
 Definition Range_append_snd
@@ -326,13 +332,13 @@ Proof.
 Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
-  if rbeg x <? rbeg y
-  then rbeg y <? rend x
-  else rbeg x <? rend y.
+  if rbeg x < rbeg y
+  then rbeg y < rend x
+  else rbeg x < rend y.
 
 Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) : option nat :=
   if rangesIntersect xr yr
-  then Some (min (rbeg x) (rbeg y))
+  then Some (minn (rbeg x) (rbeg y))
   else None.
 
 Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
@@ -473,10 +479,10 @@ Proof.
 Defined.
 
 Definition testRangeSpan (start finish n : nat) (H : start < finish) :=
-  let r := (rangeSpan (fun u => uloc u <? n) (generateRange H).2).1 in
+  let r := (rangeSpan (fun u => uloc u < n) (generateRange H).2).1 in
   (fmap (fun x => ups x.1) (fst r), fmap (fun x => ups x.1) (snd r)).
 
-Example lt_1_5 : 1 < 5. omega. Qed.
+Example lt_1_5 : 1 < 5. done. Qed.
 
 Example testRangeSpan_1 :
   testRangeSpan 1 lt_1_5 = (None, Some [(|1|); (|2|); (|3|); (|4|)]).

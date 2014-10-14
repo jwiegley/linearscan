@@ -10,6 +10,7 @@ Require Export Ssreflect.eqtype.
 Require Export Ssreflect.seq.
 Require Export Ssreflect.ssrbool.
 Require Export Ssreflect.ssreflect.
+Require Export Ssreflect.ssrnat.
 (* Require Export Ssreflect.ssrfun. *)
 
 Set Implicit Arguments.
@@ -88,7 +89,7 @@ Defined.
 
 Lemma list_cons_nonzero : forall {a x} {xs l : list a},
   l = x :: xs -> length l > 0.
-Proof. intros. rewrite H. simpl. omega. Qed.
+Proof. by move=> a x xs l ->. Qed.
 
 Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
   let fix go l :=
@@ -120,7 +121,63 @@ Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
 Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
   : Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
 
-Lemma ltb_gt : forall n m : nat, (n <? m) = false <-> m <= n.
+Lemma lt_dec : forall n m, (n < m) -> (n < m)%coq_nat.
+Proof. move=> n m H. destruct (@ltP n m); [ done | inv H ]. Qed.
+
+Lemma lt_dec_iff : forall n m, (n < m) <-> (n < m)%coq_nat.
+Proof.
+  split. apply lt_dec.
+  move=> H. destruct (@ltP n m); [ done | inv H ].
+Qed.
+
+Lemma le_dec : forall n m, (n <= m) -> (n <= m)%coq_nat.
+Proof. move=> n m H. destruct (@leP n m); [ done | inv H ]. Qed.
+
+Lemma le_dec_iff : forall n m, (n <= m) <-> (n <= m)%coq_nat.
+Proof.
+  split. apply le_dec.
+  move=> H. destruct (@leP n m); [ done | inv H ].
+Qed.
+
+Ltac ssomega :=
+  repeat match goal with
+    | [ H : is_true (leq (S ?N) ?M)  |- _ ] =>
+        destruct (@ltP N M); last done
+    | [ H : is_true (leq ?N ?M)  |- _ ] =>
+        destruct (@leP N M); last done
+    | [ |- is_true (leq (S _) _) ] => apply lt_dec_iff
+    | [ |- is_true (leq _ _) ] => apply le_dec_iff
+  end; try omega.
+
+Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
+Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.
+
+Lemma ltn_min : forall m n p, n < p -> minn m n < p.
+Proof. intros. rewrite gtn_min. by elim: (m < p). Qed.
+
+Lemma ltn_max : forall m n p, p < n -> p < maxn m n.
+ Proof. move=> *. by rewrite leq_max; intuition. Qed.
+
+Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
+Proof. intros. ssomega. Qed.
+
+Lemma lt_lt_le_shuffle : forall {x y z w}, x < y -> y < z -> z <= w -> x < w.
+Proof. intros. ssomega. Qed.
+
+Lemma lt_le_le_shuffle : forall {x y z w}, x < y -> y <= z -> z <= w -> x < w.
+Proof. intros. ssomega. Qed.
+
+Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
+Proof. intros. ssomega. Qed.
+
+Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
+  elim=> [|m IHm] // n H;
+    first by rewrite addn0.
+  rewrite addnS; by apply IHm.
+Qed.
+
+(*
+Lemma ltb_gt : forall n m : nat, (n < m) = false <-> m <= n.
 Proof.
   split; intros;
   generalize dependent m;
@@ -229,50 +286,41 @@ Proof.
   intros. unfold not in *. intros. apply H0.
   rewrite H. assumption.
 Qed.
+*)
 
 Lemma fold_gt : forall a f n m (xs : list a),
   n > m -> fold_left (fun n x => n + f x) xs n > m.
 Proof.
-  intros.
-  generalize dependent n.
-  induction xs; intros; simpl. assumption.
-  apply IHxs. omega.
+  move=> a f n m xs.
+  elim: xs n => // ? ? IHxs *.
+  by apply /IHxs /ltn_addr.
 Qed.
 
 Lemma fold_fold_le : forall a f n m (xs : list a),
   n <= m -> fold_left (fun n x => n + f x) xs n <=
             fold_left (fun n x => n + f x) xs m.
 Proof.
-  intros.
-  generalize dependent n.
-  generalize dependent m.
-  induction xs; intros; simpl. assumption.
-  apply IHxs. omega.
+  move=> a f n m xs.
+  elim: xs n m => // ? ? IHxs *.
+  by apply /IHxs /leq_add.
 Qed.
 
 Lemma fold_fold_lt : forall a f n m (xs : list a),
   n < m -> fold_left (fun n x => n + f x) xs n <
            fold_left (fun n x => n + f x) xs m.
 Proof.
-  intros.
-  generalize dependent n.
-  generalize dependent m.
-  induction xs; intros; simpl. assumption.
-  apply IHxs. omega.
+  move=> a f n m xs.
+  elim: xs n m => // ? ? IHxs *.
+  apply IHxs.
+  by rewrite ltn_add2r.
 Qed.
 
 Lemma fold_left_plus : forall a f xs n,
    fold_left (fun (n : nat) (x : a) => n + f x) xs n =
    fold_left (fun (n : nat) (x : a) => n + f x) xs 0 + n.
 Proof.
-  intros a f xs.
-  induction xs. reflexivity.
-  intros. simpl.
-  rewrite IHxs. simpl.
-  symmetry.
-  rewrite IHxs. simpl.
-  rewrite <- Plus.plus_assoc.
-  rewrite -> (Plus.plus_comm n) at 1. reflexivity.
+  move=> a f; elim=> // a' ? IHxs n /=.
+  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
 Qed.
 
 Definition find_in {a} (eq_dec : forall x y : a, { x = y } + { x <> y })
@@ -303,26 +351,7 @@ Lemma StronglySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
 Proof. intros. inversion H; subst. assumption. Qed.
 
 Definition safe_hd {a} (xs : list a) (H : (length xs > 0)%nat) : a.
-Proof.
-  destruct xs.
-    simpl in H.
-    unfold gt in H.
-    unfold Peano.lt in H.
-    apply Le.le_Sn_n in H.
-    inversion H.
-  apply a0.
-Defined.
+Proof. elim: xs H => //. Qed.
 
 Fixpoint safe_last {a} (xs : list a) (H : (length xs > 0)%nat) : a.
-Proof.
-  induction xs.
-    simpl in H.
-    unfold gt in H.
-    unfold Peano.lt in H.
-    apply Le.le_Sn_n in H.
-    inversion H.
-  destruct xs.
-    apply a0.
-  apply IHxs. simpl.
-  apply Gt.gt_Sn_O.
-Defined.
+Proof. elim: xs H => //. Qed.

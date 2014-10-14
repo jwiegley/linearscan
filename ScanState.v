@@ -91,25 +91,11 @@ Definition getAssignment `(i : IntervalId sd) := V.nth (assignments sd) i.
     [IntervalId] within another [ScanStateDesc], provided we can demonstrate
     that the [nextInterval] is at least as large. *)
 Definition transportId `(H : nextInterval sd <= nextInterval sd')
-  (x : IntervalId sd) : IntervalId sd'.
+  : IntervalId sd -> IntervalId sd'.
 Proof.
-  apply Compare_dec.le_lt_eq_dec in H.
-  destruct H.
-    destruct sd. destruct sd'.
-    unfold IntervalId0, IntervalId1 in *.
-    unfold IntervalId in *. simpl in *.
-    pose proof l.
-    apply lt_sub in H.
-    destruct H.
-    symmetry in e.
-    apply Nat.add_sub_eq_nz in e.
-      rewrite Plus.plus_comm in e.
-      rewrite <- e.
-      apply (R x0 x).
-    subst. omega.
-  unfold IntervalId in *.
-  rewrite <- e.
-  assumption.
+  case: (@leP (nextInterval sd) (nextInterval sd')) => H';
+    first by apply (fin_transport H').
+  contradiction H'. by apply le_dec.
 Defined.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
@@ -150,9 +136,11 @@ Lemma NoDup_unhandledExtent_cons
 Proof.
   intros.
   induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (V.nth ints i).2). omega.
-  destruct unh; simpl. omega.
-  apply fold_fold_lt. omega.
+  pose (Interval_extent_nonzero (V.nth ints i).2). auto.
+  destruct unh; simpl;
+    first by (rewrite add0n; apply ltn_plus).
+  apply fold_fold_lt; rewrite 2!add0n -addnA.
+  by apply ltn_plus.
 Qed.
 
 Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
@@ -267,7 +255,7 @@ Definition registerWithHighestPos
        | ((r, None), _) => (r, None)
        | (_, None) => (reg, None)
        | ((r, Some n), Some m) =>
-         if n <? m then (reg, Some m) else (r, Some n)
+         if n < m then (reg, Some m) else (r, Some n)
        end) (from_nat 0 registers_exist, Some 0).
 
 (** Given a vector from registers to values, find the slot corresponding to
@@ -462,13 +450,11 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
 Proof.
   destruct sd.
   destruct unhandled0 eqn:Heqe;
-  unfold unhandledExtent; simpl.
-    reflexivity.
-  destruct l eqn:Heqe2; simpl.
-    reflexivity.
+  unfold unhandledExtent; simpl. reflexivity.
+  destruct l eqn:Heqe2; simpl. reflexivity.
   apply fold_gt.
   pose (Interval_extent_nonzero (V.nth intervals0 i0).2).
-  omega.
+  by rewrite add0n addnC ltn_plus.
 Qed.
 
 (** ** ScanStateCursor *)

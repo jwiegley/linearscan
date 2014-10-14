@@ -7,6 +7,8 @@ import qualified Data.Compare_dec as Compare_dec
 import qualified Data.Datatypes as Datatypes
 import qualified Data.Fin as Fin
 import qualified Data.Logic as Logic
+import qualified Data.Peano as Peano
+import qualified Data.Specif as Specif
 
 
 type Coq_fin = Fin.Coq_t
@@ -41,4 +43,18 @@ fin_expand n p =
      Fin.FS n0 h -> Logic.coq_False_rec h}) (\n0 iHn p0 ->
     fin_Sn_inv n0 (Fin.F1 (Prelude.succ n0)) (\y -> Fin.FS (Prelude.succ n0)
       (iHn y)) p0) n p
+
+lt_sub :: Prelude.Int -> Prelude.Int -> Prelude.Int
+lt_sub n m =
+  Peano.minus m n
+
+fin_transport :: Prelude.Int -> Prelude.Int -> Coq_fin -> Coq_fin
+fin_transport n m =
+  let {h = Compare_dec.le_lt_eq_dec n m} in
+  case h of {
+   Specif.Coq_left ->
+    let {l = lt_sub n m} in
+    Logic.eq_rec ((Prelude.+) n l) (\f ->
+      Logic.eq_rec_r ((Prelude.+) l n) (Fin.coq_R n l f) ((Prelude.+) n l)) m;
+   Specif.Coq_right -> Logic.eq_rec_r m (\h0 -> h0) n}
 

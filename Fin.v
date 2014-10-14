@@ -475,3 +475,23 @@ Proof.
   repeat rewrite map_app in H.
   rewrite <- app_comm_cons. assumption.
 Qed.
+
+Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
+Proof. intros. exists (m - n). reflexivity. Defined.
+
+Definition fin_transport {n m : nat} (H : n <= m) : fin n -> fin m.
+Proof.
+  apply Compare_dec.le_lt_eq_dec in H.
+  destruct H.
+    pose proof l.
+    apply lt_sub in l.
+    destruct l.
+    symmetry in e.
+    apply Nat.add_sub_eq_nz in e.
+      rewrite <- e.
+      intro f.
+      rewrite Plus.plus_comm.
+      apply (R x f).
+    subst. omega.
+  rewrite e. auto.
+Defined.

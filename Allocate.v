@@ -92,7 +92,7 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P}
                split current before freeUntilPos[reg] *)
           if beq_nat n 0
           then None
-          else Some (if intervalEnd current <? n
+          else Some (if intervalEnd current < n
                      then success
                      else splitCurrentInterval (Some n) ;;;
                           moveUnhandledToActive reg ;;;
@@ -145,7 +145,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
          split current before this intersection *)
     if (match mres with
         | None   => false
-        | Some n => n <? start
+        | Some n => n < start
         end)
     then
       assignSpillSlotToCurrent ;;;
@@ -184,7 +184,7 @@ Definition checkActiveIntervals {pre} (pos : nat)
                move it from active to inactive *)
         let i := getInterval x.1 in
         let st1 :=
-            if intervalEnd i <? pos
+            if intervalEnd i < pos
             then uncurry_sig (moveActiveToHandled st) x
             else if negb (intervalCoversPos i pos)
                  then uncurry_sig (moveActiveToInactive st) x
@@ -212,7 +212,7 @@ Definition checkInactiveIntervals {pre} (pos : nat)
                move it from inactive to active *)
         let i := getInterval x.1 in
         let st1 :=
-            if intervalEnd i <? pos
+            if intervalEnd i < pos
             then uncurry_sig (moveInactiveToHandled st) x
             else if intervalCoversPos i pos
                  then uncurry_sig (moveInactiveToActive st) x
@@ -269,6 +269,9 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   end.
 (* We must prove that after every call to handleInterval, the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof. destruct ssinfo'; destruct thisHolds0; auto. Qed.
+Proof.
+  move=> sd _ s _ _ xs _ _ _ _ _ ssinfo' _.
+  by case: ssinfo' => ?; case=> /= _ /ltP.
+Qed.
 
 End MAllocate.

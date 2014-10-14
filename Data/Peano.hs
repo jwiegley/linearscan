@@ -17,17 +17,3 @@ minus n m =
       m)
     n
 
-min :: Prelude.Int -> Prelude.Int -> Prelude.Int
-min n m =
-  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
-    (\_ ->
-    0)
-    (\n' ->
-    (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
-      (\_ ->
-      0)
-      (\m' -> Prelude.succ
-      (min n' m'))
-      m)
-    n
-

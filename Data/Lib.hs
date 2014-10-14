@@ -2,8 +2,8 @@ module Data.Lib where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Datatypes as Datatypes
 import qualified Data.Logic as Logic
-import qualified Data.Peano as Peano
 import qualified Data.Seq as Seq
 
 
@@ -30,13 +30,9 @@ list_membership l =
    [] -> [];
    (:) x xs -> (:) x (Seq.map (exist_in_cons x xs) (list_membership xs))}
 
-lt_sub :: Prelude.Int -> Prelude.Int -> Prelude.Int
-lt_sub n m =
-  Peano.minus m n
-
 safe_hd :: ([] a1) -> a1
 safe_hd xs =
-  case xs of {
-   [] -> Prelude.error "absurd case";
-   (:) a0 xs0 -> a0}
+  let {_evar_0_ = \_ -> Logic.coq_False_rect} in
+  let {_evar_0_0 = \a0 l x -> a0} in
+  Datatypes.list_rect _evar_0_ (\a0 l x _ -> _evar_0_0 a0 l x) xs __
 

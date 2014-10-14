@@ -8,9 +8,8 @@ import qualified Data.List
 import qualified Data.Alternative as Alternative
 import qualified Data.Lib as Lib
 import qualified Data.Logic as Logic
-import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
-import qualified Data.Peano as Peano
+import qualified Data.Ssrnat as Ssrnat
 
 
 
@@ -98,14 +97,14 @@ type RangeSig = RangeDesc
 
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
-  case NPeano.ltb (rbeg x) (rbeg y) of {
-   Prelude.True -> NPeano.ltb (rbeg y) (rend x);
-   Prelude.False -> NPeano.ltb (rbeg x) (rend y)}
+  case Ssrnat.leq (Prelude.succ (rbeg x)) (rbeg y) of {
+   Prelude.True -> Ssrnat.leq (Prelude.succ (rbeg y)) (rend x);
+   Prelude.False -> Ssrnat.leq (Prelude.succ (rbeg x)) (rend y)}
 
 rangeIntersectionPoint :: RangeDesc -> RangeDesc -> Prelude.Maybe Prelude.Int
 rangeIntersectionPoint x y =
   case rangesIntersect x y of {
-   Prelude.True -> Prelude.Just (Peano.min (rbeg x) (rbeg y));
+   Prelude.True -> Prelude.Just (Ssrnat.minn (rbeg x) (rbeg y));
    Prelude.False -> Prelude.Nothing}
 
 findRangeUsePos :: RangeDesc -> (UsePos -> Prelude.Bool) -> Prelude.Maybe

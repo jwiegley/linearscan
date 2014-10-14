@@ -44,9 +44,9 @@ Program Instance SSMorph_PO : PreOrder SSMorph.
 Obligation 1. constructor; auto. Qed.
 Obligation 2.
   constructor; destruct H; destruct H0.
-  transitivity (nextInterval y); auto.
-  transitivity (unhandledExtent y); auto.
-  transitivity (length (handled y)); auto.
+  - by apply (leq_trans next_interval_increases0).
+  - by apply (leq_trans total_extent_decreases1).
+  - by apply (leq_trans handled_count_increases0).
 Qed.
 
 Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
@@ -241,7 +241,8 @@ Proof.
   destruct thisDesc0.
   destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
-  destruct unhandled0; simpl in *. omega.
+  destruct unhandled0; simpl in *.
+    specialize (unhandled_nonempty0 first_nonempty0). done.
   pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
@@ -252,19 +253,7 @@ Proof.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
   [ apply le_Sn_le in ue_cons | ];
-  apply le_trans with
-    (m := unhandledExtent
-            {| nextInterval     := nextInterval0
-             ; unhandled        := i :: unhandled0
-             ; active           := active0
-             ; inactive         := inactive0
-             ; handled          := handled0
-             ; intervals        := intervals0
-             ; assignments      := assignments0
-             ; fixedIntervals   := fixedIntervals0
-             ; lists_are_unique := lists_are_unique0
-             |});
-  assumption.
+  by apply (leq_trans ue_cons).
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
@@ -305,7 +294,6 @@ Proof.
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
-  apply Le.le_n_Sn.
 Defined.
 
 End MSSMorph.

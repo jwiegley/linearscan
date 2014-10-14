@@ -9,10 +9,9 @@ import qualified Data.Alternative as Alternative
 import qualified Data.Basics as Basics
 import qualified Data.Datatypes as Datatypes
 import qualified Data.Endo as Endo
-import qualified Data.NPeano as NPeano
 import qualified Data.NonEmpty0 as NonEmpty0
-import qualified Data.Peano as Peano
 import qualified Data.Range as Range
+import qualified Data.Ssrnat as Ssrnat
 
 
 
@@ -55,12 +54,12 @@ intervalEnd i =
 
 intervalCoversPos :: IntervalDesc -> Prelude.Int -> Prelude.Bool
 intervalCoversPos d pos =
-  (Prelude.&&) (NPeano.leb (intervalStart d) pos)
-    (NPeano.ltb pos (intervalEnd d))
+  (Prelude.&&) (Ssrnat.leq (intervalStart d) pos)
+    (Ssrnat.leq (Prelude.succ pos) (intervalEnd d))
 
 intervalExtent :: IntervalDesc -> Prelude.Int
 intervalExtent d =
-  Peano.minus (intervalEnd d) (intervalStart d)
+  Ssrnat.subn (intervalEnd d) (intervalStart d)
 
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
@@ -105,7 +104,8 @@ nextUseAfter d pos =
   Endo.fmap (unsafeCoerce Endo.option_Functor)
     (Basics.compose Range.uloc Datatypes.snd)
     (unsafeCoerce
-      (findIntervalUsePos d (\u -> NPeano.ltb pos (Range.uloc u))))
+      (findIntervalUsePos d (\u ->
+        Ssrnat.leq (Prelude.succ pos) (Range.uloc u))))
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =

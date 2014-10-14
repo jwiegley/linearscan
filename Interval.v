@@ -75,7 +75,7 @@ Definition intervalStart `(Interval i) : nat := ibeg i.
 Definition intervalEnd   `(Interval i) : nat := iend i.
 
 Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
-  andb (intervalStart i <=? pos) (pos <? intervalEnd i).
+  (intervalStart i <= pos) && (pos < intervalEnd i).
 
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 
@@ -123,7 +123,7 @@ Definition findIntervalUsePos `(Interval i) (f : UsePos -> bool)
   go (rds i).
 
 Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
-  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos <? uloc u)).
+  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos < uloc u)).
 
 Definition firstUsePos `(i : Interval d) : nat :=
   uloc (NE_head (ups (NE_head (rds d)).1)).
@@ -138,9 +138,10 @@ Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
 Proof.
   rewrite /intervalStart /intervalEnd.
-  move=> d. elim=> [rd r|rs i H [rd r]] * /=;
+  move=> d. elim=> [rd r|rs i H [rd r] Hend] * /=;
     first (by apply: Range_bounded).
-  pose (Range_bounded r). simpl in *. omega.
+  pose (Range_bounded r). simpl in *.
+  by apply (lt_le_shuffle i0 Hend).
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d),
@@ -149,7 +150,7 @@ Proof.
   intros.
   unfold intervalExtent.
   pose (Interval_nonempty i).
-  apply lt_minus in l. assumption.
+  by rewrite subn_gt0.
 Qed.
 
 Definition IntervalSig := { d : IntervalDesc | Interval d }.
@@ -171,8 +172,7 @@ Proof.
   rewrite /firstUsePos.
   elim: i => [rd r|rs i H [rd r]] * /=;
     first (by apply: (Range_beg_bounded r)).
-  pose (Range_beg_bounded r);
-  simpl in *; omega.
+  pose (Range_beg_bounded r). simpl in *. auto.
 Qed.
 
 Fixpoint Interval_end_bounded `(i : Interval d) : lastUsePos i < iend d.
@@ -190,7 +190,7 @@ Qed.
 Function splitInterval {d : IntervalDesc} (i : Interval d) (before : nat)
   (Hbeg : firstUsePos i < before) (Hend : before <= lastUsePos i)
   {measure (fun i => NE_length (rds i)) i} : SubIntervalsOf i :=
-  let f := (fun u => (uloc u <? before)) in
+  let f := (fun u => (uloc u < before)) in
   match d with
   | Build_IntervalDesc ibeg iend rds => match rds with
     | NE_Sing r => undefined
@@ -246,7 +246,7 @@ Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
                  ; iend := rend (NE_last rs).1
                  ; rds  := rs |}) {struct rs} : SubIntervalsOf i.
 Proof.
-  set f := (fun u => (uloc u <? before)).
+  set f := (fun u => (uloc u < before)).
   destruct rs; destruct (@rangeSpan f _ r.2);
   destruct x; destruct o; destruct o0;
   try (pose (@rangeSpan_spec f _ r.2 (exist _ (None, None) s));
@@ -292,7 +292,7 @@ Fixpoint intervalSpan
                   ; rds  := rs |}) (before : nat)
   {struct rs} : SubIntervalsOf i.
 Proof.
-  set f := fun u => (uloc u <? before).
+  set f := fun u => (uloc u < before).
 
   case: rs i => [[rd r] i'|[rd r] rs' i'].
     case: (@rangeSpan f _ r) => [[r0 r1] subr].
@@ -337,7 +337,7 @@ Fixpoint splitInterval
   (* (Hb : firstUsePos i < before) (He : before <= lastUsePos i) *)
   {struct rs} : SubIntervalsOf i.
 Proof.
-  set f := fun u => (uloc u <? before).
+  set f := fun u => (uloc u < before).
   case: rs i (* Hb He *) => [] [rd r] => [ | rs'] i (* Hb He *).
     have: (f (NE_last (ups rd)) = false). by apply ltb_gt.
     have: (f (NE_head (ups rd)) = true).  by apply ltb_lt.
