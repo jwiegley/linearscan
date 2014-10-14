@@ -1,0 +1,3 @@
+- Switch to ordinal n from fin n
+- [ ] Switch to uniq from NoDup
+  - Remove Compare.v, NoDup.v
