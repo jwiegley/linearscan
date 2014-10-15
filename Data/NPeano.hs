@@ -1,10 +1,12 @@
-module Data.Data.Data.Data.NPeano where
+module Data.Data.Data.Data.Data.Data.NPeano where
 
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Data.List as Data.List
 import qualified Data.Data.Data.List as Data.List as Data.Data.List as Data.List
 import qualified Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List
+import qualified Data.Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List
+import qualified Data.Data.Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.Data.List as Data.List as Data.Data.List as Data.List as Data.Data.Data.List as Data.List as Data.Data.List as Data.List
 
 leb :: Prelude.Int -> Prelude.Int -> Prelude.Bool
 leb n m =

@@ -335,10 +335,10 @@ Proof.
   move/Range_weaken_end: (Range_fromList Hsortedr Hforall). by apply.
 Defined.
 
+Functional Scheme even_ind := Induction for even Sort Prop.
+
 Lemma ltn_even : forall n m, even n && even m -> n < m -> n.+1 < m.
-Proof.
-  elim=> // [m|n IHn m] /andP [Hev0 Hevn] Hlt.
-Admitted.
+Proof. move=> n; functional induction even n; case=> //; by case. Qed.
 
 Definition Range_append_spec
   `(r : Range {| rbeg := rbeg0
