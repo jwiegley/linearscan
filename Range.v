@@ -58,7 +58,7 @@ Proof.
   apply NE_StronglySorted_inv in H0. inversion H0.
     apply NE_Forall_head in H2.
     unfold upos_lt in *.
-    by apply (ltn_trans H).
+    exact: (ltn_trans H).
   inversion H0. assumption.
 Qed.
 
@@ -146,7 +146,7 @@ Proof.
     apply NE_Forall_last in H0.
     rewrite <- H in *. simpl in H0. exfalso.
     apply (eq_true_false_abs (f (NE_last l)));
-      [ by [] | by apply negbTE ].
+      [ by [] | exact: negbTE ].
 
   - Case "(None, Some)".
     rewrite <- H in *. simpl in H0. exfalso.
@@ -261,9 +261,9 @@ Proof.
     pose (Range_sorted r).
     apply NE_StronglySorted_UsePos_impl in n.
     unfold upos_lt, upos_le in *.
-    by apply (lt_le_shuffle H0 n i0).
+    exact (lt_le_shuffle H0 n i0).
   - Case "R_Extend".
-    by apply /ltn_min /ltn_max.
+    exact /ltn_min /ltn_max.
 Qed.
 
 Definition Range_fromList `(us : NonEmpty UsePos) :
@@ -305,7 +305,7 @@ Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
   move/NE_Forall_append: (Range_all_even r) => /= [Hforall _].
   move: (@NE_head_append_spec) (Range_beg_bounded r) => ->.
-  move/Range_weaken_beg: (Range_fromList Hsortedl Hforall). by apply.
+  move/Range_weaken_beg: (Range_fromList Hsortedl Hforall). exact.
 Defined.
 
 Definition Range_weaken_end : forall e x y xs,
@@ -332,7 +332,7 @@ Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
   move/NE_Forall_append: (Range_all_even r) => /= [_ Hforall].
   move: (@NE_last_append_spec) (Range_end_bounded r) => ->.
-  move/Range_weaken_end: (Range_fromList Hsortedr Hforall). by apply.
+  move/Range_weaken_end: (Range_fromList Hsortedr Hforall). exact.
 Defined.
 
 Functional Scheme even_ind := Induction for even Sort Prop.
@@ -352,7 +352,7 @@ Proof.
   apply NE_Forall_head in Hfar.
   rewrite /upos_lt in Hlt.
   apply ltn_even.
-  by apply/andP. done.
+  exact/andP. done.
 Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
@@ -415,7 +415,7 @@ Proof.
                   ; ups  := l2 |}; _)).
   simpl. constructor; auto.
     by apply Range_append_spec in r.
-  by apply/andP.
+  exact/andP.
 
   Grab Existential Variables.
 
@@ -478,7 +478,7 @@ Proof.
   rewrite <- H in *; simpl in H0;
   [ apply (eq_true_false_abs (f (NE_last ups0)))
   | apply (eq_true_false_abs (f (NE_head ups0))) ];
-  auto; by apply negbTE.
+  auto; exact: negbTE.
 Defined.
 
 (**************************************************************************)

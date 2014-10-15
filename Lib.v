@@ -173,7 +173,7 @@ Proof. intros. ssomega. Qed.
 Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
   elim=> [|m IHm] // n H;
     first by rewrite addn0.
-  rewrite addnS; by apply IHm.
+  rewrite addnS; exact: IHm.
 Qed.
 
 (*
@@ -293,7 +293,7 @@ Lemma fold_gt : forall a f n m (xs : list a),
 Proof.
   move=> a f n m xs.
   elim: xs n => // ? ? IHxs *.
-  by apply /IHxs /ltn_addr.
+  exact /IHxs /ltn_addr.
 Qed.
 
 Lemma fold_fold_le : forall a f n m (xs : list a),
@@ -302,7 +302,7 @@ Lemma fold_fold_le : forall a f n m (xs : list a),
 Proof.
   move=> a f n m xs.
   elim: xs n m => // ? ? IHxs *.
-  by apply /IHxs /leq_add.
+  exact /IHxs /leq_add.
 Qed.
 
 Lemma fold_fold_lt : forall a f n m (xs : list a),

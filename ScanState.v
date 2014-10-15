@@ -94,8 +94,8 @@ Definition transportId `(H : nextInterval sd <= nextInterval sd')
   : IntervalId sd -> IntervalId sd'.
 Proof.
   case: (@leP (nextInterval sd) (nextInterval sd')) => H';
-    first by apply (fin_transport H').
-  contradiction H'. by apply le_dec.
+    first exact: (fin_transport H').
+  contradiction H'. exact: le_dec.
 Defined.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
@@ -140,7 +140,7 @@ Proof.
   destruct unh; simpl;
     first by (rewrite add0n; apply ltn_plus).
   apply fold_fold_lt; rewrite 2!add0n -addnA.
-  by apply ltn_plus.
+  exact: ltn_plus.
 Qed.
 
 Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,

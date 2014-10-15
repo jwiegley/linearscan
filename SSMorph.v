@@ -44,9 +44,9 @@ Program Instance SSMorph_PO : PreOrder SSMorph.
 Obligation 1. constructor; auto. Qed.
 Obligation 2.
   constructor; destruct H; destruct H0.
-  - by apply (leq_trans next_interval_increases0).
-  - by apply (leq_trans total_extent_decreases1).
-  - by apply (leq_trans handled_count_increases0).
+  - exact: (leq_trans next_interval_increases0).
+  - exact: (leq_trans total_extent_decreases1).
+  - exact: (leq_trans handled_count_increases0).
 Qed.
 
 Record > SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
@@ -253,7 +253,7 @@ Proof.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
   [ apply le_Sn_le in ue_cons | ];
-  by apply (leq_trans ue_cons).
+  exact: (leq_trans ue_cons).
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)

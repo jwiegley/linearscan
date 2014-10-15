@@ -80,21 +80,26 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 
 Lemma intervalConnected
-  `(i : Interval {| ibeg := rbeg r.1
-                  ; iend := rend (NE_last (NE_Cons r rs)).1
+  `(i : Interval {| ibeg := ib
+                  ; iend := ie
                   ; rds := NE_Cons r xs |})
   : rend r.1 <= rbeg (NE_head xs).1.
 Proof. move: i. invert as [ [rd0 r0] i [rd1 r1] | ] => //=. Qed.
 
+Lemma Interval_exact_end
+  `(i : Interval d)
+  : iend d = rend (NE_last (rds d)).1.
+Proof. move: i. invert as [ [rd0 r0] i [rd1 r1] | ] => //=. Qed.
+
 Definition intervalUncons
-  `(i : Interval {| ibeg := rbeg r.1
-                  ; iend := rend (NE_last (NE_Cons r rs)).1
+  `(i : Interval {| ibeg := ib
+                  ; iend := ie
                   ; rds := NE_Cons r xs |})
-  : [ /\ Interval {| ibeg := rbeg r.1
+  : [ /\ Interval {| ibeg := ib
                    ; iend := rend r.1
                    ; rds := NE_Sing r |}
     &    Interval {| ibeg := rbeg (NE_head xs).1
-                   ; iend := rend (NE_last xs).1
+                   ; iend := ie
                    ; rds := xs |}
     ].
 Proof.
@@ -154,9 +159,9 @@ Lemma Interval_nonempty : forall `(i : Interval d),
 Proof.
   rewrite /intervalStart /intervalEnd.
   move=> d. elim=> [rd r|rs i H [rd r] Hend] * /=;
-    first (by apply: Range_bounded).
+    first exact: Range_bounded.
   pose (Range_bounded r). simpl in *.
-  by apply (lt_le_shuffle i0 Hend).
+  exact: (lt_le_shuffle i0 Hend).
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d),
@@ -200,7 +205,7 @@ Lemma Interval_beg_bounded `(i : Interval d) : ibeg d <= firstUsePos i.
 Proof.
   rewrite /firstUsePos.
   elim: i => [rd r|rs i H [rd r]] * /=;
-    first (by apply: (Range_beg_bounded r)).
+    first exact: (Range_beg_bounded r).
   pose (Range_beg_bounded r). simpl in *. auto.
 Qed.
 
@@ -212,7 +217,7 @@ Proof.
   invert as [rd r| ] => /=;
     first apply: (Range_end_bounded r);
   rename H1 into i;
-  by apply (Interval_end_bounded i).
+  exact: (Interval_end_bounded i).
 Qed.
 
 (** Split the current interval before the position [before].  This must
@@ -220,9 +225,9 @@ Qed.
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
 Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
-  (i : Interval {| ibeg := rbeg (NE_head rs).1
-                 ; iend := rend (NE_last rs).1
-                 ; rds  := rs |}) {struct rs}
+  `(i : Interval {| ibeg := ib
+                  ; iend := ie
+                  ; rds  := rs |}) {struct rs}
   : { p : (option IntervalSig * option IntervalSig)
     | SubIntervalsOf before i p }.
 Proof.
@@ -248,24 +253,32 @@ Proof.
   - Case "(Some, Some)".
     case: (intervalUncons i) => [? i1].
     case: (intervalConnected i) => *.
+    case: (Interval_exact_end i) => /= Heq.
+    rewrite {}Heq in i1.
+
     have Hi'': rend (NE_head (NE_Cons r1 rs)).1 <= rbeg (NE_head rs).1.
       move/NE_StronglySorted_UsePos_impl: (Range_sorted r.2).
       rewrite H NE_head_append_spec NE_last_append_spec.
       by move/andP: H3 => [_ H3b]; move/eqP: H3b => <-.
+
     by exists (Some (exist _ _ (I_Sing r0.2)),
                Some (exist _ _ (I_Cons i1 Hi''))).
 
   - Case "(Some, None)".
     case: (intervalUncons i) => [i0 i1].
     case: (intervalConnected i) => Hi0.
-    case: (intervalSpan rs before i1) => /= [] [[o| ] [o0| ]].
+    case: (intervalSpan rs before _ _ i1) => /= [] [[o| ] [o0| ]].
     + SCase "(Some, Some)".
       move=> [Htrue Hfalse]. simpl in * |-.
+      case: (Interval_exact_end i) => /= Heq.
+      rewrite {}Heq in i1.
       exists (Some (exist _ _ (I_Cons i1 Hi0)), Some o0).
       split; auto; simpl in *.
       by rewrite <- H in H0.
     + SCase "(Some, None)".
       move=> [Heqe Htrue]. simpl in * |-.
+      case: (Interval_exact_end i) => /= Heq.
+      rewrite {}Heq in i1.
       exists (Some (exist _ _ (I_Cons i1 Hi0)), None).
       unfold SubIntervalsOf.
       split; auto; rewrite <- H in H0. simpl.
@@ -286,31 +299,27 @@ Definition DefiniteSubIntervalsOf (before : nat) `(i : Interval d)
   let f u := uloc u < before in
   match p with
   | (i1, i2) =>
-      (* rds d = NE_append (rds i1.1) (rds i2.1) *)
-      (*   /\ *) NE_all_true f (ups (NE_head (rds i1.1)).1)
-        /\ f (NE_head (ups (NE_head (rds i2.1)).1)) = false
+      [ /\ NE_all_true f (ups (NE_head (rds i1.1)).1)
+      &    f (NE_head (ups (NE_head (rds i2.1)).1)) = false
+      ]
   end.
 
 (** Split the current interval before the position [before].  This must
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Definition splitInterval (rs : NonEmpty RangeSig) (before : nat)
-  (i : Interval {| ibeg := rbeg (NE_head rs).1
-                 ; iend := rend (NE_last rs).1
-                 ; rds  := rs |})
+Definition splitInterval (before : nat) `(i : Interval d)
   (Hb : firstUsePos i < before) (He : before <= lastUsePos i)
   : { p : (IntervalSig * IntervalSig) | DefiniteSubIntervalsOf before i p }.
 Proof.
-  set f := fun u => (uloc u < before).
-  case: (intervalSpan before i) => // [] [[o| ] [o0| ]] => //=;
+  case: d i Hb He => ibeg iend rds i.
+  case: (intervalSpan before i) => // [] [[o| ] [o0| ]];
    first (by exists (o, o0));
-  move=> [Heqe]; rewrite -{}Heqe;
-  rewrite /firstUsePos in Hb;
-  rewrite /lastUsePos in He; simpl in *;
+  move=> [<-];
+  rewrite /firstUsePos /lastUsePos /=;
   try move/NE_Forall_last;
   move/leP=> /le_dec_iff;
-  move=> H; [ by ssomega | by contradiction ].
+  move=> *; [ by ssomega | by [] ].
 Defined.
 
 (** * Fixed Intervals *)

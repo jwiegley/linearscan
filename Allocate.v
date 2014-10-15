@@ -269,9 +269,6 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   end.
 (* We must prove that after every call to handleInterval, the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof.
-  move=> sd _ s _ _ xs _ _ _ _ _ ssinfo' _.
-  by case: ssinfo' => ?; case=> /= _ /ltP.
-Qed.
+Proof. intros; clear; by case: ssinfo' => ?; case=> /= _ /ltP. Qed.
 
 End MAllocate.
