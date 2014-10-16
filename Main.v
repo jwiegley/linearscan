@@ -9,7 +9,7 @@
 Require Import Coq.Bool.Bool.
 Require Import Coq.Lists.List.
 Require Import Machine.
-Require Import Graph.
+Require Import Blocks.
 Require Import Range.           (* jww (2014-10-10): REMOVE *)
 
 Module MyMachine <: Machine.
@@ -33,12 +33,12 @@ Extraction Language Haskell.
 Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "Prelude.succ"]
   "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
 
-Extract Inductive unit    => "()" [ "()" ].
-Extract Inductive bool    => "Prelude.Bool" ["Prelude.True" "Prelude.False"].
-(* Extract Inductive sumbool => "Prelude.Either" [ "Prelude.Left" "Prelude.Right" ]. *)
-Extract Inductive list    => "[]" ["[]" "(:)"].
-Extract Inductive prod    => "(,)" ["(,)"].
-Extract Inductive option  => "Prelude.Maybe" ["Prelude.Just" "Prelude.Nothing"].
+Extract Inductive unit   => "()" [ "()" ].
+Extract Inductive bool   => "Prelude.Bool" ["Prelude.True" "Prelude.False"].
+Extract Inductive sum    => "Prelude.Either" [ "Prelude.Left" "Prelude.Right" ].
+Extract Inductive list   => "[]" ["[]" "(:)"].
+Extract Inductive prod   => "(,)" ["(,)"].
+Extract Inductive option => "Prelude.Maybe" ["Prelude.Just" "Prelude.Nothing"].
 
 Extract Inductive comparison =>
   "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].

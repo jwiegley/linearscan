@@ -184,7 +184,7 @@ Inductive Range : RangeDesc -> Prop :=
   (** A [Range] built from a single use position covers that use positions, so
       that it begins at the use position, and ends one step after it (range
       ends are always exclusive). *)
-  | R_Sing u : even (uloc u) ->
+  | R_Sing u : odd (uloc u) ->
     Range {| rbeg := uloc u
            ; rend := S (uloc u)
            ; ups  := NE_Sing u
@@ -192,7 +192,7 @@ Inductive Range : RangeDesc -> Prop :=
 
   (** A [Range] can be extended by adding a use position to the beginning.
       This means that they must be built up in reverse. *)
-  | R_Cons u x : even (uloc u) -> Range x
+  | R_Cons u x : odd (uloc u) -> Range x
       -> forall (H : upos_lt u (NE_head (ups x))),
     Range {| rbeg := uloc u
            ; rend := rend x
@@ -242,7 +242,7 @@ Proof.
   - Case "R_Extend". assumption.
 Qed.
 
-Theorem Range_all_even `(r : Range rd) : NE_Forall (even ∘ uloc) (ups rd).
+Theorem Range_all_odd `(r : Range rd) : NE_Forall (odd ∘ uloc) (ups rd).
 Proof.
   Range_cases (induction r) Case; simpl.
   - Case "R_Sing". by constructor.
@@ -268,7 +268,7 @@ Qed.
 
 Definition Range_fromList `(us : NonEmpty UsePos) :
   NE_StronglySorted upos_lt us
-    -> NE_Forall (even ∘ uloc) us
+    -> NE_Forall (odd ∘ uloc) us
     -> Range {| rbeg := uloc (NE_head us)
               ; rend := S (uloc (NE_last us))
               ; ups  := us |}.
@@ -303,7 +303,7 @@ Definition Range_append_fst
          ; ups  := l1 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
-  move/NE_Forall_append: (Range_all_even r) => /= [Hforall _].
+  move/NE_Forall_append: (Range_all_odd r) => /= [Hforall _].
   move: (@NE_head_append_spec) (Range_beg_bounded r) => ->.
   move/Range_weaken_beg: (Range_fromList Hsortedl Hforall). exact.
 Defined.
@@ -330,15 +330,10 @@ Definition Range_append_snd
          ; ups  := l2 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
-  move/NE_Forall_append: (Range_all_even r) => /= [_ Hforall].
+  move/NE_Forall_append: (Range_all_odd r) => /= [_ Hforall].
   move: (@NE_last_append_spec) (Range_end_bounded r) => ->.
   move/Range_weaken_end: (Range_fromList Hsortedr Hforall). exact.
 Defined.
-
-Functional Scheme even_ind := Induction for even Sort Prop.
-
-Lemma ltn_even : forall n m, even n && even m -> n < m -> n.+1 < m.
-Proof. move=> n; functional induction even n; case=> //; by case. Qed.
 
 Definition Range_append_spec
   `(r : Range {| rbeg := rbeg0
@@ -347,11 +342,11 @@ Definition Range_append_spec
   S (uloc (NE_last l1)) < uloc (NE_head l2).
 Proof.
   move/NE_StronglySorted_impl_app: (Range_sorted r) => Hlt.
-  move/NE_Forall_append: (Range_all_even r) => /= [Hfal Hfar].
+  move/NE_Forall_append: (Range_all_odd r) => /= [Hfal Hfar].
   apply NE_Forall_last in Hfal.
   apply NE_Forall_head in Hfar.
   rewrite /upos_lt in Hlt.
-  apply ltn_even.
+  apply ltn_odd.
   exact/andP. done.
 Defined.
 
@@ -489,59 +484,59 @@ Import NonEmptyNotations.
 Import UsePosNotations.
 
 Fixpoint generateRangeBuilder
-  (start index : nat) (Heven : even start) {struct index}
+  (start index : nat) (Hodd : odd start) {struct index}
   : { rd : RangeDesc | Range rd & uloc (NE_head (ups rd)) = start }.
 Proof.
   destruct index.
-    pose (@R_Sing (|start|) Heven).
+    pose (@R_Sing (|start|) Hodd).
     exists (getRangeDesc r). apply r. auto.
   pose (generateRangeBuilder start.+2 index) as r.
   destruct r as [rd r Hr].
     assert (upos_lt (|start|) (|start.+2|)) as Hlt.
       by unfold upos_lt; auto.
-    by rewrite Nat.even_succ_succ.
+    by rewrite odd_succ_succ.
   have: (|start|) < NE_head (ups rd) by rewrite Hr.
   move=> Hlt.
-  pose (@R_Cons (|start|) rd Heven r Hlt) as r'.
+  pose (@R_Cons (|start|) rd Hodd r Hlt) as r'.
   exists (getRangeDesc r').
     apply r'.
   auto.
 Defined.
 
-Definition generateRange (start finish : nat) (Heven : even start)
+Definition generateRange (start finish : nat) (Hodd : odd start)
   (H : start < finish) : RangeSig.
 Proof.
-  pose (@generateRangeBuilder start ((finish - start)./2 - 1) Heven).
+  pose (@generateRangeBuilder start ((finish - start)./2 - 1) Hodd).
   destruct s. exists x. apply r.
 Defined.
 
-Definition testRangeSpan (start finish : nat) (Heven : even start)
+Definition testRangeSpan (start finish : nat) (Hodd : odd start)
   (H : start < finish) (before : nat) :=
-  let r := (rangeSpan (fun u => uloc u < before) (generateRange Heven H).2).1 in
+  let r := (rangeSpan (fun u => uloc u < before) (generateRange Hodd H).2).1 in
   (fmap (fun x => ups x.1) (fst r), fmap (fun x => ups x.1) (snd r)).
 
-Example lt_2_10 : 2 < 10. done. Qed.
+Example lt_1_9 : 1 < 9. done. Qed.
 
-Definition even_2 := Nat.even_2.
+Definition odd_1 : odd 1. done. Qed.
 
 Example testRangeSpan_1 :
-  testRangeSpan even_2 lt_2_10 2 = (None, Some [(|2|); (|4|); (|6|); (|8|)]).
+  testRangeSpan odd_1 lt_1_9 1 = (None, Some [(|1|); (|3|); (|5|); (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_2 :
-  testRangeSpan even_2 lt_2_10 4 = (Some (NE_Sing (|2|)), Some [(|4|); (|6|); (|8|)]).
+  testRangeSpan odd_1 lt_1_9 3 = (Some (NE_Sing (|1|)), Some [(|3|); (|5|); (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_3 :
-  testRangeSpan even_2 lt_2_10 6 = (Some [(|2|); (|4|)], Some [(|6|); (|8|)]).
+  testRangeSpan odd_1 lt_1_9 5 = (Some [(|1|); (|3|)], Some [(|5|); (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_4 :
-  testRangeSpan even_2 lt_2_10 8 = (Some [(|2|); (|4|); (|6|)], Some (NE_Sing (|8|))).
+  testRangeSpan odd_1 lt_1_9 7 = (Some [(|1|); (|3|); (|5|)], Some (NE_Sing (|7|))).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_5 :
-  testRangeSpan even_2 lt_2_10 10 = (Some [(|2|); (|4|); (|6|); (|8|)], None).
+  testRangeSpan odd_1 lt_1_9 9 = (Some [(|1|); (|3|); (|5|); (|7|)], None).
 Proof. reflexivity. Qed.
 
 End RangeTests.

@@ -100,9 +100,6 @@ Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
       end in
   go l.
 
-(** Move an element from one position within a vector to another position in
-    the same vector. *)
-
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
@@ -120,6 +117,15 @@ Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
 
 Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
   : Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
+
+Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
+Proof.
+  move/andP=> [nodd modd] Hlt.
+  rewrite -subn_gt0 odd_gt0 // odd_sub // modd /= negb_involutive //.
+Qed.
+
+Lemma odd_succ_succ n : odd (n.+2) = odd n.
+Proof. rewrite /= negb_involutive //. Qed.
 
 Lemma lt_dec : forall n m, (n < m) -> (n < m)%coq_nat.
 Proof. move=> n m H. destruct (@ltP n m); [ done | inv H ]. Qed.
@@ -175,118 +181,6 @@ Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
     first by rewrite addn0.
   rewrite addnS; exact: IHm.
 Qed.
-
-(*
-Lemma ltb_gt : forall n m : nat, (n < m) = false <-> m <= n.
-Proof.
-  split; intros;
-  generalize dependent m;
-  induction n; destruct m;
-  intros; simpl in *; auto.
-  - inversion H.
-  - apply le_n_S; apply IHn.
-    apply H.
-  - inversion H.
-  - apply IHn. omega.
-Qed.
-
-Lemma lt_sub : forall n m, n < m -> { p : nat | p = m - n }.
-Proof. intros. exists (m - n). reflexivity. Defined.
-
-Lemma one_gt_zero : forall n, n = 1 -> n > 0.
-Proof. intros. omega. Qed.
-
-Lemma nil_list_0 : forall a (xs : list a), length xs = 0 <-> xs = [].
-Proof.
-  split; intros.
-    induction xs. reflexivity.
-    inversion H.
-  rewrite H. auto.
-Qed.
-
-Lemma gt_one_gt_zero : forall n, n > 1 -> n > 0.
-Proof. intros. omega. Qed.
-
-Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
-Proof. intros. omega. Qed.
-
-Lemma lt_le_le_shuffle : forall {x y z w}, x < y -> y <= z -> z <= w -> x < w.
-Proof. intros. omega. Qed.
-
-Lemma plus_eq_zero : forall n m, n + m = n -> m = 0.
-Proof. intros. omega. Qed.
-
-Lemma plus_gt_zero : forall n m, n + m > n -> m > 0.
-Proof. intros. omega. Qed.
-
-Lemma min_lt_max : forall n m b e, n < m -> min b n < Peano.max e m.
-Proof.
-  induction n; intros; simpl;
-  apply Nat.max_lt_iff; right;
-  apply Nat.min_lt_iff; right; assumption.
-Qed.
-
-Lemma minus_lt : forall n m, n - m > 0 -> n > m.
-Proof. intros; omega. Qed.
-
-Lemma lt_minus : forall n m, n > m -> n - m > 0.
-Proof. intros; omega. Qed.
-
-Lemma le_min : forall m n p, n <= p -> min m n <= p.
-Proof. intros. apply Nat.min_le_iff. right. assumption. Qed.
-
-Lemma lt_min : forall m n p, n < p -> min m n < p.
-Proof. intros. apply Nat.min_lt_iff. right. assumption. Qed.
-
-Lemma lt_max : forall m n p, p < n -> p < max m n.
-Proof. intros. apply Nat.max_lt_iff. right. assumption. Qed.
-
-Lemma min_max_minus : forall n m b e, n - m > 0 -> Peano.max e n - min b m > 0.
-Proof.
-  induction n; intros; simpl; try omega.
-  apply lt_minus.
-  apply minus_lt in H.
-  unfold gt in *.
-  apply Nat.max_lt_iff.
-  right.
-  apply Nat.min_lt_iff.
-  right. assumption.
-Qed.
-
-Ltac min_max :=
-  auto; try omega;
-  repeat match goal with
-  | [ H : ?X < ?Y |- _ ] =>
-    match goal with
-      [ |- min _ X < Peano.max _ Y ] =>
-      apply min_lt_max; assumption
-    end
-  | [ H: ?X < ?Y |- _ ] =>
-    match goal with
-      [ H0: _ -> Y < ?Z |- _ ] =>
-      match goal with
-        [ |- X < Z ] =>
-          transitivity Y; auto
-      end
-    end
-  | [ IH: _ -> ?X < ?Y |- _] =>
-    match goal with
-      [ |- min _ X < Y ] =>
-      apply Nat.min_lt_iff; right; apply IH
-    end
-  | [ H: Peano.max _ ?X <= ?Y |- _ ] =>
-    match goal with
-      [ |- ?X <= ?Y ] =>
-        apply Max.max_lub_r in H; auto
-    end
-  end.
-
-Lemma rew_in_not_eq : forall {a : Type} {x y z : a}, x = y -> z <> x -> z <> y.
-Proof.
-  intros. unfold not in *. intros. apply H0.
-  rewrite H. assumption.
-Qed.
-*)
 
 Lemma fold_gt : forall a f n m (xs : list a),
   n > m -> fold_left (fun n x => n + f x) xs n > m.

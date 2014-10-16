@@ -19,8 +19,10 @@ import qualified Data.Interval as Interval
 import qualified Data.Lib as Lib
 import qualified Data.List0 as List0
 import qualified Data.Logic as Logic
+import qualified Data.NonEmpty0 as NonEmpty0
 import qualified Data.Peano as Peano
 import qualified Data.Plus as Plus
+import qualified Data.Range as Range
 import qualified Data.Specif as Specif
 import qualified Data.Vector0 as Vector0
 import qualified Data.Seq as Seq
@@ -1179,31 +1181,63 @@ _LinearScan__coq_R_linearScan_rec f f0 sd s r =
 
 type LinearScan__VirtReg = Prelude.Int
 
-type LinearScan__Graph a =
-  a
-  -- singleton inductive, whose constructor was Build_Graph
-  
-_LinearScan__coq_Graph_rect :: (a1 -> a2) -> (LinearScan__Graph a1) -> a2
-_LinearScan__coq_Graph_rect f g =
-  f g
+data LinearScan__Block =
+   LinearScan__Build_Block Prelude.Bool Prelude.Bool ([]
+                                                     (Prelude.Either
+                                                     LinearScan__VirtReg
+                                                     LinearScan__PhysReg))
 
-_LinearScan__coq_Graph_rec :: (a1 -> a2) -> (LinearScan__Graph a1) -> a2
-_LinearScan__coq_Graph_rec =
-  _LinearScan__coq_Graph_rect
+_LinearScan__coq_Block_rect :: (Prelude.Bool -> Prelude.Bool -> ([]
+                               (Prelude.Either LinearScan__VirtReg
+                               LinearScan__PhysReg)) -> a1) ->
+                               LinearScan__Block -> a1
+_LinearScan__coq_Block_rect f b =
+  case b of {
+   LinearScan__Build_Block x x0 x1 -> f x x0 x1}
 
-_LinearScan__postOrderTraversal :: (LinearScan__Graph a1) -> a1
-_LinearScan__postOrderTraversal graph =
-  graph
+_LinearScan__coq_Block_rec :: (Prelude.Bool -> Prelude.Bool -> ([]
+                              (Prelude.Either LinearScan__VirtReg
+                              LinearScan__PhysReg)) -> a1) ->
+                              LinearScan__Block -> a1
+_LinearScan__coq_Block_rec =
+  _LinearScan__coq_Block_rect
 
-_LinearScan__determineIntervals :: (LinearScan__Graph LinearScan__VirtReg) ->
+_LinearScan__loopStart :: LinearScan__Block -> Prelude.Bool
+_LinearScan__loopStart block =
+  case block of {
+   LinearScan__Build_Block loopStart0 loopEnd0 references0 -> loopStart0}
+
+_LinearScan__loopEnd :: LinearScan__Block -> Prelude.Bool
+_LinearScan__loopEnd block =
+  case block of {
+   LinearScan__Build_Block loopStart0 loopEnd0 references0 -> loopEnd0}
+
+_LinearScan__references :: LinearScan__Block -> []
+                           (Prelude.Either LinearScan__VirtReg
+                           LinearScan__PhysReg)
+_LinearScan__references block =
+  case block of {
+   LinearScan__Build_Block loopStart0 loopEnd0 references0 -> references0}
+
+_LinearScan__processBlocks :: Prelude.Int -> (NonEmpty0.NonEmpty
+                              LinearScan__Block) -> Prelude.Int ->
+                              (Prelude.Maybe Prelude.Int) -> (Prelude.Maybe
+                              Prelude.Int) -> (,)
+                              ((,) Prelude.Int
+                              (LinearScan__Vec
+                              (NonEmpty0.NonEmpty Range.UsePos))) Prelude.Int
+_LinearScan__processBlocks =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+_LinearScan__determineIntervals :: (NonEmpty0.NonEmpty LinearScan__Block) ->
                                    LinearScan__ScanStateDesc
 _LinearScan__determineIntervals =
   Prelude.error "AXIOM TO BE REALIZED"
 
-_LinearScan__allocateRegisters :: (LinearScan__Graph LinearScan__VirtReg) ->
+_LinearScan__allocateRegisters :: (NonEmpty0.NonEmpty LinearScan__Block) ->
                                   LinearScan__ScanStateDesc
-_LinearScan__allocateRegisters g =
+_LinearScan__allocateRegisters blocks =
   
     (Lib.uncurry_sig (\x _ -> _LinearScan__linearScan x)
-      (_LinearScan__determineIntervals g))
+      (_LinearScan__determineIntervals blocks))
 
