@@ -19,11 +19,23 @@ Fixpoint NE_length {a} (ne : NonEmpty a) : nat :=
     | NE_Cons x xs => 1 + NE_length xs
   end.
 
+Lemma NE_length_spec {a} (ne : NonEmpty a) : NE_length ne > 0.
+Proof. induction ne; simpl; auto. Qed.
+
 Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
   match ne with
     | NE_Sing x => cons x nil
     | NE_Cons x xs => cons x (NE_to_list xs)
   end.
+
+Definition destruct_NonEmpty {a} (l : NonEmpty a)
+  : ({x : a & {tl : NonEmpty a | l = NE_Cons x tl}} +
+     {x : a | l = NE_Sing x})%type.
+Proof.
+  destruct l.
+    right. exists a0. reflexivity.
+  left. exists a0. exists l. reflexivity.
+Defined.
 
 Definition NE_head {a} (ne : NonEmpty a) : a :=
   match ne with

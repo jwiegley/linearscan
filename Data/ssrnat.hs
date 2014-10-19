@@ -76,6 +76,12 @@ leP :: Prelude.Int -> Prelude.Int -> Ssrbool.Coq_reflect
 leP m n =
   Ssrbool.iffP (leq m n) (Ssrbool.idP (leq m n))
 
+maxn :: Prelude.Int -> Prelude.Int -> Prelude.Int
+maxn m n =
+  case leq (Prelude.succ m) n of {
+   Prelude.True -> n;
+   Prelude.False -> m}
+
 minn :: Prelude.Int -> Prelude.Int -> Prelude.Int
 minn m n =
   case leq (Prelude.succ m) n of {

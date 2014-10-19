@@ -1,6 +1,10 @@
 Require Export Coq.Bool.Bool.
 Require Export Coq.Lists.List.
+Require Export Coq.Logic.ProofIrrelevance.
 Require Export Coq.Numbers.Natural.Peano.NPeano.
+Require Export Coq.Program.Basics.
+Require Export Coq.Program.Equality.
+Require Export Coq.Program.Tactics.
 Require Export Coq.Sorting.Sorting.
 Require Export List.
 Require Export Omega.
@@ -46,6 +50,12 @@ Definition uncurry_sigT {A C} {B : A -> Type}
 Definition fromMaybe {a} (d : a) (mx : option a) : a :=
   match mx with
     | Some x => x
+    | None => d
+  end.
+
+Definition maybe {a b} (d : b) (f : a -> b) (mx : option a) : b :=
+  match mx with
+    | Some x => f x
     | None => d
   end.
 
@@ -181,6 +191,12 @@ Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
     first by rewrite addn0.
   rewrite addnS; exact: IHm.
 Qed.
+
+Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
+Proof. intros; ssomega. Qed.
+
+Lemma ltnSSn : forall n, n < n.+2.
+Proof. intros; ssomega. Qed.
 
 Lemma fold_gt : forall a f n m (xs : list a),
   n > m -> fold_left (fun n x => n + f x) xs n > m.

@@ -1,4 +1,3 @@
-Require Import Coq.Program.Equality.
 Require Import Lib.
 Require Import NonEmpty.
 Require Import Hask.Alternative.

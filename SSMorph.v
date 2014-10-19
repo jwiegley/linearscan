@@ -1,6 +1,4 @@
 Require Import Coq.Arith.Wf_nat.
-Require Import Coq.Program.Basics.
-Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
 Require Import Fin.
 Require Import Interval.

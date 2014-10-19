@@ -1,6 +1,5 @@
 Require Export Machine.
 
-Require Import Coq.Program.Tactics.
 Require Import Coq.Structures.Orders.
 Require Import Fin.
 Require Import Interval.
