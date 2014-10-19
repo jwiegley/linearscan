@@ -1,14 +1,14 @@
-module Data.Fin0 where
+module LinearScan.Fin0 where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Compare as Compare
-import qualified Data.Compare_dec as Compare_dec
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Fin as Fin
-import qualified Data.Logic as Logic
-import qualified Data.Peano as Peano
-import qualified Data.Specif as Specif
+import qualified LinearScan.Compare as Compare
+import qualified LinearScan.Compare_dec as Compare_dec
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Fin as Fin
+import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Peano as Peano
+import qualified LinearScan.Specif as Specif
 
 
 type Coq_fin = Fin.Coq_t

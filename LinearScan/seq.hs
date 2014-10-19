@@ -1,8 +1,8 @@
-module Data.Seq where
+module LinearScan.Seq where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Ssrbool as Ssrbool
+import qualified LinearScan.Ssrbool as Ssrbool
 
 
 cat :: ([] a1) -> ([] a1) -> [] a1

@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Endo where
+module LinearScan.Endo where
 
 import qualified Prelude
 import qualified Data.List
@@ -13,7 +13,7 @@ import qualified GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.IOExts as IOExts
+import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

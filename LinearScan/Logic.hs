@@ -1,4 +1,4 @@
-module Data.Logic where
+module LinearScan.Logic where
 
 import qualified Prelude
 import qualified Data.List

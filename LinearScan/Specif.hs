@@ -1,4 +1,4 @@
-module Data.Specif where
+module LinearScan.Specif where
 
 import qualified Prelude
 import qualified Data.List

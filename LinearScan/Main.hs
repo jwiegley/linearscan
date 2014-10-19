@@ -1,33 +1,33 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Main where
+module LinearScan.Main where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Basics as Basics
-import qualified Data.Compare as Compare
-import qualified Data.Datatypes as Datatypes
-import qualified Data.EqNat as EqNat
-import qualified Data.Fin0 as Fin0
-import qualified Data.Fin as Fin
-import qualified Data.IApplicative as IApplicative
-import qualified Data.IEndo as IEndo
-import qualified Data.IMonad as IMonad
-import qualified Data.IState as IState
-import qualified Data.Interval as Interval
-import qualified Data.Lib as Lib
-import qualified Data.List0 as List0
-import qualified Data.Logic as Logic
-import qualified Data.NonEmpty0 as NonEmpty0
-import qualified Data.Peano as Peano
-import qualified Data.Plus as Plus
-import qualified Data.Range as Range
-import qualified Data.Specif as Specif
-import qualified Data.Vector0 as Vector0
-import qualified Data.Seq as Seq
-import qualified Data.Ssrbool as Ssrbool
-import qualified Data.Ssrnat as Ssrnat
+import qualified LinearScan.Basics as Basics
+import qualified LinearScan.Compare as Compare
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.EqNat as EqNat
+import qualified LinearScan.Fin0 as Fin0
+import qualified LinearScan.Fin as Fin
+import qualified LinearScan.IApplicative as IApplicative
+import qualified LinearScan.IEndo as IEndo
+import qualified LinearScan.IMonad as IMonad
+import qualified LinearScan.IState as IState
+import qualified LinearScan.Interval as Interval
+import qualified LinearScan.Lib as Lib
+import qualified LinearScan.List0 as List0
+import qualified LinearScan.Logic as Logic
+import qualified LinearScan.NonEmpty0 as NonEmpty0
+import qualified LinearScan.Peano as Peano
+import qualified LinearScan.Plus as Plus
+import qualified LinearScan.Range as Range
+import qualified LinearScan.Specif as Specif
+import qualified LinearScan.Vector0 as Vector0
+import qualified LinearScan.Seq as Seq
+import qualified LinearScan.Ssrbool as Ssrbool
+import qualified LinearScan.Ssrnat as Ssrnat
 
 
 
@@ -37,7 +37,7 @@ import qualified GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.IOExts as IOExts
+import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

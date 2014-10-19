@@ -1,10 +1,10 @@
-module Data.Lib where
+module LinearScan.Lib where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Logic as Logic
-import qualified Data.Seq as Seq
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Seq as Seq
 
 
 __ :: any

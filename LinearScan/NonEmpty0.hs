@@ -1,4 +1,4 @@
-module Data.NonEmpty0 where
+module LinearScan.NonEmpty0 where
 
 import qualified Prelude
 import qualified Data.List

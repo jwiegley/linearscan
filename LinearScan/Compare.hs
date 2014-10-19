@@ -1,8 +1,8 @@
-module Data.Compare where
+module LinearScan.Compare where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Specif as Specif
+import qualified LinearScan.Specif as Specif
 
 
 mk_cmp_eq_dec :: a1 -> a1 -> (a1 -> a1 -> Prelude.Ordering) ->

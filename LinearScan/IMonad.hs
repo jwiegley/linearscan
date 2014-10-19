@@ -1,9 +1,9 @@
-module Data.IMonad where
+module LinearScan.IMonad where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.IApplicative as IApplicative
-import qualified Data.IEndo as IEndo
+import qualified LinearScan.IApplicative as IApplicative
+import qualified LinearScan.IEndo as IEndo
 
 
 __ :: any

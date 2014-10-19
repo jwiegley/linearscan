@@ -1,8 +1,8 @@
-module Data.Alternative where
+module LinearScan.Alternative where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Applicative as Applicative
+import qualified LinearScan.Applicative as Applicative
 
 
 __ :: any

@@ -1,9 +1,9 @@
-module Data.List0 where
+module LinearScan.List0 where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Specif as Specif
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Specif as Specif
 
 
 destruct_list :: ([] a1) -> Specif.Coq_sumor (Specif.Coq_sigT a1 ([] a1))

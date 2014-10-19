@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Ssrnat where
+module LinearScan.Ssrnat where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Peano as Peano
-import qualified Data.Eqtype as Eqtype
-import qualified Data.Ssrbool as Ssrbool
+import qualified LinearScan.Peano as Peano
+import qualified LinearScan.Eqtype as Eqtype
+import qualified LinearScan.Ssrbool as Ssrbool
 
 
 
@@ -17,7 +17,7 @@ import qualified GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.IOExts as IOExts
+import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

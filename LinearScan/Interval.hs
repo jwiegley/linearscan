@@ -1,17 +1,17 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Interval where
+module LinearScan.Interval where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Alternative as Alternative
-import qualified Data.Basics as Basics
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Endo as Endo
-import qualified Data.NonEmpty0 as NonEmpty0
-import qualified Data.Range as Range
-import qualified Data.Ssrnat as Ssrnat
+import qualified LinearScan.Alternative as Alternative
+import qualified LinearScan.Basics as Basics
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Endo as Endo
+import qualified LinearScan.NonEmpty0 as NonEmpty0
+import qualified LinearScan.Range as Range
+import qualified LinearScan.Ssrnat as Ssrnat
 
 
 
@@ -21,7 +21,7 @@ import qualified GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.IOExts as IOExts
+import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

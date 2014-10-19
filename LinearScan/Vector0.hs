@@ -1,16 +1,16 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module Data.Vector0 where
+module LinearScan.Vector0 where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Fin0 as Fin0
-import qualified Data.Fin as Fin
-import qualified Data.Logic as Logic
-import qualified Data.Peano as Peano
-import qualified Data.Plus as Plus
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Fin0 as Fin0
+import qualified LinearScan.Fin as Fin
+import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Peano as Peano
+import qualified LinearScan.Plus as Plus
 
 
 
@@ -20,7 +20,7 @@ import qualified GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified Data.IOExts as IOExts
+import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 

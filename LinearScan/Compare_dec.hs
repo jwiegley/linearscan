@@ -1,10 +1,10 @@
-module Data.Compare_dec where
+module LinearScan.Compare_dec where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Datatypes as Datatypes
-import qualified Data.Logic as Logic
-import qualified Data.Specif as Specif
+import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Specif as Specif
 
 
 lt_eq_lt_dec :: Prelude.Int -> Prelude.Int -> Specif.Coq_sumor

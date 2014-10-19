@@ -1,4 +1,4 @@
-module Data.Plus where
+module LinearScan.Plus where
 
 import qualified Prelude
 import qualified Data.List

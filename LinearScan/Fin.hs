@@ -1,8 +1,8 @@
-module Data.Fin where
+module LinearScan.Fin where
 
 import qualified Prelude
 import qualified Data.List
-import qualified Data.Logic as Logic
+import qualified LinearScan.Logic as Logic
 
 
 data Coq_t =

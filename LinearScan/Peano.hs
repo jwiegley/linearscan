@@ -1,4 +1,4 @@
-module Data.Peano where
+module LinearScan.Peano where
 
 import qualified Prelude
 import qualified Data.List

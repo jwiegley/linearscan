@@ -113,22 +113,22 @@ endif
 #                                     #
 #######################################
 
-all: Hask/State.vo $(VOFILES) Data/Main.hs
+all: Hask/State.vo $(VOFILES) LinearScan/Main.hs
 	egrep -i '(admit|undefined)' *.v | egrep -v 'Definition undefined'
 
 Hask/State.vo:
 	(cd Hask ; make)
 
-Data/Main.hs: Main.vo
+LinearScan/Main.hs: Main.vo
 	ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
-	    while read file; do mv $$file Data; done
-	perl -i -pe 's/import qualified (.*)/import qualified Data.\1 as \1/' Data/*.hs
-	perl -i -pe 's/import qualified Data\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List/' Data/*.hs
-	perl -i -pe 's/import qualified Data\.GHC/import qualified GHC/' Data/*.hs
-	perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' Data/*.hs
-	perl -i -pe 's/module (.+?) where/module Data.\1 where/' Data/*.hs
-	perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' Data/IState.hs
-	perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' Data/Main.hs
+	    while read file; do mv $$file LinearScan; done
+	perl -i -pe 's/import qualified (.*)/import qualified LinearScan.\1 as \1/' LinearScan/*.hs
+	perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List/' LinearScan/*.hs
+	perl -i -pe 's/import qualified LinearScan\.GHC/import qualified GHC/' LinearScan/*.hs
+	perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' LinearScan/*.hs
+	perl -i -pe 's/module (.+?) where/module LinearScan.\1 where/' LinearScan/*.hs
+	perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' LinearScan/IState.hs
+	perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' LinearScan/Main.hs
 
 spec: $(VIFILES)
 
@@ -198,11 +198,14 @@ install-doc:
 	done
 
 clean:
-	rm -f $(VOFILES) $(VIFILES) $(GFILES) $(VFILES:.v=.v.d) $(VFILES:=.beautified) $(VFILES:=.old)
-	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) all-mli.tex
+	rm -f $(VOFILES) $(VIFILES) $(GFILES)
+	rm -f $(VFILES:.v=.v.d) $(VFILES:=.beautified) $(VFILES:=.old)
+	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob
+	rm -f $(VFILES:.v=.glob) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) all-mli.tex
+	ls -1 LinearScan/* | egrep -v '(Utils).hs' | \
+	    while read file; do rm -f $$file; done
 	- rm -rf mlihtml
 	rm -f *.v.d *.glob *.vo
-	rm -f Data/*
 	rm -f Setup
 	rm -fr dist
 

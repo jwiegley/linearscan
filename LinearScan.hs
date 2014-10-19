@@ -11,12 +11,12 @@ module LinearScan
     ) where
 
 import           Control.Applicative
-import           Data.Fin (of_nat_lt)
-import           Data.Fin0
 import qualified Data.List.NonEmpty as NE
-import           Data.Main
 import           Data.Maybe
-import           Data.NonEmpty0
+import           LinearScan.Fin (of_nat_lt)
+import           LinearScan.Fin0
+import           LinearScan.Main
+import           LinearScan.NonEmpty0
 
 type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__ScanStateDesc

@@ -1,4 +1,4 @@
-module Data.Ssrbool where
+module LinearScan.Ssrbool where
 
 import qualified Prelude
 import qualified Data.List

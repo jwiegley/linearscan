@@ -55,7 +55,7 @@ Definition boundedTriple (pos : nat) :=
 
 Definition boundedRangeVec (pos : nat) := Vec (boundedTriple pos) maxVirtReg.
 
-Definition boundedTransport (pos : nat) `(Hlt : pos < n)
+Lemma boundedTransport (pos : nat) `(Hlt : pos < n)
   : boundedRangeVec n -> boundedRangeVec pos.
 Proof.
   rewrite /boundedRangeVec /boundedTriple /boundedRange.
@@ -69,7 +69,7 @@ Proof.
   - constructor; last by apply IHv.
     split. apply p.
     by apply None.
-Defined.
+Qed.
 
 Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos.
 Proof. eexists; [ by apply/R_Sing | by [] ]. Defined.
