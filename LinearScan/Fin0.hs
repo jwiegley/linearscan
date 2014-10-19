@@ -20,6 +20,10 @@ fin_to_nat :: Prelude.Int -> Coq_fin -> Prelude.Int
 fin_to_nat n f =
    (Fin.to_nat n f)
 
+last_fin_from_nat :: Prelude.Int -> Coq_fin
+last_fin_from_nat n =
+  from_nat (Prelude.succ n) n
+
 fin_Sn_inv :: Prelude.Int -> a1 -> (Coq_fin -> a1) -> Coq_fin -> a1
 fin_Sn_inv n pO pS x =
   case x of {

@@ -93,6 +93,10 @@ ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
 
+getRangeDesc :: RangeDesc -> RangeDesc
+getRangeDesc d =
+  d
+
 type RangeSig = RangeDesc
 
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool

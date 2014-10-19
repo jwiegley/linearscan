@@ -6,7 +6,6 @@ Require Import Coq.Arith.Lt.
 Require Import Coq.Lists.List.
 Require Import Coq.Logic.ProofIrrelevance.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
-Require Import Coq.Program.Equality.
 Require Import Coq.Structures.Orders.
 Require Import Coq.omega.Omega.
 
@@ -50,8 +49,7 @@ Defined.
 Definition pred_fin {n} (f : fin n) : option (fin n).
   apply to_nat in f.
   destruct f.
-  destruct x. apply None.
-  apply Some.
+  destruct x. apply None.  apply Some.
   apply Le.le_Sn_le in l.
   apply (from_nat x l).
 Defined.
@@ -104,28 +102,27 @@ Proof.
   specialize (IHn x). simpl in *.
   destruct (to_nat x) eqn:Heqe. simpl.
   f_equal.
-  assert (l = lt_S_n x0 n (lt_n_S x0 n l)) by (apply proof_irrelevance).
+  assert (l = lt_S_n x0 n (lt_n_S x0 n l))
+    by (apply proof_irrelevance).
   rewrite <- H.
   apply IHn.
 Qed.
 
-(*
-Program Instance fin_nat_iso : forall {n}, fin n ≅ { m : nat | m < n } := {
-    to   := to_nat;
-    from := curry_sig (@from_nat n)
-}.
-Obligation 1.
-  extensionality x.
-  unfold compose, id, curry_sig.
-  apply fin_from_to_id.
-Qed.
-Obligation 2.
-  extensionality x.
-  unfold compose, id, curry_sig.
-  destruct x.
-  apply fin_to_from_id. omega.
-Qed.
-*)
+(* Program Instance fin_nat_iso : forall {n}, fin n ≅ { m : nat | m < n } := { *)
+(*     to   := to_nat; *)
+(*     from := curry_sig (@from_nat n) *)
+(* }. *)
+(* Obligation 1. *)
+(*   extensionality x. *)
+(*   unfold compose, id, curry_sig. *)
+(*   apply fin_from_to_id. *)
+(* Qed. *)
+(* Obligation 2. *)
+(*   extensionality x. *)
+(*   unfold compose, id, curry_sig. *)
+(*   destruct x. *)
+(*   apply fin_to_from_id. omega. *)
+(* Qed. *)
 
 (** Given a value of type [fin (S n)], return the equivalent [fin n],
     returning None if the input value was the highest possible value of [fin
@@ -166,6 +163,24 @@ Proof.
   simpl. omega. omega.
 Qed.
 
+Lemma proj1_sig_inj : forall n (x y : fin n),
+  proj1_sig (to_nat x) = proj1_sig (to_nat y) -> x = y.
+Proof.
+  assert (forall {o} {m : fin o}, proj1_sig (to_nat m) = fin_to_nat m).
+    reflexivity.
+  induction n; intros. inversion x.
+  destruct x using fin_Sn_inv;
+  destruct y using fin_Sn_inv; trivial;
+  generalize dependent H0;
+  repeat rewrite H;
+  repeat rewrite fin_to_nat_Sn;
+  intro H0; unfold fin_to_nat in H0;
+  simpl in *; inversion H0.
+  f_equal. apply IHn.
+  repeat rewrite fin_to_nat_Sn.
+  inversion H0. reflexivity.
+Qed.
+
 (** The function [fin_to_nat] is bijective. *)
 Lemma fin_to_nat_bijective : forall n (x y : fin n),
   fin_to_nat x = fin_to_nat y <-> x = y.
@@ -174,25 +189,11 @@ Proof.
   split; intros.
   - destruct n. inversion x.
     generalize dependent y.
-    induction x; intros.
-      dependent destruction y.
-        reflexivity.
-      simpl in H.
-      destruct (to_nat y).
-      simpl in H. inversion H.
-    dependent destruction y.
-      simpl in H.
-      destruct (to_nat x).
-      simpl in H. inversion H.
-    specialize (IHx y).
-    f_equal. apply IHx.
-    simpl in H.
-    destruct (to_nat x).
-    destruct (to_nat y).
-    simpl in H.
-    apply eq_add_S in H.
-    subst. reflexivity.
-  - f_equal. f_equal. assumption.
+    induction x; intros;
+    apply proj1_sig_inj;
+    assumption.
+  - f_equal. f_equal.
+    assumption.
 Qed.
 
 Fixpoint catMaybes {a : Set} (l : list (option a)) : list a :=

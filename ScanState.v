@@ -305,33 +305,22 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; lists_are_unique := NoDup_nil _
        |}
 
-  | ScanState_newUnhandled
-      ni unh (* unhsort *) act inact hnd ints assgn fixints lau :
+  | ScanState_newUnhandled d sd :
     forall `(i : Interval d),
+    ScanState sd ->
     ScanState
-      {| nextInterval     := ni
-       ; unhandled        := unh
-       ; active           := act
-       ; inactive         := inact
-       ; handled          := hnd
-       ; intervals        := ints
-       ; assignments      := assgn
-       ; fixedIntervals   := fixints
+      {| nextInterval     := S (nextInterval sd)
+       ; unhandled        := last_fin_from_nat (nextInterval sd)
+                               :: map fin_expand (unhandled sd)
+       ; active           := map fin_expand (active sd)
+       ; inactive         := map fin_expand (inactive sd)
+       ; handled          := map fin_expand (handled sd)
+       ; intervals        := V.shiftin (d; i) (intervals sd)
+       ; assignments      := V.shiftin None (assignments sd)
+       ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := lau
-       |} ->
-    forall newi (H : newi = last_fin_from_nat ni),
-    ScanState
-      {| nextInterval     := S ni
-       ; unhandled        := newi :: map fin_expand unh
-       ; active           := map fin_expand act
-       ; inactive         := map fin_expand inact
-       ; handled          := map fin_expand hnd
-       ; intervals        := V.shiftin (d; i) ints
-       ; assignments      := V.shiftin None assgn
-       ; fixedIntervals   := fixints
-       (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := map_fin_expand_rewrite (NoDup_fin_cons _ _ lau H)
+       ; lists_are_unique := map_fin_expand_rewrite
+                               (NoDup_fin_cons _ _ (lists_are_unique sd) refl_equal)
        |}
 
   | ScanState_moveUnhandledToActive
@@ -435,7 +424,9 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
-Definition scanStateDesc `(st : ScanState sd) := sd.
+Definition ScanStateSig := { sd : ScanStateDesc | ScanState sd}.
+
+Definition getScanStateDesc `(st : ScanState sd) := sd.
 
 (** [ScanState_unhandledExtent] relates the [unhandledExtent] of a [ScanState]
     with the [intervalExtent] of the first member of its [unhandled] list. *)

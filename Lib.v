@@ -3,7 +3,6 @@ Require Export Coq.Lists.List.
 Require Export Coq.Logic.ProofIrrelevance.
 Require Export Coq.Numbers.Natural.Peano.NPeano.
 Require Export Coq.Program.Basics.
-Require Export Coq.Program.Equality.
 Require Export Coq.Program.Tactics.
 Require Export Coq.Sorting.Sorting.
 Require Export List.

@@ -1,5 +1,3 @@
-Require Import Coq.Logic.ProofIrrelevance.
-
 (** ** Comparisons *)
 
 (** These definitions avoid boilerplate involved with setting up properly
@@ -47,12 +45,12 @@ Class CompareSpec (a : Set) := {
     mk_cmp_eq_dec x y cmp (cmp_eq_iff x y)
 }.
 
-Ltac cmp_reflexive :=
-  match goal with
-    [ |- context [match cmp_eq_dec ?X ?X with _ => _ end] ] =>
-      assert (cmp_eq_dec X X = left eq_refl) as Hrcmp
-        by (intros; destruct (cmp_eq_dec X X);
-              [ f_equal; apply proof_irrelevance
-              | intuition ]);
-      rewrite Hrcmp in *; clear Hrcmp; simpl in *
-  end.
+(* Ltac cmp_reflexive := *)
+(*   match goal with *)
+(*     [ |- context [match cmp_eq_dec ?X ?X with _ => _ end] ] => *)
+(*       assert (cmp_eq_dec X X = left eq_refl) as Hrcmp *)
+(*         by (intros; destruct (cmp_eq_dec X X); *)
+(*               [ f_equal; apply proof_irrelevance *)
+(*               | intuition ]); *)
+(*       rewrite Hrcmp in *; clear Hrcmp; simpl in * *)
+(*   end. *)

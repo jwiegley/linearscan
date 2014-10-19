@@ -1,5 +1,6 @@
 Require Import Allocate.
 Require Import Fin.
+Require Import Interval.
 Require Import Lib.
 Require Import Machine.
 Require Import NonEmpty.
@@ -113,47 +114,77 @@ Definition applyList (bs : NonEmpty Block)
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
   V.const (None, None, None) maxVirtReg.
 
+Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
+  (rest : boundedRangeVec pos.+2) : boundedRangeVec pos :=
+  let liftOr f mx y :=
+      Some (match mx with Some x => f x y | None => y end) in
+  let savingBound x :=
+      if loopBound b
+      then let: (mb, me, r) := x in
+           (liftOr minn mb pos, liftOr maxn me pos, r)
+      else x in
+  let consr (x : boundedTriple pos.+2) : boundedTriple pos :=
+      let upos := Build_UsePos pos (regRequired b) in
+      @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
+  let rest' := V.map savingBound rest in
+  match references b with
+  | V.nil => boundedTransport (ltnSSn _) rest'
+  | V.cons v _ vs =>
+    let x := consr (V.nth rest' v) in
+    V.replace (boundedTransport (ltnSSn _) rest') v x
+  (* jww (2014-10-18): See note above. *)
+  (* | V.cons (inr r) _ vs => undefined *)
+  end.
+
+Definition extractRange (x : boundedTriple 1) : option RangeSig :=
+  let: (mb, me, mr) := x in
+  match mr with
+  | None => None
+  | Some (exist2 rd r _) =>
+    let mres := match (mb, me) with
+      | (None, None)     => None
+      | (Some b, None)   => Some (b, rend rd)
+      | (None, Some e)   => Some (rbeg rd, e)
+      | (Some b, Some e) => Some (b, e)
+      end in
+    Some (match mres with
+          | None => exist Range rd r
+          | Some (b, e) =>
+            let r' := R_Extend b e r in
+            exist Range (getRangeDesc r') r'
+          end)
+  end.
+
 (** The list of blocks is processed in reverse, so that the resulting
     sub-lists are also in order. *)
 Definition processBlocks (blocks : NonEmpty Block)
   : Vec (option RangeSig) maxVirtReg :=
-  let liftOr f mx y :=
-      Some (match mx with Some x => f x y | None => y end) in
-
-  let handle b pos (Hodd : odd pos) (rest : boundedRangeVec pos.+2)
-      : boundedRangeVec pos :=
-      let savingBound x :=
-          if loopBound b
-          then let: (mb, me, r) := x in
-               (liftOr minn mb pos, liftOr maxn me pos, r)
-          else x in
-      let consr (x : boundedTriple pos.+2) : boundedTriple pos :=
-          let upos := Build_UsePos pos (regRequired b) in
-          @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
-      let rest' := V.map savingBound rest in
-      match references b with
-      | V.nil => boundedTransport (ltnSSn _) rest'
-      | V.cons v _ vs =>
-        let x := consr (V.nth rest' v) in
-        V.replace (boundedTransport (ltnSSn _) rest') v x
-      (* jww (2014-10-18): See note above. *)
-      (* | V.cons (inr r) _ vs => undefined *)
-      end in
-
-  let res  := applyList blocks emptyBoundedRangeVec handle in
-  V.map (fun x =>
-    let: (mb, me, mr) := x in
-    match mr with
-    | None => None
-    | Some (exist2 rd r _) => Some (exist _ rd r)
-      (* match (mb, me) with *)
-      (* | (None, None) => Some (exist _ rd r) *)
-      (* end *)
-    end) res.
+  let res := applyList blocks emptyBoundedRangeVec handleBlock in
+  V.map extractRange res.
 
 Definition determineIntervals (blocks : NonEmpty Block)
-  : { sd : ScanStateDesc | ScanState sd }.
-Admitted.
+  : { sd : ScanStateDesc | ScanState sd } :=
+  let mkint (mx : option RangeSig) : option IntervalSig := match mx with
+      | None => None
+      | Some (exist _ r) =>
+        let i := I_Sing r in
+        Some (exist Interval (getIntervalDesc i) i)
+      end in
+  let go (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
+      match mkint mx with
+      | None => ss
+      | Some (exist idesc i) =>
+        let: (exist sd st) := ss in
+        let st' := ScanState_newUnhandled i st in
+        exist ScanState (getScanStateDesc st') st'
+      end in
+  let s0 := ScanState_nil in
+  let s1 : ScanStateSig := exist ScanState (getScanStateDesc s0) s0 in
+  let ranges := processBlocks blocks in
+  (* jww (2014-10-19): I need to sort the ranges by starting position, and
+     then make this ordering a requirement for building up the unhandled
+     intervals in the [ScanState]. *)
+  V.fold_left go s1 ranges.
 
 Definition allocateRegisters (blocks : NonEmpty Block)
   : ScanStateDesc :=

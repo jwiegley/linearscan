@@ -9,7 +9,9 @@
 Require Import Lib.
 Require Import Machine.
 Require Import Blocks.
-Require Import Range.           (* jww (2014-10-10): REMOVE *)
+(* jww (2014-10-10): Remove this and the export of [splitRange] below, once
+   interval splitting is integrated into Allocate.v. *)
+Require Import Range.
 
 Module MyMachine <: Machine.
 
