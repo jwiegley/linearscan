@@ -1,12 +1,15 @@
-- Switch to ordinal n from fin n
-  
-- Remove Fin.v
-  
-- Switch to neseq from NonEmpty
-
-- Remove NonEmpty.v
-
-- Switch to uniq from NoDup
-
-- Remove Compare.v
-- Remove NoDup.v
+* TODO Integrate splitting
+* TODO Implement spilling
+* TODO Figure out a better way to return allocation data
+* TODO Implement missing functions in ScanState.v
+* TODO Maintain the sortedness of the unhandled list
+* TODO Remove the handled list once everything is working
+* TODO Ensure the number of actives is < maxReg
+* TODO Integrate better with ssreflect
+** TODO Switch to ordinal n from fin n
+** TODO Remove Fin.v
+** TODO Switch to neseq from NonEmpty
+** TODO Remove NonEmpty.v
+** TODO Switch to uniq from NoDup
+** TODO Remove Compare.v
+** TODO Remove NoDup.v
