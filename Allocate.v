@@ -18,28 +18,23 @@ Include MSSMorph M.
 
 Definition splitCurrentInterval {pre P} `{HasWork P} (before : option nat)
   : SState pre P SSMorphStHasLen unit.
-  (* jww (2014-09-26): NYI *)
 Admitted.
 
 Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (position : nat)
   : SState pre P P unit.
-  (* jww (2014-10-01): NYI *)
 Admitted.
 
 Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg)
   : SState pre P P unit.
-  (* jww (2014-10-01): NYI *)
 Admitted.
 
 Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg)
   (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
   : SState pre P P (option nat).
-  (* jww (2014-10-01): NYI *)
 Admitted.
 
 Definition assignSpillSlotToCurrent {pre P} `{HasWork P}
   : SState pre P P unit.
-  (* jww (2014-09-26): NYI *)
 Admitted.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
