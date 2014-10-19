@@ -5,10 +5,9 @@ module LinearScan.Main where
 
 import qualified Prelude
 import qualified Data.List
-import qualified LinearScan.Basics as Basics
+import qualified LinearScan.Utils
 import qualified LinearScan.Compare as Compare
 import qualified LinearScan.Datatypes as Datatypes
-import qualified LinearScan.EqNat as EqNat
 import qualified LinearScan.Fin0 as Fin0
 import qualified LinearScan.Fin as Fin
 import qualified LinearScan.IApplicative as IApplicative
@@ -20,12 +19,9 @@ import qualified LinearScan.Lib as Lib
 import qualified LinearScan.List0 as List0
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
-import qualified LinearScan.Peano as Peano
-import qualified LinearScan.Plus as Plus
 import qualified LinearScan.Range as Range
 import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Vector0 as Vector0
-import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssrnat as Ssrnat
 
@@ -117,7 +113,7 @@ _LinearScan__V__case0 :: a2 -> (LinearScan__V__Coq_t a1) -> a2
 _LinearScan__V__case0 h v =
   case v of {
    LinearScan__V__Coq_nil -> h;
-   LinearScan__V__Coq_cons h0 n t -> unsafeCoerce (\_ -> Datatypes.id)}
+   LinearScan__V__Coq_cons h0 n t -> unsafeCoerce (\_ -> (Prelude.id))}
 
 _LinearScan__V__caseS :: (a1 -> Prelude.Int -> (LinearScan__V__Coq_t 
                          a1) -> a2) -> Prelude.Int -> (LinearScan__V__Coq_t
@@ -244,11 +240,11 @@ _LinearScan__V__shiftrepeat n v =
 _LinearScan__V__trunc :: Prelude.Int -> Prelude.Int -> (LinearScan__V__Coq_t
                          a1) -> LinearScan__V__Coq_t a1
 _LinearScan__V__trunc n p x =
-  Datatypes.nat_rect (\_ v -> Logic.eq_rect n v (Peano.minus n 0))
+  Datatypes.nat_rect (\_ v -> Logic.eq_rect n v ((Prelude.-) n 0))
     (\p0 f _ v ->
-    _LinearScan__V__shiftout (Peano.minus n (Prelude.succ p0))
-      (Logic.eq_rect_r (Peano.minus (Prelude.succ n) (Prelude.succ p0))
-        (f __ v) (Prelude.succ (Peano.minus n (Prelude.succ p0))))) p __ x
+    _LinearScan__V__shiftout ((Prelude.-) n (Prelude.succ p0))
+      (Logic.eq_rect_r ((Prelude.-) (Prelude.succ n) (Prelude.succ p0))
+        (f __ v) (Prelude.succ ((Prelude.-) n (Prelude.succ p0))))) p __ x
 
 _LinearScan__V__append :: Prelude.Int -> Prelude.Int -> (LinearScan__V__Coq_t
                           a1) -> (LinearScan__V__Coq_t a1) ->
@@ -275,8 +271,8 @@ _LinearScan__V__rev_append :: Prelude.Int -> Prelude.Int ->
                               (LinearScan__V__Coq_t a1) ->
                               LinearScan__V__Coq_t a1
 _LinearScan__V__rev_append n p v w =
-  Logic.eq_rect_r (Plus.tail_plus n p)
-    (_LinearScan__V__rev_append_tail n p v w) ((Prelude.+) n p)
+  Logic.eq_rect_r ((Prelude.+) n p) (_LinearScan__V__rev_append_tail n p v w)
+    ((Prelude.+) n p)
 
 _LinearScan__V__rev :: Prelude.Int -> (LinearScan__V__Coq_t a1) ->
                        LinearScan__V__Coq_t a1
@@ -347,10 +343,10 @@ _LinearScan__V__fold_left2 f a n v w =
    LinearScan__V__Coq_nil ->
     case w of {
      LinearScan__V__Coq_nil -> a;
-     LinearScan__V__Coq_cons h n0 t -> unsafeCoerce (\_ -> Datatypes.id)};
+     LinearScan__V__Coq_cons h n0 t -> unsafeCoerce (\_ -> (Prelude.id))};
    LinearScan__V__Coq_cons vh vn vt ->
     case w of {
-     LinearScan__V__Coq_nil -> unsafeCoerce (\_ -> Datatypes.id) vt;
+     LinearScan__V__Coq_nil -> unsafeCoerce (\_ -> (Prelude.id)) vt;
      LinearScan__V__Coq_cons wh n0 wt ->
       _LinearScan__V__fold_left2 f (f a vh wh) n0 vt wt}}
 
@@ -358,7 +354,7 @@ _LinearScan__V__of_list :: ([] a1) -> LinearScan__V__Coq_t a1
 _LinearScan__V__of_list l =
   case l of {
    [] -> LinearScan__V__Coq_nil;
-   (:) h tail -> LinearScan__V__Coq_cons h (Datatypes.length tail)
+   (:) h tail -> LinearScan__V__Coq_cons h ((Data.List.length) tail)
     (_LinearScan__V__of_list tail)}
 
 _LinearScan__V__to_list :: Prelude.Int -> (LinearScan__V__Coq_t a1) -> [] a1
@@ -468,9 +464,9 @@ _LinearScan__fixedIntervals s =
 _LinearScan__all_state_lists :: LinearScan__ScanStateDesc -> []
                                 LinearScan__IntervalId
 _LinearScan__all_state_lists s =
-  Seq.cat (_LinearScan__unhandled s)
-    (Seq.cat (_LinearScan__active s)
-      (Seq.cat (_LinearScan__inactive s) (_LinearScan__handled s)))
+  (Prelude.++) (_LinearScan__unhandled s)
+    ((Prelude.++) (_LinearScan__active s)
+      ((Prelude.++) (_LinearScan__inactive s) (_LinearScan__handled s)))
 
 _LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
                               LinearScan__IntervalId -> Prelude.Maybe
@@ -508,7 +504,7 @@ _LinearScan__unhandledExtent sd =
      (:) i0 l0 ->
       let {
        f = \n x ->
-        Ssrnat.addn n
+        (Prelude.+) n
           (Interval.intervalExtent
             (
               (_LinearScan__V__nth (_LinearScan__nextInterval sd)
@@ -529,7 +525,7 @@ _LinearScan__registerWithHighestPos =
          Prelude.Just n ->
           case x of {
            Prelude.Just m ->
-            case Ssrnat.leq (Prelude.succ n) m of {
+            case (Prelude.<=) (Prelude.succ n) m of {
              Prelude.True -> (,) reg (Prelude.Just m);
              Prelude.False -> (,) r (Prelude.Just n)};
            Prelude.Nothing -> (,) reg Prelude.Nothing};
@@ -562,7 +558,7 @@ _LinearScan__coq_ScanStateCursor_rec sd f =
 
 _LinearScan__curId :: LinearScan__ScanStateDesc -> LinearScan__IntervalId
 _LinearScan__curId sd =
-  Lib.safe_hd (_LinearScan__unhandled sd)
+  (Prelude.head) (_LinearScan__unhandled sd)
 
 _LinearScan__curIntDetails :: LinearScan__ScanStateDesc ->
                               Interval.IntervalDesc
@@ -880,7 +876,7 @@ _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc ->
                                    (Prelude.Maybe
                                    (LinearScan__SState LinearScan__PhysReg))
 _LinearScan__tryAllocateFreeReg pre =
-  Basics.apply (_LinearScan__withCursor pre) (\sd _ ->
+  (Prelude.$) (_LinearScan__withCursor pre) (\sd _ ->
     let {sd0 = _LinearScan__curStateDesc sd} in
     let {
      go = \n ->
@@ -893,7 +889,7 @@ _LinearScan__tryAllocateFreeReg pre =
                          _LinearScan__maxReg)}
     in
     let {
-     intersectingIntervals = Seq.filter (\x ->
+     intersectingIntervals = (Prelude.filter) (\x ->
                                Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
@@ -921,10 +917,10 @@ _LinearScan__tryAllocateFreeReg pre =
       let {
        maction = case mres of {
                   Prelude.Just n ->
-                   case EqNat.beq_nat n 0 of {
+                   case (Prelude.==) n 0 of {
                     Prelude.True -> Prelude.Nothing;
                     Prelude.False -> Prelude.Just
-                     (case Ssrnat.leq (Prelude.succ
+                     (case (Prelude.<=) (Prelude.succ
                              (Interval.intervalEnd
                                ( (_LinearScan__curIntDetails sd)))) n of {
                        Prelude.True -> success;
@@ -943,7 +939,7 @@ _LinearScan__allocateBlockedReg :: LinearScan__ScanStateDesc ->
                                    LinearScan__SState
                                    (Prelude.Maybe LinearScan__PhysReg)
 _LinearScan__allocateBlockedReg pre =
-  Basics.apply (_LinearScan__withCursor pre) (\sd _ ->
+  (Prelude.$) (_LinearScan__withCursor pre) (\sd _ ->
     let {start = Interval.intervalStart ( (_LinearScan__curIntDetails sd))}
     in
     let {pos = _LinearScan__curPosition sd} in
@@ -961,7 +957,7 @@ _LinearScan__allocateBlockedReg pre =
                        _LinearScan__maxReg)}
     in
     let {
-     intersectingIntervals = Seq.filter (\x ->
+     intersectingIntervals = (Prelude.filter) (\x ->
                                Interval.intervalsIntersect
                                  ( (_LinearScan__curIntDetails sd))
                                  (
@@ -974,7 +970,7 @@ _LinearScan__allocateBlockedReg pre =
     case _LinearScan__registerWithHighestPos nextUsePos of {
      (,) reg mres ->
       case case mres of {
-            Prelude.Just n -> Ssrnat.leq (Prelude.succ n) start;
+            Prelude.Just n -> (Prelude.<=) (Prelude.succ n) start;
             Prelude.Nothing -> Prelude.False} of {
        Prelude.True ->
         _LinearScan__stbind (\x ->
@@ -1019,7 +1015,7 @@ _LinearScan__checkActiveIntervals pre pos =
             [] -> ss;
             (:) x xs ->
              let {
-              st1 = case Ssrnat.leq (Prelude.succ
+              st1 = case (Prelude.<=) (Prelude.succ
                            (Interval.intervalEnd
                              (
                                (_LinearScan__V__nth
@@ -1043,7 +1039,7 @@ _LinearScan__checkActiveIntervals pre pos =
              go sd st1 xs}}
         in go}
   in
-  Basics.apply (_LinearScan__withScanStatePO pre) (\sd _ ->
+  (Prelude.$) (_LinearScan__withScanStatePO pre) (\sd _ ->
     IState.iput (go sd sd (Lib.list_membership (_LinearScan__active sd))))
 
 _LinearScan__checkInactiveIntervals :: LinearScan__ScanStateDesc ->
@@ -1057,7 +1053,7 @@ _LinearScan__checkInactiveIntervals pre pos =
             [] -> ss;
             (:) x xs ->
              let {
-              st1 = case Ssrnat.leq (Prelude.succ
+              st1 = case (Prelude.<=) (Prelude.succ
                            (Interval.intervalEnd
                              (
                                (_LinearScan__V__nth
@@ -1080,14 +1076,14 @@ _LinearScan__checkInactiveIntervals pre pos =
              go sd st1 xs}}
         in go}
   in
-  Basics.apply (_LinearScan__withScanStatePO pre) (\sd _ ->
+  (Prelude.$) (_LinearScan__withScanStatePO pre) (\sd _ ->
     IState.iput (go sd sd (Lib.list_membership (_LinearScan__inactive sd))))
 
 _LinearScan__handleInterval :: LinearScan__ScanStateDesc ->
                                LinearScan__SState
                                (Prelude.Maybe LinearScan__PhysReg)
 _LinearScan__handleInterval pre =
-  Basics.apply (unsafeCoerce (_LinearScan__withCursor pre)) (\sd _ ->
+  (Prelude.$) (unsafeCoerce (_LinearScan__withCursor pre)) (\sd _ ->
     let {position = _LinearScan__curPosition sd} in
     _LinearScan__stbind (\x ->
       _LinearScan__stbind (\x0 ->
@@ -1099,9 +1095,9 @@ _LinearScan__handleInterval pre =
            Prelude.Nothing ->
             unsafeCoerce (_LinearScan__allocateBlockedReg pre)})
           (_LinearScan__tryAllocateFreeReg pre))
-        (Basics.apply (_LinearScan__liftLen pre)
+        ((Prelude.$) (_LinearScan__liftLen pre)
           (_LinearScan__checkInactiveIntervals pre position)))
-      (Basics.apply (_LinearScan__liftLen pre)
+      ((Prelude.$) (_LinearScan__liftLen pre)
         (_LinearScan__checkActiveIntervals pre position)))
 
 _LinearScan__linearScan_F :: (LinearScan__ScanStateDesc -> () ->
@@ -1110,33 +1106,33 @@ _LinearScan__linearScan_F :: (LinearScan__ScanStateDesc -> () ->
                              LinearScan__ScanStateDesc
 _LinearScan__linearScan_F linearScan0 sd =
   case List0.destruct_list (_LinearScan__unhandled sd) of {
-   Specif.Coq_inleft s ->
+   Prelude.Just s ->
     case IState.runIState (_LinearScan__handleInterval sd) sd of {
      (,) o ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo') __};
-   Specif.Coq_inright -> sd}
+   Prelude.Nothing -> sd}
 
 _LinearScan__linearScan_terminate :: LinearScan__ScanStateDesc ->
                                      LinearScan__ScanStateDesc
 _LinearScan__linearScan_terminate sd =
   case List0.destruct_list (_LinearScan__unhandled sd) of {
-   Specif.Coq_inleft s ->
+   Prelude.Just s ->
     case IState.runIState (_LinearScan__handleInterval sd) sd of {
      (,) o ssinfo' ->
       Specif.sig_rec (\rec_res _ -> rec_res)
         (_LinearScan__linearScan_terminate
           (_LinearScan__thisDesc sd ssinfo'))};
-   Specif.Coq_inright -> sd}
+   Prelude.Nothing -> sd}
 
 _LinearScan__linearScan :: LinearScan__ScanStateDesc ->
                            LinearScan__ScanStateDesc
 _LinearScan__linearScan sd =
   case List0.destruct_list (_LinearScan__unhandled sd) of {
-   Specif.Coq_inleft s ->
+   Prelude.Just s ->
     case IState.runIState (_LinearScan__handleInterval sd) sd of {
      (,) o ssinfo' ->
       Specif.sig_rec (\rec_res _ -> rec_res)
         (_LinearScan__linearScan (_LinearScan__thisDesc sd ssinfo'))};
-   Specif.Coq_inright -> sd}
+   Prelude.Nothing -> sd}
 
 data LinearScan__R_linearScan =
    LinearScan__R_linearScan_0 LinearScan__ScanStateDesc LinearScan__IntervalId 
@@ -1346,8 +1342,8 @@ _LinearScan__processBlocks maxVirtReg blocks =
         case x of {
          (,) y r ->
           case y of {
-           (,) mb me -> (,) ((,) (liftOr Ssrnat.minn mb pos)
-            (liftOr Ssrnat.maxn me pos)) r}};
+           (,) mb me -> (,) ((,) (liftOr (Prelude.min) mb pos)
+            (liftOr (Prelude.max) me pos)) r}};
        Prelude.False -> x}}
     in
     let {

@@ -2,6 +2,7 @@ module LinearScan.NonEmpty0 where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 
 data NonEmpty a =
    NE_Sing a

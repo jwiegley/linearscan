@@ -5,6 +5,7 @@ module LinearScan.Eqtype where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.Ssrbool as Ssrbool
 
 
@@ -72,8 +73,4 @@ _Equality__clone :: Equality__Coq_type -> (Equality__Coq_mixin_of a1) ->
                     (Equality__Coq_sort -> a1) -> Equality__Coq_type
 _Equality__clone cT c x =
   _Equality__pack c
-
-eq_op :: Equality__Coq_type -> Ssrbool.Coq_rel Equality__Coq_sort
-eq_op t =
-  _Equality__op (_Equality__coq_class t)
 

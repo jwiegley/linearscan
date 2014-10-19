@@ -2,6 +2,7 @@ module LinearScan.Alternative where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.Applicative as Applicative
 
 

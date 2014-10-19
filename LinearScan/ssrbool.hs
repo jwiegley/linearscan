@@ -2,6 +2,7 @@ module LinearScan.Ssrbool where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"

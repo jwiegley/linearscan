@@ -261,7 +261,7 @@ Lemma StronglySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
 Proof. intros. inversion H; subst. assumption. Qed.
 
 Definition safe_hd {a} (xs : list a) (H : (length xs > 0)%nat) : a.
-Proof. elim: xs H => //. Qed.
+Proof. elim: xs H => //. Defined.
 
 Fixpoint safe_last {a} (xs : list a) (H : (length xs > 0)%nat) : a.
-Proof. elim: xs H => //. Qed.
+Proof. elim: xs H => //. Defined.

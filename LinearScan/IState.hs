@@ -5,6 +5,7 @@ module LinearScan.IState where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
 import qualified LinearScan.IMonad as IMonad

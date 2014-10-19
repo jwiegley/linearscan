@@ -5,13 +5,11 @@ module LinearScan.Interval where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.Alternative as Alternative
-import qualified LinearScan.Basics as Basics
-import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.Endo as Endo
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
-import qualified LinearScan.Ssrnat as Ssrnat
 
 
 
@@ -54,12 +52,12 @@ intervalEnd i =
 
 intervalCoversPos :: IntervalDesc -> Prelude.Int -> Prelude.Bool
 intervalCoversPos d pos =
-  (Prelude.&&) (Ssrnat.leq (intervalStart d) pos)
-    (Ssrnat.leq (Prelude.succ pos) (intervalEnd d))
+  (Prelude.&&) ((Prelude.<=) (intervalStart d) pos)
+    ((Prelude.<=) (Prelude.succ pos) (intervalEnd d))
 
 intervalExtent :: IntervalDesc -> Prelude.Int
 intervalExtent d =
-  Ssrnat.subn (intervalEnd d) (intervalStart d)
+  (Prelude.-) (intervalEnd d) (intervalStart d)
 
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
@@ -102,14 +100,14 @@ findIntervalUsePos i f =
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
   Endo.fmap (unsafeCoerce Endo.option_Functor)
-    (Basics.compose Range.uloc Datatypes.snd)
+    ((Prelude..) Range.uloc (Prelude.snd))
     (unsafeCoerce
       (findIntervalUsePos d (\u ->
-        Ssrnat.leq (Prelude.succ pos) (Range.uloc u))))
+        (Prelude.<=) (Prelude.succ pos) (Range.uloc u))))
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
   Endo.fmap (unsafeCoerce Endo.option_Functor)
-    (Basics.compose Range.uloc Datatypes.snd)
+    ((Prelude..) Range.uloc (Prelude.snd))
     (unsafeCoerce (findIntervalUsePos d Range.regReq))
 

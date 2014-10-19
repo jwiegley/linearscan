@@ -5,11 +5,11 @@ module LinearScan.Range where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.Alternative as Alternative
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
-import qualified LinearScan.Ssrnat as Ssrnat
 
 
 
@@ -97,14 +97,14 @@ type RangeSig = RangeDesc
 
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
-  case Ssrnat.leq (Prelude.succ (rbeg x)) (rbeg y) of {
-   Prelude.True -> Ssrnat.leq (Prelude.succ (rbeg y)) (rend x);
-   Prelude.False -> Ssrnat.leq (Prelude.succ (rbeg x)) (rend y)}
+  case (Prelude.<=) (Prelude.succ (rbeg x)) (rbeg y) of {
+   Prelude.True -> (Prelude.<=) (Prelude.succ (rbeg y)) (rend x);
+   Prelude.False -> (Prelude.<=) (Prelude.succ (rbeg x)) (rend y)}
 
 rangeIntersectionPoint :: RangeDesc -> RangeDesc -> Prelude.Maybe Prelude.Int
 rangeIntersectionPoint x y =
   case rangesIntersect x y of {
-   Prelude.True -> Prelude.Just (Ssrnat.minn (rbeg x) (rbeg y));
+   Prelude.True -> Prelude.Just ((Prelude.min) (rbeg x) (rbeg y));
    Prelude.False -> Prelude.Nothing}
 
 findRangeUsePos :: RangeDesc -> (UsePos -> Prelude.Bool) -> Prelude.Maybe

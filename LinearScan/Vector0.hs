@@ -5,12 +5,11 @@ module LinearScan.Vector0 where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.Fin0 as Fin0
 import qualified LinearScan.Fin as Fin
 import qualified LinearScan.Logic as Logic
-import qualified LinearScan.Peano as Peano
-import qualified LinearScan.Plus as Plus
 
 
 
@@ -77,7 +76,7 @@ _V__case0 :: a2 -> (V__Coq_t a1) -> a2
 _V__case0 h v =
   case v of {
    V__Coq_nil -> h;
-   V__Coq_cons h0 n t -> unsafeCoerce (\_ -> Datatypes.id)}
+   V__Coq_cons h0 n t -> unsafeCoerce (\_ -> (Prelude.id))}
 
 _V__caseS :: (a1 -> Prelude.Int -> (V__Coq_t a1) -> a2) -> Prelude.Int ->
              (V__Coq_t a1) -> a2
@@ -186,11 +185,11 @@ _V__shiftrepeat n v =
 
 _V__trunc :: Prelude.Int -> Prelude.Int -> (V__Coq_t a1) -> V__Coq_t a1
 _V__trunc n p x =
-  Datatypes.nat_rect (\_ v -> Logic.eq_rect n v (Peano.minus n 0))
+  Datatypes.nat_rect (\_ v -> Logic.eq_rect n v ((Prelude.-) n 0))
     (\p0 f _ v ->
-    _V__shiftout (Peano.minus n (Prelude.succ p0))
-      (Logic.eq_rect_r (Peano.minus (Prelude.succ n) (Prelude.succ p0))
-        (f __ v) (Prelude.succ (Peano.minus n (Prelude.succ p0))))) p __ x
+    _V__shiftout ((Prelude.-) n (Prelude.succ p0))
+      (Logic.eq_rect_r ((Prelude.-) (Prelude.succ n) (Prelude.succ p0))
+        (f __ v) (Prelude.succ ((Prelude.-) n (Prelude.succ p0))))) p __ x
 
 _V__append :: Prelude.Int -> Prelude.Int -> (V__Coq_t a1) -> (V__Coq_t 
               a1) -> V__Coq_t a1
@@ -211,7 +210,7 @@ _V__rev_append_tail n p v w =
 _V__rev_append :: Prelude.Int -> Prelude.Int -> (V__Coq_t a1) -> (V__Coq_t
                   a1) -> V__Coq_t a1
 _V__rev_append n p v w =
-  Logic.eq_rect_r (Plus.tail_plus n p) (_V__rev_append_tail n p v w)
+  Logic.eq_rect_r ((Prelude.+) n p) (_V__rev_append_tail n p v w)
     ((Prelude.+) n p)
 
 _V__rev :: Prelude.Int -> (V__Coq_t a1) -> V__Coq_t a1
@@ -270,17 +269,17 @@ _V__fold_left2 f a n v w =
    V__Coq_nil ->
     case w of {
      V__Coq_nil -> a;
-     V__Coq_cons h n0 t -> unsafeCoerce (\_ -> Datatypes.id)};
+     V__Coq_cons h n0 t -> unsafeCoerce (\_ -> (Prelude.id))};
    V__Coq_cons vh vn vt ->
     case w of {
-     V__Coq_nil -> unsafeCoerce (\_ -> Datatypes.id) vt;
+     V__Coq_nil -> unsafeCoerce (\_ -> (Prelude.id)) vt;
      V__Coq_cons wh n0 wt -> _V__fold_left2 f (f a vh wh) n0 vt wt}}
 
 _V__of_list :: ([] a1) -> V__Coq_t a1
 _V__of_list l =
   case l of {
    [] -> V__Coq_nil;
-   (:) h tail -> V__Coq_cons h (Datatypes.length tail) (_V__of_list tail)}
+   (:) h tail -> V__Coq_cons h ((Data.List.length) tail) (_V__of_list tail)}
 
 _V__to_list :: Prelude.Int -> (V__Coq_t a1) -> [] a1
 _V__to_list n v =

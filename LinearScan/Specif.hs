@@ -2,6 +2,7 @@ module LinearScan.Specif where
 
 import qualified Prelude
 import qualified Data.List
+import qualified LinearScan.Utils
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -22,14 +23,3 @@ type Coq_sig2 a =
   a
   -- singleton inductive, whose constructor was exist2
   
-data Coq_sigT a p =
-   Coq_existT a p
-
-data Coq_sumbool =
-   Coq_left
- | Coq_right
-
-data Coq_sumor a =
-   Coq_inleft a
- | Coq_inright
-
