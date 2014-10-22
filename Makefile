@@ -113,7 +113,7 @@ endif
 all: Hask/State.vo $(VOFILES) LinearScan/Main.hs
 	egrep -in '(admit|undefined)' *.v | egrep -v 'Definition undefined'
 
-Hask/State.vo:
+Hask/State.vo: Hask/State.v
 	(cd Hask ; make)
 
 LinearScan/Main.hs: Main.vo
