@@ -1,4 +1,4 @@
--I . -R Hask Hask
+-I . -R Hask Hask -dont-load-proofs
 Compare.v
 Fin.v
 Vector.v
