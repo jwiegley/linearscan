@@ -227,7 +227,6 @@ Definition handleInterval {pre}
   (* position = start position of current *)
   withCursor $ fun _ cur =>
     let position := curPosition cur in
-
     (* // check for intervals in active that are handled or inactive *)
     liftLen $ checkActiveIntervals position ;;;
     (* // check for intervals in inactive that are handled or active *)
@@ -256,14 +255,14 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
                    ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
-    match runIState handleInterval ssinfo with
-      (_, ssinfo') =>
-        linearScan (thisDesc ssinfo') (thisState ssinfo')
-    end
+    let (_, ssinfo') := runIState handleInterval ssinfo in
+    linearScan (thisDesc ssinfo') (thisState ssinfo')
   | inright _ => (sd; st)
   end.
-(* We must prove that after every call to handleInterval, the total extent
+(* We must prove that after every call to [handleInterval], the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof. intros; clear; by case: ssinfo' => ?; case=> /= _ /ltP. Qed.
+Proof.
+  intros; clear; abstract by case: ssinfo' => ?; case=> /= _ /ltP.
+Qed.
 
 End MAllocate.
