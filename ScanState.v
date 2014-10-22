@@ -29,8 +29,8 @@ Record ScanStateDesc := {
     active    : list IntervalId;           (* ranges over pos *)
     inactive  : list IntervalId;           (* falls in lifetime hole *)
 
-    unhandledIds    := map fst unhandled;
-    unhandledStarts := map snd unhandled;
+    unhandledIds    := map (@fst _ _) unhandled;
+    unhandledStarts := map (@snd _ _) unhandled;
 
     (* jww (2014-10-01): Prove: The length of the active intervals list <
        maxReg. *)
@@ -89,10 +89,10 @@ Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
 
 Lemma uniq_unhandledExtent_cons
   : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
-           (act act' inact inact' hnd hnd' : list (fin ni))
-           (lau : uniq (map fst unh ++ act ++ inact ++ hnd))
-           (lau' : uniq ((fst i :: map fst unh) ++ act' ++ inact' ++ hnd'))
-           unhs unhs',
+      (act act' inact inact' hnd hnd' : list (fin ni))
+      (lau : uniq (map (@fst _ _) unh ++ act ++ inact ++ hnd))
+      (lau' : uniq ((fst i :: map (@fst _ _) unh) ++ act' ++ inact' ++ hnd'))
+      unhs unhs',
   unhandledExtent
     {| nextInterval     := ni
      ; unhandled        := unh
@@ -361,7 +361,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
 
   | ScanState_moveUnhandledToActive
       ni unh (* unhsort *) act inact hnd ints assgn fixints x reg unhs :
-    forall lau : uniq ((fst x :: map fst unh) ++ act ++ inact ++ hnd),
+    forall lau : uniq ((fst x :: map (@fst _ _) unh) ++ act ++ inact ++ hnd),
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh

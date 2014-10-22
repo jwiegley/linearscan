@@ -130,25 +130,32 @@ Definition usePosSplit (f : UsePos -> bool)
   (Hlast_false : ~~ f (NE_last l))
   : UsePosDefiniteSublistsOf l.
 Proof.
-  pose (usePosSpan f l). destruct u.
+  pose (usePosSpan f l).
+  destruct u.
   unfold UsePosDefiniteSublistsOf.
-  induction l; simpl in *. intuition.
+  induction l; simpl in *.
+  inversion Hlen.
   destruct x.
 
   destruct o as [o| ];
-  destruct o0 as [o0| ]; intuition.
+  destruct o0 as [o0| ];
+  intuition.
   - Case "(Some, Some)".
-    inversion y. exists (o, o0). assumption.
+    inversion y. exists (o, o0).
+    assumption.
 
   - Case "(Some, None)".
     apply NE_Forall_last in H0.
-    rewrite <- H in *. simpl in H0. exfalso.
+    rewrite <- H in *.
+    simpl in H0. exfalso.
     apply (eq_true_false_abs (f (NE_last l)));
       [ by [] | exact: negbTE ].
 
   - Case "(None, Some)".
-    rewrite <- H in *. simpl in H0. exfalso.
-    apply (eq_true_false_abs (f a)); assumption.
+    rewrite <- H in *.
+    simpl in H0. exfalso.
+    apply (eq_true_false_abs (f a));
+      assumption.
 Defined.
 
 (** ** RangeDesc *)
