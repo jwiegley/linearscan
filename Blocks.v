@@ -1,11 +1,5 @@
 Require Import Allocate.
-Require Import Fin.
-Require Import Interval.
 Require Import Lib.
-Require Import Machine.
-Require Import NonEmpty.
-Require Import Range.
-Require Import Vector.
 
 Open Scope nat_scope.
 
@@ -130,8 +124,8 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
   match references b with
   | V.nil => boundedTransport (ltnSSn _) rest'
   | V.cons v _ vs =>
-    let x := consr (V.nth rest' v) in
-    V.replace (boundedTransport (ltnSSn _) rest') v x
+    let x := consr (V.nth rest' (to_vfin v)) in
+    V.replace (boundedTransport (ltnSSn _) rest') (to_vfin v) x
   (* jww (2014-10-18): See note above. *)
   (* | V.cons (inr r) _ vs => undefined *)
   end.

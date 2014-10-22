@@ -7,18 +7,15 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
 Require Import Lib.
-Require Import Machine.
 Require Import Blocks.
-(* jww (2014-10-10): Remove this and the export of [splitRange] below, once
-   interval splitting is integrated into Allocate.v. *)
-Require Import Range.
+Require Import Machine.
 
 Module MyMachine <: Machine.
 
 Definition maxReg := 32.
 
-Lemma registers_exist : (maxReg > 0)%coq_nat.
-Proof. unfold maxReg. omega. Qed.
+Lemma registers_exist : (maxReg > 0).
+Proof. unfold maxReg. ssomega. Qed.
 
 End MyMachine.
 
@@ -55,14 +52,17 @@ Extract Inlined Constant apply      => "(Prelude.$)".
 Extract Inlined Constant beq_nat    => "(Prelude.==)".
 Extract Inlined Constant compose    => "(Prelude..)".
 Extract Inlined Constant eqb        => "(Prelude.==)".
-Extract Inlined Constant existsb    => "(Prelude.any)".
+(* Extract Inlined Constant existsb    => "(Prelude.any)". *)
 Extract Inlined Constant filter     => "(Prelude.filter)".
-Extract Inlined Constant fold_left  => "(\f -> Prelude.flip (Data.List.foldl' f))".
-Extract Inlined Constant fold_right => "Prelude.foldr".
+(* Extract Inlined Constant fold_left  => "(\f -> Prelude.flip (Data.List.foldl' f))". *)
+Extract Inlined Constant foldl      => "Data.List.foldl'".
+(* Extract Inlined Constant fold_right => "Prelude.foldr". *)
+Extract Inlined Constant foldr      => "Prelude.foldr".
 Extract Inlined Constant fst        => "(Prelude.fst)".
 Extract Inlined Constant id         => "(Prelude.id)".
 Extract Inlined Constant length     => "(Data.List.length)".
 Extract Inlined Constant map        => "(Prelude.map)".
+Extract Inlined Constant predn      => "(Prelude.pred)".
 Extract Inlined Constant minus      => "(Prelude.-)".
 Extract Inlined Constant mult       => "(Prelude.*)".
 Extract Inlined Constant negb       => "(Prelude.not)".
@@ -89,7 +89,7 @@ Extract Inlined Constant leq  => "(Prelude.<=)".
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction LinearScan.allocateRegisters splitRange.
+Separate Extraction LinearScan.allocateRegisters Range.splitRange.
 
 (* Show which axioms we depend on for this development. *)
 Print Assumptions LinearScan.allocateRegisters.

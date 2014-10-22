@@ -1,8 +1,7 @@
 Require Import Lib.
-Require Import NonEmpty.
-Require Import Hask.Alternative.
 
 Open Scope nat_scope.
+Open Scope program_scope.
 
 Import EqNotations.
 
@@ -363,7 +362,7 @@ Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
   let check u := if f u then Some u else None in
   let fix go us := match us with
       | NE_Sing u     => check u
-      | NE_Cons u us' => check u <|> go us'
+      | NE_Cons u us' => option_choose (check u) (go us')
       end in
   go (ups r).
 
@@ -479,8 +478,10 @@ Defined.
 
 Module RangeTests.
 
-Import NonEmptyNotations.
-Import UsePosNotations.
+Module Import E := NonEmptyNotations.
+Module Import U := UsePosNotations.
+
+Open Scope list_scope.
 
 Fixpoint generateRangeBuilder
   (start index : nat) (Hodd : odd start) {struct index}
@@ -512,7 +513,8 @@ Defined.
 Definition testRangeSpan (start finish : nat) (Hodd : odd start)
   (H : start < finish) (before : nat) :=
   let r := (rangeSpan (fun u => uloc u < before) (generateRange Hodd H).2).1 in
-  (fmap (fun x => ups x.1) (fst r), fmap (fun x => ups x.1) (snd r)).
+  (option_map (fun x => ups x.1) (fst r),
+   option_map (fun x => ups x.1) (snd r)).
 
 Example lt_1_9 : 1 < 9. done. Qed.
 

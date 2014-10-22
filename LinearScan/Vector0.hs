@@ -7,9 +7,9 @@ import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
 import qualified LinearScan.Datatypes as Datatypes
-import qualified LinearScan.Fin0 as Fin0
 import qualified LinearScan.Fin as Fin
 import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Fintype as Fintype
 
 
 
@@ -292,9 +292,30 @@ _V__to_list n v =
 
 type Vec a = V__Coq_t a
 
-fold_left_with_index :: Prelude.Int -> (Fin0.Coq_fin -> a2 -> a1 -> a2) -> a2
-                        -> (Vec a1) -> a2
+type Coq_fin = Fintype.Coq_ordinal
+
+type Coq_vfin = Fin.Coq_t
+
+fin_contra :: Coq_fin -> a1
+fin_contra =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+to_vfin :: Prelude.Int -> Coq_fin -> Coq_vfin
+to_vfin n x =
+  let {_evar_0_ = \h -> fin_contra h} in
+  let {
+   _evar_0_0 = \n0 _top_assumption_ ->
+    Fin.of_nat_lt _top_assumption_ (Prelude.succ n0)}
+  in
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    _evar_0_ x)
+    (\x0 ->
+    _evar_0_0 x0 x)
+    n
+
+fold_left_with_index :: Prelude.Int -> (Coq_fin -> a2 -> a1 -> a2) -> a2 ->
+                        (Vec a1) -> a2
 fold_left_with_index n f b v =
-  _V__t_rect (\f0 -> b) (\h n0 v0 iHv f0 ->
-    iHv (\h0 x x0 -> let {h1 = Fin0.fin_expand n0 h0} in f0 h1 x x0)) n v f
+  _V__t_rect (\f0 -> b) (\h n0 v0 iHv f0 -> iHv (\x x0 x1 -> x0)) n v f
 

@@ -1,14 +1,7 @@
-Require Export Machine.
-
-Require Import Coq.Structures.Orders.
-Require Import Fin.
-Require Import Interval.
 Require Import Lib.
-Require Import NoDup.
-Require Import Vector.
-Require Coq.Vectors.Vector.
 
-Module Import LN := ListNotations.
+Require Export Machine.
+Require Export Interval.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -22,9 +15,6 @@ Definition maxReg := maxReg.
 Definition PhysReg := fin maxReg.
 Definition registers_exist := registers_exist.
 
-Module V := Coq.Vectors.Vector.
-Definition Vec := V.t.
-
 (** ** ScanStateDesc *)
 
 (** A [ScanStateDesc] is always relative to a current position as we move
@@ -35,9 +25,11 @@ Record ScanStateDesc := {
     nextInterval : nat;
     IntervalId   := fin nextInterval;
 
-    unhandled : list IntervalId;   (* starts after pos *)
-    active    : list IntervalId;   (* ranges over pos *)
-    inactive  : list IntervalId;   (* falls in lifetime hole *)
+    unhandled : list (IntervalId * nat);   (* starts after pos *)
+    active    : list IntervalId;           (* ranges over pos *)
+    inactive  : list IntervalId;           (* falls in lifetime hole *)
+
+    unhandledIds := map fst unhandled;
 
     (* jww (2014-10-01): Prove: The length of the active intervals list <
        maxReg. *)
@@ -77,39 +69,37 @@ Record ScanStateDesc := {
        everything is functional. *)
     (* unhandled_sorted : StronglySorted cmp_le unhandled; *)
 
-    all_state_lists  := unhandled ++ active ++ inactive ++ handled;
-    lists_are_unique : NoDup all_state_lists
+    all_state_lists  := unhandledIds ++ active ++ inactive ++ handled;
+    lists_are_unique : uniq all_state_lists
 }.
 
 Definition getInterval `(i : IntervalId sd) :=
- (V.nth (intervals sd) i).2.
+ (V.nth (intervals sd) (to_vfin i)).2.
 
-Definition getAssignment `(i : IntervalId sd) := V.nth (assignments sd) i.
+Definition getAssignment `(i : IntervalId sd) :=
+  V.nth (assignments sd) (to_vfin i).
 
 (** Given an [IntervalId] from one [ScanStateDesc], promote it to an
     [IntervalId] within another [ScanStateDesc], provided we can demonstrate
     that the [nextInterval] is at least as large. *)
 Definition transportId `(H : nextInterval sd <= nextInterval sd')
   : IntervalId sd -> IntervalId sd'.
-Proof.
-  case: (@leP (nextInterval sd) (nextInterval sd')) => H';
-    first exact: (fin_transport H').
-  contradiction H'. exact: le_dec.
-Defined.
+Proof. by apply widen_ord. Defined.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
-  match unhandled sd with
+  match unhandledIds sd with
   | nil => 0
-  | [i] => intervalExtent (V.nth (intervals sd) i).2
-  | xs  => let f n x := n + intervalExtent (V.nth (intervals sd) x).2 in
-           fold_left f xs 0
+  | [:: i] => intervalExtent (V.nth (intervals sd) (to_vfin i)).2
+  | xs  =>
+    let f n x := n + intervalExtent (V.nth (intervals sd) (to_vfin x)).2 in
+    foldl f 0 xs
   end.
 
-Lemma NoDup_unhandledExtent_cons
-  : forall ni i (unh : list (fin ni)) ints assgn assgn' fixints
+Lemma uniq_unhandledExtent_cons
+  : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
            (act act' inact inact' hnd hnd' : list (fin ni))
-           (lau : NoDup (unh ++ act ++ inact ++ hnd))
-           (lau' : NoDup ((i :: unh) ++ act' ++ inact' ++ hnd')),
+           (lau : uniq (map fst unh ++ act ++ inact ++ hnd))
+           (lau' : uniq ((fst i :: map fst unh) ++ act' ++ inact' ++ hnd')),
   unhandledExtent
     {| nextInterval     := ni
      ; unhandled        := unh
@@ -134,107 +124,180 @@ Lemma NoDup_unhandledExtent_cons
      |}.
 Proof.
   intros.
-  induction unh; unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (V.nth ints i).2). auto.
-  destruct unh; simpl;
-    first by (rewrite add0n; apply ltn_plus).
+  induction unh;
+  unfold unhandledExtent;
+  simpl; destruct i as [i beg];
+  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
+    auto.
+  destruct unh;
+  simpl; destruct a as [a ?];
+  first by (rewrite add0n; apply ltn_plus).
   apply fold_fold_lt; rewrite 2!add0n -addnA.
   exact: ltn_plus.
 Qed.
 
 Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
-  NoDup ((x :: unh) ++ act ++ inact ++ hnd)
-    -> NoDup (unh ++ (x :: act) ++ inact ++ hnd).
+  uniq ((x :: unh) ++ act ++ inact ++ hnd)
+    -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
 Proof.
-  intros. rewrite <- app_comm_cons.
-  apply NoDup_app_cons. assumption.
+  intros.
+  by rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons.
+Qed.
+
+Lemma uniq_nil : forall (a : eqType), @uniq a nil.
+Proof. by done. Qed.
+
+Lemma not_in_app : forall (a : eqType) x (l l' : list a),
+  x \notin (l ++ l') -> x \notin l.
+Proof.
+  move=> a x l l'.
+  rewrite mem_cat negb_orb.
+  move=> /andP H. inv H.
+Qed.
+
+Lemma not_in_rem : forall (a : eqType) x y (l : list a),
+  x \notin l -> x != y -> x \notin rem y l.
+Proof.
+  move=> a x y.
+  elim=> // x0 l IHl H Heqe /=.
+  case E: (x0 == y) /eqP;
+  move: in_cons H => ->;
+  move: negb_orb => -> /andP [H1 H2].
+    by [].
+  rewrite in_cons negb_orb.
+  apply/andP.
+  split; [ by [] | by apply IHl ].
+Qed.
+
+Lemma uniq_juggle : forall (a : eqType) (xs ys zs : list a),
+  uniq (xs ++ ys ++ zs) -> forall x, x \in xs
+    -> uniq (rem x xs ++ (x :: ys) ++ zs).
+Proof.
+  move=> a.
+  elim=> [|x xs IHxs] ys zs H x0 Hin //=.
+  case E: (x == x0) => /=.
+    move: E => /eqP <-.
+    by rewrite -cat1s uniq_catCA cat1s -cat_cons.
+  apply/andP.
+  split.
+    rewrite !mem_cat.
+    move: cat_uniq H => -> /and3P => [[H1 H2 H3]].
+    move: cons_uniq H1 => -> /andP => [[H4 H5]].
+    rewrite negb_orb.
+    apply/andP.
+    apply negbT in E.
+    split. by apply not_in_rem.
+    rewrite has_sym in H2.
+    inversion H2 as [H2'].
+    move: negb_orb H2' => -> /andP [H6 H7].
+    rewrite in_cons negb_orb.
+    by apply/andP.
+  apply IHxs.
+    inversion H as [H'].
+    by move: H' => /andP [_ ?].
+  move: in_cons Hin => -> /orP [He|_] //.
+  move: eq_sym E He => -> /eqP E /eqP He.
+  contradiction.
 Qed.
 
 Lemma move_active_to_inactive : forall sd x,
-  NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
-    -> In x (active sd)
-    -> NoDup (unhandled sd ++ remove cmp_eq_dec x (active sd) ++
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in active sd
+    -> uniq (unhandledIds sd ++ rem x (active sd) ++
               (x :: inactive sd) ++ handled sd).
 Proof.
   intros.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
-  rewrite <- app_assoc.
-  apply NoDup_juggle.
-  rewrite app_assoc.
-  rewrite app_assoc.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
+  rewrite uniq_catC.
+  rewrite <- catA.
+  rewrite <- catA.
+  apply uniq_juggle.
+  rewrite catA.
+  rewrite catA.
+  rewrite uniq_catC.
+  rewrite <- catA.
   assumption.
   apply H0.
 Qed.
 
+Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a)
+  : uniq (s1 ++ s2 ++ s3) = uniq (s1 ++ s3 ++ s2).
+Proof.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite catA.
+  reflexivity.
+Qed.
+
 Lemma move_active_to_handled : forall sd x,
-  NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
-    -> In x (active sd)
-    -> NoDup (unhandled sd ++ remove cmp_eq_dec x (active sd) ++
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in active sd
+    -> uniq (unhandledIds sd ++ rem x (active sd) ++
               inactive sd ++ x :: handled sd).
 Proof.
   intros.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
-  rewrite <- app_assoc.
-  apply NoDup_swap2.
-  rewrite <- app_assoc.
-  apply NoDup_juggle.
-  rewrite app_assoc.
-  apply NoDup_swap2.
-  rewrite app_assoc.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
-  rewrite app_assoc.
-  apply NoDup_swap2.
-  rewrite <- app_assoc.
+  rewrite uniq_catC.
+  rewrite <- catA.
+  rewrite <- catA.
+  rewrite uniq_catCA2.
+  rewrite <- catA.
+  apply uniq_juggle.
+  rewrite catA.
+  rewrite uniq_catCA2.
+  rewrite catA.
+  rewrite uniq_catC.
+  rewrite <- catA.
+  rewrite catA.
+  rewrite uniq_catCA2.
+  rewrite <- catA.
   assumption.
   apply H0.
 Qed.
 
 Lemma move_inactive_to_active : forall sd x,
-  NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
-    -> In x (inactive sd)
-    -> NoDup (unhandled sd ++ x :: active sd ++
-              remove cmp_eq_dec x (inactive sd) ++ handled sd).
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in inactive sd
+    -> uniq (unhandledIds sd ++ x :: active sd ++
+              rem x (inactive sd) ++ handled sd).
 Proof.
   intros.
-  rewrite app_comm_cons.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
-  apply NoDup_swap.
-  repeat rewrite <- app_assoc.
-  rewrite (app_assoc (handled sd)).
-  apply NoDup_swap2.
-  apply NoDup_juggle.
-  repeat rewrite app_assoc.
-  apply NoDup_swap.
-  rewrite <- app_assoc.
-  apply NoDup_swap2.
-  rewrite <- app_assoc.
-  rewrite app_assoc.
-  apply NoDup_swap2.
-  rewrite <- app_assoc.
+  rewrite -cat_cons.
+  rewrite uniq_catC.
+  rewrite <- catA.
+  rewrite uniq_catC.
+  rewrite -!catA.
+  rewrite (catA (handled sd)).
+  rewrite uniq_catCA2.
+  apply uniq_juggle.
+  rewrite !catA.
+  rewrite uniq_catC.
+  rewrite <- catA.
+  rewrite uniq_catCA2.
+  rewrite <- catA.
+  rewrite catA.
+  rewrite uniq_catCA2.
+  rewrite <- catA.
   assumption.
   apply H0.
 Qed.
 
 Lemma move_inactive_to_handled : forall sd x,
-  NoDup (unhandled sd ++ active sd ++ inactive sd ++ handled sd)
-    -> In x (inactive sd)
-    -> NoDup (unhandled sd ++ active sd ++
-              remove cmp_eq_dec x (inactive sd) ++ x :: handled sd).
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in inactive sd
+    -> uniq (unhandledIds sd ++ active sd ++
+              rem x (inactive sd) ++ x :: handled sd).
 Proof.
   intros.
-  rewrite (app_assoc (unhandled sd)).
-  apply NoDup_swap.
-  repeat rewrite <- app_assoc.
-  apply NoDup_juggle.
-  rewrite (app_assoc (inactive sd)).
-  apply NoDup_swap.
-  repeat rewrite <- app_assoc.
+  rewrite (catA (unhandledIds sd)).
+  rewrite uniq_catC.
+  rewrite -!catA.
+  apply uniq_juggle.
+  rewrite (catA (inactive sd)).
+  rewrite uniq_catC.
+  rewrite -!catA.
   assumption.
   apply H0.
 Qed.
@@ -255,16 +318,16 @@ Definition registerWithHighestPos
        | (_, None) => (reg, None)
        | ((r, Some n), Some m) =>
          if n < m then (reg, Some m) else (r, Some n)
-       end) (from_nat 0 registers_exist, Some 0).
+       end) (Ordinal registers_exist, Some 0).
 
 (** Given a vector from registers to values, find the slot corresponding to
     the register assigned to [i] and replace it with [x]. *)
 
 Definition atIntervalReg {sd : ScanStateDesc} (i : IntervalId sd)
   {a} (v : Vec a maxReg) (x : a) :=
-  match V.nth (assignments sd) i with
+  match V.nth (assignments sd) (to_vfin i) with
   | None => v
-  | Some r => V.replace v r x
+  | Some r => V.replace v (to_vfin r) x
   end.
 
 (** ** ScanState *)
@@ -302,7 +365,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := V.nil _
        ; fixedIntervals   := V.const None _
        (* ; unhandled_sorted := LSorted_nil _ *)
-       ; lists_are_unique := NoDup_nil _
+       ; lists_are_unique := uniq_nil _
        |}
 
   | ScanState_newUnhandled d sd :
@@ -310,22 +373,24 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     ScanState sd ->
     ScanState
       {| nextInterval     := S (nextInterval sd)
-       ; unhandled        := last_fin_from_nat (nextInterval sd)
-                               :: map fin_expand (unhandled sd)
-       ; active           := map fin_expand (active sd)
-       ; inactive         := map fin_expand (inactive sd)
-       ; handled          := map fin_expand (handled sd)
+       ; unhandled        :=
+           (ord_max, ibeg d)
+             :: map (fun p => (lift ord0 (fst p), snd p)) (unhandled sd)
+       ; active           := map (lift ord0) (active sd)
+       ; inactive         := map (lift ord0) (inactive sd)
+       ; handled          := map (lift ord0) (handled sd)
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
        (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := map_fin_expand_rewrite
-                               (NoDup_fin_cons _ _ (lists_are_unique sd) refl_equal)
+       ; lists_are_unique := undefined
+           (* map_lift0_rewrite *)
+           (*                     (uniq_fin_cons _ _ (lists_are_unique sd) refl_equal) *)
        |}
 
   | ScanState_moveUnhandledToActive
       ni unh (* unhsort *) act inact hnd ints assgn fixints x reg :
-    forall lau : NoDup ((x :: unh) ++ act ++ inact ++ hnd),
+    forall lau : uniq ((fst x :: map fst unh) ++ act ++ inact ++ hnd),
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh
@@ -341,23 +406,23 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     ScanState
       {| nextInterval     := ni
        ; unhandled        := unh
-       ; active           := x :: act
+       ; active           := fst x :: act
        ; inactive         := inact
        ; handled          := hnd
        ; intervals        := ints
        (* jww (2014-10-01): Prove: It was None before this call *)
-       ; assignments      := V.replace assgn x (Some reg)
+       ; assignments      := V.replace assgn (to_vfin (fst x)) (Some reg)
        ; fixedIntervals   := fixints
        (* ; unhandled_sorted := unhandled_sorted sd *)
        ; lists_are_unique := move_unhandled_to_active lau
        |}
 
   | ScanState_moveActiveToInactive sd x :
-    ScanState sd -> forall (H : In x (active sd)),
+    ScanState sd -> forall (H : x \in active sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
-       ; active           := remove cmp_eq_dec x (active sd)
+       ; active           := rem x (active sd)
        ; inactive         := x :: inactive sd
        ; handled          := handled sd
        ; intervals        := intervals sd
@@ -368,11 +433,11 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveActiveToHandled sd x :
-    ScanState sd -> forall (H : In x (active sd)),
+    ScanState sd -> forall (H : x \in active sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
-       ; active           := remove cmp_eq_dec x (active sd)
+       ; active           := rem x (active sd)
        ; inactive         := inactive sd
        ; handled          := x :: handled sd
        ; intervals        := intervals sd
@@ -383,12 +448,12 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveInactiveToActive sd x :
-    ScanState sd -> forall (H : In x (inactive sd)),
+    ScanState sd -> forall (H : x \in inactive sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := x :: active sd
-       ; inactive         := remove cmp_eq_dec x (inactive sd)
+       ; inactive         := rem x (inactive sd)
        ; handled          := handled sd
        ; intervals        := intervals sd
        ; assignments      := assignments sd
@@ -398,12 +463,12 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveInactiveToHandled sd x :
-    ScanState sd -> forall (H : In x (inactive sd)),
+    ScanState sd -> forall (H : x \in inactive sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := active sd
-       ; inactive         := remove cmp_eq_dec x (inactive sd)
+       ; inactive         := rem x (inactive sd)
        ; handled          := x :: handled sd
        ; intervals        := intervals sd
        ; assignments      := assignments sd
@@ -434,8 +499,8 @@ Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let ue := unhandledExtent sd in
   match unhandled sd with
   | nil    => ue = 0
-  | [i]    => ue = intervalExtent (V.nth (intervals sd) i).2
-  | i :: _ => ue > intervalExtent (V.nth (intervals sd) i).2
+  | [:: i] => ue = intervalExtent (V.nth (intervals sd) (to_vfin (fst i))).2
+  | i :: _ => ue > intervalExtent (V.nth (intervals sd) (to_vfin (fst i))).2
   end.
 Proof.
   destruct sd.
@@ -443,7 +508,8 @@ Proof.
   unfold unhandledExtent; simpl. reflexivity.
   destruct l eqn:Heqe2; simpl. reflexivity.
   apply fold_gt.
-  pose (Interval_extent_nonzero (V.nth intervals0 i0).2).
+  destruct p0.
+  pose (Interval_extent_nonzero (V.nth intervals0 (to_vfin i)).2).
   by rewrite add0n addnC ltn_plus.
 Qed.
 
@@ -458,7 +524,7 @@ Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
     curExists : length (unhandled sd) > 0;
 
     curId         := safe_hd curExists;
-    curIntDetails := V.nth (intervals sd) curId
+    curIntDetails := V.nth (intervals sd) (to_vfin (fst curId))
 }.
 
 Arguments curState {sd} _.

@@ -74,3 +74,18 @@ _Equality__clone :: Equality__Coq_type -> (Equality__Coq_mixin_of a1) ->
 _Equality__clone cT c x =
   _Equality__pack c
 
+eq_op :: Equality__Coq_type -> Ssrbool.Coq_rel Equality__Coq_sort
+eq_op t =
+  _Equality__op (_Equality__coq_class t)
+
+data Coq_subType t =
+   SubType (() -> t) (t -> () -> ()) (() -> (t -> () -> ()) -> () -> ())
+
+type Coq_sub_sort t = ()
+
+val_eqP :: Equality__Coq_type -> (Ssrbool.Coq_pred Equality__Coq_sort) ->
+           (Coq_subType Equality__Coq_sort) -> Equality__Coq_axiom
+           (Coq_sub_sort Equality__Coq_sort)
+val_eqP =
+  Prelude.error "AXIOM TO BE REALIZED"
+

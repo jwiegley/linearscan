@@ -6,7 +6,7 @@ module LinearScan.Ssrnat where
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
-import qualified LinearScan.Ssrbool as Ssrbool
+import qualified LinearScan.Eqtype as Eqtype
 
 
 
@@ -20,7 +20,21 @@ import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
-leP :: Prelude.Int -> Prelude.Int -> Ssrbool.Coq_reflect
-leP m n =
-  Ssrbool.iffP ((Prelude.<=) m n) (Ssrbool.idP ((Prelude.<=) m n))
+eqnP :: Eqtype.Equality__Coq_axiom Prelude.Int
+eqnP =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+nat_eqMixin :: Eqtype.Equality__Coq_mixin_of Prelude.Int
+nat_eqMixin =
+  Eqtype.Equality__Mixin (Prelude.==) eqnP
+
+nat_eqType :: Eqtype.Equality__Coq_type
+nat_eqType =
+  unsafeCoerce nat_eqMixin
+
+nat_of_bool :: Prelude.Bool -> Prelude.Int
+nat_of_bool b =
+  case b of {
+   Prelude.True -> Prelude.succ 0;
+   Prelude.False -> 0}
 

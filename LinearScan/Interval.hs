@@ -1,27 +1,13 @@
-{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
-{- For Hugs, use the option -F"cpp -P -traditional" -}
-
 module LinearScan.Interval where
 
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
-import qualified LinearScan.Alternative as Alternative
-import qualified LinearScan.Endo as Endo
+import qualified LinearScan.Lib as Lib
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
+import qualified LinearScan.Seq as Seq
 
-
-
---unsafeCoerce :: a -> b
-#ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base
-unsafeCoerce = GHC.Base.unsafeCoerce#
-#else
--- HUGS
-import qualified LinearScan.IOExts as IOExts
-unsafeCoerce = IOExts.unsafeCoerce
-#endif
 
 data IntervalDesc =
    Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty
@@ -66,9 +52,8 @@ intervalExtent d =
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
   let {f = \x y -> Range.rangesIntersect ( x) ( y)} in
-  Prelude.foldr (\r b ->
-    (Prelude.||) b ((Prelude.any) (f r) (NonEmpty0.coq_NE_to_list (rds j))))
-    Prelude.False (NonEmpty0.coq_NE_to_list (rds i))
+  Seq.has (\x -> Seq.has (f x) (NonEmpty0.coq_NE_to_list (rds j)))
+    (NonEmpty0.coq_NE_to_list (rds i))
 
 intervalIntersectionPoint :: IntervalDesc -> IntervalDesc -> Prelude.Maybe
                              Prelude.Int
@@ -96,22 +81,17 @@ findIntervalUsePos i f =
    go rs =
      case rs of {
       NonEmpty0.NE_Sing r -> f0 r;
-      NonEmpty0.NE_Cons r rs' ->
-       Alternative.choose (unsafeCoerce Alternative.option_Alternative)
-         (f0 r) (go rs')}}
+      NonEmpty0.NE_Cons r rs' -> Lib.option_choose (f0 r) (go rs')}}
   in go (rds i)
 
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
-  Endo.fmap (unsafeCoerce Endo.option_Functor)
-    ((Prelude..) Range.uloc (Prelude.snd))
-    (unsafeCoerce
-      (findIntervalUsePos d (\u ->
-        (Prelude.<=) (Prelude.succ pos) (Range.uloc u))))
+  Lib.option_map ((Prelude..) Range.uloc (Prelude.snd))
+    (findIntervalUsePos d (\u ->
+      (Prelude.<=) (Prelude.succ pos) (Range.uloc u)))
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
-  Endo.fmap (unsafeCoerce Endo.option_Functor)
-    ((Prelude..) Range.uloc (Prelude.snd))
-    (unsafeCoerce (findIntervalUsePos d Range.regReq))
+  Lib.option_map ((Prelude..) Range.uloc (Prelude.snd))
+    (findIntervalUsePos d Range.regReq)
 

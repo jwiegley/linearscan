@@ -1,16 +1,13 @@
 -I . -R Hask Hask -dont-load-proofs
-Compare.v
-Fin.v
-Vector.v
-Lib.v
-NonEmpty.v
-Range.v
-Interval.v
-NoDup.v
-Tactics.v
-Machine.v
-ScanState.v
-SSMorph.v
 Allocate.v
 Blocks.v
+Interval.v
+Lib.v
+Machine.v
 Main.v
+NonEmpty.v
+Range.v
+SSMorph.v
+ScanState.v
+Tactics.v
+Vector.v

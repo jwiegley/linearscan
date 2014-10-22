@@ -1,12 +1,10 @@
-Require Import Coq.Structures.Orders.
-Require Import Range.
-Require Import Interval.
 Require Import Lib.
-Require Import ScanState.
-Require Import SSMorph.
+Require Import Recdef.
 Require Import Hask.IApplicative.
 Require Import Hask.IMonad.
 Require Import Hask.IState.
+
+Require Export SSMorph.
 
 Open Scope nat_scope.
 Open Scope program_scope.

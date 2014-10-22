@@ -75,16 +75,13 @@ endif
 #                    #
 ######################
 
-VFILES:=Compare.v\
-  Fin.v\
-  Vector.v\
+VFILES:=Vector.v\
   Interval.v\
   Lib.v\
   Allocate.v\
   Blocks.v\
   Main.v\
   Machine.v\
-  NoDup.v\
   NonEmpty.v\
   Range.v\
   ScanState.v\

@@ -1,13 +1,11 @@
-Require Import Coq.Arith.Wf_nat.
-Require Import Coq.Structures.Orders.
-Require Import Fin.
-Require Import Interval.
 Require Import Lib.
-Require Import ScanState.
+Require Import Coq.Arith.Wf_nat.
 Require Import Hask.IEndo.
 Require Import Hask.IApplicative.
 Require Import Hask.IMonad.
 Require Import Hask.IState.
+
+Require Export ScanState.
 
 Open Scope nat_scope.
 Open Scope program_scope.
@@ -142,8 +140,8 @@ Proof.
   assert (SSInfo thisDesc0 P).
     eapply {| thisDesc  := _
             ; thisHolds := _ |}.
-  apply p in H.
-  destruct H.
+  apply p in X.
+  destruct X.
   split. apply a0.
   destruct s.
   eexists.
@@ -163,7 +161,7 @@ Proof.
   intros.
   destruct X.
   exists. intros.
-  destruct H.
+  destruct X.
   destruct thisHolds0.
   specialize (p
     {| thisDesc  := thisDesc0
@@ -234,18 +232,20 @@ Proof.
   constructor. intros.
   split. apply tt.
   destruct H.
-  destruct H0.
+  destruct X.
   specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
   destruct thisDesc0.
   destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   destruct unhandled0; simpl in *.
-    specialize (unhandled_nonempty0 first_nonempty0). done.
+    by specialize (unhandled_nonempty0 first_nonempty0).
+  destruct p.
   pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
-  pose (NoDup_unhandledExtent_cons intervals0
-         (V.replace assignments0 i (Some reg)) assignments0 fixedIntervals0
+  pose (uniq_unhandledExtent_cons intervals0
+         (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
+         fixedIntervals0
          (move_unhandled_to_active lists_are_unique0) lists_are_unique0)
       as ue_cons.
   rapply Build_SSMorphSt; auto;
@@ -255,7 +255,7 @@ Proof.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H: In x (active sd))
+  (H: x \in active sd)
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
@@ -265,7 +265,7 @@ Proof.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
-  (H: In x (active sd))
+  (H: x \in active sd)
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
@@ -275,7 +275,7 @@ Proof.
 Defined.
 
 Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (inactive sd))
+  (H : x \in inactive sd)
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToActive st H).
@@ -285,7 +285,7 @@ Proof.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H : In x (inactive sd))
+  (H : x \in inactive sd)
   : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).

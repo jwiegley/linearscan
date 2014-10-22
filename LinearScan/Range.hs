@@ -1,27 +1,12 @@
-{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
-{- For Hugs, use the option -F"cpp -P -traditional" -}
-
 module LinearScan.Range where
 
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
-import qualified LinearScan.Alternative as Alternative
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 
-
-
---unsafeCoerce :: a -> b
-#ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base
-unsafeCoerce = GHC.Base.unsafeCoerce#
-#else
--- HUGS
-import qualified LinearScan.IOExts as IOExts
-unsafeCoerce = IOExts.unsafeCoerce
-#endif
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -124,9 +109,7 @@ findRangeUsePos r f =
    go us =
      case us of {
       NonEmpty0.NE_Sing u -> check u;
-      NonEmpty0.NE_Cons u us' ->
-       Alternative.choose (unsafeCoerce Alternative.option_Alternative)
-         (check u) (go us')}}
+      NonEmpty0.NE_Cons u us' -> Lib.option_choose (check u) (go us')}}
   in go (ups r)
 
 dividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> (NonEmpty0.NonEmpty

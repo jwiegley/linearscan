@@ -1,3 +1,5 @@
+Require Import Lib.
+
 Module Type Machine.
 
 Variable maxReg : nat.          (* max number of registers *)

@@ -6,10 +6,5 @@
 * TODO Remove the handled list once everything is working
 * TODO Ensure the number of actives is < maxReg
 * TODO Integrate better with ssreflect
-** TODO Switch to ordinal n from fin n
-** TODO Remove Fin.v
 ** TODO Switch to neseq from NonEmpty
 ** TODO Remove NonEmpty.v
-** TODO Switch to uniq from NoDup
-** TODO Remove Compare.v
-** TODO Remove NoDup.v

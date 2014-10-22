@@ -6,7 +6,7 @@ Generalizable All Variables.
 
 (** ** NonEmpty lists *)
 
-Inductive NonEmpty (a : Set) : Set :=
+Inductive NonEmpty (a : Type) : Type :=
   | NE_Sing : a -> NonEmpty a
   | NE_Cons : a -> NonEmpty a -> NonEmpty a.
 
@@ -49,41 +49,41 @@ Fixpoint NE_last {a} (ne : NonEmpty a) : a :=
     | NE_Cons x xs => NE_last xs
   end.
 
-Fixpoint NE_map {a b : Set} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
+Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
   match ne with
     | NE_Sing x => NE_Sing (f x)
     | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
   end.
 
-Lemma NE_map_head_spec : forall {a b : Set} (f : a -> b) (xs : NonEmpty a),
+Lemma NE_map_head_spec : forall {a b : Type} (f : a -> b) (xs : NonEmpty a),
   NE_head (NE_map f xs) = f (NE_head xs).
 Proof. induction xs; auto. Qed.
 
-Lemma NE_map_last_spec : forall {a b : Set} (f : a -> b) (xs : NonEmpty a),
+Lemma NE_map_last_spec : forall {a b : Type} (f : a -> b) (xs : NonEmpty a),
   NE_last (NE_map f xs) = f (NE_last xs).
 Proof. induction xs; auto. Qed.
 
-Fixpoint NE_fold_left {a b : Set} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
+Fixpoint NE_fold_left {a b : Type} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
   match ne with
     | NE_Sing x => f z x
     | NE_Cons x xs => NE_fold_left f xs (f z x)
   end.
 
-Fixpoint NE_append {a : Set} (l1 l2 : NonEmpty a) : NonEmpty a :=
+Fixpoint NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a :=
   match l1 with
     | NE_Sing x => NE_Cons x l2
     | NE_Cons x xs => NE_Cons x (NE_append xs l2)
   end.
 
-Lemma NE_append_spec : forall {a : Set} {x} {xs ys : NonEmpty a},
+Lemma NE_append_spec : forall {a : Type} {x} {xs ys : NonEmpty a},
   NE_Sing x = NE_append xs ys -> False.
 Proof. intros. induction xs; destruct ys; simpl in *; inversion H. Qed.
 
-Lemma NE_append_sing : forall {a : Set} {x} {l1 l2 : NonEmpty a},
+Lemma NE_append_sing : forall {a : Type} {x} {l1 l2 : NonEmpty a},
   NE_Sing x = NE_append l1 l2 -> False.
 Proof. intros. induction l1; simpl in H; inversion H. Qed.
 
-Lemma NE_map_append_spec : forall {a b : Set} (f : a -> b) {xs ys : NonEmpty a},
+Lemma NE_map_append_spec : forall {a b : Type} (f : a -> b) {xs ys : NonEmpty a},
   NE_map f (NE_append xs ys) = NE_append (NE_map f xs) (NE_map f ys).
 Proof.
   induction xs; intros; simpl; auto.
@@ -154,7 +154,7 @@ Qed.
 
 Section Reverse_Induction.
 
-Variable A : Set.
+Variable A : Type.
 
 Unset Implicit Arguments.
 
@@ -188,7 +188,7 @@ Qed.
 
 End Reverse_Induction.
 
-Fixpoint NE_span {a : Set} (f : a -> bool) (l : NonEmpty a)
+Fixpoint NE_span {a : Type} (f : a -> bool) (l : NonEmpty a)
   : (option (NonEmpty a) * option (NonEmpty a)) :=
   let maybeAppend (x : a) (xs : option (NonEmpty a)) :=
       match xs with
@@ -231,7 +231,7 @@ Qed.
 
 Section Sorted.
 
-Variable A : Set.
+Variable A : Type.
 Variable R : relation A.
 Context `{H : Transitive A R}.
 

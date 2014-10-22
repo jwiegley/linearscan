@@ -1,7 +1,6 @@
 Require Import Lib.
-Require Import NonEmpty.
-Require Import Range.
-Require Import Hask.Alternative.
+
+Require Export Range.
 
 Open Scope nat_scope.
 
@@ -109,10 +108,9 @@ Proof.
 Defined.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
-  let f x y := rangesIntersect x.2 y.2 in
-  fold_right
-    (fun r b => orb b (existsb (f r) (NE_to_list (rds j))))
-    false (NE_to_list (rds i)).
+  let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
+  has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
+      (NE_to_list (rds i)).
 
 Definition intervalIntersectionPoint `(Interval i) `(Interval j) : option nat :=
   NE_fold_left
@@ -138,18 +136,18 @@ Definition findIntervalUsePos `(Interval i) (f : UsePos -> bool)
       end in
   let fix go rs := match rs with
       | NE_Sing r     => f r
-      | NE_Cons r rs' => f r <|> go rs'
+      | NE_Cons r rs' => option_choose (f r) (go rs')
       end in
   go (rds i).
 
 Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
-  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos < uloc u)).
+  option_map (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos < uloc u)).
 
 Definition firstUsePos `(i : Interval d) : nat :=
   uloc (NE_head (ups (NE_head (rds d)).1)).
 
 Definition firstUseReqReg `(i : Interval d) : option nat :=
-  fmap (uloc ∘ @snd _ _) (findIntervalUsePos i regReq).
+  option_map (uloc ∘ @snd _ _) (findIntervalUsePos i regReq).
 
 Definition lastUsePos `(i : Interval d) : nat :=
   uloc (NE_last (ups (NE_last (rds d)).1)).
@@ -199,7 +197,7 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
 
 Definition splitPosition `(i : Interval d) (before : option nat) : nat :=
   fromMaybe (uloc (NE_last (ups (NE_last (rds d)).1)))
-            (before <|> firstUseReqReg i).
+            (option_choose before (firstUseReqReg i)).
 
 Lemma Interval_beg_bounded `(i : Interval d) : ibeg d <= firstUsePos i.
 Proof.

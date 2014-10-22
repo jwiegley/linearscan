@@ -1,26 +1,30 @@
 Require Export Coq.Bool.Bool.
-Require Export Coq.Lists.List.
 Require Export Coq.Logic.ProofIrrelevance.
 Require Export Coq.Numbers.Natural.Peano.NPeano.
 Require Export Coq.Program.Basics.
 Require Export Coq.Program.Tactics.
 Require Export Coq.Sorting.Sorting.
-Require Export List.
+Require Export Coq.Structures.Orders.
+Require Export NonEmpty.
 Require Export Omega.
 Require Export Tactics.
 
+Require Export Vector.
+Require Coq.Vectors.Vector.
+Module V := Coq.Vectors.Vector.
+Definition Vec := V.t.
+
+Require Export Ssreflect.ssreflect.
+(* Require Export Ssreflect.ssrfun. *)
+Require Export Ssreflect.ssrbool.
 Require Export Ssreflect.eqtype.
 Require Export Ssreflect.seq.
-Require Export Ssreflect.ssrbool.
-Require Export Ssreflect.ssreflect.
 Require Export Ssreflect.ssrnat.
-(* Require Export Ssreflect.ssrfun. *)
 
+Generalizable All Variables.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
-Module Export LN := ListNotations.
 
 (** The following are extensions to the Coq standard library. *)
 
@@ -28,9 +32,6 @@ Definition undefined {a : Type} : a. Admitted.
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
 Proof. intros P. contra. Defined.
-
-Definition predicate {a} (f : a -> bool) : a -> Prop :=
-  fun x => Is_true (f x).
 
 Notation "p .1" := (proj1_sig p)
   (at level 2, left associativity, format "p .1").
@@ -56,6 +57,18 @@ Definition maybe {a b} (d : b) (f : a -> b) (mx : option a) : b :=
   match mx with
     | Some x => f x
     | None => d
+  end.
+
+Definition option_map `(f : a -> b) (x : option a) : option b :=
+  match x with
+  | None => None
+  | Some x => Some (f x)
+  end.
+
+Definition option_choose {a} (x y : option a) : option a :=
+  match x with
+  | None => y
+  | Some _ => x
   end.
 
 Ltac move_to_top x :=
@@ -86,26 +99,26 @@ Tactic Notation "SSSSSSSCase" constr(name) := Case_aux SSSSSSSCase name.
 Require String.
 Open Scope string_scope.
 
-Definition exist_in_cons : forall {A a} {l : list A},
-  {x : A | In x l} -> {x : A | In x (a :: l)}.
-Proof.
-  destruct l; intros; simpl; destruct X.
-    inversion i.
-  exists x.
-  apply in_inv in i.
-  destruct i; right; [ left | right]; assumption.
-Defined.
-
 Lemma list_cons_nonzero : forall {a x} {xs l : list a},
   l = x :: xs -> length l > 0.
 Proof. by move=> a x xs l ->. Qed.
 
-Definition list_membership {a} (l : list a) : list { x : a | In x l } :=
+Definition exist_in_cons : forall {A : eqType} {a} {l : list A},
+  {x : A | x \in l} -> {x : A | x \in a :: l}.
+Proof.
+  move=> A a l.
+  case=> x H.
+  exists x.
+  rewrite in_cons.
+  by apply/orP; right.
+Defined.
+
+Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } :=
   let fix go l :=
       match l with
       | nil => nil
       | cons x xs =>
-          exist _ x (in_eq x xs) :: map exist_in_cons (go xs)
+          exist _ x (mem_head _ xs) :: map exist_in_cons (go xs)
       end in
   go l.
 
@@ -198,7 +211,7 @@ Lemma ltnSSn : forall n, n < n.+2.
 Proof. intros; ssomega. Qed.
 
 Lemma fold_gt : forall a f n m (xs : list a),
-  n > m -> fold_left (fun n x => n + f x) xs n > m.
+  n > m -> foldl (fun n x => n + f x) n xs > m.
 Proof.
   move=> a f n m xs.
   elim: xs n => // ? ? IHxs *.
@@ -206,8 +219,8 @@ Proof.
 Qed.
 
 Lemma fold_fold_le : forall a f n m (xs : list a),
-  n <= m -> fold_left (fun n x => n + f x) xs n <=
-            fold_left (fun n x => n + f x) xs m.
+  n <= m -> foldl (fun n x => n + f x) n xs <=
+            foldl (fun n x => n + f x) m xs.
 Proof.
   move=> a f n m xs.
   elim: xs n m => // ? ? IHxs *.
@@ -215,8 +228,8 @@ Proof.
 Qed.
 
 Lemma fold_fold_lt : forall a f n m (xs : list a),
-  n < m -> fold_left (fun n x => n + f x) xs n <
-           fold_left (fun n x => n + f x) xs m.
+  n < m -> foldl (fun n x => n + f x) n xs <
+           foldl (fun n x => n + f x) m xs.
 Proof.
   move=> a f n m xs.
   elim: xs n m => // ? ? IHxs *.
@@ -225,15 +238,16 @@ Proof.
 Qed.
 
 Lemma fold_left_plus : forall a f xs n,
-   fold_left (fun (n : nat) (x : a) => n + f x) xs n =
-   fold_left (fun (n : nat) (x : a) => n + f x) xs 0 + n.
+   foldl (fun (n : nat) (x : a) => n + f x) n xs =
+   foldl (fun (n : nat) (x : a) => n + f x) 0 xs + n.
 Proof.
   move=> a f; elim=> // a' ? IHxs n /=.
   rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
 Qed.
 
+(*
 Definition find_in {a} (eq_dec : forall x y : a, { x = y } + { x <> y })
-  (n : a) (l : list a) : {In n l} + {~ In n l}.
+  (n : a) (l : list a) : {n \in l} + {n \notin l}.
 Proof.
   induction l as [| x xs].
     right. auto.
@@ -250,6 +264,7 @@ Proof.
 Defined.
 
 Arguments find_in [_] _ _ _.
+*)
 
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
