@@ -76,7 +76,7 @@ _V__case0 :: a2 -> (V__Coq_t a1) -> a2
 _V__case0 h v =
   case v of {
    V__Coq_nil -> h;
-   V__Coq_cons h0 n t -> unsafeCoerce (\_ -> (Prelude.id))}
+   V__Coq_cons h0 n t -> unsafeCoerce (\_ -> Datatypes.id)}
 
 _V__caseS :: (a1 -> Prelude.Int -> (V__Coq_t a1) -> a2) -> Prelude.Int ->
              (V__Coq_t a1) -> a2
@@ -269,10 +269,10 @@ _V__fold_left2 f a n v w =
    V__Coq_nil ->
     case w of {
      V__Coq_nil -> a;
-     V__Coq_cons h n0 t -> unsafeCoerce (\_ -> (Prelude.id))};
+     V__Coq_cons h n0 t -> unsafeCoerce (\_ -> Datatypes.id)};
    V__Coq_cons vh vn vt ->
     case w of {
-     V__Coq_nil -> unsafeCoerce (\_ -> (Prelude.id)) vt;
+     V__Coq_nil -> unsafeCoerce (\_ -> Datatypes.id) vt;
      V__Coq_cons wh n0 wt -> _V__fold_left2 f (f a vh wh) n0 vt wt}}
 
 _V__of_list :: ([] a1) -> V__Coq_t a1

@@ -56,7 +56,7 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
     transportation (x : IntervalId sd1) : IntervalId sd2 :=
-      transportId (next_interval_increases len_is_SSMorph) x;
+      widen_ord (next_interval_increases len_is_SSMorph) x;
 
     unhandled_nonempty :
       length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
@@ -243,10 +243,14 @@ Proof.
   pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
+  pose proof unhandled_sorted0 as unhs.
+  rewrite /unhandledStarts0 in unhs.
   pose (uniq_unhandledExtent_cons intervals0
          (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
          fixedIntervals0
-         (move_unhandled_to_active lists_are_unique0) lists_are_unique0)
+         (move_unhandled_to_active lists_are_unique0) lists_are_unique0
+         (unhandled_sorted_uncons unhs) unhandled_sorted0
+         )
       as ue_cons.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;

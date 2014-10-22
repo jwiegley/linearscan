@@ -3,10 +3,13 @@ module LinearScan.List0 where
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
+import qualified LinearScan.Datatypes as Datatypes
+
 
 destruct_list :: ([] a1) -> Prelude.Maybe ((,) a1 ([] a1))
-destruct_list =
-  Prelude.error "AXIOM TO BE REALIZED"
+destruct_list l =
+  Datatypes.list_rect Prelude.Nothing (\a tail iHtail -> Prelude.Just ((,) a
+    tail)) l
 
 fold_left :: (a1 -> a2 -> a1) -> ([] a2) -> a1 -> a1
 fold_left f l a0 =

@@ -15,7 +15,7 @@ Module V := Coq.Vectors.Vector.
 Definition Vec := V.t.
 
 Require Export Ssreflect.ssreflect.
-(* Require Export Ssreflect.ssrfun. *)
+Require Export Ssreflect.ssrfun.
 Require Export Ssreflect.ssrbool.
 Require Export Ssreflect.eqtype.
 Require Export Ssreflect.seq.
@@ -279,3 +279,82 @@ Proof. elim: xs H => //. Defined.
 
 Fixpoint safe_last {a} (xs : list a) (H : (length xs > 0)%nat) : a.
 Proof. elim: xs H => //. Defined.
+
+Lemma uniq_nil : forall (a : eqType), @uniq a nil.
+Proof. by done. Qed.
+
+Lemma not_in_app : forall (a : eqType) x (l l' : list a),
+  x \notin (l ++ l') -> x \notin l.
+Proof.
+  move=> a x l l'.
+  rewrite mem_cat negb_orb.
+  move=> /andP H. inv H.
+Qed.
+
+Lemma not_in_rem : forall (a : eqType) x y (l : list a),
+  x \notin l -> x != y -> x \notin rem y l.
+Proof.
+  move=> a x y.
+  elim=> // x0 l IHl H Heqe /=.
+  case E: (x0 == y) /eqP;
+  move: in_cons H => ->;
+  move: negb_orb => -> /andP [H1 H2].
+    by [].
+  rewrite in_cons negb_orb.
+  apply/andP.
+  split; [ by [] | by apply IHl ].
+Qed.
+
+Lemma uniq_juggle : forall (a : eqType) (xs ys zs : list a),
+  uniq (xs ++ ys ++ zs) -> forall x, x \in xs
+    -> uniq (rem x xs ++ (x :: ys) ++ zs).
+Proof.
+  move=> a.
+  elim=> [|x xs IHxs] ys zs H x0 Hin //=.
+  case E: (x == x0) => /=.
+    move: E => /eqP <-.
+    by rewrite -cat1s uniq_catCA cat1s -cat_cons.
+  apply/andP.
+  split.
+    rewrite !mem_cat.
+    move: cat_uniq H => -> /and3P => [[H1 H2 H3]].
+    move: cons_uniq H1 => -> /andP => [[H4 H5]].
+    rewrite negb_orb.
+    apply/andP.
+    apply negbT in E.
+    split. by apply not_in_rem.
+    rewrite has_sym in H2.
+    inversion H2 as [H2'].
+    move: negb_orb H2' => -> /andP [H6 H7].
+    rewrite in_cons negb_orb.
+    by apply/andP.
+  apply IHxs.
+    inversion H as [H'].
+    by move: H' => /andP [_ ?].
+  move: in_cons Hin => -> /orP [He|_] //.
+  move: eq_sym E He => -> /eqP E /eqP He.
+  contradiction.
+Qed.
+
+Lemma lift_bounded : forall n (x : fin n),
+  ord_max != lift ord0 x.
+Proof.
+Admitted.
+
+Lemma uniq_fin_cons {n} (l : list (fin n))
+  : uniq l -> uniq (ord_max :: map (lift ord0) l).
+Proof.
+  move=> Huniq.
+  rewrite cons_uniq.
+  apply/andP. split.
+  - elim: l Huniq => // x l IHl Huniq /=.
+    inv Huniq; move: H0 => /andP [H1 H2].
+    rewrite in_cons negb_orb.
+    apply/andP; split; last by apply IHl.
+    apply lift_bounded.
+  - rewrite map_inj_in_uniq //.
+    rewrite /prop_in2 /= => ? ? ? ? /eqP Heqe.
+    apply/eqP; move: Heqe.
+    rewrite inj_eq; first by [].
+    apply lift_inj.
+Qed.

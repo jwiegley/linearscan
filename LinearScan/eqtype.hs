@@ -78,14 +78,30 @@ eq_op :: Equality__Coq_type -> Ssrbool.Coq_rel Equality__Coq_sort
 eq_op t =
   _Equality__op (_Equality__coq_class t)
 
+eqP :: Equality__Coq_type -> Equality__Coq_axiom Equality__Coq_sort
+eqP t =
+  let {_evar_0_ = \op0 a -> a} in
+  case t of {
+   Equality__Mixin x x0 -> _evar_0_ x x0}
+
 data Coq_subType t =
    SubType (() -> t) (t -> () -> ()) (() -> (t -> () -> ()) -> () -> ())
 
 type Coq_sub_sort t = ()
 
+val :: (Ssrbool.Coq_pred a1) -> (Coq_subType a1) -> (Coq_sub_sort a1) -> a1
+val p s =
+  case s of {
+   SubType val0 sub x -> val0}
+
+inj_eqAxiom :: Equality__Coq_type -> (a1 -> Equality__Coq_sort) ->
+               Equality__Coq_axiom a1
+inj_eqAxiom eT f x y =
+  Ssrbool.iffP (eq_op eT (f x) (f y)) (eqP eT (f x) (f y))
+
 val_eqP :: Equality__Coq_type -> (Ssrbool.Coq_pred Equality__Coq_sort) ->
            (Coq_subType Equality__Coq_sort) -> Equality__Coq_axiom
            (Coq_sub_sort Equality__Coq_sort)
-val_eqP =
-  Prelude.error "AXIOM TO BE REALIZED"
+val_eqP t p sT =
+  inj_eqAxiom t (val p sT)
 

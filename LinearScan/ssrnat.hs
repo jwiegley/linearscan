@@ -7,6 +7,7 @@ import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
 import qualified LinearScan.Eqtype as Eqtype
+import qualified LinearScan.Ssrbool as Ssrbool
 
 
 
@@ -21,8 +22,8 @@ unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
 eqnP :: Eqtype.Equality__Coq_axiom Prelude.Int
-eqnP =
-  Prelude.error "AXIOM TO BE REALIZED"
+eqnP n m =
+  Ssrbool.iffP ((Prelude.==) n m) (Ssrbool.idP ((Prelude.==) n m))
 
 nat_eqMixin :: Eqtype.Equality__Coq_mixin_of Prelude.Int
 nat_eqMixin =

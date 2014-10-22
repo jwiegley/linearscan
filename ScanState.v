@@ -29,7 +29,8 @@ Record ScanStateDesc := {
     active    : list IntervalId;           (* ranges over pos *)
     inactive  : list IntervalId;           (* falls in lifetime hole *)
 
-    unhandledIds := map fst unhandled;
+    unhandledIds    := map fst unhandled;
+    unhandledStarts := map snd unhandled;
 
     (* jww (2014-10-01): Prove: The length of the active intervals list <
        maxReg. *)
@@ -65,9 +66,7 @@ Record ScanStateDesc := {
     fixedIntervals :
       Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
 
-    (* jww (2014-09-25): These restricting lemmas should be added back once
-       everything is functional. *)
-    (* unhandled_sorted : StronglySorted cmp_le unhandled; *)
+    unhandled_sorted : StronglySorted leq unhandledStarts;
 
     all_state_lists  := unhandledIds ++ active ++ inactive ++ handled;
     lists_are_unique : uniq all_state_lists
@@ -78,13 +77,6 @@ Definition getInterval `(i : IntervalId sd) :=
 
 Definition getAssignment `(i : IntervalId sd) :=
   V.nth (assignments sd) (to_vfin i).
-
-(** Given an [IntervalId] from one [ScanStateDesc], promote it to an
-    [IntervalId] within another [ScanStateDesc], provided we can demonstrate
-    that the [nextInterval] is at least as large. *)
-Definition transportId `(H : nextInterval sd <= nextInterval sd')
-  : IntervalId sd -> IntervalId sd'.
-Proof. by apply widen_ord. Defined.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandledIds sd with
@@ -99,7 +91,8 @@ Lemma uniq_unhandledExtent_cons
   : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
            (act act' inact inact' hnd hnd' : list (fin ni))
            (lau : uniq (map fst unh ++ act ++ inact ++ hnd))
-           (lau' : uniq ((fst i :: map fst unh) ++ act' ++ inact' ++ hnd')),
+           (lau' : uniq ((fst i :: map fst unh) ++ act' ++ inact' ++ hnd'))
+           unhs unhs',
   unhandledExtent
     {| nextInterval     := ni
      ; unhandled        := unh
@@ -109,6 +102,7 @@ Lemma uniq_unhandledExtent_cons
      ; intervals        := ints
      ; assignments      := assgn
      ; fixedIntervals   := fixints
+     ; unhandled_sorted := unhs
      ; lists_are_unique := lau
      |} <
   unhandledExtent
@@ -120,6 +114,7 @@ Lemma uniq_unhandledExtent_cons
      ; intervals        := ints
      ; assignments      := assgn'
      ; fixedIntervals   := fixints
+     ; unhandled_sorted := unhs'
      ; lists_are_unique := lau'
      |}.
 Proof.
@@ -144,61 +139,38 @@ Proof.
   by rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons.
 Qed.
 
-Lemma uniq_nil : forall (a : eqType), @uniq a nil.
-Proof. by done. Qed.
-
-Lemma not_in_app : forall (a : eqType) x (l l' : list a),
-  x \notin (l ++ l') -> x \notin l.
+Lemma uniq_unhandled_cons : forall d sd,
+ uniq (ord_max :: [seq lift ord0 i | i <- all_state_lists sd])
+   -> uniq
+        ([seq fst i
+            | i <- (ord_max, ibeg d)
+                   :: [seq (lift ord0 (fst p), snd p) | p <- unhandled sd]] ++
+         [seq lift ord0 i | i <- active sd] ++
+         [seq lift ord0 i | i <- inactive sd] ++
+         [seq lift ord0 i | i <- handled sd]).
 Proof.
-  move=> a x l l'.
-  rewrite mem_cat negb_orb.
-  move=> /andP H. inv H.
+  rewrite /all_state_lists /unhandledIds.
+  move=> d sd /= /andP [H1 H2].
+  have: [seq fst i | i <- [seq (lift ord0 (fst p), snd p) | p <- unhandled sd]]
+      = [seq lift ord0 i | i <- [seq fst i | i <- unhandled sd]].
+    by elim: (unhandled sd) => // a l IHl /=; f_equal.
+  by move=> ->; rewrite -!map_cat; apply/andP.
 Qed.
 
-Lemma not_in_rem : forall (a : eqType) x y (l : list a),
-  x \notin l -> x != y -> x \notin rem y l.
+Lemma unhandled_sorted_cons : forall d sd,
+ StronglySorted (fun m n : nat => m <= n) (unhandledStarts sd)
+   -> StronglySorted (fun m n : nat => m <= n)
+        [seq snd i
+           | i <- (ord_max, ibeg d) ::
+                  [seq (lift ord0 (fst p), snd p) | p <- unhandled sd]].
 Proof.
-  move=> a x y.
-  elim=> // x0 l IHl H Heqe /=.
-  case E: (x0 == y) /eqP;
-  move: in_cons H => ->;
-  move: negb_orb => -> /andP [H1 H2].
-    by [].
-  rewrite in_cons negb_orb.
-  apply/andP.
-  split; [ by [] | by apply IHl ].
-Qed.
+Admitted.
 
-Lemma uniq_juggle : forall (a : eqType) (xs ys zs : list a),
-  uniq (xs ++ ys ++ zs) -> forall x, x \in xs
-    -> uniq (rem x xs ++ (x :: ys) ++ zs).
+Lemma unhandled_sorted_uncons : forall ni (x : (ordinal ni * nat)) unh,
+ StronglySorted (fun m n : nat => m <= n) [seq snd i | i <- x :: unh]
+   -> StronglySorted (fun m n : nat => m <= n) [seq snd i | i <- unh].
 Proof.
-  move=> a.
-  elim=> [|x xs IHxs] ys zs H x0 Hin //=.
-  case E: (x == x0) => /=.
-    move: E => /eqP <-.
-    by rewrite -cat1s uniq_catCA cat1s -cat_cons.
-  apply/andP.
-  split.
-    rewrite !mem_cat.
-    move: cat_uniq H => -> /and3P => [[H1 H2 H3]].
-    move: cons_uniq H1 => -> /andP => [[H4 H5]].
-    rewrite negb_orb.
-    apply/andP.
-    apply negbT in E.
-    split. by apply not_in_rem.
-    rewrite has_sym in H2.
-    inversion H2 as [H2'].
-    move: negb_orb H2' => -> /andP [H6 H7].
-    rewrite in_cons negb_orb.
-    by apply/andP.
-  apply IHxs.
-    inversion H as [H'].
-    by move: H' => /andP [_ ?].
-  move: in_cons Hin => -> /orP [He|_] //.
-  move: eq_sym E He => -> /eqP E /eqP He.
-  contradiction.
-Qed.
+Admitted.
 
 Lemma move_active_to_inactive : forall sd x,
   uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
@@ -364,7 +336,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := V.nil _
        ; assignments      := V.nil _
        ; fixedIntervals   := V.const None _
-       (* ; unhandled_sorted := LSorted_nil _ *)
+       ; unhandled_sorted := SSorted_nil _
        ; lists_are_unique := uniq_nil _
        |}
 
@@ -382,14 +354,13 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
-       (* ; unhandled_sorted := unhsort *)
-       ; lists_are_unique := undefined
-           (* map_lift0_rewrite *)
-           (*                     (uniq_fin_cons _ _ (lists_are_unique sd) refl_equal) *)
+       ; unhandled_sorted := unhandled_sorted_cons d undefined
+       ; lists_are_unique := uniq_unhandled_cons d
+                               (uniq_fin_cons (lists_are_unique sd))
        |}
 
   | ScanState_moveUnhandledToActive
-      ni unh (* unhsort *) act inact hnd ints assgn fixints x reg :
+      ni unh (* unhsort *) act inact hnd ints assgn fixints x reg unhs :
     forall lau : uniq ((fst x :: map fst unh) ++ act ++ inact ++ hnd),
     ScanState
       {| nextInterval     := ni
@@ -400,7 +371,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; assignments      := assgn
        ; fixedIntervals   := fixints
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhs
        ; lists_are_unique := lau
        |} ->
     ScanState
@@ -413,7 +384,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        (* jww (2014-10-01): Prove: It was None before this call *)
        ; assignments      := V.replace assgn (to_vfin (fst x)) (Some reg)
        ; fixedIntervals   := fixints
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhandled_sorted_uncons unhs
        ; lists_are_unique := move_unhandled_to_active lau
        |}
 
@@ -428,7 +399,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhandled_sorted sd
        ; lists_are_unique := move_active_to_inactive (lists_are_unique sd) H
        |}
 
@@ -443,7 +414,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhandled_sorted sd
        ; lists_are_unique := move_active_to_handled (lists_are_unique sd) H
        |}
 
@@ -458,7 +429,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhandled_sorted sd
        ; lists_are_unique := move_inactive_to_active (lists_are_unique sd) H
        |}
 
@@ -473,7 +444,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       (* ; unhandled_sorted := unhandled_sorted sd *)
+       ; unhandled_sorted := unhandled_sorted sd
        ; lists_are_unique :=
          move_inactive_to_handled (lists_are_unique sd) H
        |}.

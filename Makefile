@@ -46,7 +46,7 @@ COQDOCLIBS?=
 
 OPT?=
 COQDEP?=$(COQBIN)coqdep -c
-COQFLAGS?=-q -dont-load-proofs $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
+COQFLAGS?=-q $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
 COQCHKFLAGS?=-silent -o
 COQDOCFLAGS?=-interpolate -utf8
 COQC?=$(COQBIN)coqc

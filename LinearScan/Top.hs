@@ -1,35 +1,37 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module LinearScan.Main where
+module LinearScan.LinearScan.Top where
 
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
-import qualified LinearScan.IApplicative as IApplicative
-import qualified LinearScan.IEndo as IEndo
-import qualified LinearScan.IMonad as IMonad
-import qualified LinearScan.IState as IState
-import qualified LinearScan.Interval as Interval
-import qualified LinearScan.Lib as Lib
-import qualified LinearScan.List0 as List0
-import qualified LinearScan.Logic as Logic
-import qualified LinearScan.NonEmpty0 as NonEmpty0
-import qualified LinearScan.Range as Range
-import qualified LinearScan.Specif as Specif
-import qualified LinearScan.Vector0 as Vector0
-import qualified LinearScan.Fintype as Fintype
-import qualified LinearScan.Seq as Seq
+import qualified LinearScan.Data.List as Data.List
+import qualified LinearScan.LinearScan.Utils as LinearScan.Utils
+import qualified LinearScan.LinearScan.IApplicative as IApplicative as LinearScan.IApplicative as IApplicative
+import qualified LinearScan.LinearScan.IEndo as IEndo as LinearScan.IEndo as IEndo
+import qualified LinearScan.LinearScan.IMonad as IMonad as LinearScan.IMonad as IMonad
+import qualified LinearScan.LinearScan.IState as IState as LinearScan.IState as IState
+import qualified LinearScan.LinearScan.Interval as Interval as LinearScan.Interval as Interval
+import qualified LinearScan.LinearScan.Lib as Lib as LinearScan.Lib as Lib
+import qualified LinearScan.LinearScan.List0 as List0 as LinearScan.List0 as List0
+import qualified LinearScan.LinearScan.Logic as Logic as LinearScan.Logic as Logic
+import qualified LinearScan.LinearScan.NonEmpty0 as NonEmpty0 as LinearScan.NonEmpty0 as NonEmpty0
+import qualified LinearScan.LinearScan.Range as Range as LinearScan.Range as Range
+import qualified LinearScan.LinearScan.Specif as Specif as LinearScan.Specif as Specif
+import qualified LinearScan.LinearScan.Vector0 as Vector0 as LinearScan.Vector0 as Vector0
+import qualified LinearScan.LinearScan.Fintype as Fintype as LinearScan.Fintype as Fintype
+import qualified LinearScan.LinearScan.Seq as Seq as LinearScan.Seq as Seq
 
 
 
---unsafeCoerce :: a -> b
+----unsafeCoerce :: a -> b
 #ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base
+import qualified GHC.Base as GHC.Base as GHC.Base as GHC.Base
 unsafeCoerce = GHC.Base.unsafeCoerce#
 #else
 -- HUGS
-import qualified LinearScan.IOExts as IOExts
+import qualified LinearScan.LinearScan.IOExts as IOExts as LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
