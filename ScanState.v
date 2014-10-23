@@ -139,36 +139,22 @@ Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
     -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
 Proof. by intros; rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons. Qed.
 
-Lemma sort_uniq_cons : forall d sd,
-  uniq [seq (fst i) | i <- isort snd
-    ((ord_max, ibeg d) :: [seq (widen_id (fst p), snd p)
-                          | p <- unhandled sd])] =
-  uniq [seq (fst i) | i <-
-    ((ord_max, ibeg d) :: [seq (widen_id (fst p), snd p)
-                          | p <- unhandled sd])].
+Lemma uniq_unhandled : forall d sd,
+  uniq (ord_max :: [seq widen_id i | i <- unhandledIds sd])
+    -> uniq [seq fst i | i <- isort snd
+              ((ord_max, ibeg d)
+                :: [seq (widen_id (fst p), snd p) | p <- unhandled sd])].
 Proof.
-Admitted.
-
-Lemma sort_has_mem_cons : forall d sd,
-  has
-    (mem
-       [seq (fst i)
-          | i <- isort snd
-                   ((ord_max, ibeg d)
-                    :: [seq (widen_id (fst p), snd p)
-                       | p <- unhandled sd])]) =
-  has
-    (mem
-       [seq (fst i)
-          | i <- ((ord_max, ibeg d)
-                    :: [seq (widen_id (fst p), snd p)
-                       | p <- unhandled sd])]).
-Proof.
+  rewrite /unhandledIds.
+  move=> d sd /= /andP [H1 H2].
+  have H: [seq fst i | i <- [seq (widen_id (fst p), snd p) | p <- unhandled sd]]
+      = [seq widen_id i | i <- [seq fst i | i <- unhandled sd]].
+    by elim: (unhandled sd) => // a l IHl /=; f_equal.
 Admitted.
 
 Lemma uniq_unhandled_cons : forall d sd,
- uniq (ord_max :: [seq widen_id i | i <- all_state_lists sd])
-   -> uniq
+  uniq (ord_max :: [seq widen_id i | i <- all_state_lists sd])
+    -> uniq
         ([seq fst i | i <- isort snd
             ((ord_max, ibeg d)
                :: [seq (widen_id (fst p), snd p) | p <- unhandled sd])] ++
@@ -176,15 +162,20 @@ Lemma uniq_unhandled_cons : forall d sd,
          [seq widen_id i | i <- inactive sd] ++
          [seq widen_id i | i <- handled sd]).
 Proof.
-  rewrite /all_state_lists /unhandledIds.
+  rewrite /all_state_lists.
   move=> d sd /= /andP [H1 H2].
-  have H: [seq fst i | i <- [seq (widen_id (fst p), snd p) | p <- unhandled sd]]
-      = [seq widen_id i | i <- [seq fst i | i <- unhandled sd]].
-    by elim: (unhandled sd) => // a l IHl /=; f_equal.
-  rewrite cat_uniq sort_uniq_cons sort_has_mem_cons
-         -cat_uniq /= H -!map_cat.
-  by apply/andP.
-Qed.
+  move: map_cat mem_cat negb_orb H1 => -> -> ->.
+  move=> /andP [? ?].
+  move: map_cat cat_uniq H2 => -> ->.
+  move=> /and3P [? H3 ?].
+  rewrite -!map_cat cat_uniq.
+  apply/and3P. split.
+  - apply uniq_unhandled.
+    by apply/andP.
+  - rewrite /unhandledIds in H3.
+    admit.
+  - by [].
+Admitted.
 
 Lemma unhandled_sorted_uncons : forall ni (x : (ordinal ni * nat)) unh,
  StronglySorted (fun m n : nat => m <= n) [seq snd i | i <- x :: unh]
