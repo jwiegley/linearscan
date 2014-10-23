@@ -33,9 +33,3 @@ nat_eqType :: Eqtype.Equality__Coq_type
 nat_eqType =
   unsafeCoerce nat_eqMixin
 
-nat_of_bool :: Prelude.Bool -> Prelude.Int
-nat_of_bool b =
-  case b of {
-   Prelude.True -> Prelude.succ 0;
-   Prelude.False -> 0}
-

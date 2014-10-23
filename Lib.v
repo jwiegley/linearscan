@@ -336,13 +336,38 @@ Proof.
   contradiction.
 Qed.
 
-Lemma lift_bounded : forall n (x : fin n),
-  ord_max != lift ord0 x.
+Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a)
+  : uniq (s1 ++ s2 ++ s3) = uniq (s1 ++ s3 ++ s2).
 Proof.
-Admitted.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite uniq_catC.
+  rewrite uniq_catCA.
+  rewrite catA.
+  reflexivity.
+Qed.
+
+Lemma lift_bounded : forall n (x : fin n), ord_max != widen_ord (leqnSn n) x.
+Proof.
+  move=> n.
+  case=> /= m Hlt.
+  rewrite /ord_max /lift.
+  apply/eqP; invert.
+  move: H0 Hlt => -> H.
+  abstract ssomega.
+Qed.
+
+Lemma widen_ord_inj : forall m n (H : m <= n), injective (widen_ord H).
+Proof.
+  move=> m n H.
+  rewrite /injective => x1 x2.
+  by invert; apply ord_inj.
+Qed.
 
 Lemma uniq_fin_cons {n} (l : list (fin n))
-  : uniq l -> uniq (ord_max :: map (lift ord0) l).
+  : uniq l -> uniq (ord_max :: map (widen_ord (leqnSn n)) l).
 Proof.
   move=> Huniq.
   rewrite cons_uniq.
@@ -356,5 +381,214 @@ Proof.
     rewrite /prop_in2 /= => ? ? ? ? /eqP Heqe.
     apply/eqP; move: Heqe.
     rewrite inj_eq; first by [].
-    apply lift_inj.
+    apply widen_ord_inj.
+Qed.
+
+Section Mergesort.
+
+Variable t : Type.
+Variable f : t -> nat.
+
+Fixpoint imerge l1 l2 :=
+  let fix imerge_aux l2 :=
+  match l1, l2 with
+  | [::], _ => l2
+  | _, [::] => l1
+  | a1::l1', a2::l2' =>
+      if f a1 <= f a2 then a1 :: imerge l1' l2 else a2 :: imerge_aux l2'
+  end
+  in imerge_aux l2.
+
+Fixpoint imerge_list_to_stack stack l :=
+  match stack with
+  | [::] => [:: Some l]
+  | None :: stack' => Some l :: stack'
+  | Some l' :: stack' => None :: imerge_list_to_stack stack' (imerge l' l)
+  end.
+
+Fixpoint imerge_stack stack :=
+  match stack with
+  | [::] => [::]
+  | None :: stack' => imerge_stack stack'
+  | Some l :: stack' => imerge l (imerge_stack stack')
+  end.
+
+Fixpoint iter_imerge stack l :=
+  match l with
+  | [::] => imerge_stack stack
+  | a::l' => iter_imerge (imerge_list_to_stack stack [:: a]) l'
+  end.
+
+Definition isort := iter_imerge [::].
+
+(** The proof of correctness *)
+
+Definition lebf := fun n m => f n <= f m.
+
+Local Notation Sorted := (LocallySorted lebf) (only parsing).
+
+Fixpoint SortedStack stack :=
+  match stack with
+  | [::] => True
+  | None :: stack' => SortedStack stack'
+  | Some l :: stack' => Sorted l /\ SortedStack stack'
+  end.
+
+Local Ltac invert H := inversion H; subst; clear H.
+
+Fixpoint flatten_stack (stack : list (option (list t))) :=
+  match stack with
+  | [::] => [::]
+  | None :: stack' => flatten_stack stack'
+  | Some l :: stack' => l ++ flatten_stack stack'
+  end.
+
+Theorem Sorted_imerge : forall l1 l2,
+  Sorted l1 -> Sorted l2 -> Sorted (imerge l1 l2).
+Proof.
+  induction l1; induction l2; intros; simpl; auto.
+  destruct (f a <= f a0) eqn:Heq1.
+    invert H.
+      simpl. constructor; trivial; rewrite Heq1; constructor.
+      assert (Sorted (imerge (b::l) (a0::l2))) by (apply IHl1; auto).
+      clear H0 H3 IHl1; simpl in *.
+      destruct (f b <= f a0); constructor; auto || rewrite Heq1; constructor.
+    assert (f a0 <= f a) by
+      (case: (@leq_total (f a0) (f a)) => /orP [H'|H'];
+        (trivial || (rewrite Heq1 in H'; inversion H'))).
+    invert H0.
+      constructor; trivial.
+      assert (Sorted (imerge (a::l1) (b::l))) by auto using IHl1.
+      clear IHl2; simpl in *.
+      destruct (f a <= f b); constructor; auto.
+Qed.
+
+Theorem Sorted_imerge_list_to_stack : forall stack l,
+  SortedStack stack -> Sorted l -> SortedStack (imerge_list_to_stack stack l).
+Proof.
+  induction stack as [|[|]]; intros; simpl.
+    auto.
+    apply IHstack. destruct H as (_,H1). fold SortedStack in H1. auto.
+      apply Sorted_imerge; auto; destruct H; auto.
+      auto.
+Qed.
+
+Theorem Sorted_imerge_stack : forall stack,
+  SortedStack stack -> Sorted (imerge_stack stack).
+Proof.
+induction stack as [|[|]]; simpl; intros.
+  constructor; auto.
+  apply Sorted_imerge; tauto.
+  auto.
+Qed.
+
+Theorem Sorted_iter_imerge : forall stack l,
+  SortedStack stack -> Sorted (iter_imerge stack l).
+Proof.
+  intros stack l H; induction l in stack, H |- *; simpl.
+    auto using Sorted_imerge_stack.
+    assert (Sorted [:: a]) by constructor.
+    auto using Sorted_imerge_list_to_stack.
+Qed.
+
+Theorem Sorted_isort : forall l, Sorted (isort l).
+Proof.
+intro; apply Sorted_iter_imerge. constructor.
+Qed.
+
+Corollary LocallySorted_isort : forall l, Sorted.Sorted lebf (isort l).
+Proof. intro; eapply Sorted_LocallySorted_iff, Sorted_isort; auto. Qed.
+
+Corollary StronglySorted_isort : forall l,
+  StronglySorted lebf (isort l).
+Proof.
+  move=> l.
+  apply Sorted_StronglySorted.
+  rewrite /Relations_1.Transitive.
+  move=> x y z.
+  rewrite /lebf.
+  intros; ssomega.
+  apply LocallySorted_isort.
+Qed.
+
+End Mergesort.
+
+Lemma Forall_map : forall a f x l,
+  List.Forall (fun m : a => f x <= f m) l
+    -> List.Forall (fun n : nat => f x <= n) [seq f i | i <- l].
+Proof.
+  move=> a f x.
+  elim=> [|z l IHl] H /=.
+    by constructor.
+  constructor. by inv H.
+  by apply IHl; inv H.
+Qed.
+
+Lemma StronglySorted_map : forall a f l,
+  StronglySorted (fun n m : a => f n <= f m) l
+    -> StronglySorted (fun m n : nat => m <= n) [seq f i | i <- l].
+Proof.
+  move=> a f.
+  elim=> [|x l IHl] H /=.
+    by constructor.
+  constructor. by apply IHl; inv H.
+  by apply Forall_map; inv H.
+Qed.
+
+Corollary StronglySorted_isort_f : forall a (f : a -> nat) l,
+  StronglySorted leq [seq f i | i <- isort f l ].
+Proof.
+  move=> a f l.
+  pose (StronglySorted_isort f l) as Hsort.
+  unfold lebf in Hsort.
+  elim: l Hsort => /= [|x l IHl] Hsort.
+    by constructor.
+  inv Hsort. constructor.
+  constructor.
+    by apply StronglySorted_map.
+  by apply Forall_map.
+Qed.
+
+Lemma in_sort : forall (a : eqType) (f : a -> nat) x l,
+  (x \in isort f l) = (x \in l).
+Proof.
+  move=> a f x.
+  elim=> // z l /= IHl.
+  rewrite in_cons -{}IHl -in_cons /isort /=.
+Admitted.
+
+Lemma mem_sort_irrelevant
+  (a b : eqType) (k : a -> b) (f : a -> nat) (xs : list a) :
+  (mem [seq k i | i <- isort f xs]) = (mem [seq k i | i <- xs]).
+Proof.
+  elim: xs => // z l IHl /=.
+Admitted.
+(*   rewrite in_cons -IHl  -in_cons -map_cons !mem_map; *)
+(*   rewrite !mem_map in IHl; auto. *)
+(*   by rewrite in_cons IHl -in_cons in_sort. *)
+(* Qed. *)
+
+Lemma uniq_sort_cons : forall (a : eqType) (f : a -> nat) (x : a) (l : seq a),
+  uniq (isort f (x :: l)) = uniq (x :: isort f l).
+Proof.
+  move=> a f x l.
+  (* rewrite cons_uniq in_sort. *)
+  (* elim: l x => // z l /= -> x. *)
+  (* rewrite /isort. simpl. *)
+  (* case: (f x <= f z) => /=. *)
+Admitted.
+
+Lemma uniq_sort_irrelevant
+  : forall (a b : eqType) (k : a -> b) (f : a -> nat) (xs : list a),
+  injective k
+    -> uniq [seq k i | i <- isort f xs] = uniq [seq k i | i <- xs].
+Proof.
+  move=> a b k f x Hinj.
+  rewrite !map_inj_in_uniq;
+  elim: x => // x l IHl /=;
+  try (rewrite /injective => x1 x2;
+       move=> *; by apply Hinj).
+  rewrite uniq_sort_cons cons_uniq -IHl.
+  f_equal; f_equal.
+  apply in_sort.
 Qed.

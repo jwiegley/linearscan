@@ -55,18 +55,6 @@ widen_ord :: Prelude.Int -> Prelude.Int -> Coq_ordinal -> Coq_ordinal
 widen_ord n m i =
   nat_of_ord n i
 
-bump :: Prelude.Int -> Prelude.Int -> Prelude.Int
-bump h i =
-  (Prelude.+) (Ssrnat.nat_of_bool ((Prelude.<=) h i)) i
-
-lift :: Prelude.Int -> Coq_ordinal -> Coq_ordinal -> Coq_ordinal
-lift n h i =
-  bump (nat_of_ord n h) (nat_of_ord ((Prelude.pred) n) i)
-
-ord0 :: Prelude.Int -> Coq_ordinal
-ord0 n' =
-  0
-
 ord_max :: Prelude.Int -> Coq_ordinal
 ord_max n' =
   n'

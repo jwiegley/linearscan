@@ -164,6 +164,12 @@ _LinearScan__all_state_lists s =
     ((Prelude.++) (_LinearScan__active s)
       ((Prelude.++) (_LinearScan__inactive s) (_LinearScan__handled s)))
 
+_LinearScan__widen_id :: LinearScan__ScanStateDesc -> Fintype.Coq_ordinal ->
+                         Fintype.Coq_ordinal
+_LinearScan__widen_id sd =
+  Fintype.widen_ord (_LinearScan__nextInterval sd) (Prelude.succ
+    (_LinearScan__nextInterval sd))
+
 _LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
                               LinearScan__IntervalId -> Prelude.Maybe
                               LinearScan__PhysReg
@@ -1137,24 +1143,16 @@ _LinearScan__determineIntervals maxVirtReg blocks =
     case mkint mx of {
      Prelude.Just i0 ->
       _LinearScan__getScanStateDesc (LinearScan__Build_ScanStateDesc
-        (Prelude.succ (_LinearScan__nextInterval ss)) ((:) ((,)
-        (Fintype.ord_max (_LinearScan__nextInterval ss)) (Interval.ibeg i0))
-        ((Prelude.map) (\p -> (,)
-          (Fintype.lift (Prelude.succ (_LinearScan__nextInterval ss))
-            (Fintype.ord0 (_LinearScan__nextInterval ss)) ((Prelude.fst) p))
-          ((Prelude.snd) p)) (_LinearScan__unhandled ss)))
-        ((Prelude.map)
-          (Fintype.lift (Prelude.succ (_LinearScan__nextInterval ss))
-            (Fintype.ord0 (_LinearScan__nextInterval ss)))
-          (_LinearScan__active ss))
-        ((Prelude.map)
-          (Fintype.lift (Prelude.succ (_LinearScan__nextInterval ss))
-            (Fintype.ord0 (_LinearScan__nextInterval ss)))
-          (_LinearScan__inactive ss))
-        ((Prelude.map)
-          (Fintype.lift (Prelude.succ (_LinearScan__nextInterval ss))
-            (Fintype.ord0 (_LinearScan__nextInterval ss)))
-          (_LinearScan__handled ss))
+        (Prelude.succ (_LinearScan__nextInterval ss))
+        (Lib.isort (Prelude.snd) ((:) ((,)
+          (Fintype.ord_max (_LinearScan__nextInterval ss))
+          (Interval.ibeg i0))
+          ((Prelude.map) (\p -> (,)
+            (_LinearScan__widen_id ss ((Prelude.fst) p)) ((Prelude.snd) p))
+            (_LinearScan__unhandled ss))))
+        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__active ss))
+        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__inactive ss))
+        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__handled ss))
         (Lib._V__shiftin (_LinearScan__nextInterval ss) i0
           (_LinearScan__intervals ss))
         (Lib._V__shiftin (_LinearScan__nextInterval ss) Prelude.Nothing
