@@ -511,6 +511,48 @@ Proof.
   apply LocallySorted_isort.
 Qed.
 
+Import EqNotations.
+Require Import Recdef.
+
+Fixpoint isorted_insert (z : t) (l : list t) (H : StronglySorted lebf l)
+  : { l' : list t | StronglySorted lebf l' }.
+Proof.
+  elim L: l H => /= [|x xs IHxs] Hsort.
+    exists [:: z]; by constructor.
+  case E: (f z < f x); last first.
+    destruct IHxs. by inv Hsort.
+    by exists x0.
+  exists [:: z, x & xs].
+  constructor. by [].
+  inv Hsort.
+  constructor.
+    by rewrite /lebf; apply ltnW.
+  apply List.Forall_impl with (P := (fun m : t => lebf x m)).
+    rewrite /lebf.
+    move=> a Hlt.
+    by apply /ltnW /(ltn_leq_trans E).
+  by [].
+Defined.
+
+Program Fixpoint isorted_insert' (z : t) (l : list t)
+  (H : StronglySorted lebf l) {measure (length l)} : list t :=
+  match List.destruct_list l with
+  | inleft (existT x (exist xs Hxs)) =>
+    if f z < f x
+    then z :: x :: xs
+    else x :: isorted_insert' z (StronglySorted_uncons (rew Hxs in H))
+  | inright _ => [:: z]
+  end.
+
+Corollary StronglySorted_isorted_insert : forall z l
+  (H : StronglySorted lebf l), StronglySorted lebf (isorted_insert' z H).
+Proof.
+  move=> z.
+  elim=> /= [|x xs IHxs] Hsort.
+    (* We have a problem here, because isorted_insert' doesn't simplify, and
+       unfolding it leads to a term which does not simplify either. *)
+Admitted.
+
 End Mergesort.
 
 Lemma Forall_map : forall a f x l,
