@@ -11,6 +11,8 @@ Generalizable All Variables.
 Module MScanState (Mach : Machine).
 Import Mach.
 
+Import EqNotations.
+
 Definition maxReg := maxReg.
 Definition PhysReg := fin maxReg.
 Definition registers_exist := registers_exist.
@@ -165,6 +167,53 @@ Proof.
   - inv H5.
 Qed.
 
+Lemma unhandled_uniq_inj : forall sd,
+  uniq (unhandled sd) == uniq [seq fst i | i <- unhandled sd].
+Proof.
+  case=> /= ?.
+  elim=> //= x xs IHxs act inact hnd ints assgn fints unhs lau.
+  apply/eqP; f_equal.
+    admit.
+  apply/eqP.
+  inv unhs.
+  apply (IHxs act inact hnd ints assgn fints H1 (proj2 (andP lau))).
+Qed.
+
+Lemma uniq_insert_cons : forall (T : eqType) P x xs,
+  @uniq T (insert (P ^~ x) x xs) == uniq xs.
+Admitted.
+
+Lemma unhandled_uniq_cons : forall sd d,
+  let n   := (ord_max, ibeg d) in
+  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
+  let xs  := insert (fun m => lebf snd m n) n unh in
+  uniq (unhandled sd) -> uniq xs.
+Proof.
+  case=> /= ni.
+  elim=> //= x xs IHxs act inact hnd ints assgn fints unhs lau.
+  inv unhs.
+  move=> d /andP [H3 H4].
+  specialize (IHxs act inact hnd ints assgn fints
+                   H1 (proj2 (andP lau)) d H4).
+  case E: (lebf snd _ (ord_max, ibeg d)) => /=.
+    apply/andP; split.
+      admit.
+    destruct xs. by [].
+    inv H2.
+  apply/andP; split.
+    admit.
+  apply/andP; split.
+    admit.
+  rewrite map_inj_uniq. by [].
+  rewrite /injective => x1 x2.
+  move=> /eqP.
+  rewrite xpair_eqE.
+  move=> /andP [H5 H6].
+  move: H5 => /eqP.
+  rewrite /widen_id /=.
+  admit.
+Qed.
+
 Lemma unhandled_insert_uniq : forall sd d,
   let n   := (ord_max, ibeg d) in
   let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
@@ -182,52 +231,19 @@ Proof.
   set ins := insert ((lebf snd)^~ (ord_max, ibeg d)) (ord_max, ibeg d).
   move=> /and3P [H1 H2 H3].
   rewrite -!map_cat cat_uniq.
-  admit.
-(*
   apply/and3P. split.
-  - have: uniq [seq (fst i) | i <- unh]
-       == uniq [seq (fst i) | i <- ins [seq (widen_id (fst p), snd p)
-                            | p <- unh]].
-      move: H1 => /eqP /eqP H1.
-      rewrite H1.
-      apply/eqP. symmetry.
-      assert ((uniq [seq (fst i) | i <- ins [seq (widen_id (fst p), snd p)
-                                 | p <- unh]] = true)
-            = (uniq [seq (fst i) | i <- ins [seq (widen_id (fst p), snd p)
-                                 | p <- unh]])).
-        auto. rewrite H. clear H.
-      rewrite /ins map_inj_uniq.
-      elim: unh H1 H2 => [|x xs IHxs] H1 H2 //=.
-      case E: (lebf snd (widen_id (fst x), snd x) (ord_max, ibeg d)) => /=;
-      move: cons_uniq H1 => -> /= /andP [H4 H5].
-        apply/andP; split.
-          admit.
-        apply IHxs.
-          by apply H5.
-        admit.
-      apply/andP; split.
-        admit.
-      apply/andP; split.
-        admit.
-      admit.
-    admit.
-  - apply/hasPn.
-    move=> x Hin.
-    have: (mem [seq (widen_id (fst i)) | i <- unh]) x
-       == (mem [seq (fst i) | i <- ins [seq (widen_id (fst p), snd p)
-                            | p <- unh]]) x.
-      admit.
-    move=> /eqP <-.
-    apply/hasPn.
-    + apply ([seq widen_id i | i <- active sd] ++
-             [seq widen_id i | i <- inactive sd] ++
-             [seq widen_id i | i <- handled sd]).
-    + rewrite -!map_cat.
-      admit.
-    + by rewrite -!map_cat.
-  - rewrite map_inj_uniq. by [].
-    admit.                      (* prove injectivity *)
-*)
+  admit.
+  (* - rewrite /ins uniq_insert_cons map_cons cons_uniq. *)
+  (*   destruct sd; simpl in *. *)
+  (*   unfold unh in *; clear unh. *)
+  (*   apply/andP; split. *)
+  (*     admit. *)
+  (*   rewrite map_inj_uniq. *)
+  (*   admit. *)
+  (*   admit. *)
+  (* - admit. *)
+  (* - rewrite map_inj_uniq. by []. *)
+  (*   apply widen_ord_inj. *)
 Admitted.
 
 Lemma unhandled_sorted_uncons : forall ni z unh,
@@ -411,7 +427,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
        ; unhandled_sorted := unhandled_insert_sorted _ (unhandled_sorted sd)
-       ; lists_are_unique := unhandled_insert_uniq _ (lists_are_unique sd)
+       ; lists_are_unique := unhandled_insert_uniq   _ (lists_are_unique sd)
        |}
 
   | ScanState_moveUnhandledToActive

@@ -249,8 +249,7 @@ Proof.
          (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
          fixedIntervals0
          (move_unhandled_to_active lists_are_unique0) lists_are_unique0
-         (unhandled_sorted_uncons unhs) unhandled_sorted0
-         )
+         (unhandled_sorted_uncons unhs) unhandled_sorted0)
       as ue_cons.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
