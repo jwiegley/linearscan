@@ -66,7 +66,7 @@ Record ScanStateDesc := {
     fixedIntervals :
       Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
 
-    unhandled_sorted : StronglySorted leq unhandledStarts;
+    unhandled_sorted : StronglySorted (lebf snd) unhandled;
 
     all_state_lists  := unhandledIds ++ active ++ inactive ++ handled;
     lists_are_unique : uniq all_state_lists
@@ -139,48 +139,77 @@ Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
     -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
 Proof. by intros; rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons. Qed.
 
-Lemma uniq_unhandled : forall d sd,
-  uniq (ord_max :: [seq widen_id i | i <- unhandledIds sd])
-    -> uniq [seq fst i | i <- isort snd
-              ((ord_max, ibeg d)
-                :: [seq (widen_id (fst p), snd p) | p <- unhandled sd])].
+Lemma unhandled_widen_forall : forall (sd : ScanStateDesc) x xs,
+  List.Forall (lebf snd x) xs
+    -> List.Forall (lebf snd (@widen_id sd (fst x), snd x))
+                   (map (fun p => (widen_id (fst p), snd p)) xs).
 Proof.
-  rewrite /unhandledIds.
-  move=> d sd /= /andP [H1 H2].
-  have H: [seq fst i | i <- [seq (widen_id (fst p), snd p) | p <- unhandled sd]]
-      = [seq widen_id i | i <- [seq fst i | i <- unhandled sd]].
-    by elim: (unhandled sd) => // a l IHl /=; f_equal.
-Admitted.
+  move=> sd x.
+  elim=> // [|y ys IHys] H.
+    by constructor.
+  constructor; by inv H.
+Qed.
+
+Lemma unhandled_widen_sorted : forall sd,
+  StronglySorted (lebf snd) (unhandled sd)
+    -> StronglySorted (lebf snd)
+         (map (fun p => (widen_id (fst p), snd p)) (unhandled sd)).
+Proof.
+  move=> sd.
+  elim=> /= [|x xs IHxs Hsort Hfa].
+    by constructor.
+  constructor. by [].
+  by apply unhandled_widen_forall.
+Qed.
 
 Lemma uniq_unhandled_cons : forall d sd,
   uniq (ord_max :: [seq widen_id i | i <- all_state_lists sd])
-    -> uniq
-        ([seq fst i | i <- isort snd
-            ((ord_max, ibeg d)
-               :: [seq (widen_id (fst p), snd p) | p <- unhandled sd])] ++
-         [seq widen_id i | i <- active sd] ++
-         [seq widen_id i | i <- inactive sd] ++
-         [seq widen_id i | i <- handled sd]).
+    -> let xs := isorted_insert (ord_max, ibeg d)
+                   (unhandled_widen_sorted (unhandled_sorted sd)) in
+       uniq
+         ([seq (fst i) | i <- xs.1] ++
+          [seq widen_id i | i <- active sd] ++
+          [seq widen_id i | i <- inactive sd] ++
+          [seq widen_id i | i <- handled sd]).
 Proof.
   rewrite /all_state_lists.
-  move=> d sd /= /andP [H1 H2].
-  move: map_cat mem_cat negb_orb H1 => -> -> ->.
-  move=> /andP [? ?].
-  move: map_cat cat_uniq H2 => -> ->.
-  move=> /and3P [? H3 ?].
+  move=> d sd Huniq /=.
+  inv Huniq.
+  move: H0. rewrite !map_cat mem_cat negb_orb.
+  rewrite cat_uniq.
+  move=> /andP [/andP [H1 H2] /and3P [H3 H4 H5]] {Huniq}.
   rewrite -!map_cat cat_uniq.
   apply/and3P. split.
-  - apply uniq_unhandled.
-    by apply/andP.
-  - rewrite /unhandledIds in H3.
-    admit.
-  - by [].
-Admitted.
+  - have: uniq [seq (fst i) | i <- (isorted_insert (ord_max, ibeg d)
+                  (unhandled_widen_sorted (unhandled_sorted sd))).1]
+       == uniq [seq widen_id i | i <- unhandledIds sd].
+      admit.
+    abstract by move=> /eqP ->.
+  - apply/hasPn.
+    move=> x Hin.
+    have: (mem [seq (fst i) | i <-
+                  (isorted_insert (ord_max, ibeg d)
+                     (unhandled_widen_sorted (unhandled_sorted sd))).1]) x
+       == (mem [seq widen_id i | i <- unhandledIds sd]) x.
+      admit.
+    move=> /eqP ->.
+    apply/hasPn.
+    apply ([seq widen_id i | i <- active sd] ++
+           [seq widen_id i | i <- inactive sd] ++
+           [seq widen_id i | i <- handled sd]). by [].
+    abstract by rewrite -!map_cat.
+  - abstract by rewrite !map_cat.
+Qed.
 
-Lemma unhandled_sorted_uncons : forall ni (x : (ordinal ni * nat)) unh,
- StronglySorted (fun m n : nat => m <= n) [seq snd i | i <- x :: unh]
-   -> StronglySorted (fun m n : nat => m <= n) [seq snd i | i <- unh].
-Proof. by move=> ni x unh; invert. Qed.
+Lemma unhandled_sorted_uncons : forall ni z unh,
+ StronglySorted (lebf (@snd ni _)) (z :: unh)
+   -> StronglySorted (lebf (@snd ni _)) unh.
+Proof.
+  move=> ni z.
+  elim=> /= [|x xs IHxs].
+    by constructor.
+  by invert.
+Qed.
 
 Lemma move_active_to_inactive : forall sd x,
   uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
@@ -340,18 +369,18 @@ Inductive ScanState : ScanStateDesc -> Prop :=
   | ScanState_newUnhandled d sd :
     forall `(i : Interval d),
     ScanState sd ->
+    let xs := isorted_insert (ord_max, ibeg d)
+                (unhandled_widen_sorted (unhandled_sorted sd)) in
     ScanState
       {| nextInterval     := S (nextInterval sd)
-       ; unhandled        :=
-           isort snd ((ord_max, ibeg d)
-             :: map (fun p => (widen_id (fst p), snd p)) (unhandled sd))
+       ; unhandled        := xs.1
        ; active           := map (@widen_id sd) (active sd)
        ; inactive         := map (@widen_id sd) (inactive sd)
        ; handled          := map (@widen_id sd) (handled sd)
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := StronglySorted_isort_f _ _
+       ; unhandled_sorted := xs.2
        ; lists_are_unique := uniq_unhandled_cons d
                                (uniq_fin_cons (lists_are_unique sd))
        |}

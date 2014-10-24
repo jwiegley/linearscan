@@ -326,49 +326,16 @@ list_membership a l =
    (:) x xs -> (:) x
     ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
 
-imerge :: (a1 -> Prelude.Int) -> ([] a1) -> ([] a1) -> [] a1
-imerge f l1 l2 =
+isorted_insert :: (a1 -> Prelude.Int) -> a1 -> ([] a1) -> ([] a1)
+isorted_insert f z l =
+  let {_evar_0_ = \_ -> (:) z []} in
   let {
-   imerge_aux l3 =
-     case l1 of {
-      [] -> l3;
-      (:) a1 l1' ->
-       case l3 of {
-        [] -> l1;
-        (:) a2 l2' ->
-         case (Prelude.<=) (f a1) (f a2) of {
-          Prelude.True -> (:) a1 (imerge f l1' l3);
-          Prelude.False -> (:) a2 (imerge_aux l2')}}}}
-  in imerge_aux l2
-
-imerge_list_to_stack :: (a1 -> Prelude.Int) -> ([] (Prelude.Maybe ([] a1)))
-                        -> ([] a1) -> [] (Prelude.Maybe ([] a1))
-imerge_list_to_stack f stack l =
-  case stack of {
-   [] -> (:) (Prelude.Just l) [];
-   (:) y stack' ->
-    case y of {
-     Prelude.Just l' -> (:) Prelude.Nothing
-      (imerge_list_to_stack f stack' (imerge f l' l));
-     Prelude.Nothing -> (:) (Prelude.Just l) stack'}}
-
-imerge_stack :: (a1 -> Prelude.Int) -> ([] (Prelude.Maybe ([] a1))) -> [] a1
-imerge_stack f stack =
-  case stack of {
-   [] -> [];
-   (:) y stack' ->
-    case y of {
-     Prelude.Just l -> imerge f l (imerge_stack f stack');
-     Prelude.Nothing -> imerge_stack f stack'}}
-
-iter_imerge :: (a1 -> Prelude.Int) -> ([] (Prelude.Maybe ([] a1))) -> ([] 
-               a1) -> [] a1
-iter_imerge f stack l =
-  case l of {
-   [] -> imerge_stack f stack;
-   (:) a l' -> iter_imerge f (imerge_list_to_stack f stack ((:) a [])) l'}
-
-isort :: (a1 -> Prelude.Int) -> ([] a1) -> [] a1
-isort f =
-  iter_imerge f []
+   _evar_0_0 = \x xs iHxs ->
+    let {_evar_0_0 = \_ -> (:) z ((:) x xs)} in
+    let {_evar_0_1 = \_ -> iHxs __} in
+    case (Prelude.<=) (Prelude.succ (f z)) (f x) of {
+     Prelude.True -> _evar_0_0 __;
+     Prelude.False -> _evar_0_1 __}}
+  in
+  Datatypes.list_rect _evar_0_ (\x xs iHxs _ -> _evar_0_0 x xs iHxs) l __
 
