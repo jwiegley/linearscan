@@ -326,16 +326,16 @@ list_membership a l =
    (:) x xs -> (:) x
     ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
 
-isorted_insert :: (a1 -> Prelude.Int) -> a1 -> ([] a1) -> ([] a1)
-isorted_insert f z l =
-  let {_evar_0_ = \_ -> (:) z []} in
-  let {
-   _evar_0_0 = \x xs iHxs ->
-    let {_evar_0_0 = \_ -> (:) z ((:) x xs)} in
-    let {_evar_0_1 = \_ -> iHxs __} in
-    case (Prelude.<=) (Prelude.succ (f z)) (f x) of {
-     Prelude.True -> _evar_0_0 __;
-     Prelude.False -> _evar_0_1 __}}
-  in
-  Datatypes.list_rect _evar_0_ (\x xs iHxs _ -> _evar_0_0 x xs iHxs) l __
+insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
+insert p z l =
+  case l of {
+   [] -> (:) z [];
+   (:) x xs ->
+    case p x of {
+     Prelude.True -> (:) x (insert p z xs);
+     Prelude.False -> (:) z ((:) x xs)}}
+
+lebf :: (a1 -> Prelude.Int) -> a1 -> a1 -> Prelude.Bool
+lebf f n m =
+  (Prelude.<=) (f n) (f m)
 

@@ -384,6 +384,55 @@ Proof.
     apply widen_ord_inj.
 Qed.
 
+Fixpoint span {a} (p : a -> bool) (l : list a) : (list a * list a) :=
+  match l with
+  | nil => (nil, nil)
+  | x :: xs =>
+    if p x
+    then let: (ys,zs) := span p xs in (x::ys,zs)
+    else (nil,l)
+  end.
+
+Lemma span_spec {a} (l : list a) : forall p l1 l2,
+  (l1, l2) = span p l -> l = l1 ++ l2.
+Proof.
+  move=> p.
+  elim: l => /= [|x xs IHxs] l1 l2 Heqe.
+    by inv Heqe.
+  case E: (p x); rewrite E in Heqe.
+    destruct (span p xs) eqn:S.
+    inv Heqe.
+    specialize (IHxs l l0).
+    rewrite {}IHxs; by reflexivity.
+  inv Heqe.
+Qed.
+
+Definition insert' {a} (p : a -> bool) (z : a) (l : list a) : list a :=
+  let: (l1,l2) := span p l in l1 ++ z :: l2.
+
+Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
+  match l with
+    | nil => [:: z]
+    | cons x xs =>
+      if p x
+      then x :: insert p z xs
+      else z :: x :: xs
+  end.
+
+(* Lemma insert_cons : forall a p z x (xs : list a), *)
+(*   insert p z (x :: xs) = if p x *)
+(*                          then x :: insert p z xs *)
+(*                          else z :: x :: xs. *)
+(* Proof. *)
+(*   move=> a p z x xs. *)
+(*   rewrite /insert /span. *)
+(*   case: (p x) => //=. *)
+(*   elim: xs x => /= [|y ys IHys] x. by []. *)
+(*   case: (p y) => //=. *)
+(*   fold @span in *. *)
+(*   rewrite IHys. *)
+(* Admitted. *)
+
 Section Mergesort.
 
 Variable t : Type.
@@ -514,44 +563,53 @@ Qed.
 Import EqNotations.
 Require Import Recdef.
 
-Fixpoint isorted_insert (z : t) (l : list t) (H : StronglySorted lebf l)
-  : { l' : list t | StronglySorted lebf l' }.
+(* Lemma StronglySorted_span : forall l p l1 l2, *)
+(*   StronglySorted lebf l *)
+(*     -> (l1,l2) = span p l *)
+(*     -> StronglySorted lebf l1 /\ StronglySorted lebf l2. *)
+
+Lemma Forall_insert_spec : forall x xs z,
+  List.Forall (lebf x) xs -> lebf x z
+    -> List.Forall (lebf x) (insert (lebf^~ z) z xs).
 Proof.
-  elim L: l H => /= [|x xs IHxs] Hsort.
-    exists [:: z]; by constructor.
-  case E: (f z < f x); last first.
-    destruct IHxs. by inv Hsort.
-    by exists x0.
-  exists [:: z, x & xs].
-  constructor. by [].
-  inv Hsort.
+  move=> x.
+  elim=> /= [|y ys IHys] z H Hlt.
+    by constructor.
+  case L: (lebf y z).
+    constructor. by inv H.
+    by apply IHys; inv H.
+  by constructor.
+Qed.
+
+Lemma StronglySorted_insert_spec (l : list t) : forall z,
+  StronglySorted lebf l
+    -> StronglySorted lebf (insert (fun x => lebf x z) z l).
+Proof.
+  move=> z.
+  elim: l => /= [|x xs IHxs] Hsort.
+    by constructor.
+  inv Hsort. clear Hsort.
+  specialize (IHxs H1).
+  case L: (lebf x z).
+    constructor. by apply IHxs.
+    by apply Forall_insert_spec.
   constructor.
-    by rewrite /lebf; apply ltnW.
+    by constructor.
+  constructor.
+    unfold lebf in *.
+    apply ltnW. rewrite ltnNge.
+    apply/negP/eqP. by rewrite L.
   apply List.Forall_impl with (P := (fun m : t => lebf x m)).
     rewrite /lebf.
     move=> a Hlt.
-    by apply /ltnW /(ltn_leq_trans E).
+    move: L => /negP.
+    rewrite /lebf.
+    move=> /negP.
+    rewrite -ltnNge.
+    move=> L.
+    ssomega.
   by [].
-Defined.
-
-Program Fixpoint isorted_insert' (z : t) (l : list t)
-  (H : StronglySorted lebf l) {measure (length l)} : list t :=
-  match List.destruct_list l with
-  | inleft (existT x (exist xs Hxs)) =>
-    if f z < f x
-    then z :: x :: xs
-    else x :: isorted_insert' z (StronglySorted_uncons (rew Hxs in H))
-  | inright _ => [:: z]
-  end.
-
-Corollary StronglySorted_isorted_insert : forall z l
-  (H : StronglySorted lebf l), StronglySorted lebf (isorted_insert' z H).
-Proof.
-  move=> z.
-  elim=> /= [|x xs IHxs] Hsort.
-    (* We have a problem here, because isorted_insert' doesn't simplify, and
-       unfolding it leads to a term which does not simplify either. *)
-Admitted.
+Qed.
 
 End Mergesort.
 

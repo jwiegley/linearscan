@@ -1144,13 +1144,15 @@ _LinearScan__determineIntervals maxVirtReg blocks =
      Prelude.Just i0 ->
       _LinearScan__getScanStateDesc (LinearScan__Build_ScanStateDesc
         (Prelude.succ (_LinearScan__nextInterval ss))
-        (
-          (Lib.isorted_insert (Prelude.snd) ((,)
+        (Lib.insert (\m ->
+          Lib.lebf (Prelude.snd) m ((,)
             (Fintype.ord_max (_LinearScan__nextInterval ss))
-            (Interval.ibeg i0))
-            ((Prelude.map) (\p -> (,)
-              (_LinearScan__widen_id ss ((Prelude.fst) p)) ((Prelude.snd) p))
-              (_LinearScan__unhandled ss))))
+            (Interval.ibeg i0))) ((,)
+          (Fintype.ord_max (_LinearScan__nextInterval ss))
+          (Interval.ibeg i0))
+          ((Prelude.map) (\p -> (,)
+            (_LinearScan__widen_id ss ((Prelude.fst) p)) ((Prelude.snd) p))
+            (_LinearScan__unhandled ss)))
         ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__active ss))
         ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__inactive ss))
         ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__handled ss))
