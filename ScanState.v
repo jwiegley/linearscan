@@ -628,6 +628,40 @@ Proof.
     by rewrite 2!addnS -addSn /=.
 Qed.
 
+(* jww (2014-10-25): Proving this will require that the constructor accepts a
+   proof that there is romo in the active pool, and then in tryAllocateFreeReg
+   is when we split based on whether that list is full or not (for this is
+   what causes allocation there to fail).  With the knowledge of that split,
+   we would then know that there is either room, or no room (but after
+   spilling there should then be room again).
+
+   But rather than taking the size of the active list to determine this, we
+   would have another lemma stating that if the algorithm that determines
+   freeUntilPos fails to find a free register, this implies that size (active
+   sd) == maxReg. *)
+(*
+Theorem actives_within_range `(st : ScanState sd) :
+  size (active sd) <= maxReg.
+Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    by rewrite size_map.
+  - Case "ScanState_moveUnhandledToActive". (* TODO *)
+  - Case "ScanState_moveActiveToInactive".
+    rewrite size_rem; last by [].
+    case E: (active sd) => //=.
+    by rewrite E /= in IHst; apply ltnW.
+  - Case "ScanState_moveActiveToHandled".
+    rewrite size_rem; last by [].
+    case E: (active sd) => //=.
+    by rewrite E /= in IHst; apply ltnW.
+  - Case "ScanState_moveInactiveToActive". (* TODO *)
+  - Case "ScanState_moveInactiveToHandled".
+    by [].
+Qed.
+*)
+
 Theorem uniq_unhandledExtent_cons
   : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
       (act act' inact inact' hnd hnd' : list (fin ni)),
