@@ -243,13 +243,10 @@ Proof.
   pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
-  pose proof unhandled_sorted0 as unhs.
-  rewrite /unhandledStarts0 in unhs.
-  pose (uniq_unhandledExtent_cons intervals0
+  pose (uniq_unhandledExtent_cons (i, n) unhandled0 intervals0
          (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
          fixedIntervals0
-         (move_unhandled_to_active lists_are_unique0) lists_are_unique0
-         (unhandled_sorted_uncons unhs) unhandled_sorted0)
+         (i :: active0) active0 inactive0 inactive0 handled0 handled0)
       as ue_cons.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;

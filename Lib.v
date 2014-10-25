@@ -245,27 +245,6 @@ Proof.
   rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
 Qed.
 
-(*
-Definition find_in {a} (eq_dec : forall x y : a, { x = y } + { x <> y })
-  (n : a) (l : list a) : {n \in l} + {n \notin l}.
-Proof.
-  induction l as [| x xs].
-    right. auto.
-  destruct (eq_dec n x).
-    subst. left. apply in_eq.
-  inversion IHxs.
-    left. apply List.in_cons.
-    assumption.
-  right. unfold not in *.
-  intros. apply in_inv in H0.
-  inversion H0.
-     symmetry in H1. contradiction.
-  contradiction.
-Defined.
-
-Arguments find_in [_] _ _ _.
-*)
-
 Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   LocallySorted R (x :: xs) -> LocallySorted R xs.
 Proof. intros. inversion H; subst; [ constructor | assumption ]. Qed.
@@ -419,20 +398,6 @@ Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
       else z :: x :: xs
   end.
 
-(* Lemma insert_cons : forall a p z x (xs : list a), *)
-(*   insert p z (x :: xs) = if p x *)
-(*                          then x :: insert p z xs *)
-(*                          else z :: x :: xs. *)
-(* Proof. *)
-(*   move=> a p z x xs. *)
-(*   rewrite /insert /span. *)
-(*   case: (p x) => //=. *)
-(*   elim: xs x => /= [|y ys IHys] x. by []. *)
-(*   case: (p y) => //=. *)
-(*   fold @span in *. *)
-(*   rewrite IHys. *)
-(* Admitted. *)
-
 Section Mergesort.
 
 Variable t : Type.
@@ -563,11 +528,6 @@ Qed.
 Import EqNotations.
 Require Import Recdef.
 
-(* Lemma StronglySorted_span : forall l p l1 l2, *)
-(*   StronglySorted lebf l *)
-(*     -> (l1,l2) = span p l *)
-(*     -> StronglySorted lebf l1 /\ StronglySorted lebf l2. *)
-
 Lemma Forall_insert_spec : forall x xs z,
   List.Forall (lebf x) xs -> lebf x z
     -> List.Forall (lebf x) (insert (lebf^~ z) z xs).
@@ -613,7 +573,20 @@ Qed.
 
 End Mergesort.
 
-Lemma Forall_map : forall a f x l,
+Lemma Forall_map : forall (a : eqType) P
+  (f : a -> P a) (g : P a -> a) (R : a -> a -> bool) (x : a) l,
+  (forall n, g (f n) = n)
+    -> List.Forall (R x) l
+    -> List.Forall (fun n : P a => R x (g n)) [seq f i | i <- l].
+Proof.
+  move=> a P f g R x.
+  elim=> [|z l IHl] H /=.
+    by constructor.
+  constructor. rewrite H. inv H0.
+  apply IHl. apply H. inv H0.
+Qed.
+
+Lemma Forall_leq_map : forall a f x l,
   List.Forall (fun m : a => f x <= f m) l
     -> List.Forall (fun n : nat => f x <= n) [seq f i | i <- l].
 Proof.
@@ -624,7 +597,23 @@ Proof.
   by apply IHl; inv H.
 Qed.
 
-Lemma StronglySorted_map : forall a f l,
+Lemma StronglySorted_map : forall (a b : eqType) P
+  (f : a -> P a) (g : P a -> a) (R : a -> a -> bool) l,
+  (forall n, g (f n) = n)
+    -> StronglySorted R l
+    -> StronglySorted (fun x y : P a => R (g x) (g y)) [seq f i | i <- l].
+Proof.
+  move=> a b P f g R.
+  elim=> [|x l IHl] H /=.
+    by constructor.
+  constructor. apply IHl. apply H. inv H0.
+  apply Forall_map. apply H. inv H0.
+  apply List.Forall_impl with (P := (fun x0 : a => R x x0)).
+    by rewrite H.
+  by [].
+Qed.
+
+Lemma StronglySorted_leq_map : forall a f l,
   StronglySorted (fun n m : a => f n <= f m) l
     -> StronglySorted (fun m n : nat => m <= n) [seq f i | i <- l].
 Proof.
@@ -632,7 +621,7 @@ Proof.
   elim=> [|x l IHl] H /=.
     by constructor.
   constructor. by apply IHl; inv H.
-  by apply Forall_map; inv H.
+  by apply Forall_leq_map; inv H.
 Qed.
 
 Corollary StronglySorted_isort_f : forall a (f : a -> nat) l,
@@ -645,6 +634,6 @@ Proof.
     by constructor.
   inv Hsort. constructor.
   constructor.
-    by apply StronglySorted_map.
-  by apply Forall_map.
+    by apply StronglySorted_leq_map.
+  by apply Forall_leq_map.
 Qed.

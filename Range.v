@@ -174,7 +174,7 @@ Defined.
     the first and last use positions; for example, in the case of a use
     position ranging over the scope of a loop. *)
 
-Record RangeDesc := {
+Record RangeDesc : Set := {
     rbeg : nat;
     rend : nat;                 (* 1 past the last use position *)
     ups  : NonEmpty UsePos

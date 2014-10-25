@@ -6,6 +6,7 @@ module LinearScan.Main where
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
+import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
 import qualified LinearScan.IMonad as IMonad
@@ -18,8 +19,10 @@ import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
 import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Vector0 as Vector0
+import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
 import qualified LinearScan.Seq as Seq
+import qualified LinearScan.Ssrbool as Ssrbool
 
 
 
@@ -71,12 +74,12 @@ _LinearScan__coq_ScanStateDesc_rect :: (Prelude.Int -> ([]
                                        (Prelude.Maybe LinearScan__PhysReg))
                                        -> (Lib.Vec
                                        (Prelude.Maybe Interval.IntervalDesc))
-                                       -> () -> () -> a1) ->
-                                       LinearScan__ScanStateDesc -> a1
+                                       -> a1) -> LinearScan__ScanStateDesc ->
+                                       a1
 _LinearScan__coq_ScanStateDesc_rect f s =
   case s of {
    LinearScan__Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 x6 ->
-    f x x0 x1 x2 x3 x4 x5 x6 __ __}
+    f x x0 x1 x2 x3 x4 x5 x6}
 
 _LinearScan__coq_ScanStateDesc_rec :: (Prelude.Int -> ([]
                                       ((,) Vector0.Coq_fin Prelude.Int)) ->
@@ -87,8 +90,8 @@ _LinearScan__coq_ScanStateDesc_rec :: (Prelude.Int -> ([]
                                       (Prelude.Maybe LinearScan__PhysReg)) ->
                                       (Lib.Vec
                                       (Prelude.Maybe Interval.IntervalDesc))
-                                      -> () -> () -> a1) ->
-                                      LinearScan__ScanStateDesc -> a1
+                                      -> a1) -> LinearScan__ScanStateDesc ->
+                                      a1
 _LinearScan__coq_ScanStateDesc_rec =
   _LinearScan__coq_ScanStateDesc_rect
 
@@ -239,6 +242,75 @@ _LinearScan__getScanStateDesc :: LinearScan__ScanStateDesc ->
 _LinearScan__getScanStateDesc sd =
   sd
 
+_LinearScan__in_map_inj :: Prelude.Int -> Eqtype.Equality__Coq_sort -> ([]
+                           Fintype.Coq_ordinal) -> Specif.Coq_sig2
+                           Fintype.Coq_ordinal
+_LinearScan__in_map_inj n x xs =
+  let {_evar_0_ = \_ -> Logic.coq_False_rect} in
+  let {
+   _evar_0_0 = \y ys iHys ->
+    let {_evar_0_0 = \_ -> y} in
+    let {
+     _evar_0_1 = \_ ->
+      let {
+       _evar_0_1 = \_ ->
+        let {
+         _evar_0_1 = \_ ->
+          let {
+           _evar_0_1 = let {_evar_0_1 = \_ -> iHys __} in
+                       Logic.eq_rect_r
+                         (Ssrbool.in_mem x
+                           (Ssrbool.mem
+                             (Seq.seq_predType
+                               (Fintype.ordinal_eqType (Prelude.succ n)))
+                             (unsafeCoerce
+                               ((Prelude.map) (\i ->
+                                 Fintype.widen_ord n (Prelude.succ n) i) ys))))
+                         _evar_0_1
+                         ((Prelude.||) Prelude.False
+                           (Ssrbool.in_mem x
+                             (Ssrbool.mem
+                               (Seq.seq_predType
+                                 (Fintype.ordinal_eqType (Prelude.succ n)))
+                               (unsafeCoerce
+                                 ((Prelude.map) (\i ->
+                                   Fintype.widen_ord n (Prelude.succ n) i)
+                                   ys)))))}
+          in
+          Logic.eq_rect_r Prelude.False _evar_0_1
+            (Eqtype.eq_op (Fintype.ordinal_eqType (Prelude.succ n)) x
+              (unsafeCoerce (Fintype.widen_ord n (Prelude.succ n) y)))}
+        in
+        Logic.eq_rect_r
+          ((Prelude.||)
+            (Eqtype.eq_op (Fintype.ordinal_eqType (Prelude.succ n)) x
+              (unsafeCoerce (Fintype.widen_ord n (Prelude.succ n) y)))
+            (Ssrbool.in_mem x
+              (Ssrbool.mem
+                (Seq.seq_predType (Fintype.ordinal_eqType (Prelude.succ n)))
+                (unsafeCoerce
+                  ((Prelude.map) (\i ->
+                    Fintype.widen_ord n (Prelude.succ n) i) ys))))) _evar_0_1
+          (Ssrbool.in_mem x
+            (Ssrbool.mem
+              (Seq.seq_predType (Fintype.ordinal_eqType (Prelude.succ n)))
+              (unsafeCoerce ((:) (Fintype.widen_ord n (Prelude.succ n) y)
+                ((Prelude.map) (\i -> Fintype.widen_ord n (Prelude.succ n) i)
+                  ys)))))}
+      in
+      Logic.eq_rect_r ((:) (Fintype.widen_ord n (Prelude.succ n) y)
+        ((Prelude.map) (\i -> Fintype.widen_ord n (Prelude.succ n) i) ys))
+        _evar_0_1
+        ((Prelude.map) (\i -> Fintype.widen_ord n (Prelude.succ n) i) ((:) y
+          ys)) __ __ __}
+    in
+    case Eqtype.eq_op (Fintype.ordinal_eqType (Prelude.succ n)) x
+           (unsafeCoerce (Fintype.widen_ord n (Prelude.succ n) y)) of {
+     Prelude.True -> _evar_0_0 __;
+     Prelude.False -> _evar_0_1 __}}
+  in
+  Datatypes.list_rect _evar_0_ (\y ys iHys _ -> _evar_0_0 y ys iHys) xs __
+
 _LinearScan__coq_ScanStateCursor_rect :: LinearScan__ScanStateDesc -> (() ->
                                          () -> a1) -> a1
 _LinearScan__coq_ScanStateCursor_rect sd f =
@@ -273,40 +345,6 @@ _LinearScan__curIntDesc sd =
 _LinearScan__curPosition :: LinearScan__ScanStateDesc -> Prelude.Int
 _LinearScan__curPosition sd =
   Interval.intervalStart ( (_LinearScan__curIntDetails sd))
-
-type LinearScan__NextScanState =
-  LinearScan__ScanStateDesc
-  -- singleton inductive, whose constructor was Build_NextScanState
-  
-_LinearScan__coq_NextScanState_rect :: (LinearScan__ScanStateDesc -> () -> ()
-                                       -> a1) -> LinearScan__NextScanState ->
-                                       a1
-_LinearScan__coq_NextScanState_rect f n =
-  f n __ __
-
-_LinearScan__coq_NextScanState_rec :: (LinearScan__ScanStateDesc -> () -> ()
-                                      -> a1) -> LinearScan__NextScanState ->
-                                      a1
-_LinearScan__coq_NextScanState_rec =
-  _LinearScan__coq_NextScanState_rect
-
-_LinearScan__nextDesc :: LinearScan__NextScanState ->
-                         LinearScan__ScanStateDesc
-_LinearScan__nextDesc n =
-  n
-
-type LinearScan__NextState = LinearScan__NextScanState
-
-type LinearScan__NextStateDep = LinearScan__NextScanState
-
-type LinearScan__NextStateWith a = (,) a LinearScan__NextScanState
-
-_LinearScan__coq_NSS_transport :: LinearScan__ScanStateDesc ->
-                                  LinearScan__ScanStateDesc ->
-                                  LinearScan__NextScanState ->
-                                  LinearScan__NextScanState
-_LinearScan__coq_NSS_transport sd sd' n =
-  _LinearScan__nextDesc n
 
 _LinearScan__coq_SSMorph_rect :: LinearScan__ScanStateDesc ->
                                  LinearScan__ScanStateDesc -> (() -> () -> ()

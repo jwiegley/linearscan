@@ -23,7 +23,7 @@ Definition registers_exist := registers_exist.
     through the sequentialized instruction stream over which registers are
     allocated. *)
 
-Record ScanStateDesc := {
+Record ScanStateDesc : Type := {
     nextInterval : nat;
     IntervalId   := fin nextInterval;
 
@@ -68,10 +68,7 @@ Record ScanStateDesc := {
     fixedIntervals :
       Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
 
-    unhandled_sorted : StronglySorted (lebf snd) unhandled;
-
-    all_state_lists  := unhandledIds ++ active ++ inactive ++ handled;
-    lists_are_unique : uniq all_state_lists
+    all_state_lists := unhandledIds ++ active ++ inactive ++ handled
 }.
 
 Definition widen_id (sd : ScanStateDesc) :=
@@ -91,259 +88,6 @@ Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
     let f n x := n + intervalExtent (V.nth (intervals sd) (to_vfin x)).2 in
     foldl f 0 xs
   end.
-
-Lemma uniq_unhandledExtent_cons
-  : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
-      (act act' inact inact' hnd hnd' : list (fin ni))
-      (lau : uniq (map (@fst _ _) unh ++ act ++ inact ++ hnd))
-      (lau' : uniq ((fst i :: map (@fst _ _) unh) ++ act' ++ inact' ++ hnd'))
-      unhs unhs',
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := unh
-     ; active           := act
-     ; inactive         := inact
-     ; handled          := hnd
-     ; intervals        := ints
-     ; assignments      := assgn
-     ; fixedIntervals   := fixints
-     ; unhandled_sorted := unhs
-     ; lists_are_unique := lau
-     |} <
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := i :: unh
-     ; active           := act'
-     ; inactive         := inact'
-     ; handled          := hnd'
-     ; intervals        := ints
-     ; assignments      := assgn'
-     ; fixedIntervals   := fixints
-     ; unhandled_sorted := unhs'
-     ; lists_are_unique := lau'
-     |}.
-Proof.
-  intros.
-  induction unh;
-  unfold unhandledExtent;
-  simpl; destruct i as [i beg];
-  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
-    auto.
-  destruct unh;
-  simpl; destruct a as [a ?];
-  first by (rewrite add0n; apply ltn_plus).
-  apply fold_fold_lt; rewrite 2!add0n -addnA.
-  exact: ltn_plus.
-Qed.
-
-Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
-  uniq ((x :: unh) ++ act ++ inact ++ hnd)
-    -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
-Proof. by intros; rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons. Qed.
-
-Lemma unhandled_insert_sorted : forall sd d,
-  let n   := (ord_max, ibeg d) in
-  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
-  let xs  := insert (fun m => lebf snd m n) n unh in
-  StronglySorted (lebf snd) (unhandled sd)
-    -> StronglySorted (lebf snd) xs.
-Proof.
-  move=> sd.
-  set unh := unhandled sd.
-  move=> d /= Hsort.
-  apply StronglySorted_insert_spec.
-  elim: unh Hsort => /= [|x xs IHxs] Hsort.
-    by constructor; constructor.
-  inversion Hsort as [H1|H2 H3 H4 H5 H6]; subst.
-  clear Hsort.
-  constructor. by apply IHxs.
-  elim: xs IHxs H4 H5 => /= [|y ys IHys] IHxs H4 H5.
-    by constructor.
-  constructor. inv H5.
-  apply IHys.
-  - specialize (IHxs H4).
-    inv IHxs.
-  - inv H4.
-  - inv H5.
-Qed.
-
-Lemma unhandled_uniq_inj : forall sd,
-  uniq (unhandled sd) == uniq [seq fst i | i <- unhandled sd].
-Proof.
-  case=> /= ?.
-  elim=> //= x xs IHxs act inact hnd ints assgn fints unhs lau.
-  apply/eqP; f_equal.
-    admit.
-  apply/eqP.
-  inv unhs.
-  apply (IHxs act inact hnd ints assgn fints H1 (proj2 (andP lau))).
-Qed.
-
-Lemma uniq_insert_cons : forall (T : eqType) P x xs,
-  @uniq T (insert (P ^~ x) x xs) == uniq xs.
-Admitted.
-
-Lemma unhandled_uniq_cons : forall sd d,
-  let n   := (ord_max, ibeg d) in
-  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
-  let xs  := insert (fun m => lebf snd m n) n unh in
-  uniq (unhandled sd) -> uniq xs.
-Proof.
-  case=> /= ni.
-  elim=> //= x xs IHxs act inact hnd ints assgn fints unhs lau.
-  inv unhs.
-  move=> d /andP [H3 H4].
-  specialize (IHxs act inact hnd ints assgn fints
-                   H1 (proj2 (andP lau)) d H4).
-  case E: (lebf snd _ (ord_max, ibeg d)) => /=.
-    apply/andP; split.
-      admit.
-    destruct xs. by [].
-    inv H2.
-  apply/andP; split.
-    admit.
-  apply/andP; split.
-    admit.
-  rewrite map_inj_uniq. by [].
-  rewrite /injective => x1 x2.
-  move=> /eqP.
-  rewrite xpair_eqE.
-  move=> /andP [H5 H6].
-  move: H5 => /eqP.
-  rewrite /widen_id /=.
-  admit.
-Qed.
-
-Lemma unhandled_insert_uniq : forall sd d,
-  let n   := (ord_max, ibeg d) in
-  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
-  let xs  := insert (fun m => lebf snd m n) n unh in
-  uniq (all_state_lists sd)
-    -> uniq ([seq (fst i) | i <- xs] ++
-             [seq widen_id i | i <- active sd] ++
-             [seq widen_id i | i <- inactive sd] ++
-             [seq widen_id i | i <- handled sd]).
-Proof.
-  move=> sd.
-  rewrite /all_state_lists /unhandledIds cat_uniq.
-  set unh := unhandled sd.
-  move=> d.
-  set ins := insert ((lebf snd)^~ (ord_max, ibeg d)) (ord_max, ibeg d).
-  move=> /and3P [H1 H2 H3].
-  rewrite -!map_cat cat_uniq.
-  apply/and3P. split.
-  admit.
-  (* - rewrite /ins uniq_insert_cons map_cons cons_uniq. *)
-  (*   destruct sd; simpl in *. *)
-  (*   unfold unh in *; clear unh. *)
-  (*   apply/andP; split. *)
-  (*     admit. *)
-  (*   rewrite map_inj_uniq. *)
-  (*   admit. *)
-  (*   admit. *)
-  (* - admit. *)
-  (* - rewrite map_inj_uniq. by []. *)
-  (*   apply widen_ord_inj. *)
-Admitted.
-
-Lemma unhandled_sorted_uncons : forall ni z unh,
- StronglySorted (lebf (@snd ni _)) (z :: unh)
-   -> StronglySorted (lebf (@snd ni _)) unh.
-Proof.
-  move=> ni z.
-  elim=> /= [|x xs IHxs].
-    by constructor.
-  by invert.
-Qed.
-
-Lemma move_active_to_inactive : forall sd x,
-  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
-    -> x \in active sd
-    -> uniq (unhandledIds sd ++ rem x (active sd) ++
-              (x :: inactive sd) ++ handled sd).
-Proof.
-  intros.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  rewrite <- catA.
-  apply uniq_juggle.
-  rewrite catA.
-  rewrite catA.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  assumption.
-  apply H0.
-Qed.
-
-Lemma move_active_to_handled : forall sd x,
-  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
-    -> x \in active sd
-    -> uniq (unhandledIds sd ++ rem x (active sd) ++
-              inactive sd ++ x :: handled sd).
-Proof.
-  intros.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  rewrite <- catA.
-  rewrite uniq_catCA2.
-  rewrite <- catA.
-  apply uniq_juggle.
-  rewrite catA.
-  rewrite uniq_catCA2.
-  rewrite catA.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  rewrite catA.
-  rewrite uniq_catCA2.
-  rewrite <- catA.
-  assumption.
-  apply H0.
-Qed.
-
-Lemma move_inactive_to_active : forall sd x,
-  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
-    -> x \in inactive sd
-    -> uniq (unhandledIds sd ++ x :: active sd ++
-              rem x (inactive sd) ++ handled sd).
-Proof.
-  intros.
-  rewrite -cat_cons.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  rewrite uniq_catC.
-  rewrite -!catA.
-  rewrite (catA (handled sd)).
-  rewrite uniq_catCA2.
-  apply uniq_juggle.
-  rewrite !catA.
-  rewrite uniq_catC.
-  rewrite <- catA.
-  rewrite uniq_catCA2.
-  rewrite <- catA.
-  rewrite catA.
-  rewrite uniq_catCA2.
-  rewrite <- catA.
-  assumption.
-  apply H0.
-Qed.
-
-Lemma move_inactive_to_handled : forall sd x,
-  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
-    -> x \in inactive sd
-    -> uniq (unhandledIds sd ++ active sd ++
-              rem x (inactive sd) ++ x :: handled sd).
-Proof.
-  intros.
-  rewrite (catA (unhandledIds sd)).
-  rewrite uniq_catC.
-  rewrite -!catA.
-  apply uniq_juggle.
-  rewrite (catA (inactive sd)).
-  rewrite uniq_catC.
-  rewrite -!catA.
-  assumption.
-  apply H0.
-Qed.
 
 (** Given a vector of optional positions associated with register, return the
     first register (counting downwards) which is either [None], or the highest
@@ -407,32 +151,25 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := V.nil _
        ; assignments      := V.nil _
        ; fixedIntervals   := V.const None _
-       ; unhandled_sorted := SSorted_nil _
-       ; lists_are_unique := uniq_nil _
        |}
 
-  | ScanState_newUnhandled d sd :
-    forall `(i : Interval d),
-    ScanState sd ->
+  | ScanState_newUnhandled sd :
+    ScanState sd -> forall `(i : Interval d),
     let n   := (ord_max, ibeg d) in
     let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
-    let xs  := insert (fun m => lebf snd m n) n unh in
     ScanState
       {| nextInterval     := S (nextInterval sd)
-       ; unhandled        := xs
+       ; unhandled        := insert (fun m => lebf snd m n) n unh
        ; active           := map (@widen_id sd) (active sd)
        ; inactive         := map (@widen_id sd) (inactive sd)
        ; handled          := map (@widen_id sd) (handled sd)
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := unhandled_insert_sorted _ (unhandled_sorted sd)
-       ; lists_are_unique := unhandled_insert_uniq   _ (lists_are_unique sd)
        |}
 
   | ScanState_moveUnhandledToActive
-      ni unh (* unhsort *) act inact hnd ints assgn fixints x reg unhs :
-    forall lau : uniq ((fst x :: map (@fst _ _) unh) ++ act ++ inact ++ hnd),
+      ni unh act inact hnd ints assgn fixints x reg :
     ScanState
       {| nextInterval     := ni
        ; unhandled        := x :: unh
@@ -442,8 +179,6 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; assignments      := assgn
        ; fixedIntervals   := fixints
-       ; unhandled_sorted := unhs
-       ; lists_are_unique := lau
        |} ->
     ScanState
       {| nextInterval     := ni
@@ -455,12 +190,10 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        (* jww (2014-10-01): Prove: It was None before this call *)
        ; assignments      := V.replace assgn (to_vfin (fst x)) (Some reg)
        ; fixedIntervals   := fixints
-       ; unhandled_sorted := unhandled_sorted_uncons unhs
-       ; lists_are_unique := move_unhandled_to_active lau
        |}
 
-  | ScanState_moveActiveToInactive sd x :
-    ScanState sd -> forall (H : x \in active sd),
+  | ScanState_moveActiveToInactive sd :
+    ScanState sd -> forall `(H : x \in active sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -470,12 +203,10 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := unhandled_sorted sd
-       ; lists_are_unique := move_active_to_inactive (lists_are_unique sd) H
        |}
 
-  | ScanState_moveActiveToHandled sd x :
-    ScanState sd -> forall (H : x \in active sd),
+  | ScanState_moveActiveToHandled sd :
+    ScanState sd -> forall `(H : x \in active sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -485,12 +216,10 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := unhandled_sorted sd
-       ; lists_are_unique := move_active_to_handled (lists_are_unique sd) H
        |}
 
-  | ScanState_moveInactiveToActive sd x :
-    ScanState sd -> forall (H : x \in inactive sd),
+  | ScanState_moveInactiveToActive sd :
+    ScanState sd -> forall `(H : x \in inactive sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -500,12 +229,10 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := unhandled_sorted sd
-       ; lists_are_unique := move_inactive_to_active (lists_are_unique sd) H
        |}
 
-  | ScanState_moveInactiveToHandled sd x :
-    ScanState sd -> forall (H : x \in inactive sd),
+  | ScanState_moveInactiveToHandled sd :
+    ScanState sd -> forall `(H : x \in inactive sd),
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -515,9 +242,6 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
-       ; unhandled_sorted := unhandled_sorted sd
-       ; lists_are_unique :=
-         move_inactive_to_handled (lists_are_unique sd) H
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
@@ -531,7 +255,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
-Definition ScanStateSig := { sd : ScanStateDesc | ScanState sd}.
+Definition ScanStateSig := { sd : ScanStateDesc | ScanState sd }.
 
 Definition getScanStateDesc `(st : ScanState sd) := sd.
 
@@ -553,6 +277,328 @@ Proof.
   destruct p0.
   pose (Interval_extent_nonzero (V.nth intervals0 (to_vfin i)).2).
   by rewrite add0n addnC ltn_plus.
+Qed.
+
+Lemma Forall_widen : forall sd x (xs : list (IntervalId sd * nat)),
+  List.Forall (lebf snd x) xs
+    -> List.Forall (lebf snd (widen_id (fst x), snd x))
+                   [seq (widen_id (fst p), snd p) | p <- xs].
+Proof.
+  move=> ? x xs.
+  elim: xs x => //= [? ? IHys] ? H /=.
+  constructor; first by inv H.
+  by apply IHys; inv H.
+Qed.
+
+Lemma StronglySorted_widen : forall sd (xs : list (IntervalId sd * nat)),
+  StronglySorted (lebf snd) xs
+    -> StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
+Proof.
+  move=> ?.
+  elim=> /= [|? ? ?] H; first by constructor.
+  constructor; first by inv H.
+  by apply Forall_widen; inv H.
+Qed.
+
+Lemma unhandled_sorted `(st : ScanState sd) :
+  StronglySorted (lebf snd) (unhandled sd).
+Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". constructor.
+  - Case "ScanState_newUnhandled".
+    rewrite /unh.
+    by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
+  - Case "ScanState_moveUnhandledToActive". inv IHst.
+  - Case "ScanState_moveActiveToInactive". apply IHst.
+  - Case "ScanState_moveActiveToHandled". apply IHst.
+  - Case "ScanState_moveInactiveToActive". apply IHst.
+  - Case "ScanState_moveInactiveToHandled".  apply IHst.
+Qed.
+
+Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
+  uniq ((x :: unh) ++ act ++ inact ++ hnd)
+    -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
+Proof. by intros; rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons. Qed.
+
+Lemma move_active_to_inactive : forall sd x,
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in active sd
+    -> uniq (unhandledIds sd ++ rem x (active sd) ++
+              (x :: inactive sd) ++ handled sd).
+Proof.
+  intros.
+  rewrite uniq_catC -catA -catA.
+  apply uniq_juggle.
+    by rewrite catA catA uniq_catC -catA.
+  by apply H0.
+Qed.
+
+Lemma move_active_to_handled : forall sd x,
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in active sd
+    -> uniq (unhandledIds sd ++ rem x (active sd) ++
+              inactive sd ++ x :: handled sd).
+Proof.
+  intros.
+  rewrite uniq_catC -catA -catA uniq_catCA2 -catA.
+  apply uniq_juggle.
+    by rewrite catA uniq_catCA2 catA uniq_catC -catA catA uniq_catCA2 -catA.
+  by apply H0.
+Qed.
+
+Lemma move_inactive_to_active : forall sd x,
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in inactive sd
+    -> uniq (unhandledIds sd ++ x :: active sd ++
+              rem x (inactive sd) ++ handled sd).
+Proof.
+  intros.
+  rewrite -cat_cons uniq_catC -catA uniq_catC -!catA
+          (catA (handled sd)) uniq_catCA2.
+  apply uniq_juggle.
+    by rewrite !catA uniq_catC -catA uniq_catCA2 -catA catA uniq_catCA2 -catA.
+  by apply H0.
+Qed.
+
+Lemma move_inactive_to_handled : forall sd x,
+  uniq (unhandledIds sd ++ active sd ++ inactive sd ++ handled sd)
+    -> x \in inactive sd
+    -> uniq (unhandledIds sd ++ active sd ++
+              rem x (inactive sd) ++ x :: handled sd).
+Proof.
+  intros.
+  rewrite (catA (unhandledIds sd)) uniq_catC -!catA.
+  apply uniq_juggle.
+    by rewrite (catA (inactive sd)) uniq_catC -!catA.
+  by apply H0.
+Qed.
+
+Lemma notin_fst
+  : forall n P x y (xs : seq (fin n * nat)),
+  fst x != fst y
+    -> @fst _ nat y \notin [seq fst i | i <- xs]
+    -> fst y \notin [seq fst i | i <- insert (P^~ x) x xs].
+Proof.
+  move=> n P x y.
+  elim=> /= [|z zs IHzs] Heqe H.
+    by rewrite mem_seq1 eq_sym.
+  move: H.
+  rewrite in_cons negb_orb => /andP [H1 H2].
+  case E: (P z x).
+    rewrite map_cons in_cons negb_orb.
+    apply/andP; split. by [].
+    by apply IHzs.
+  rewrite map_cons in_cons negb_orb.
+  apply/andP; split.
+    by rewrite eq_sym.
+  rewrite map_cons in_cons negb_orb.
+  by apply/andP.
+Qed.
+
+Lemma uniq_insert_cons
+  : forall n P (f : fin n -> fin (S n)) x (xs : seq (fin n * nat)),
+  uniq [seq fst i | i <- x :: xs]
+    -> uniq [seq fst i | i <- insert (P ^~ x) x xs].
+Proof.
+  move=> n P f x.
+  elim=> //= y ys IHys /and3P [H1 ? ?].
+  move: H1.
+  rewrite in_cons negb_orb => /andP [? ?].
+  case E: (P y x).
+    rewrite map_cons cons_uniq.
+    apply/andP; split.
+      by apply notin_fst.
+    by apply/IHys/andP.
+  rewrite !map_cons !cons_uniq.
+  rewrite in_cons negb_orb.
+  apply/and3P; split; auto.
+  by apply/andP.
+Qed.
+
+Lemma map_f_notin :
+  forall (T1 T2 : eqType) (f : T1 -> T2) (s : seq T1) (x : T1),
+  injective f -> x \notin s -> f x \notin [seq f i | i <- s].
+Proof.
+  move=> T1 T2 f.
+  elim=> // x xs IHxs x0 Hinj.
+  rewrite in_cons negb_orb => /andP [H1 H2].
+  rewrite map_cons in_cons negb_orb.
+  apply/andP; split.
+    by rewrite inj_eq.
+  by apply IHxs.
+Qed.
+
+Lemma uniq_trans_fst
+  : forall n (f : fin n -> fin (S n)) (xs : seq (fin n * nat)),
+  injective f
+    -> uniq [seq fst i | i <- xs]
+    -> uniq [seq fst i | i <- [seq (fun p => (f (fst p), snd p)) p | p <- xs]].
+Proof.
+  move=> n f.
+  elim=> // x xs IHxs Hinj.
+  rewrite map_cons cons_uniq => /andP [H1 H2].
+  rewrite -map_comp map_cons map_comp /=.
+  apply/andP; split.
+    rewrite -map_comp.
+    replace ([eta fst] \o (fun p : fin n * nat => (f (fst p), snd p)))
+       with (f \o @fst _ nat); last by [].
+    rewrite map_comp.
+    by apply map_f_notin.
+  by apply IHxs.
+Qed.
+
+Lemma no_ord_max : forall n (xs : seq (fin n * nat)),
+   ord_max
+     \notin [ seq fst i
+            | i <- [seq (widen_ord (leqnSn n) (fst p), snd p) | p <- xs] ].
+Proof.
+  move=> n.
+  elim=> // x xs IHxs.
+  rewrite -map_comp map_cons in_cons negb_orb /=.
+  apply/andP; split.
+    apply lift_bounded.
+  rewrite map_comp.
+  apply IHxs.
+Qed.
+
+Lemma in_map_inj : forall n x xs,
+  let f := widen_ord (leqnSn n) in
+  x \in [seq f i | i <- xs] -> { y | x = f y & y \in xs }.
+Proof.
+  move=> n x xs.
+  elim E: xs => //= [y ys IHys] Hin.
+  case X: (x == widen_ord (leqnSn n) y).
+    exists y. by apply/eqP/X.
+    rewrite in_cons.
+    by apply/orP; left.
+  move: map_cons in_cons X Hin => -> -> ->.
+  rewrite orb_false_l => Hin.
+  specialize (IHys Hin).
+  case: IHys => z Heqe2 Hin2.
+  exists z. by [].
+  case Y: (y == z).
+    rewrite in_cons eq_sym.
+    by apply/orP; left.
+  rewrite in_cons.
+  by apply/orP; right.
+Qed.
+
+Lemma not_in_widen : forall n (xs : seq (fin n * nat)) z,
+  let f := widen_ord (leqnSn n) in
+  z \notin [seq fst i | i <- xs]
+    -> f z
+         \notin [seq fst i | i <- [seq (f (fst p), snd p) | p <- xs]].
+Proof.
+  move=> n.
+  elim=> //= x xs IHxs z Hni.
+  move: Hni.
+  rewrite in_cons negb_orb => /andP [H1 H2].
+  rewrite in_cons negb_orb.
+  apply/andP; split. by [].
+  by apply IHxs.
+Qed.
+
+Lemma not_mem_insert_cons
+  : forall n (x : fin n.+1 * nat) (xs : seq (fin n * nat)) z,
+  let f := widen_ord (leqnSn n) in
+  let xs' : seq (fin n.+1 * nat) := [seq (f (fst p), snd p) | p <- xs] in
+  fst x != f z
+    -> ~~ (mem [seq fst i | i <- xs]) z
+    -> ~~ (mem [seq fst i | i <- insert ((lebf snd)^~ x) x
+                  [seq (f (fst p), snd p) | p <- xs]]) (f z).
+Proof.
+  move=> n x.
+  elim=> //= [|y ys IHys] z Hne Hmem.
+    by rewrite mem_seq1 eq_sym.
+  move: Hmem. rewrite in_cons negb_orb => /andP [? ?].
+  case E: (lebf snd (widen_ord (leqnSn n) (fst y), snd y) x).
+    rewrite map_cons in_cons negb_orb.
+    apply/andP; split. by [].
+    by apply IHys.
+  rewrite map_cons in_cons negb_orb.
+  apply/andP; split.
+    by rewrite eq_sym.
+  rewrite map_cons in_cons negb_orb.
+  apply/andP; split. by [].
+  by apply not_in_widen.
+Qed.
+
+Definition lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
+Proof.
+  rewrite /all_state_lists /unhandledIds /IntervalId.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    rewrite -!map_cat cat_uniq => /=.
+    move: IHst.
+    rewrite cat_uniq => /and3P [H2 H3 H4].
+    apply/and3P; split.
+    - apply uniq_insert_cons.
+        by apply widen_ord.
+      rewrite map_cons /=.
+      apply/andP; split.
+        by apply no_ord_max.
+      apply uniq_trans_fst.
+        by apply widen_ord_inj.
+      by assumption.
+    - move: H3 => /hasPn H3.
+      apply/hasPn. move=> x Hin.
+      apply in_map_inj in Hin.
+      set f := widen_ord (leqnSn (nextInterval sd)).
+      case: Hin => y -> Hin.
+      have Hne: fst n != f y.
+        rewrite /n /f /=.
+        apply lift_bounded.
+      by apply/not_mem_insert_cons/(H3 y Hin).
+    - rewrite map_inj_uniq. by [].
+      by apply widen_ord_inj.
+  - Case "ScanState_moveUnhandledToActive".
+    by apply move_unhandled_to_active.
+  - Case "ScanState_moveActiveToInactive".
+    by apply (@move_active_to_inactive _ x IHst H).
+  - Case "ScanState_moveActiveToHandled".
+    by apply (@move_active_to_handled _ x IHst H).
+  - Case "ScanState_moveInactiveToActive".
+    by apply (@move_inactive_to_active _ x IHst H).
+  - Case "ScanState_moveInactiveToHandled".
+    by apply (@move_inactive_to_handled _ x IHst H).
+Qed.
+
+Lemma uniq_unhandledExtent_cons
+  : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
+      (act act' inact inact' hnd hnd' : list (fin ni)),
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := unh
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; intervals        := ints
+     ; assignments      := assgn
+     ; fixedIntervals   := fixints
+     |} <
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := i :: unh
+     ; active           := act'
+     ; inactive         := inact'
+     ; handled          := hnd'
+     ; intervals        := ints
+     ; assignments      := assgn'
+     ; fixedIntervals   := fixints
+     |}.
+Proof.
+  intros.
+  induction unh;
+  unfold unhandledExtent;
+  simpl; destruct i as [i beg];
+  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
+    auto.
+  destruct unh;
+  simpl; destruct a as [a ?];
+  first by (rewrite add0n; apply ltn_plus).
+  apply fold_fold_lt; rewrite 2!add0n -addnA.
+  exact: ltn_plus.
 Qed.
 
 (** ** ScanStateCursor *)
@@ -580,41 +626,5 @@ Definition curInterval  `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
 
 Definition curPosition `(cur : ScanStateCursor sd) :=
   intervalStart (curInterval cur).
-
-(** ** NextScanState *)
-
-(** A [NextScanState] is a [ScanState] produced by mutating a prior
-    [ScanState], while respecting the given predicate on the newly generated
-    version.  This allows us to define well-founded recursion easily on the
-    composition a series of [ScanState] mutations. *)
-
-Record NextScanState (P : ScanStateDesc -> Prop) : Type := {
-    nextDesc   : ScanStateDesc;
-    nextState  : ScanState nextDesc;
-    morphProof : P nextDesc
-}.
-
-Arguments Build_NextScanState [P] _ _ _.
-
-Arguments nextDesc   [P] _.
-Arguments nextState  [P] _.
-Arguments morphProof [P] _.
-
-Definition NextState `(cur : ScanStateCursor sd) P := NextScanState (P sd).
-
-Definition NextStateDep  `(cur : ScanStateCursor sd) P Q :=
-  { x : NextScanState (P sd) | Q x }.
-
-Definition NextStateWith `(cur : ScanStateCursor sd) P A :=
-  (A * NextScanState (P sd))%type.
-
-Definition NSS_transport
-  (P Q : ScanStateDesc -> ScanStateDesc -> Prop)
-  {sd : ScanStateDesc} `(n : NextScanState (P sd'))
-  (f : P sd' (nextDesc n) -> Q sd (nextDesc n)) : NextScanState (Q sd) :=
-  {| nextDesc   := nextDesc n
-   ; nextState  := nextState n
-   ; morphProof := f (morphProof n)
-   |}.
 
 End MScanState.

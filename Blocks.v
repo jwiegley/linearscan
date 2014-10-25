@@ -34,7 +34,7 @@ Variable maxVirtReg : nat.
 (* Definition SomeVar := (fin maxVirtReg + fin maxReg)%type. *)
 Definition SomeVar := (fin maxVirtReg)%type.
 
-Record Block := {
+Record Block : Type := {
     original    : baseType;
     loopBound   : bool;
     regRequired : bool;
@@ -169,7 +169,7 @@ Definition determineIntervals (blocks : NonEmpty Block)
       | None => ss
       | Some (exist idesc i) =>
         let: (exist sd st) := ss in
-        let st' := ScanState_newUnhandled i st in
+        let st' := ScanState_newUnhandled st i in
         exist ScanState (getScanStateDesc st') st'
       end in
   let s0 := ScanState_nil in

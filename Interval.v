@@ -34,7 +34,7 @@ Generalizable All Variables.
     the interval is split into two or more intervals, so each interval can be
     assigned its own register. *)
 
-Record IntervalDesc := {
+Record IntervalDesc : Set := {
     ibeg : nat;
     iend : nat;
     rds  : NonEmpty RangeSig
@@ -99,8 +99,7 @@ Definition intervalUncons
                    ; rds := NE_Sing r |}
     &    Interval {| ibeg := rbeg (NE_head xs).1
                    ; iend := ie
-                   ; rds := xs |}
-    ].
+                   ; rds := xs |} ].
 Proof.
   move: i. invert as [ [rd0 r0] i [rd1 r1] | ] => //=.
   split; auto.
