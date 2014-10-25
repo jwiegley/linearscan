@@ -242,8 +242,8 @@ Definition handleInterval {pre}
     | None   => allocateBlockedReg
     end.
 
-Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure unhandledExtent sd} : { sd' : ScanStateDesc | ScanState sd' } :=
+Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
+  {measure (unhandledExtent sd)} : { sd' : ScanStateDesc | ScanState sd' } :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
@@ -259,8 +259,6 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
   end.
 (* We must prove that after every call to [handleInterval], the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof.
-  intros; clear; abstract by case: ssinfo' => ?; case=> /= _ /ltP.
-Qed.
+Obligation 1. clear; by case: ssinfo' => ?; case=> /= _ /ltP. Qed.
 
 End MAllocate.

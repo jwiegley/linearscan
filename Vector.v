@@ -18,7 +18,7 @@ Definition fin_contra : forall {x}, fin 0 -> x.
 Proof.
   move=> x; case=> m.
   by move/eqP: (ltn0 m) => Hcontra //.
-Qed.
+Defined.
 
 Definition to_vfin {n} (x : fin n) : vfin n.
 Proof.

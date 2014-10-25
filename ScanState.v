@@ -481,7 +481,7 @@ Proof.
     by apply/orP; left.
   rewrite in_cons.
   by apply/orP; right.
-Qed.
+Defined.
 
 Lemma not_in_widen : forall n (xs : seq (fin n * nat)) z,
   let f := widen_ord (leqnSn n) in
@@ -584,8 +584,8 @@ Lemma size_insert : forall (a : eqType) P (x : a) xs,
 Proof.
   move=> a P x.
   elim=> //= [y ys IHys].
-  case E: (P y x) => /=. by rewrite IHys.
-  by [].
+  case: (P y x) => /=;
+    [ by rewrite IHys | by [] ].
 Qed.
 
 Theorem all_intervals_represented `(st : ScanState sd) :

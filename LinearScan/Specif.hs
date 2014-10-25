@@ -4,18 +4,16 @@ import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
 
-__ :: any
-__ = Prelude.error "Logical or arity value used"
-
 type Coq_sig a =
   a
   -- singleton inductive, whose constructor was exist
   
-sig_rect :: (a1 -> () -> a2) -> a1 -> a2
-sig_rect f s =
-  f s __
-
 type Coq_sig2 a =
   a
   -- singleton inductive, whose constructor was exist2
   
+projT1 :: ((,) a1 a2) -> a1
+projT1 x =
+  case x of {
+   (,) a p -> a}
+

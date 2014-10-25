@@ -851,87 +851,25 @@ _LinearScan__handleInterval pre =
       ((Prelude.$) (_LinearScan__liftLen pre)
         (_LinearScan__checkActiveIntervals pre position)))
 
-_LinearScan__linearScan_F :: (LinearScan__ScanStateDesc -> () ->
-                             LinearScan__ScanStateDesc) ->
-                             LinearScan__ScanStateDesc ->
-                             LinearScan__ScanStateDesc
-_LinearScan__linearScan_F linearScan0 sd =
-  case List0.destruct_list (_LinearScan__unhandled sd) of {
+_LinearScan__linearScan_func :: ((,) LinearScan__ScanStateDesc ()) ->
+                                LinearScan__ScanStateDesc
+_LinearScan__linearScan_func x =
+  let {sd = Specif.projT1 x} in
+  let {
+   linearScan0 = \sd0 ->
+    let {y = (,) sd0 __} in _LinearScan__linearScan_func ( y)}
+  in
+  let {filtered_var = List0.destruct_list (_LinearScan__unhandled sd)} in
+  case filtered_var of {
    Prelude.Just s ->
     case IState.runIState (_LinearScan__handleInterval sd) sd of {
-     (,) x ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo') __};
-   Prelude.Nothing -> sd}
-
-_LinearScan__linearScan_terminate :: LinearScan__ScanStateDesc ->
-                                     LinearScan__ScanStateDesc
-_LinearScan__linearScan_terminate sd =
-  case List0.destruct_list (_LinearScan__unhandled sd) of {
-   Prelude.Just s ->
-    case IState.runIState (_LinearScan__handleInterval sd) sd of {
-     (,) anonymous ssinfo' ->
-      Specif.sig_rect (\rec_res _ -> rec_res)
-        (_LinearScan__linearScan_terminate
-          (_LinearScan__thisDesc sd ssinfo'))};
+     (,) x0 ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo')};
    Prelude.Nothing -> sd}
 
 _LinearScan__linearScan :: LinearScan__ScanStateDesc ->
                            LinearScan__ScanStateDesc
 _LinearScan__linearScan sd =
-  case List0.destruct_list (_LinearScan__unhandled sd) of {
-   Prelude.Just s ->
-    case IState.runIState (_LinearScan__handleInterval sd) sd of {
-     (,) anonymous ssinfo' ->
-      Specif.sig_rect (\rec_res _ -> rec_res)
-        (_LinearScan__linearScan (_LinearScan__thisDesc sd ssinfo'))};
-   Prelude.Nothing -> sd}
-
-data LinearScan__R_linearScan =
-   LinearScan__R_linearScan_0 LinearScan__ScanStateDesc ((,)
-                                                        LinearScan__IntervalId
-                                                        Prelude.Int) 
- ([] ((,) LinearScan__IntervalId Prelude.Int)) (Prelude.Maybe
-                                               LinearScan__PhysReg) LinearScan__SSInfo 
- LinearScan__ScanStateDesc LinearScan__R_linearScan
- | LinearScan__R_linearScan_1 LinearScan__ScanStateDesc
-
-_LinearScan__coq_R_linearScan_rect :: (LinearScan__ScanStateDesc -> () ->
-                                      ((,) LinearScan__IntervalId
-                                      Prelude.Int) -> ([]
-                                      ((,) LinearScan__IntervalId
-                                      Prelude.Int)) -> () -> () ->
-                                      (Prelude.Maybe LinearScan__PhysReg) ->
-                                      LinearScan__SSInfo -> () ->
-                                      LinearScan__ScanStateDesc ->
-                                      LinearScan__R_linearScan -> a1 -> a1)
-                                      -> (LinearScan__ScanStateDesc -> () ->
-                                      () -> () -> a1) ->
-                                      LinearScan__ScanStateDesc ->
-                                      LinearScan__ScanStateDesc ->
-                                      LinearScan__R_linearScan -> a1
-_LinearScan__coq_R_linearScan_rect f f0 sd s r =
-  case r of {
-   LinearScan__R_linearScan_0 sd0 x xs x0 x1 x2 x3 ->
-    f sd0 __ x xs __ __ x0 x1 __ x2 x3
-      (_LinearScan__coq_R_linearScan_rect f f0 (_LinearScan__thisDesc sd0 x1)
-        x2 x3);
-   LinearScan__R_linearScan_1 sd0 -> f0 sd0 __ __ __}
-
-_LinearScan__coq_R_linearScan_rec :: (LinearScan__ScanStateDesc -> () -> ((,)
-                                     LinearScan__IntervalId Prelude.Int) ->
-                                     ([]
-                                     ((,) LinearScan__IntervalId Prelude.Int))
-                                     -> () -> () -> (Prelude.Maybe
-                                     LinearScan__PhysReg) ->
-                                     LinearScan__SSInfo -> () ->
-                                     LinearScan__ScanStateDesc ->
-                                     LinearScan__R_linearScan -> a1 -> a1) ->
-                                     (LinearScan__ScanStateDesc -> () -> ()
-                                     -> () -> a1) ->
-                                     LinearScan__ScanStateDesc ->
-                                     LinearScan__ScanStateDesc ->
-                                     LinearScan__R_linearScan -> a1
-_LinearScan__coq_R_linearScan_rec f f0 sd s r =
-  _LinearScan__coq_R_linearScan_rect f f0 sd s r
+  _LinearScan__linearScan_func ((,) sd __)
 
 type LinearScan__VirtReg = Prelude.Int
 
