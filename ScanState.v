@@ -523,37 +523,50 @@ Proof.
   by apply not_in_widen.
 Qed.
 
+Lemma unhandled_insert_uniq : forall sd d,
+  let n   := (ord_max, ibeg d) in
+  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
+  let xs  := insert (fun m => lebf snd m n) n unh in
+  uniq (all_state_lists sd)
+    -> uniq ([seq (fst i) | i <- xs] ++
+             [seq widen_id i | i <- active sd] ++
+             [seq widen_id i | i <- inactive sd] ++
+             [seq widen_id i | i <- handled sd]).
+Proof.
+  move=> sd d n unh xs IHst.
+  rewrite /all_state_lists /unhandledIds /IntervalId.
+  rewrite -!map_cat cat_uniq => /=.
+  move: IHst.
+  rewrite cat_uniq => /and3P [H2 H3 H4].
+  apply/and3P; split.
+  + apply uniq_insert_cons.
+      by apply widen_ord.
+    rewrite map_cons /=.
+    apply/andP; split.
+      by apply no_ord_max.
+    apply uniq_trans_fst.
+      by apply widen_ord_inj.
+    by assumption.
+  + move: H3 => /hasPn H3.
+    apply/hasPn. move=> x Hin.
+    apply in_map_inj in Hin.
+    set f := widen_ord (leqnSn (nextInterval sd)).
+    case: Hin => y -> Hin.
+    have Hne: fst n != f y.
+      rewrite /n /f /=.
+      apply lift_bounded.
+    by apply/not_mem_insert_cons/(H3 y Hin).
+  + rewrite map_inj_uniq. by [].
+    by apply widen_ord_inj.
+Qed.
+
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists /unhandledIds /IntervalId.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by [].
-
   - Case "ScanState_newUnhandled".
-    rewrite -!map_cat cat_uniq => /=.
-    move: IHst.
-    rewrite cat_uniq => /and3P [H2 H3 H4].
-    apply/and3P; split.
-    + apply uniq_insert_cons.
-        by apply widen_ord.
-      rewrite map_cons /=.
-      apply/andP; split.
-        by apply no_ord_max.
-      apply uniq_trans_fst.
-        by apply widen_ord_inj.
-      by assumption.
-    + move: H3 => /hasPn H3.
-      apply/hasPn. move=> x Hin.
-      apply in_map_inj in Hin.
-      set f := widen_ord (leqnSn (nextInterval sd)).
-      case: Hin => y -> Hin.
-      have Hne: fst n != f y.
-        rewrite /n /f /=.
-        apply lift_bounded.
-      by apply/not_mem_insert_cons/(H3 y Hin).
-    + rewrite map_inj_uniq. by [].
-      by apply widen_ord_inj.
-
+    by apply unhandled_insert_uniq.
   - Case "ScanState_moveUnhandledToActive".
     by apply move_unhandled_to_active.
   - Case "ScanState_moveActiveToInactive".
