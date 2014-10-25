@@ -100,7 +100,7 @@ Require String.
 Open Scope string_scope.
 
 Lemma list_cons_nonzero : forall {a x} {xs l : list a},
-  l = x :: xs -> length l > 0.
+  l = x :: xs -> size l > 0.
 Proof. by move=> a x xs l ->. Qed.
 
 Definition exist_in_cons : forall {A : eqType} {a} {l : list A},
@@ -253,10 +253,10 @@ Lemma StronglySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
   StronglySorted R (x :: xs) -> StronglySorted R xs.
 Proof. intros. inversion H; subst. assumption. Qed.
 
-Definition safe_hd {a} (xs : list a) (H : (length xs > 0)%nat) : a.
+Definition safe_hd {a} (xs : list a) (H : (size xs > 0)) : a.
 Proof. elim: xs H => //. Defined.
 
-Fixpoint safe_last {a} (xs : list a) (H : (length xs > 0)%nat) : a.
+Fixpoint safe_last {a} (xs : list a) (H : (size xs > 0)) : a.
 Proof. elim: xs H => //. Defined.
 
 Lemma uniq_nil : forall (a : eqType), @uniq a nil.

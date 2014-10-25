@@ -300,7 +300,7 @@ Proof.
   by apply Forall_widen; inv H.
 Qed.
 
-Lemma unhandled_sorted `(st : ScanState sd) :
+Theorem unhandled_sorted `(st : ScanState sd) :
   StronglySorted (lebf snd) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case; simpl in *.
@@ -523,17 +523,18 @@ Proof.
   by apply not_in_widen.
 Qed.
 
-Definition lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
+Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists /unhandledIds /IntervalId.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by [].
+
   - Case "ScanState_newUnhandled".
     rewrite -!map_cat cat_uniq => /=.
     move: IHst.
     rewrite cat_uniq => /and3P [H2 H3 H4].
     apply/and3P; split.
-    - apply uniq_insert_cons.
+    + apply uniq_insert_cons.
         by apply widen_ord.
       rewrite map_cons /=.
       apply/andP; split.
@@ -541,7 +542,7 @@ Proof.
       apply uniq_trans_fst.
         by apply widen_ord_inj.
       by assumption.
-    - move: H3 => /hasPn H3.
+    + move: H3 => /hasPn H3.
       apply/hasPn. move=> x Hin.
       apply in_map_inj in Hin.
       set f := widen_ord (leqnSn (nextInterval sd)).
@@ -550,8 +551,9 @@ Proof.
         rewrite /n /f /=.
         apply lift_bounded.
       by apply/not_mem_insert_cons/(H3 y Hin).
-    - rewrite map_inj_uniq. by [].
+    + rewrite map_inj_uniq. by [].
       by apply widen_ord_inj.
+
   - Case "ScanState_moveUnhandledToActive".
     by apply move_unhandled_to_active.
   - Case "ScanState_moveActiveToInactive".
@@ -564,7 +566,56 @@ Proof.
     by apply (@move_inactive_to_handled _ x IHst H).
 Qed.
 
-Lemma uniq_unhandledExtent_cons
+Lemma size_insert : forall (a : eqType) P (x : a) xs,
+  size (insert (P ^~ x) x xs) = (size xs).+1.
+Proof.
+  move=> a P x.
+  elim=> //= [y ys IHys].
+  case E: (P y x) => /=. by rewrite IHys.
+  by [].
+Qed.
+
+Theorem all_intervals_represented `(st : ScanState sd) :
+  size (all_state_lists sd) == nextInterval sd.
+Proof.
+  rewrite /all_state_lists /unhandledIds /IntervalId /nextInterval.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+
+  - Case "ScanState_newUnhandled".
+    rewrite !size_cat !size_map size_insert /=.
+    by move: IHst; rewrite !size_cat !size_map /=.
+
+  - Case "ScanState_moveUnhandledToActive".
+    rewrite !size_cat size_map /=.
+    by move: IHst; rewrite !size_cat size_map /= addnS.
+
+  - Case "ScanState_moveActiveToInactive".
+    rewrite !size_cat size_map size_rem /=; last by [].
+    move: IHst; rewrite !size_cat size_map /=.
+    case E: (active sd). by rewrite E in H; inv H.
+    by rewrite [_.-1 + _]addnC addSn -[_ + _.-1]addnC -addSn /=.
+
+  - Case "ScanState_moveActiveToHandled".
+    rewrite !size_cat size_map size_rem /=; last by [].
+    move: IHst; rewrite !size_cat size_map.
+    case E: (active sd). by rewrite E in H; inv H.
+    by rewrite 2!addnS -addSn /=.
+
+  - Case "ScanState_moveInactiveToActive".
+    rewrite -cat_cons !size_cat size_map size_rem /=; last by [].
+    move: IHst; rewrite !size_cat size_map /=.
+    case E: (inactive sd). rewrite E in H. inv H.
+    by rewrite 2!addnS -addSn /=.
+
+  - Case "ScanState_moveInactiveToHandled".
+    rewrite !size_cat size_map size_rem /=; last by [].
+    move: IHst; rewrite !size_cat size_map /=.
+    case E: (inactive sd). rewrite E in H. inv H.
+    by rewrite 2!addnS -addSn /=.
+Qed.
+
+Theorem uniq_unhandledExtent_cons
   : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
       (act act' inact inact' hnd hnd' : list (fin ni)),
   unhandledExtent
