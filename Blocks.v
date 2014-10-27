@@ -56,24 +56,24 @@ Proof.
   rewrite /boundedRangeVec /boundedTriple /boundedRange.
   elim=> [|[p [[rd r Hr]| ]] n' v' IHv].
   - by constructor.
-  - constructor; last by apply IHv.
+  - constructor; last exact: IHv.
     split. apply p.
     apply Some.
     exists rd. apply r.
     by abstract ssomega.
-  - constructor; last by apply IHv.
+  - constructor; last exact: IHv.
     split. apply p.
-    by apply None.
+    exact: None.
 Qed.
 
 Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos.
-Proof. eexists; [ by apply/R_Sing | by [] ]. Defined.
+Proof. eexists; [ by exact: R_Sing | by [] ]. Defined.
 
 Definition boundedCons (upos : UsePos) (Hodd : odd upos)
   `(Hlt : upos < n) : boundedRange n -> boundedRange upos.
 Proof.
   move=> [rd r Hr].
-  eexists; [ by apply/R_Cons => //; apply (ltn_leq_trans Hlt) | by [] ].
+  eexists; [ apply/R_Cons => //; exact: (ltn_leq_trans Hlt) | by [] ].
 Defined.
 
 Lemma withRanges (pos : nat) (Hodd : odd pos) (req : bool)
@@ -81,14 +81,14 @@ Lemma withRanges (pos : nat) (Hodd : odd pos) (req : bool)
   `(Hlt : upos < n) : boundedTriple n -> boundedTriple (uloc upos).
 Proof.
   move=> [p [[rd r Hr]| ]]; last first.
-    split. by apply p.
+    split. exact: p.
     apply/Some/boundedSing.
     by rewrite Heqe /=.
-  split. by apply p.
+  split. exact: p.
   apply/Some/(@boundedCons upos).
   - by rewrite Heqe /=.
-  - by apply n.
-  - by apply Hlt.
+  - exact: n.
+  - exact: Hlt.
   - by exists rd.
 Defined.
 

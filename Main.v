@@ -89,7 +89,7 @@ Extract Inlined Constant leq  => "(Prelude.<=)".
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction LinearScan.allocateRegisters Range.splitRange.
+Separate Extraction LinearScan.allocateRegisters Interval.splitInterval.
 
 (* Show which axioms we depend on for this development. *)
 Print Assumptions LinearScan.allocateRegisters.

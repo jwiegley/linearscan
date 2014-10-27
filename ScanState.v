@@ -31,8 +31,8 @@ Record ScanStateDesc : Type := {
     active    : list IntervalId;           (* ranges over pos *)
     inactive  : list IntervalId;           (* falls in lifetime hole *)
 
-    unhandledIds    := map (@fst _ _) unhandled;
-    unhandledStarts := map (@snd _ _) unhandled;
+    unhandledIds    := map fst unhandled;
+    unhandledStarts := map snd unhandled;
 
     (* jww (2014-10-01): Prove: The length of the active intervals list <
        maxReg. *)
@@ -330,7 +330,7 @@ Proof.
   rewrite uniq_catC -catA -catA.
   apply uniq_juggle.
     by rewrite catA catA uniq_catC -catA.
-  by apply H0.
+  exact: H0.
 Qed.
 
 Lemma move_active_to_handled : forall sd x,
@@ -343,7 +343,7 @@ Proof.
   rewrite uniq_catC -catA -catA uniq_catCA2 -catA.
   apply uniq_juggle.
     by rewrite catA uniq_catCA2 catA uniq_catC -catA catA uniq_catCA2 -catA.
-  by apply H0.
+  exact: H0.
 Qed.
 
 Lemma move_inactive_to_active : forall sd x,
@@ -357,7 +357,7 @@ Proof.
           (catA (handled sd)) uniq_catCA2.
   apply uniq_juggle.
     by rewrite !catA uniq_catC -catA uniq_catCA2 -catA catA uniq_catCA2 -catA.
-  by apply H0.
+  exact: H0.
 Qed.
 
 Lemma move_inactive_to_handled : forall sd x,
@@ -370,7 +370,7 @@ Proof.
   rewrite (catA (unhandledIds sd)) uniq_catC -!catA.
   apply uniq_juggle.
     by rewrite (catA (inactive sd)) uniq_catC -!catA.
-  by apply H0.
+  exact: H0.
 Qed.
 
 Lemma notin_fst
@@ -387,7 +387,7 @@ Proof.
   case E: (P z x).
     rewrite map_cons in_cons negb_orb.
     apply/andP; split. by [].
-    by apply IHzs.
+    exact: IHzs.
   rewrite map_cons in_cons negb_orb.
   apply/andP; split.
     by rewrite eq_sym.
@@ -407,7 +407,7 @@ Proof.
   case E: (P y x).
     rewrite map_cons cons_uniq.
     apply/andP; split.
-      by apply notin_fst.
+      exact: notin_fst.
     by apply/IHys/andP.
   rewrite !map_cons !cons_uniq.
   rewrite in_cons negb_orb.
@@ -425,7 +425,7 @@ Proof.
   rewrite map_cons in_cons negb_orb.
   apply/andP; split.
     by rewrite inj_eq.
-  by apply IHxs.
+  exact: IHxs.
 Qed.
 
 Lemma uniq_trans_fst
@@ -443,8 +443,8 @@ Proof.
     replace ([eta fst] \o (fun p : fin n * nat => (f (fst p), snd p)))
        with (f \o @fst _ nat); last by [].
     rewrite map_comp.
-    by apply map_f_notin.
-  by apply IHxs.
+    exact: map_f_notin.
+  exact: IHxs.
 Qed.
 
 Lemma no_ord_max : forall n (xs : seq (fin n * nat)),
@@ -495,7 +495,7 @@ Proof.
   rewrite in_cons negb_orb => /andP [H1 H2].
   rewrite in_cons negb_orb.
   apply/andP; split. by [].
-  by apply IHxs.
+  exact: IHxs.
 Qed.
 
 Lemma not_mem_insert_cons
@@ -514,13 +514,13 @@ Proof.
   case E: (lebf snd (widen_ord (leqnSn n) (fst y), snd y) x).
     rewrite map_cons in_cons negb_orb.
     apply/andP; split. by [].
-    by apply IHys.
+    exact: IHys.
   rewrite map_cons in_cons negb_orb.
   apply/andP; split.
     by rewrite eq_sym.
   rewrite map_cons in_cons negb_orb.
   apply/andP; split. by [].
-  by apply not_in_widen.
+  exact: not_in_widen.
 Qed.
 
 Lemma unhandled_insert_uniq : forall sd d,
@@ -540,12 +540,12 @@ Proof.
   rewrite cat_uniq => /and3P [H2 H3 H4].
   apply/and3P; split.
   + apply uniq_insert_cons.
-      by apply widen_ord.
+      exact: widen_ord.
     rewrite map_cons /=.
     apply/andP; split.
-      by apply no_ord_max.
+      exact: no_ord_max.
     apply uniq_trans_fst.
-      by apply widen_ord_inj.
+      exact: widen_ord_inj.
     by assumption.
   + move: H3 => /hasPn H3.
     apply/hasPn. move=> x Hin.
@@ -557,7 +557,7 @@ Proof.
       apply lift_bounded.
     by apply/not_mem_insert_cons/(H3 y Hin).
   + rewrite map_inj_uniq. by [].
-    by apply widen_ord_inj.
+    exact: widen_ord_inj.
 Qed.
 
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
@@ -566,17 +566,17 @@ Proof.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by [].
   - Case "ScanState_newUnhandled".
-    by apply unhandled_insert_uniq.
+    exact: unhandled_insert_uniq.
   - Case "ScanState_moveUnhandledToActive".
-    by apply move_unhandled_to_active.
+    exact: move_unhandled_to_active.
   - Case "ScanState_moveActiveToInactive".
-    by apply (@move_active_to_inactive _ x IHst H).
+    exact: (@move_active_to_inactive _ x IHst H).
   - Case "ScanState_moveActiveToHandled".
-    by apply (@move_active_to_handled _ x IHst H).
+    exact: (@move_active_to_handled _ x IHst H).
   - Case "ScanState_moveInactiveToActive".
-    by apply (@move_inactive_to_active _ x IHst H).
+    exact: (@move_inactive_to_active _ x IHst H).
   - Case "ScanState_moveInactiveToHandled".
-    by apply (@move_inactive_to_handled _ x IHst H).
+    exact: (@move_inactive_to_handled _ x IHst H).
 Qed.
 
 Lemma size_insert : forall (a : eqType) P (x : a) xs,
@@ -694,7 +694,7 @@ Proof.
     auto.
   destruct unh;
   simpl; destruct a as [a ?];
-  first by (rewrite add0n; apply ltn_plus).
+  first by (rewrite add0n; exact: ltn_plus).
   apply fold_fold_lt; rewrite 2!add0n -addnA.
   exact: ltn_plus.
 Qed.

@@ -281,7 +281,7 @@ Proof.
     by [].
   rewrite in_cons negb_orb.
   apply/andP.
-  split; [ by [] | by apply IHl ].
+  split; [ by [] | exact: IHl ].
 Qed.
 
 Lemma uniq_juggle : forall (a : eqType) (xs ys zs : list a),
@@ -301,7 +301,7 @@ Proof.
     rewrite negb_orb.
     apply/andP.
     apply negbT in E.
-    split. by apply not_in_rem.
+    split. exact: not_in_rem.
     rewrite has_sym in H2.
     inversion H2 as [H2'].
     move: negb_orb H2' => -> /andP [H6 H7].
@@ -354,7 +354,7 @@ Proof.
   - elim: l Huniq => // x l IHl Huniq /=.
     inv Huniq; move: H0 => /andP [H1 H2].
     rewrite in_cons negb_orb.
-    apply/andP; split; last by apply IHl.
+    apply/andP; split; last exact: IHl.
     apply lift_bounded.
   - rewrite map_inj_in_uniq //.
     rewrite /prop_in2 /= => ? ? ? ? /eqP Heqe.
@@ -537,7 +537,7 @@ Proof.
     by constructor.
   case L: (lebf y z).
     constructor. by inv H.
-    by apply IHys; inv H.
+    by apply: IHys; inv H.
   by constructor.
 Qed.
 
@@ -551,8 +551,8 @@ Proof.
   inv Hsort. clear Hsort.
   specialize (IHxs H1).
   case L: (lebf x z).
-    constructor. by apply IHxs.
-    by apply Forall_insert_spec.
+    constructor. exact: IHxs.
+    exact: Forall_insert_spec.
   constructor.
     by constructor.
   constructor.
@@ -594,7 +594,7 @@ Proof.
   elim=> [|z l IHl] H /=.
     by constructor.
   constructor. by inv H.
-  by apply IHl; inv H.
+  apply: IHl; inv H.
 Qed.
 
 Lemma StronglySorted_map : forall (a b : eqType) P
@@ -634,6 +634,6 @@ Proof.
     by constructor.
   inv Hsort. constructor.
   constructor.
-    by apply StronglySorted_leq_map.
-  by apply Forall_leq_map.
+    exact: StronglySorted_leq_map.
+  exact: Forall_leq_map.
 Qed.

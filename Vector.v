@@ -23,7 +23,7 @@ Defined.
 Definition to_vfin {n} (x : fin n) : vfin n.
 Proof.
   case: n x => [H|n [m Hm]].
-    by apply fin_contra.
+    exact: fin_contra.
   by apply/(@Coq.Vectors.Fin.of_nat_lt m)/ltP.
 Defined.
 

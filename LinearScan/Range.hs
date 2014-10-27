@@ -138,17 +138,3 @@ rangeSpan f rd =
        Prelude.Just n -> (,) Prelude.Nothing (Prelude.Just rd);
        Prelude.Nothing -> Lib.ex_falso_quodlibet}}}
 
-type DefiniteSubRangesOf = ((,) RangeSig RangeSig)
-
-splitRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> DefiniteSubRangesOf
-splitRange f rd =
-  let {s = rangeSpan f rd} in
-  case s of {
-   (,) o o0 ->
-    case o of {
-     Prelude.Just o1 ->
-      case o0 of {
-       Prelude.Just o2 -> (,) o1 o2;
-       Prelude.Nothing -> Logic.coq_False_rec};
-     Prelude.Nothing -> Logic.coq_False_rec}}
-
