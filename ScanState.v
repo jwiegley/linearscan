@@ -31,8 +31,8 @@ Record ScanStateDesc : Type := {
     active    : list IntervalId;           (* ranges over pos *)
     inactive  : list IntervalId;           (* falls in lifetime hole *)
 
-    unhandledIds    := map fst unhandled;
-    unhandledStarts := map snd unhandled;
+    unhandledIds    := [seq fst i | i <- unhandled];
+    unhandledStarts := [seq snd i | i <- unhandled];
 
     (* jww (2014-10-01): Prove the size of the active list < maxReg. *)
     (* active_registers : size active < min maxReg nextInterval; *)

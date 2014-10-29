@@ -127,11 +127,11 @@ _LinearScan__inactive s =
 _LinearScan__unhandledIds :: LinearScan__ScanStateDesc -> []
                              LinearScan__IntervalId
 _LinearScan__unhandledIds s =
-  (Prelude.map) (Prelude.fst) (_LinearScan__unhandled s)
+  (Prelude.map) (\i -> (Prelude.fst) i) (_LinearScan__unhandled s)
 
 _LinearScan__unhandledStarts :: LinearScan__ScanStateDesc -> [] Prelude.Int
 _LinearScan__unhandledStarts s =
-  (Prelude.map) (Prelude.snd) (_LinearScan__unhandled s)
+  (Prelude.map) (\i -> (Prelude.snd) i) (_LinearScan__unhandled s)
 
 _LinearScan__handled :: LinearScan__ScanStateDesc -> []
                         LinearScan__IntervalId
