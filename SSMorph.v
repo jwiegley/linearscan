@@ -24,9 +24,9 @@ Include MScanState M.
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (sd1 sd2 : ScanStateDesc) : Prop := {
-    next_interval_increases : nextInterval sd1     <= nextInterval sd2;
-    total_extent_decreases  : unhandledExtent sd2  <= unhandledExtent sd1;
-    handled_count_increases : length (handled sd1) <= length (handled sd2)
+    next_interval_increases : nextInterval sd1    <= nextInterval sd2;
+    total_extent_decreases  : unhandledExtent sd2 <= unhandledExtent sd1;
+    handled_count_increases : size (handled sd1)  <= size (handled sd2)
 }.
 
 Arguments next_interval_increases [sd1 sd2] _.
@@ -58,8 +58,7 @@ Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     transportation (x : IntervalId sd1) : IntervalId sd2 :=
       widen_ord (next_interval_increases len_is_SSMorph) x;
 
-    unhandled_nonempty :
-      length (unhandled sd1) > 0 -> length (unhandled sd2) > 0
+    unhandled_nonempty : size (unhandled sd1) > 0 -> size (unhandled sd2) > 0
 }.
 
 Program Instance SSMorphLen_PO : PreOrder SSMorphLen.
@@ -85,11 +84,11 @@ Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     haslen_is_SSMorph    :> SSMorph sd1 sd2;
     haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
 
-    first_nonempty : length (unhandled sd1) > 0
+    first_nonempty : size (unhandled sd1) > 0
 }.
 
 Definition newSSMorphHasLen (sd : ScanStateDesc)
-  (H : length (unhandled sd) > 0) : SSMorphHasLen sd sd.
+  (H : size (unhandled sd) > 0) : SSMorphHasLen sd sd.
 Proof. repeat (constructor; auto). Defined.
 
 Class HasWork (P : relation ScanStateDesc) := {
@@ -122,16 +121,14 @@ Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
   IState (SSInfo sd P) (SSInfo sd Q).
 
 Definition withScanState {a pre} {P Q : relation ScanStateDesc}
-  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a)
-  : SState pre P Q a :=
-  iget >>>= fun i => f (thisDesc i) (thisState i).
+  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a) :
+  SState pre P Q a := iget >>>= fun i => f (thisDesc i) (thisState i).
 
 Arguments withScanState {a pre P Q} f.
 
 Definition withScanStatePO {a pre P} `{PO : PreOrder _ P}
   (f : forall sd : ScanStateDesc, ScanState sd
-         -> SState sd P P a)
-  : SState pre P P a.
+         -> SState sd P P a) : SState pre P P a.
 Proof.
   exists. intros i.
   destruct i.
@@ -154,9 +151,9 @@ Defined.
 
 Arguments withScanStatePO {a pre P _} f.
 
-Definition liftLen {pre a}
-  : SState pre SSMorphLen SSMorphLen a
-      -> SState pre SSMorphHasLen SSMorphHasLen a.
+Definition liftLen {pre a} :
+  SState pre SSMorphLen SSMorphLen a
+    -> SState pre SSMorphHasLen SSMorphHasLen a.
 Proof.
   intros.
   destruct X.
@@ -192,8 +189,8 @@ Notation "A ;;; B" := (_ <<- A ;; B)
 
 Definition return_ {I X} := @ipure IState _ I X.
 
-Definition weakenStHasLenToSt {pre}
-  : SState pre SSMorphStHasLen SSMorphSt unit.
+Definition weakenStHasLenToSt {pre} :
+  SState pre SSMorphStHasLen SSMorphSt unit.
 Proof.
   constructor. intros HS.
   split. apply tt.
@@ -204,8 +201,8 @@ Proof.
 Defined.
 
 Definition withCursor {P Q a pre} `{HasWork P}
-  (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState pre P Q a)
-  : SState pre P Q a.
+  (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState pre P Q a) :
+  SState pre P Q a.
 Proof.
   constructor. intros i.
   destruct i.
@@ -226,8 +223,8 @@ Proof.
   assumption.
 Defined.
 
-Definition moveUnhandledToActive {pre P} `{HasWork P}
-  (reg : PhysReg) : SState pre P SSMorphSt unit.
+Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
+  SState pre P SSMorphSt unit.
 Proof.
   constructor. intros.
   split. apply tt.
@@ -243,7 +240,7 @@ Proof.
   pose (ScanState_moveUnhandledToActive reg thisState0).
   eapply {| thisState := s |}.
   Grab Existential Variables.
-  pose (uniq_unhandledExtent_cons (i, n) unhandled0 intervals0
+  pose (unhandledExtent_cons (i, n) unhandled0 intervals0
          (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
          fixedIntervals0
          (i :: active0) active0 inactive0 inactive0 handled0 handled0)
@@ -255,8 +252,8 @@ Proof.
 Defined.
 
 Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H: x \in active sd)
-  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
+  (H: x \in active sd) :
+  { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
@@ -265,8 +262,8 @@ Proof.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
-  (H: x \in active sd)
-  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
+  (H: x \in active sd) :
+  { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
@@ -275,8 +272,8 @@ Proof.
 Defined.
 
 Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
-  (H : x \in inactive sd)
-  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
+  (H : x \in inactive sd) :
+  { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToActive st H).
   eexists. apply s.
@@ -285,13 +282,44 @@ Proof.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H : x \in inactive sd)
-  : { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
+  (H : x \in inactive sd) :
+  { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
   eexists. apply s.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
+Defined.
+
+Definition splitCurrentInterval {pre P} `{W : HasWork P}
+  (before : option nat) : SState pre P SSMorphStHasLen unit.
+Proof.
+  constructor. intros.
+  split. apply tt.
+  destruct W.
+  destruct X.
+  specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
+  destruct thisDesc0.
+  destruct ssMorphHasLen0.
+  destruct haslen_is_SSMorphLen0.
+  destruct haslen_is_SSMorph0.
+  destruct unhandled0; simpl in *.
+    by specialize (unhandled_nonempty0 first_nonempty0).
+  destruct p.
+  have int := (V.nth intervals0 (to_vfin i)).2.
+  pose (@ScanState_splitCurrentInterval (splitPosition int before)
+                                        _ _ _ _ _ _ _ _ _ _ thisState0).
+  eapply {| thisState := s _ _ |}.
+  Grab Existential Variables.
+  - admit.
+  - admit.
+  - try rapply Build_SSMorphStHasLen;
+    try rapply Build_SSMorphHasLen;
+    try rapply Build_SSMorphLen;
+    try rapply Build_SSMorphSt;
+    try rapply Build_SSMorph;
+    rewrite ?size_insert ?size_map /unhandled;
+    auto; admit.
 Defined.
 
 End MSSMorph.

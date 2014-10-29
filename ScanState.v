@@ -34,9 +34,8 @@ Record ScanStateDesc : Type := {
     unhandledIds    := map fst unhandled;
     unhandledStarts := map snd unhandled;
 
-    (* jww (2014-10-01): Prove: The length of the active intervals list <
-       maxReg. *)
-    (* active_registers : length active < min maxReg nextInterval; *)
+    (* jww (2014-10-01): Prove the size of the active list < maxReg. *)
+    (* active_registers : size active < min maxReg nextInterval; *)
 
     (* jww (2014-10-01): The handled list is unnecessary and can be deleted
        when everything is working. *)
@@ -61,8 +60,8 @@ Record ScanStateDesc : Type := {
         for fixed intervals because they are never split and spilled. Register
         constraints at method calls are also modeled using fixed intervals:
         Because all registers are destroyed when the call is executed, ranges
-        of length 1 are added to all fixed intervals at the call
-        site. Therefore, the allocation pass cannot assign a register to any
+        of length 1 are added to all fixed intervals at the call site.
+        Therefore, the allocation pass cannot assign a register to any
         interval there, and all intervals are spilled before the call. *)
 
     fixedIntervals :
@@ -71,8 +70,7 @@ Record ScanStateDesc : Type := {
     all_state_lists := unhandledIds ++ active ++ inactive ++ handled
 }.
 
-Definition widen_id (sd : ScanStateDesc) :=
-  widen_ord (leqnSn (nextInterval sd)).
+Definition widen_id {n} := widen_ord (leqnSn n).
 
 Definition getInterval `(i : IntervalId sd) :=
  (V.nth (intervals sd) (to_vfin i)).2.
@@ -96,8 +94,8 @@ Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
     The worst case scenario is that every register has [Some n] with the same
     n, in which case register 0 is selected. *)
 
-Definition registerWithHighestPos
-  : Vec (option nat) maxReg -> fin maxReg * option nat :=
+Definition registerWithHighestPos :
+  Vec (option nat) maxReg -> fin maxReg * option nat :=
   fold_left_with_index
     (fun reg (res : fin maxReg * option nat) x =>
        match (res, x) with
@@ -158,11 +156,11 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     let n   := (ord_max, ibeg d) in
     let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
     ScanState
-      {| nextInterval     := S (nextInterval sd)
+      {| nextInterval     := (nextInterval sd).+1
        ; unhandled        := insert (fun m => lebf snd m n) n unh
-       ; active           := map (@widen_id sd) (active sd)
-       ; inactive         := map (@widen_id sd) (inactive sd)
-       ; handled          := map (@widen_id sd) (handled sd)
+       ; active           := map widen_id (active sd)
+       ; inactive         := map widen_id (inactive sd)
+       ; handled          := map widen_id (handled sd)
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; assignments      := V.shiftin None (assignments sd)
        ; fixedIntervals   := fixedIntervals sd
@@ -242,6 +240,40 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; assignments      := assignments sd
        ; fixedIntervals   := fixedIntervals sd
+       |}
+
+  | ScanState_splitCurrentInterval
+      pos ni xid xbeg unh act inact hnd ints assgn fixints :
+    let x := (xid, xbeg) in
+    ScanState
+      {| nextInterval     := ni
+       ; unhandled        := x :: unh
+       ; active           := act
+       ; inactive         := inact
+       ; handled          := hnd
+       ; intervals        := ints
+       ; assignments      := assgn
+       ; fixedIntervals   := fixints
+       |} ->
+    let xi := (V.nth ints (to_vfin xid)).2 in
+    forall (Hb : firstUsePos xi < pos)
+           (He : pos <= lastUsePos xi),
+
+    let xe     := splitInterval Hb He in
+    let x2     := (ord_max, ibeg (snd xe.1).1) in
+    let widp p := (widen_id (fst p), snd p) in
+    let unh'   := map widp (x :: unh) in
+    ScanState
+      {| nextInterval     := ni.+1
+       ; unhandled        := insert (fun m => lebf snd m x2) x2 unh'
+       ; active           := map widen_id act
+       ; inactive         := map widen_id inact
+       ; handled          := map widen_id hnd
+       ; intervals        :=
+           V.replace (V.shiftin (snd xe.1) ints)
+                     (to_vfin (widen_id xid)) (fst xe.1)
+       ; assignments      := V.shiftin None assgn
+       ; fixedIntervals   := fixints
        |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
@@ -253,6 +285,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveActiveToHandled"
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
+  | Case_aux c "ScanState_splitCurrentInterval"
   ].
 
 Definition ScanStateSig := { sd : ScanStateDesc | ScanState sd }.
@@ -279,7 +312,7 @@ Proof.
   by rewrite add0n addnC ltn_plus.
 Qed.
 
-Lemma Forall_widen : forall sd x (xs : list (IntervalId sd * nat)),
+Lemma Forall_widen : forall n x (xs : list (fin n * nat)),
   List.Forall (lebf snd x) xs
     -> List.Forall (lebf snd (widen_id (fst x), snd x))
                    [seq (widen_id (fst p), snd p) | p <- xs].
@@ -290,7 +323,7 @@ Proof.
   by apply IHys; inv H.
 Qed.
 
-Lemma StronglySorted_widen : forall sd (xs : list (IntervalId sd * nat)),
+Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
   StronglySorted (lebf snd) xs
     -> StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
@@ -303,16 +336,26 @@ Qed.
 Theorem unhandled_sorted `(st : ScanState sd) :
   StronglySorted (lebf snd) (unhandled sd).
 Proof.
-  ScanState_cases (induction st) Case; simpl in *.
+  ScanState_cases (induction st) Case.
   - Case "ScanState_nil". constructor.
+
   - Case "ScanState_newUnhandled".
     rewrite /unh.
     by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
+
   - Case "ScanState_moveUnhandledToActive". inv IHst.
   - Case "ScanState_moveActiveToInactive". apply IHst.
   - Case "ScanState_moveActiveToHandled". apply IHst.
   - Case "ScanState_moveInactiveToActive". apply IHst.
   - Case "ScanState_moveInactiveToHandled".  apply IHst.
+
+  - Case "ScanState_splitCurrentInterval".
+    rewrite /unhandled /unh' in IHst *.
+    apply StronglySorted_insert_spec.
+    apply StronglySorted_inv in IHst.
+    move: IHst => [H1 H2].
+    apply: StronglySorted_widen.
+    by constructor.
 Qed.
 
 Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
@@ -373,8 +416,7 @@ Proof.
   exact: H0.
 Qed.
 
-Lemma notin_fst
-  : forall n P x y (xs : seq (fin n * nat)),
+Lemma notin_fst : forall n P x y (xs : seq (fin n * nat)),
   fst x != fst y
     -> @fst _ nat y \notin [seq fst i | i <- xs]
     -> fst y \notin [seq fst i | i <- insert (P^~ x) x xs].
@@ -395,8 +437,8 @@ Proof.
   by apply/andP.
 Qed.
 
-Lemma uniq_insert_cons
-  : forall n P (f : fin n -> fin (S n)) x (xs : seq (fin n * nat)),
+Lemma uniq_insert_cons :
+  forall n P (f : fin n -> fin (S n)) x (xs : seq (fin n * nat)),
   uniq [seq fst i | i <- x :: xs]
     -> uniq [seq fst i | i <- insert (P ^~ x) x xs].
 Proof.
@@ -428,8 +470,8 @@ Proof.
   exact: IHxs.
 Qed.
 
-Lemma uniq_trans_fst
-  : forall n (f : fin n -> fin (S n)) (xs : seq (fin n * nat)),
+Lemma uniq_trans_fst :
+  forall n (f : fin n -> fin (S n)) (xs : seq (fin n * nat)),
   injective f
     -> uniq [seq fst i | i <- xs]
     -> uniq [seq fst i | i <- [seq (fun p => (f (fst p), snd p)) p | p <- xs]].
@@ -498,8 +540,8 @@ Proof.
   exact: IHxs.
 Qed.
 
-Lemma not_mem_insert_cons
-  : forall n (x : fin n.+1 * nat) (xs : seq (fin n * nat)) z,
+Lemma not_mem_insert_cons :
+  forall n (x : fin n.+1 * nat) (xs : seq (fin n * nat)) z,
   let f := widen_ord (leqnSn n) in
   let xs' : seq (fin n.+1 * nat) := [seq (f (fst p), snd p) | p <- xs] in
   fst x != f z
@@ -523,18 +565,17 @@ Proof.
   exact: not_in_widen.
 Qed.
 
-Lemma unhandled_insert_uniq : forall sd d,
-  let n   := (ord_max, ibeg d) in
-  let unh := map (fun p => (widen_id (fst p), snd p)) (unhandled sd) in
-  let xs  := insert (fun m => lebf snd m n) n unh in
-  uniq (all_state_lists sd)
-    -> uniq ([seq (fst i) | i <- xs] ++
-             [seq widen_id i | i <- active sd] ++
-             [seq widen_id i | i <- inactive sd] ++
-             [seq widen_id i | i <- handled sd]).
+Lemma unhandled_insert_uniq : forall n beg xs act inact hnd,
+  let xs1 := map (fun p => (@widen_id n (fst p), snd p)) xs in
+  let x   := (ord_max, beg) in
+  let xs2 := insert (lebf snd ^~ x) x xs1 in
+  uniq ([seq (fst i) | i <- xs] ++ act ++ inact ++ hnd)
+    -> uniq ([seq (fst i) | i <- xs2] ++
+             [seq widen_id i | i <- act] ++
+             [seq widen_id i | i <- inact] ++
+             [seq widen_id i | i <- hnd]).
 Proof.
-  move=> sd d n unh xs IHst.
-  rewrite /all_state_lists /unhandledIds /IntervalId.
+  move=> n beg xs act inact hnd xs1 x xs2 IHst.
   rewrite -!map_cat cat_uniq => /=.
   move: IHst.
   rewrite cat_uniq => /and3P [H2 H3 H4].
@@ -546,15 +587,14 @@ Proof.
       exact: no_ord_max.
     apply uniq_trans_fst.
       exact: widen_ord_inj.
-    by assumption.
+    by [].
   + move: H3 => /hasPn H3.
-    apply/hasPn. move=> x Hin.
+    apply/hasPn. move=> ? Hin.
     apply in_map_inj in Hin.
-    set f := widen_ord (leqnSn (nextInterval sd)).
+    set f := widen_ord (leqnSn n).
     case: Hin => y -> Hin.
-    have Hne: fst n != f y.
-      rewrite /n /f /=.
-      apply lift_bounded.
+    have Hne: fst x != f y.
+      by apply lift_bounded.
     by apply/not_mem_insert_cons/(H3 y Hin).
   + rewrite map_inj_uniq. by [].
     exact: widen_ord_inj.
@@ -563,7 +603,7 @@ Qed.
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists /unhandledIds /IntervalId.
-  ScanState_cases (induction st) Case; simpl in *.
+  ScanState_cases (induction st) Case.
   - Case "ScanState_nil". by [].
   - Case "ScanState_newUnhandled".
     exact: unhandled_insert_uniq.
@@ -577,26 +617,26 @@ Proof.
     exact: (@move_inactive_to_active _ x IHst H).
   - Case "ScanState_moveInactiveToHandled".
     exact: (@move_inactive_to_handled _ x IHst H).
+  - Case "ScanState_splitCurrentInterval".
+    exact: unhandled_insert_uniq.
 Qed.
 
 Lemma size_insert : forall (a : eqType) P (x : a) xs,
   size (insert (P ^~ x) x xs) = (size xs).+1.
 Proof.
-  move=> a P x.
-  elim=> //= [y ys IHys].
-  case: (P y x) => /=;
-    [ by rewrite IHys | by [] ].
+  move=> a P x; elim=> //= [y ys IHys].
+  case: (P y x) => /=; [ by rewrite IHys | by [] ].
 Qed.
 
 Theorem all_intervals_represented `(st : ScanState sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
   rewrite /all_state_lists /unhandledIds /IntervalId /nextInterval.
-  ScanState_cases (induction st) Case; simpl in *.
+  ScanState_cases (induction st) Case.
   - Case "ScanState_nil". by [].
 
   - Case "ScanState_newUnhandled".
-    rewrite !size_cat !size_map size_insert /=.
+    rewrite !size_cat !size_map ?size_insert /=.
     by move: IHst; rewrite !size_cat !size_map /=.
 
   - Case "ScanState_moveUnhandledToActive".
@@ -604,6 +644,7 @@ Proof.
     by move: IHst; rewrite !size_cat size_map /= addnS.
 
   - Case "ScanState_moveActiveToInactive".
+    simpl in *.
     rewrite !size_cat size_map size_rem /=; last by [].
     move: IHst; rewrite !size_cat size_map /=.
     case E: (active sd). by rewrite E in H; inv H.
@@ -616,6 +657,7 @@ Proof.
     by rewrite 2!addnS -addSn /=.
 
   - Case "ScanState_moveInactiveToActive".
+    simpl in *.
     rewrite -cat_cons !size_cat size_map size_rem /=; last by [].
     move: IHst; rewrite !size_cat size_map /=.
     case E: (inactive sd). rewrite E in H. inv H.
@@ -626,6 +668,11 @@ Proof.
     move: IHst; rewrite !size_cat size_map /=.
     case E: (inactive sd). rewrite E in H. inv H.
     by rewrite 2!addnS -addSn /=.
+
+  - Case "ScanState_splitCurrentInterval".
+    rewrite /unhandled /active /inactive /handled in IHst *.
+    rewrite !size_cat !size_map size_insert /=.
+    by move: IHst; rewrite !size_cat !size_map /=.
 Qed.
 
 (* jww (2014-10-25): Proving this will require that the constructor accepts a
@@ -662,9 +709,9 @@ Proof.
 Qed.
 *)
 
-Theorem uniq_unhandledExtent_cons
-  : forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
-      (act act' inact inact' hnd hnd' : list (fin ni)),
+Theorem unhandledExtent_cons :
+  forall ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
+    (act act' inact inact' hnd hnd' : list (fin ni)),
   unhandledExtent
     {| nextInterval     := ni
      ; unhandled        := unh
@@ -699,6 +746,113 @@ Proof.
   exact: ltn_plus.
 Qed.
 
+(*
+   unhandledExtent
+     {|
+     nextInterval := nextInterval0.+1;
+     unhandled := insert
+                    (λ m : 'I_nextInterval0.+1 * nat,
+                     lebf snd m
+                       (ord_max,
+                       ibeg
+                         (splitInterval
+                            (splitCurrentInterval_admitted0
+                               next_interval_increases0
+                               total_extent_decreases0
+                               handled_count_increases0 len_is_SSMorph0
+                               unhandled_nonempty0 first_nonempty0 before
+                               thisHolds0 thisState0 int)
+                            (splitCurrentInterval_admitted
+                               next_interval_increases0
+                               total_extent_decreases0
+                               handled_count_increases0 len_is_SSMorph0
+                               unhandled_nonempty0 first_nonempty0 before
+                               thisHolds0 thisState0 int)).1.2.1))
+                    (ord_max,
+                    ibeg
+                      (splitInterval
+                         (splitCurrentInterval_admitted0
+                            next_interval_increases0 total_extent_decreases0
+                            handled_count_increases0 len_is_SSMorph0
+                            unhandled_nonempty0 first_nonempty0 before
+                            thisHolds0 thisState0 int)
+                         (splitCurrentInterval_admitted
+                            next_interval_increases0 total_extent_decreases0
+                            handled_count_increases0 len_is_SSMorph0
+                            unhandled_nonempty0 first_nonempty0 before
+                            thisHolds0 thisState0 int)).1.2.1)
+                    [seq (widen_id p.1, p.2) | p <- (i, n) :: unhandled0];
+     active := [seq widen_id i | i <- active0];
+     inactive := [seq widen_id i | i <- inactive0];
+     handled := [seq widen_id i | i <- handled0];
+     intervals := V.replace
+                    (V.shiftin
+                       (splitInterval
+                          (splitCurrentInterval_admitted0
+                             next_interval_increases0 total_extent_decreases0
+                             handled_count_increases0 len_is_SSMorph0
+                             unhandled_nonempty0 first_nonempty0 before
+                             thisHolds0 thisState0 int)
+                          (splitCurrentInterval_admitted
+                             next_interval_increases0 total_extent_decreases0
+                             handled_count_increases0 len_is_SSMorph0
+                             unhandled_nonempty0 first_nonempty0 before
+                             thisHolds0 thisState0 int)).1.2 intervals0)
+                    (to_vfin (widen_id i))
+                    (splitInterval
+                       (splitCurrentInterval_admitted0
+                          next_interval_increases0 total_extent_decreases0
+                          handled_count_increases0 len_is_SSMorph0
+                          unhandled_nonempty0 first_nonempty0 before
+                          thisHolds0 thisState0 int)
+                       (splitCurrentInterval_admitted
+                          next_interval_increases0 total_extent_decreases0
+                          handled_count_increases0 len_is_SSMorph0
+                          unhandled_nonempty0 first_nonempty0 before
+                          thisHolds0 thisState0 int)).1.1;
+     assignments := V.shiftin None assignments0;
+     fixedIntervals := fixedIntervals0 |} <= unhandledExtent pre
+*)
+
+(*
+Theorem unhandledExtent_insert :
+  forall P ni i (unh : list (fin ni * nat)) ints assgn assgn' fixints
+    (act act' inact inact' hnd hnd' : list (fin ni)),
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := unh
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; intervals        := ints
+     ; assignments      := assgn
+     ; fixedIntervals   := fixints
+     |} <
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := insert (P ^~ i) i unh
+     ; active           := act'
+     ; inactive         := inact'
+     ; handled          := hnd'
+     ; intervals        := ints
+     ; assignments      := assgn'
+     ; fixedIntervals   := fixints
+     |}.
+Proof.
+  intros.
+  induction unh;
+  unfold unhandledExtent;
+  simpl; destruct i as [i beg];
+  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
+    auto.
+  destruct unh;
+  simpl; destruct a as [a ?];
+  first by (rewrite add0n; exact: ltn_plus).
+  apply fold_fold_lt; rewrite 2!add0n -addnA.
+  exact: ltn_plus.
+Qed.
+*)
+
 (** ** ScanStateCursor *)
 
 (** A [ScannStateCursor] gives us a view of the first unhandled element within
@@ -707,9 +861,9 @@ Qed.
 
 Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
     curState  : ScanState sd;
-    curExists : length (unhandled sd) > 0;
+    curExists : size (unhandled sd) > 0;
 
-    curId         := safe_hd curExists;
+    curId := safe_hd curExists;
     curIntDetails := V.nth (intervals sd) (to_vfin (fst curId))
 }.
 

@@ -29,8 +29,8 @@ Notation " (| x |) " := {| uloc := x; regReq := false |}.
 Notation " (! x !) " := {| uloc := x; regReq := true |}.
 End UsePosNotations.
 
-Definition upos_le (x y : UsePos) := uloc x <= uloc y.
-Definition upos_lt (x y : UsePos) := uloc x < uloc y.
+Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
+Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
   NE_StronglySorted upos_lt xs -> NE_head xs <= NE_last xs.
@@ -43,11 +43,8 @@ Proof.
   apply/ltnW.
 Qed.
 
-Lemma NE_StronglySorted_lt_trans
-  : forall (x : UsePos) (xs : NonEmpty UsePos),
-  x < NE_head xs
-    -> NE_StronglySorted upos_lt xs
-    -> NE_Forall (upos_lt x) xs.
+Lemma NE_StronglySorted_lt_trans : forall (x : UsePos) (xs : NonEmpty UsePos),
+  x < NE_head xs -> NE_StronglySorted upos_lt xs -> NE_Forall (upos_lt x) xs.
 Proof.
   intros. induction xs; simpl in *.
     constructor. assumption.
@@ -68,27 +65,27 @@ Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
   | match p with
     | (Some l1, Some l2) =>
         [ /\ l = NE_append l1 l2
-        , NE_all_true f l1
-        & f (NE_head l2) = false
+        ,    NE_all_true f l1
+        &    ~~ f (NE_head l2)
         ]
 
     | (Some l1, None) => l = l1 /\ NE_all_true f l1
-    | (None, Some l2) => l = l2 /\ f (NE_head l2) = false
+    | (None, Some l2) => l = l2 /\ ~~ f (NE_head l2)
     | (None, None)    => False
     end
   }.
 
 (** Return two sublists of [l] such that for every element in the first
     sublist, [f elem] return [true]. *)
-Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos)
-  : UsePosSublistsOf f l.
+Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos) :
+  UsePosSublistsOf f l.
 Proof.
   destruct l as [x|x xs] eqn:Heqe.
     destruct (f x) eqn:Heqef.
       exists (Some (NE_Sing x), None).
-      simpl. split. reflexivity.
-      constructor. assumption.
-    exists (None, Some (NE_Sing x)). auto.
+      by split; constructor.
+    exists (None, Some (NE_Sing x)).
+      by split; try apply negbT.
 
   destruct (f x) eqn:Heqef.
   - Case "f x = true".
@@ -107,11 +104,11 @@ Proof.
 
   - Case "f x = false".
     eexists (None, Some (NE_Cons x xs)).
-    split. reflexivity. assumption.
+    by split; try apply negbT.
 Defined.
 
-Lemma usePosSpan_spec (f : UsePos -> bool) (l : NonEmpty UsePos)
-  : forall res, res = usePosSpan f l -> res.1 <> (None, None).
+Lemma usePosSpan_spec (f : UsePos -> bool) (l : NonEmpty UsePos) :
+  forall res, res = usePosSpan f l -> res.1 <> (None, None).
 Proof.
   elim: l => [a|a l IHl] res Heqe;
   case: res Heqe => [[[o| ] [o0| ]] H] //.
@@ -121,14 +118,12 @@ Qed.
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition UsePosDefiniteSublistsOf (l : NonEmpty UsePos) :=
-  { p : (NonEmpty UsePos * NonEmpty UsePos)
-  | l = NE_append (fst p) (snd p) }.
+  { p : NonEmpty UsePos * NonEmpty UsePos | l = NE_append (fst p) (snd p) }.
 
 Definition usePosSplit (f : UsePos -> bool)
   (l : NonEmpty UsePos) (Hlen : NE_length l > 1)
   (Hfirst_true : f (NE_head l))
-  (Hlast_false : ~~ f (NE_last l))
-  : UsePosDefiniteSublistsOf l.
+  (Hlast_false : ~~ f (NE_last l)) : UsePosDefiniteSublistsOf l.
 Proof.
   pose (usePosSpan f l).
   destruct u.
@@ -154,6 +149,7 @@ Proof.
   - Case "(None, Some)".
     rewrite <- H in *.
     simpl in H0. exfalso.
+    apply negbTE in H0.
     apply (eq_true_false_abs (f a));
       assumption.
 Defined.
@@ -191,7 +187,7 @@ Inductive Range : RangeDesc -> Prop :=
       ends are always exclusive). *)
   | R_Sing u : odd (uloc u) ->
     Range {| rbeg := uloc u
-           ; rend := S (uloc u)
+           ; rend := (uloc u).+1
            ; ups  := NE_Sing u
            |}
 
@@ -271,11 +267,19 @@ Proof.
     exact /ltn_min /ltn_max.
 Qed.
 
+Lemma Range_ups_bounded `(r : Range rd) : NE_head (ups rd) <= NE_last (ups rd).
+Proof.
+  Range_cases (induction r) Case; simpl in *.
+  - Case "R_Sing".   by [].
+  - Case "R_Cons".   unfold upos_lt in *; ssomega.
+  - Case "R_Extend". by [].
+Qed.
+
 Definition Range_fromList `(us : NonEmpty UsePos) :
   NE_StronglySorted upos_lt us
     -> NE_Forall (odd ∘ uloc) us
     -> Range {| rbeg := uloc (NE_head us)
-              ; rend := S (uloc (NE_last us))
+              ; rend := (uloc (NE_last us)).+1
               ; ups  := us |}.
 Proof.
   elim: us => [a|a us IHus] Hsorted Hforall //.
@@ -304,7 +308,7 @@ Definition Range_append_fst
                ; rend := rend0
                ; ups  := NE_append l1 l2 |}) :
   Range {| rbeg := rbeg0
-         ; rend := S (uloc (NE_last l1))
+         ; rend := (uloc (NE_last l1)).+1
          ; ups  := l1 |}.
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
@@ -344,7 +348,7 @@ Definition Range_append_spec
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups  := NE_append l1 l2 |}) :
-  S (uloc (NE_last l1)) < uloc (NE_head l2).
+  (uloc (NE_last l1)).+1 < uloc (NE_head l2).
 Proof.
   move/NE_StronglySorted_impl_app: (Range_sorted r) => Hlt.
   move/NE_Forall_append: (Range_all_odd r) => /= [Hfal Hfar].
@@ -380,45 +384,45 @@ Record SplittableUsePos `(Range r) := {
       /\ upos_lt splittable_UsePos (NE_last (ups r))
 }.
 
+Record DividedRange `(r : Range rd) (f : UsePos -> bool)
+  `(r1 : Range rd1) `(r2 : Range rd2) : Prop := {
+    _ : ups rd = NE_append (ups rd1) (ups rd2);
+    _ : NE_all_true f (ups rd1);
+    _ : ~~ f (NE_head (ups rd2));
+    _ : rbeg r == rbeg rd1;
+    _ : rend r == rend rd2;
+    _ : (uloc (NE_last (ups rd1))).+1 == rend rd1;
+    _ : uloc (NE_head (ups rd2)) == rbeg rd2;
+    _ : rend rd1 < rbeg rd2
+}.
+
 Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
   (p : (option RangeSig * option RangeSig)) :=
   match p with
-  | (Some r1, Some r2) =>
-      [ /\ ups rd = NE_append (ups r1.1) (ups r2.1)
-      , NE_all_true f (ups r1.1)
-      , f (NE_head (ups r2.1)) = false
-      , rend r1.1 < rbeg r2.1
-      & (rbeg r == rbeg r1.1) && (rend r == rend r2.1)
-      ]
-
-  | (Some r1, None) =>
-      ups rd = ups r1.1 /\ NE_all_true f (ups r1.1)
-  | (None, Some r2) =>
-      ups rd = ups r2.1 /\ f (NE_head (ups r2.1)) = false
-
-  | (None, None) => False
+  | (Some r1, Some r2) => DividedRange r f r1.2 r2.2
+  | (Some r1, None)    => ups rd = ups r1.1 /\ NE_all_true f (ups r1.1)
+  | (None, Some r2)    => ups rd = ups r2.1 /\ ~~ f (NE_head (ups r2.1))
+  | (None, None)       => False
   end.
 
-Definition dividedRange (f : UsePos -> bool) `(r : Range rd)
+Definition makeDividedRange (f : UsePos -> bool) `(r : Range rd)
   (l1 l2 : NonEmpty UsePos)
   (Heqe : ups rd = NE_append l1 l2)
   (Hu1 : NE_all_true f l1)
-  (Hu2 : f (NE_head l2) = false)
-  : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p }.
+  (Hu2 : ~~ f (NE_head l2)) :
+  { p : (option RangeSig * option RangeSig) | SubRangesOf f r p }.
 Proof.
   destruct rd. simpl in *. subst.
   eexists (Some ({| rbeg := rbeg0
-                  ; rend := S (uloc (NE_last l1))
+                  ; rend := (uloc (NE_last l1)).+1
                   ; ups  := l1 |}; _),
            Some ({| rbeg := uloc (NE_head l2)
                   ; rend := rend0
                   ; ups  := l2 |}; _)).
+  move: (Range_append_spec r).
   simpl. constructor; auto.
-    by apply Range_append_spec in r.
-  exact/andP.
 
   Grab Existential Variables.
-
   - apply (Range_append_snd r).
   - apply (Range_append_fst r).
 Defined.
@@ -426,11 +430,11 @@ Defined.
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
-Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
-  : { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
+Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) :
+  { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
   match usePosSpan f (ups rd) with
   | exist (Some l1, Some l2) (And3 Heqe Hu1 Hu2) =>
-      dividedRange r Heqe Hu1 Hu2
+      makeDividedRange r Heqe Hu1 Hu2
 
   | exist (Some _, None) (conj Heqe Hu) =>
       exist (SubRangesOf f r)
@@ -440,29 +444,28 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd)
   | exist (None, Some _) (conj Heqe Hu) =>
       exist (SubRangesOf f r)
         (None, Some (exist Range rd r))
-        (conj refl_equal (eq_rect_r (fun x => f (NE_head x) = false) Hu Heqe))
+        (conj refl_equal (eq_rect_r (fun x => ~~ f (NE_head x)) Hu Heqe))
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.
 
-Lemma rangeSpan_spec (f : UsePos -> bool) `(r : Range rd)
-  : forall res, res = rangeSpan f r -> res.1 <> (None, None).
+Lemma rangeSpan_spec (f : UsePos -> bool) `(r : Range rd) :
+  forall res, res = rangeSpan f r -> res.1 <> (None, None).
 Proof. elim: rd r => rbeg rend ups r [[[o| ] [o0| ]] res] Heq //. Qed.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
-Definition DefiniteSubRangesOf `(r : Range rd) :=
+Definition DefiniteSubRangesOf (f : UsePos -> bool) `(r : Range rd) :=
   { p : (RangeSig * RangeSig)
-  | let (r1, r2) := p in ups rd = NE_append (ups r1.1) (ups r2.1) }.
+  | let (r1, r2) := p in DividedRange r f r1.2 r2.2 }.
 
 (** [splitRange] differs from [rangeSpan] in that the first and last elements
     must not be eligible for splitting, and therefore the [Range] will always
     be split into two definite sub-ranges. *)
 Definition splitRange (f : UsePos -> bool) `(r : Range rd)
-  (Hfirst_true : f (NE_head (ups rd)))
-  (Hlast_false : ~~ f (NE_last (ups rd)))
-  : DefiniteSubRangesOf r.
+  (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
+  DefiniteSubRangesOf f r.
 Proof.
   destruct rd. simpl in *.
   pose (rangeSpan f r) as s. destruct s.
@@ -470,15 +473,18 @@ Proof.
   destruct x.
 
   destruct o as [o| ];
-  destruct o0 as [o0| ]; intuition; destruct s;
-  [ Case "(Some, Some)"; exists (o, o0); apply H
-  | Case "(Some, None)"; exfalso; apply NE_Forall_last in H0
-  | Case "(None, Some)"; exfalso ];
-
-  rewrite <- H in *; simpl in H0;
-  [ apply (eq_true_false_abs (f (NE_last ups0)))
-  | apply (eq_true_false_abs (f (NE_head ups0))) ];
-  auto; exact: negbTE.
+  destruct o0 as [o0| ]; intuition.
+  - Case "(Some, Some)".
+    exists (o, o0); exact: s.
+  - Case "(Some, None)".
+    exfalso; destruct s.
+    destruct Hl as [H1 H2 H3].
+    rewrite -H in H0.
+    move: (NE_Forall_member_spec H0 H2).
+    by move: H3 => /negbTE -> /=.
+  - Case "(None, Some)".
+    exfalso; destruct s.
+    by move: H H0 Hf => <- /negbTE /= ->.
 Defined.
 
 (**************************************************************************)
@@ -491,8 +497,8 @@ Module Import U := UsePosNotations.
 Open Scope list_scope.
 
 Fixpoint generateRangeBuilder
-  (start index : nat) (Hodd : odd start) {struct index}
-  : { rd : RangeDesc | Range rd & uloc (NE_head (ups rd)) = start }.
+  (start index : nat) (Hodd : odd start) {struct index} :
+  { rd : RangeDesc | Range rd & uloc (NE_head (ups rd)) = start }.
 Proof.
   destruct index.
     pose (@R_Sing (|start|) Hodd).

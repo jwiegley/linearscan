@@ -112,10 +112,11 @@ findRangeUsePos r f =
       NonEmpty0.NE_Cons u us' -> Lib.option_choose (check u) (go us')}}
   in go (ups r)
 
-dividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> (NonEmpty0.NonEmpty
-                UsePos) -> (NonEmpty0.NonEmpty UsePos) ->
-                ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
-dividedRange f rd l1 l2 =
+makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc ->
+                    (NonEmpty0.NonEmpty UsePos) -> (NonEmpty0.NonEmpty
+                    UsePos) ->
+                    ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
+makeDividedRange f rd l1 l2 =
   case rd of {
    Build_RangeDesc rbeg0 rend0 ups0 ->
     Logic.eq_rec_r (NonEmpty0.coq_NE_append l1 l2) (\_ -> (,) (Prelude.Just
@@ -131,7 +132,7 @@ rangeSpan f rd =
     case o of {
      Prelude.Just l1 ->
       case o0 of {
-       Prelude.Just l2 -> dividedRange f rd l1 l2;
+       Prelude.Just l2 -> makeDividedRange f rd l1 l2;
        Prelude.Nothing -> (,) (Prelude.Just rd) Prelude.Nothing};
      Prelude.Nothing ->
       case o0 of {

@@ -23,6 +23,7 @@ import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
 import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssrbool as Ssrbool
+import qualified LinearScan.Ssreflect as Ssreflect
 
 
 
@@ -167,11 +168,10 @@ _LinearScan__all_state_lists s =
     ((Prelude.++) (_LinearScan__active s)
       ((Prelude.++) (_LinearScan__inactive s) (_LinearScan__handled s)))
 
-_LinearScan__widen_id :: LinearScan__ScanStateDesc -> Fintype.Coq_ordinal ->
+_LinearScan__widen_id :: Prelude.Int -> Fintype.Coq_ordinal ->
                          Fintype.Coq_ordinal
-_LinearScan__widen_id sd =
-  Fintype.widen_ord (_LinearScan__nextInterval sd) (Prelude.succ
-    (_LinearScan__nextInterval sd))
+_LinearScan__widen_id n =
+  Fintype.widen_ord n (Prelude.succ n)
 
 _LinearScan__getAssignment :: LinearScan__ScanStateDesc ->
                               LinearScan__IntervalId -> Prelude.Maybe
@@ -577,8 +577,76 @@ _LinearScan__moveInactiveToHandled sd x =
 _LinearScan__splitCurrentInterval :: LinearScan__ScanStateDesc ->
                                      (Prelude.Maybe Prelude.Int) ->
                                      LinearScan__SState ()
-_LinearScan__splitCurrentInterval =
-  Prelude.error "AXIOM TO BE REALIZED"
+_LinearScan__splitCurrentInterval pre before x =
+  (,) ()
+    (case x of {
+      LinearScan__Build_ScanStateDesc nextInterval0 unhandled0 active0
+       inactive0 x0 x1 x2 x3 ->
+       case unhandled0 of {
+        [] -> Logic.coq_False_rect;
+        (:) p unhandled1 ->
+         case p of {
+          (,) i n ->
+           Ssreflect.ssr_have __ (\_ -> LinearScan__Build_ScanStateDesc
+             (Prelude.succ nextInterval0)
+             (Lib.insert (\m ->
+               Lib.lebf (Prelude.snd) m ((,) (Fintype.ord_max nextInterval0)
+                 (Interval.ibeg
+                   (
+                     ((Prelude.snd)
+                       (
+                         (Interval.splitInterval
+                           (Interval.splitPosition
+                             (
+                               (Lib._V__nth nextInterval0 x1
+                                 (Vector0.to_vfin nextInterval0 i))) before)
+                           (
+                             (Lib._V__nth nextInterval0 x1
+                               (Vector0.to_vfin nextInterval0 i))))))))))
+               ((,) (Fintype.ord_max nextInterval0)
+               (Interval.ibeg
+                 (
+                   ((Prelude.snd)
+                     (
+                       (Interval.splitInterval
+                         (Interval.splitPosition
+                           (
+                             (Lib._V__nth nextInterval0 x1
+                               (Vector0.to_vfin nextInterval0 i))) before)
+                         (
+                           (Lib._V__nth nextInterval0 x1
+                             (Vector0.to_vfin nextInterval0 i)))))))))
+               ((Prelude.map) (\p0 -> (,)
+                 (_LinearScan__widen_id nextInterval0 ((Prelude.fst) p0))
+                 ((Prelude.snd) p0)) ((:) ((,) i n) unhandled1)))
+             ((Prelude.map) (_LinearScan__widen_id nextInterval0) active0)
+             ((Prelude.map) (_LinearScan__widen_id nextInterval0) inactive0)
+             ((Prelude.map) (_LinearScan__widen_id nextInterval0) x0)
+             (Lib._V__replace (Prelude.succ nextInterval0)
+               (Lib._V__shiftin nextInterval0
+                 ((Prelude.snd)
+                   (
+                     (Interval.splitInterval
+                       (Interval.splitPosition
+                         (
+                           (Lib._V__nth nextInterval0 x1
+                             (Vector0.to_vfin nextInterval0 i))) before)
+                       (
+                         (Lib._V__nth nextInterval0 x1
+                           (Vector0.to_vfin nextInterval0 i)))))) x1)
+               (Vector0.to_vfin (Prelude.succ nextInterval0)
+                 (_LinearScan__widen_id nextInterval0 i))
+               ((Prelude.fst)
+                 (
+                   (Interval.splitInterval
+                     (Interval.splitPosition
+                       (
+                         (Lib._V__nth nextInterval0 x1
+                           (Vector0.to_vfin nextInterval0 i))) before)
+                     (
+                       (Lib._V__nth nextInterval0 x1
+                         (Vector0.to_vfin nextInterval0 i)))))))
+             (Lib._V__shiftin nextInterval0 Prelude.Nothing x2) x3)}}})
 
 _LinearScan__splitActiveIntervalForReg :: LinearScan__ScanStateDesc ->
                                           LinearScan__PhysReg -> Prelude.Int
@@ -610,13 +678,12 @@ _LinearScan__tryAllocateFreeReg :: LinearScan__ScanStateDesc ->
                                    (LinearScan__SState LinearScan__PhysReg))
 _LinearScan__tryAllocateFreeReg pre =
   (Prelude.$) (_LinearScan__withCursor pre) (\sd _ ->
-    let {sd0 = _LinearScan__curStateDesc sd} in
     let {
      go = \n ->
-      List0.fold_left (\v i -> _LinearScan__atIntervalReg sd0 i v (n i))}
+      List0.fold_left (\v i -> _LinearScan__atIntervalReg sd i v (n i))}
     in
     let {
-     freeUntilPos' = go (\x -> Prelude.Just 0) (_LinearScan__active sd0)
+     freeUntilPos' = go (\x -> Prelude.Just 0) (_LinearScan__active sd)
                        (Lib._V__const Prelude.Nothing _LinearScan__maxReg)}
     in
     let {
@@ -625,19 +692,19 @@ _LinearScan__tryAllocateFreeReg pre =
                                  ( (_LinearScan__curIntDetails sd))
                                  (
                                    (Lib._V__nth
-                                     (_LinearScan__nextInterval sd0)
-                                     (_LinearScan__intervals sd0)
+                                     (_LinearScan__nextInterval sd)
+                                     (_LinearScan__intervals sd)
                                      (Vector0.to_vfin
-                                       (_LinearScan__nextInterval sd0) x))))
-                               (_LinearScan__inactive sd0)}
+                                       (_LinearScan__nextInterval sd) x))))
+                               (_LinearScan__inactive sd)}
     in
     let {
      freeUntilPos = go (\i ->
                       Interval.intervalIntersectionPoint
                         (
-                          (Lib._V__nth (_LinearScan__nextInterval sd0)
-                            (_LinearScan__intervals sd0)
-                            (Vector0.to_vfin (_LinearScan__nextInterval sd0)
+                          (Lib._V__nth (_LinearScan__nextInterval sd)
+                            (_LinearScan__intervals sd)
+                            (Vector0.to_vfin (_LinearScan__nextInterval sd)
                               i))) ( (_LinearScan__curIntDetails sd)))
                       intersectingIntervals freeUntilPos'}
     in
@@ -1127,11 +1194,15 @@ _LinearScan__determineIntervals maxVirtReg blocks =
           (Fintype.ord_max (_LinearScan__nextInterval ss))
           (Interval.ibeg i0))
           ((Prelude.map) (\p -> (,)
-            (_LinearScan__widen_id ss ((Prelude.fst) p)) ((Prelude.snd) p))
+            (_LinearScan__widen_id (_LinearScan__nextInterval ss)
+              ((Prelude.fst) p)) ((Prelude.snd) p))
             (_LinearScan__unhandled ss)))
-        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__active ss))
-        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__inactive ss))
-        ((Prelude.map) (_LinearScan__widen_id ss) (_LinearScan__handled ss))
+        ((Prelude.map) (_LinearScan__widen_id (_LinearScan__nextInterval ss))
+          (_LinearScan__active ss))
+        ((Prelude.map) (_LinearScan__widen_id (_LinearScan__nextInterval ss))
+          (_LinearScan__inactive ss))
+        ((Prelude.map) (_LinearScan__widen_id (_LinearScan__nextInterval ss))
+          (_LinearScan__handled ss))
         (Lib._V__shiftin (_LinearScan__nextInterval ss) i0
           (_LinearScan__intervals ss))
         (Lib._V__shiftin (_LinearScan__nextInterval ss) Prelude.Nothing

@@ -14,35 +14,30 @@ Generalizable All Variables.
 Module MAllocate (M : Machine).
 Include MSSMorph M.
 
-Definition splitCurrentInterval {pre P} `{HasWork P} (before : option nat)
-  : SState pre P SSMorphStHasLen unit.
+Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (position : nat) :
+  SState pre P P unit.
 Admitted.
 
-Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (position : nat)
-  : SState pre P P unit.
+Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg) :
+  SState pre P P unit.
 Admitted.
 
-Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg)
-  : SState pre P P unit.
-Admitted.
-
-Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg)
+Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
   (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
-  : SState pre P P (option nat).
+  SState pre P P (option nat).
 Admitted.
 
-Definition assignSpillSlotToCurrent {pre P} `{HasWork P}
-  : SState pre P P unit.
+Definition assignSpillSlotToCurrent {pre P} `{HasWork P} :
+  SState pre P P unit.
 Admitted.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
-Definition tryAllocateFreeReg {pre P} `{W : HasWork P}
-  : SState pre P P (option (SState pre P SSMorphSt PhysReg)) :=
+Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
+  SState pre P P (option (SState pre P SSMorphSt PhysReg)) :=
   withCursor $ fun sd cur =>
     let current := curInterval cur in
-    let sd := curStateDesc cur in
 
     (* set freeUntilPos of all physical registers to maxInt
        for each interval it in active do
@@ -96,8 +91,8 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P}
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
     the change to the [ScanState] must be a productive one. *)
-Definition allocateBlockedReg {pre P} `{HasWork P}
-  : SState pre P SSMorphSt (option PhysReg) :=
+Definition allocateBlockedReg {pre P} `{HasWork P} :
+  SState pre P SSMorphSt (option PhysReg) :=
   withCursor $ fun sd cur =>
     let st      := curState cur in
     let current := curInterval cur in
@@ -164,8 +159,8 @@ Definition allocateBlockedReg {pre P} `{HasWork P}
       end ;;;
       return_ (Some reg).
 
-Definition checkActiveIntervals {pre} (pos : nat)
-  : SState pre SSMorphLen SSMorphLen unit :=
+Definition checkActiveIntervals {pre} (pos : nat) :
+  SState pre SSMorphLen SSMorphLen unit :=
   let fix go sd (st : ScanState sd) ss ints :=
     match ints with
     | nil => ss
@@ -192,8 +187,8 @@ Definition checkActiveIntervals {pre} (pos : nat)
           ; thisState := st'
           |}.
 
-Definition checkInactiveIntervals {pre} (pos : nat)
-  : SState pre SSMorphLen SSMorphLen unit :=
+Definition checkInactiveIntervals {pre} (pos : nat) :
+  SState pre SSMorphLen SSMorphLen unit :=
   let fix go sd (st : ScanState sd) ss ints :=
     match ints with
     | nil => ss
@@ -220,8 +215,8 @@ Definition checkInactiveIntervals {pre} (pos : nat)
           ; thisState := st'
           |}.
 
-Definition handleInterval {pre}
-  : SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
+Definition handleInterval {pre} :
+  SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
   (* position = start position of current *)
   withCursor $ fun _ cur =>
     let position := curPosition cur in

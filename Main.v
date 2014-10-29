@@ -61,6 +61,7 @@ Extract Inlined Constant foldr      => "Prelude.foldr".
 Extract Inlined Constant fst        => "(Prelude.fst)".
 (* Extract Inlined Constant id         => "(Prelude.id)". *)
 Extract Inlined Constant length     => "(Data.List.length)".
+Extract Inlined Constant size       => "(Data.List.length)".
 Extract Inlined Constant map        => "(Prelude.map)".
 Extract Inlined Constant predn      => "(Prelude.pred)".
 Extract Inlined Constant minus      => "(Prelude.-)".

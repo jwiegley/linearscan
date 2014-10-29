@@ -50,8 +50,8 @@ Definition boundedTriple (pos : nat) :=
 
 Definition boundedRangeVec (pos : nat) := Vec (boundedTriple pos) maxVirtReg.
 
-Lemma boundedTransport (pos : nat) `(Hlt : pos < n)
-  : boundedRangeVec n -> boundedRangeVec pos.
+Lemma boundedTransport (pos : nat) `(Hlt : pos < n) :
+  boundedRangeVec n -> boundedRangeVec pos.
 Proof.
   rewrite /boundedRangeVec /boundedTriple /boundedRange.
   elim=> [|[p [[rd r Hr]| ]] n' v' IHv].
@@ -151,13 +151,13 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
 
 (** The list of blocks is processed in reverse, so that the resulting
     sub-lists are also in order. *)
-Definition processBlocks (blocks : NonEmpty Block)
-  : Vec (option RangeSig) maxVirtReg :=
+Definition processBlocks (blocks : NonEmpty Block) :
+  Vec (option RangeSig) maxVirtReg :=
   let res := applyList blocks emptyBoundedRangeVec handleBlock in
   V.map extractRange res.
 
-Definition determineIntervals (blocks : NonEmpty Block)
-  : { sd : ScanStateDesc | ScanState sd } :=
+Definition determineIntervals (blocks : NonEmpty Block) :
+  { sd : ScanStateDesc | ScanState sd } :=
   let mkint (mx : option RangeSig) : option IntervalSig := match mx with
       | None => None
       | Some (exist _ r) =>
@@ -180,8 +180,7 @@ Definition determineIntervals (blocks : NonEmpty Block)
      intervals in the [ScanState]. *)
   V.fold_left go s1 ranges.
 
-Definition allocateRegisters (blocks : NonEmpty Block)
-  : ScanStateDesc :=
+Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).
 
 End Block.

@@ -300,6 +300,12 @@ uncurry_sig :: (a1 -> () -> a2) -> a1 -> a2
 uncurry_sig f p =
   f p __
 
+fromMaybe :: a1 -> (Prelude.Maybe a1) -> a1
+fromMaybe d mx =
+  case mx of {
+   Prelude.Just x -> x;
+   Prelude.Nothing -> d}
+
 option_map :: (a1 -> a2) -> (Prelude.Maybe a1) -> Prelude.Maybe a2
 option_map f x =
   case x of {

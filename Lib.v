@@ -125,20 +125,20 @@ Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } 
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
-Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
-  : P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p.
+Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) :
+  P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p.
 
-Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x})
-  : Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
+Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) :
+  Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
 
 Definition proj1_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
-Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
-  : P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p.
+Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) :
+  P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p.
 
-Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x})
-  : Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
+Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) :
+  Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
 
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
@@ -208,6 +208,9 @@ Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
 Proof. intros; ssomega. Qed.
 
 Lemma ltnSSn : forall n, n < n.+2.
+Proof. intros; ssomega. Qed.
+
+Lemma leqSSn : forall n, n <= n.+2.
 Proof. intros; ssomega. Qed.
 
 Lemma fold_gt : forall a f n m (xs : list a),
@@ -315,8 +318,8 @@ Proof.
   contradiction.
 Qed.
 
-Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a)
-  : uniq (s1 ++ s2 ++ s3) = uniq (s1 ++ s3 ++ s2).
+Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a) :
+  uniq (s1 ++ s2 ++ s3) = uniq (s1 ++ s3 ++ s2).
 Proof.
   rewrite uniq_catC.
   rewrite uniq_catCA.
@@ -345,8 +348,8 @@ Proof.
   by invert; apply ord_inj.
 Qed.
 
-Lemma uniq_fin_cons {n} (l : list (fin n))
-  : uniq l -> uniq (ord_max :: map (widen_ord (leqnSn n)) l).
+Lemma uniq_fin_cons {n} (l : list (fin n)) :
+  uniq l -> uniq (ord_max :: map (widen_ord (leqnSn n)) l).
 Proof.
   move=> Huniq.
   rewrite cons_uniq.

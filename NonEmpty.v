@@ -3,6 +3,9 @@ Require Import Coq.Sorting.Sorted.
 Require Import Coq.Relations.Relations.
 
 Generalizable All Variables.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 
 (** ** NonEmpty lists *)
 
@@ -28,8 +31,8 @@ Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
     | NE_Cons x xs => cons x (NE_to_list xs)
   end.
 
-Definition destruct_NonEmpty {a} (l : NonEmpty a)
-  : ({x : a & {tl : NonEmpty a | l = NE_Cons x tl}} +
+Definition destruct_NonEmpty {a} (l : NonEmpty a) :
+  ({x : a & {tl : NonEmpty a | l = NE_Cons x tl}} +
      {x : a | l = NE_Sing x})%type.
 Proof.
   destruct l.
@@ -188,8 +191,8 @@ Qed.
 
 End Reverse_Induction.
 
-Fixpoint NE_span {a : Type} (f : a -> bool) (l : NonEmpty a)
-  : (option (NonEmpty a) * option (NonEmpty a)) :=
+Fixpoint NE_span {a : Type} (f : a -> bool) (l : NonEmpty a) :
+  (option (NonEmpty a) * option (NonEmpty a)) :=
   let maybeAppend (x : a) (xs : option (NonEmpty a)) :=
       match xs with
         | Some xs' => Some (NE_Cons x xs')
@@ -231,7 +234,7 @@ Qed.
 
 Section Sorted.
 
-Variable A : Type.
+Variable A : Set.
 Variable R : relation A.
 Context `{H : Transitive A R}.
 
@@ -327,6 +330,50 @@ Proof.
   apply IHxs. assumption.
   intuition.
 Qed.
+
+Section Membership.
+
+Hypothesis eq_dec : forall x y : A, {x = y}+{x <> y}.
+
+Fixpoint NE_member (z : A) (ne : NonEmpty A) : Prop :=
+  match ne with
+    | NE_Sing x => x = z
+    | NE_Cons x xs => (x = z) \/ NE_member z xs
+  end.
+
+Lemma NE_member_head (ne : NonEmpty A) : NE_member (NE_head ne) ne.
+Proof. induction ne; simpl; auto. Qed.
+
+Lemma NE_member_append_fst (z : A) (xs ys : NonEmpty A) :
+  NE_member z xs -> NE_member z (NE_append xs ys).
+Proof.
+  induction xs; simpl; auto.
+  destruct (eq_dec a z).
+    left. assumption.
+  right.
+  inversion H0.
+    contradiction.
+  apply IHxs.
+  assumption.
+Qed.
+
+Lemma NE_member_append_snd (z : A) (xs ys : NonEmpty A) :
+  NE_member z ys -> NE_member z (NE_append xs ys).
+Proof. induction xs; simpl; auto. Qed.
+
+Lemma NE_Forall_member_spec (z : A) (ne : NonEmpty A) :
+  forall f, NE_Forall f ne -> NE_member z ne -> f z.
+Proof.
+  induction ne; simpl; intros.
+    inversion H0. subst. assumption.
+  inversion H1.
+    inversion H0. subst. assumption.
+  apply IHne.
+    inversion H0. assumption.
+  assumption.
+Qed.
+
+End Membership.
 
 Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_sing a   : NE_StronglySorted (NE_Sing a)
@@ -427,8 +474,8 @@ Proof.
   assumption.
 Qed.
 
-Fixpoint NE_StronglySorted_append {xs ys : NonEmpty A}
-  : R (NE_last xs) (NE_head ys)
+Fixpoint NE_StronglySorted_append {xs ys : NonEmpty A} :
+  R (NE_last xs) (NE_head ys)
     -> NE_StronglySorted xs
     -> NE_StronglySorted ys
     -> NE_StronglySorted (NE_append xs ys).
