@@ -256,10 +256,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixints
        |} ->
     let xi := (V.nth ints (to_vfin xid)).2 in
-    forall (Hb : firstUsePos xi < pos)
-           (He : pos <= lastUsePos xi),
+    forall (H : firstUsePos xi < pos <= lastUsePos xi),
 
-    let xe     := splitInterval Hb He in
+    let xe     := splitInterval H in
     let x2     := (ord_max, ibeg (snd xe.1).1) in
     let widp p := (widen_id (fst p), snd p) in
     let unh'   := map widp (x :: unh) in

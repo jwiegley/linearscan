@@ -191,13 +191,13 @@ intervalSpan rs before ib ie =
           let {
            _evar_0_ = \_ ->
             let {
-             _evar_0_ = Ssreflect.ssr_have __ (\_ _ _ -> (,) (Prelude.Just
-                          (Build_IntervalDesc (Range.rbeg ( r0))
-                          (Range.rend ( r0)) (NonEmpty0.NE_Sing ( r0))))
-                          (Prelude.Just (Build_IntervalDesc
-                          (Range.rbeg ( r1))
-                          (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
-                          (NonEmpty0.NE_Cons r1 rs0))))}
+             _evar_0_ = \_ _ ->
+              Ssreflect.ssr_have __ (\_ -> (,) (Prelude.Just
+                (Build_IntervalDesc (Range.rbeg ( r0)) (Range.rend ( r0))
+                (NonEmpty0.NE_Sing ( r0)))) (Prelude.Just (Build_IntervalDesc
+                (Range.rbeg ( r1))
+                (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
+                (NonEmpty0.NE_Cons r1 rs0))))}
             in
             Logic.eq_rec_r (Range.rbeg ( r0)) _evar_0_
               (Range.rbeg
@@ -233,7 +233,7 @@ intervalSpan rs before ib ie =
                      Build_IntervalDesc ibeg0 iend0 rds0 ->
                       let {
                        _evar_0_0 = let {
-                                    _evar_0_0 = \_ ->
+                                    _evar_0_0 = \_ _ ->
                                      let {
                                       _evar_0_0 = \_ ->
                                        let {
@@ -242,7 +242,7 @@ intervalSpan rs before ib ie =
                                           _evar_0_0 = Ssreflect.ssr_have __
                                                         (\_ ->
                                                         let {
-                                                         _evar_0_0 = \_ _ _ ->
+                                                         _evar_0_0 = \_ _ ->
                                                           (,) (Prelude.Just
                                                           (Build_IntervalDesc
                                                           (Range.rbeg ( r))
@@ -259,7 +259,8 @@ intervalSpan rs before ib ie =
                                                               (NonEmpty0.coq_NE_last
                                                                 rds0))) __)}
                                          in
-                                         Logic.eq_rec_r (iend ( i1_2))
+                                         Logic.eq_rec_r
+                                           (iend (getIntervalDesc ( i1_2)))
                                            _evar_0_0
                                            (Range.rend
                                              (Range.getRangeDesc
@@ -289,7 +290,7 @@ intervalSpan rs before ib ie =
                         (Range.rbeg
                           (Range.getRangeDesc
                             ( (NonEmpty0.coq_NE_head rds0)))) _evar_0_0 ibeg0
-                        __}}
+                        __ __}}
                   in
                   let {
                    _evar_0_1 = \_ ->
@@ -306,7 +307,7 @@ intervalSpan rs before ib ie =
                       _evar_0_1 (rds ( i1_1)) __}
                   in
                   case _top_assumption_4 of {
-                   Prelude.Just x -> (\_ -> _evar_0_0 x);
+                   Prelude.Just x -> (\_ _ -> _evar_0_0 x);
                    Prelude.Nothing -> _evar_0_1}}
                 in
                 let {

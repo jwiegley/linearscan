@@ -309,9 +309,8 @@ Proof.
   have int := (V.nth intervals0 (to_vfin i)).2.
   pose (@ScanState_splitCurrentInterval (splitPosition int before)
                                         _ _ _ _ _ _ _ _ _ _ thisState0).
-  eapply {| thisState := s _ _ |}.
+  eapply {| thisState := s _ |}.
   Grab Existential Variables.
-  - admit.
   - admit.
   - try rapply Build_SSMorphStHasLen;
     try rapply Build_SSMorphHasLen;

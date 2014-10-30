@@ -487,6 +487,15 @@ Proof.
     by move: H H0 Hf => <- /negbTE /= ->.
 Defined.
 
+Lemma splitRange_spec (f : UsePos -> bool) `(r : Range rd)
+  (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
+  let: exist (r1, r2) Hdr := splitRange r Hf Hl in
+  rangeExtent r1.2 + rangeExtent r2.2 < rangeExtent r.
+Proof.
+  case: (splitRange r Hf Hl) => [[r1 r2] [_ _ _ /eqP H4 /eqP H5 _ _ H8]].
+  rewrite /rangeExtent {}H4 {}H5 {Hf Hl r rd f}.
+Admitted.
+
 (**************************************************************************)
 
 Module RangeTests.
@@ -525,7 +534,8 @@ Defined.
 
 Definition testRangeSpan (start finish : nat) (Hodd : odd start)
   (H : start < finish) (before : nat) :=
-  let r := (rangeSpan (fun u => uloc u < before) (generateRange Hodd H).2).1 in
+  let f u := uloc u < before in
+  let r := (rangeSpan f (generateRange Hodd H).2).1 in
   (option_map (fun x => ups x.1) (fst r),
    option_map (fun x => ups x.1) (snd r)).
 
