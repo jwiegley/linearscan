@@ -7,7 +7,7 @@ MISSING  = \
 all: Makefile.coq
 	$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
 	$(MAKE) LinearScan/Main.hs
-	$(MISSING)
+	$(MISSING) | grep -v Hask/
 
 LinearScan/Main.hs: Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \

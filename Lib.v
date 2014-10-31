@@ -207,6 +207,9 @@ Qed.
 Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
 Proof. intros; ssomega. Qed.
 
+Lemma ltn_leq_leq : forall n m p : nat, m < n -> n <= p -> m <= p.
+Proof. intros; ssomega. Qed.
+
 Lemma ltnSSn : forall n, n < n.+2.
 Proof. intros; ssomega. Qed.
 
@@ -285,37 +288,6 @@ Proof.
   rewrite in_cons negb_orb.
   apply/andP.
   split; [ by [] | exact: IHl ].
-Qed.
-
-Lemma uniq_juggle : forall (a : eqType) (xs ys zs : list a),
-  uniq (xs ++ ys ++ zs) -> forall x, x \in xs
-    -> uniq (rem x xs ++ (x :: ys) ++ zs).
-Proof.
-  move=> a.
-  elim=> [|x xs IHxs] ys zs H x0 Hin //=.
-  case E: (x == x0) => /=.
-    move: E => /eqP <-.
-    by rewrite -cat1s uniq_catCA cat1s -cat_cons.
-  apply/andP.
-  split.
-    rewrite !mem_cat.
-    move: cat_uniq H => -> /and3P => [[H1 H2 H3]].
-    move: cons_uniq H1 => -> /andP => [[H4 H5]].
-    rewrite negb_orb.
-    apply/andP.
-    apply negbT in E.
-    split. exact: not_in_rem.
-    rewrite has_sym in H2.
-    inversion H2 as [H2'].
-    move: negb_orb H2' => -> /andP [H6 H7].
-    rewrite in_cons negb_orb.
-    by apply/andP.
-  apply IHxs.
-    inversion H as [H'].
-    by move: H' => /andP [_ ?].
-  move: in_cons Hin => -> /orP [He|_] //.
-  move: eq_sym E He => -> /eqP E /eqP He.
-  contradiction.
 Qed.
 
 Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a) :
@@ -400,6 +372,16 @@ Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
       then x :: insert p z xs
       else z :: x :: xs
   end.
+
+Arguments insert {a} p z l : simpl never.
+
+Lemma size_insert : forall (a : eqType) P (x : a) xs,
+  size (insert (P ^~ x) x xs) = (size xs).+1.
+Proof.
+  move=> a P x; elim=> //= [y ys IHys].
+  rewrite /insert.
+  case: (P y x) => /=; [ by rewrite IHys | by [] ].
+Qed.
 
 Section Mergesort.
 
@@ -538,6 +520,7 @@ Proof.
   move=> x.
   elim=> /= [|y ys IHys] z H Hlt.
     by constructor.
+  rewrite /insert.
   case L: (lebf y z).
     constructor. by inv H.
     by apply: IHys; inv H.
@@ -553,6 +536,7 @@ Proof.
     by constructor.
   inv Hsort. clear Hsort.
   specialize (IHxs H1).
+  rewrite /insert.
   case L: (lebf x z).
     constructor. exact: IHxs.
     exact: Forall_insert_spec.

@@ -44,11 +44,12 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go n := fold_left (fun v i => atIntervalReg i v (n i)) in
+    let go n := fold_left (fun v p => let: (i, r) := p in
+                                      V.replace v (to_vfin r) (n i)) in
     let freeUntilPos' := go (fun _ => Some 0)
                             (active sd) (V.const None maxReg) in
     let intersectingIntervals :=
-        filter (fun x => intervalsIntersect current (getInterval x))
+        filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
     let freeUntilPos :=
         go (fun i => intervalIntersectionPoint (getInterval i) current)
@@ -94,21 +95,21 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
 Definition allocateBlockedReg {pre P} `{HasWork P} :
   SState pre P SSMorphSt (option PhysReg) :=
   withCursor $ fun sd cur =>
-    let st      := curState cur in
     let current := curInterval cur in
     let start   := intervalStart current in
-    let pos     := curPosition cur in
 
     (* set nextUsePos of all physical registers to maxInt
        for each interval it in active do
          nextUsePos[it.reg] = next use of it after start of current
        for each interval it in inactive intersecting with current do
          nextUsePos[it.reg] = next use of it after start of current *)
-    let go := fold_left (fun v i =>
-                atIntervalReg i v (nextUseAfter (getInterval i) start)) in
+    let go := fold_left (fun v p =>
+                let: (i, r) := p in
+                V.replace v (to_vfin r)
+                          (nextUseAfter (getInterval i) start)) in
     let nextUsePos' := go (active sd) (V.const None maxReg) in
     let intersectingIntervals :=
-        filter (fun x => intervalsIntersect current (getInterval x))
+        filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
     let nextUsePos := go intersectingIntervals nextUsePos' in
 
@@ -147,6 +148,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       weakenStHasLenToSt ;;;
       return_ None
     else
+      let pos := curPosition cur in
       splitActiveIntervalForReg reg pos ;;;
       splitAnyInactiveIntervalForReg reg ;;;
 
@@ -170,12 +172,12 @@ Definition checkActiveIntervals {pre} (pos : nat) :
                move it from active to handled
              else if it does not cover position then
                move it from active to inactive *)
-        let i := getInterval x.1 in
+        let i := getInterval (fst x.1) in
         let st1 :=
             if intervalEnd i < pos
-            then uncurry_sig (moveActiveToHandled st) x
+            then moveActiveToHandled st x.2
             else if negb (intervalCoversPos i pos)
-                 then uncurry_sig (moveActiveToInactive st) x
+                 then moveActiveToInactive st x.2
                  else ss in
         go sd st st1 xs
     end in
@@ -198,12 +200,12 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
                move it from inactive to handled
              else if it covers position then
                move it from inactive to active *)
-        let i := getInterval x.1 in
+        let i := getInterval (fst x.1) in
         let st1 :=
             if intervalEnd i < pos
-            then uncurry_sig (moveInactiveToHandled st) x
+            then moveInactiveToHandled st x.2
             else if intervalCoversPos i pos
-                 then uncurry_sig (moveInactiveToActive st) x
+                 then moveInactiveToActive st x.2
                  else ss in
         go sd st st1 xs
     end in

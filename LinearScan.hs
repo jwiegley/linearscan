@@ -56,10 +56,10 @@ allocateRegisters maxVirtReg blockInfo blocks =
                      refs))
 
 handledIntervalIds :: ScanState -> [IntervalId]
-handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ hnd _ _ _)) = hnd
+handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ hnd)) = hnd
 
-registerAssignment :: ScanState -> IntervalId -> Maybe PhysReg
-registerAssignment (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =
-    -- jww (2014-10-01): Allow the Haskell caller to specific the maximum
-    -- number of registers.
-    PhysReg <$> _V__nth _LinearScan__maxReg f (to_vfin ni n)
+-- registerAssignment :: ScanState -> IntervalId -> Maybe PhysReg
+-- registerAssignment (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =
+--     -- jww (2014-10-01): Allow the Haskell caller to specific the maximum
+--     -- number of registers.
+--     PhysReg <$> _V__nth _LinearScan__maxReg f (to_vfin ni n)

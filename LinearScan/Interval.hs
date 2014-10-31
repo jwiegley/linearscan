@@ -95,19 +95,30 @@ nextUseAfter d pos =
     (findIntervalUsePos d (\u ->
       (Prelude.<=) (Prelude.succ pos) (Range.uloc u)))
 
+firstUsePos :: IntervalDesc -> Prelude.Int
+firstUsePos d =
+  Range.uloc
+    (NonEmpty0.coq_NE_head (Range.ups ( (NonEmpty0.coq_NE_head (rds d)))))
+
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
   Lib.option_map ((Prelude..) Range.uloc (Prelude.snd))
     (findIntervalUsePos d Range.regReq)
 
+lastUsePos :: IntervalDesc -> Prelude.Int
+lastUsePos d =
+  Range.uloc
+    (NonEmpty0.coq_NE_last (Range.ups ( (NonEmpty0.coq_NE_last (rds d)))))
+
 type IntervalSig = IntervalDesc
 
 splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Int
 splitPosition d before =
-  Lib.fromMaybe
-    (Range.uloc
-      (NonEmpty0.coq_NE_last (Range.ups ( (NonEmpty0.coq_NE_last (rds d))))))
-    (Lib.option_choose before (firstUseReqReg d))
+  let {initial = firstUsePos d} in
+  let {final = lastUsePos d} in
+  (Prelude.max) (Prelude.succ initial)
+    ((Prelude.min) final
+      (Lib.fromMaybe final (Lib.option_choose before (firstUseReqReg d))))
 
 intervalSpan :: (NonEmpty0.NonEmpty Range.RangeSig) -> Prelude.Int ->
                 Prelude.Int -> Prelude.Int ->
@@ -259,38 +270,31 @@ intervalSpan rs before ib ie =
                                                               (NonEmpty0.coq_NE_last
                                                                 rds0))) __)}
                                          in
-                                         Logic.eq_rec_r
-                                           (iend (getIntervalDesc ( i1_2)))
+                                         Logic.eq_rec_r (iend ( i1_2))
                                            _evar_0_0
                                            (Range.rend
-                                             (Range.getRangeDesc
-                                               ( (NonEmpty0.coq_NE_last rs0))))}
+                                             ( (NonEmpty0.coq_NE_last rs0)))}
                                        in
                                        Logic.eq_rec_r
                                          (Range.rbeg
-                                           (Range.getRangeDesc
-                                             ( (NonEmpty0.coq_NE_head rds0))))
+                                           ( (NonEmpty0.coq_NE_head rds0)))
                                          _evar_0_0
                                          (Range.rbeg
                                            ( (NonEmpty0.coq_NE_head rs0))) __}
                                      in
                                      Logic.eq_rec_r
                                        (Range.rbeg
-                                         (Range.getRangeDesc
-                                           ( (NonEmpty0.coq_NE_head rds0))))
+                                         ( (NonEmpty0.coq_NE_head rds0)))
                                        _evar_0_0 ibeg0 __}
                                    in
                                    Logic.eq_rec_r
                                      (Range.rend
-                                       (Range.getRangeDesc
-                                         ( (NonEmpty0.coq_NE_last rds0))))
+                                       ( (NonEmpty0.coq_NE_last rds0)))
                                      _evar_0_0 iend0}
                       in
                       Logic.eq_rec_r
-                        (Range.rbeg
-                          (Range.getRangeDesc
-                            ( (NonEmpty0.coq_NE_head rds0)))) _evar_0_0 ibeg0
-                        __ __}}
+                        (Range.rbeg ( (NonEmpty0.coq_NE_head rds0)))
+                        _evar_0_0 ibeg0 __ __}}
                   in
                   let {
                    _evar_0_1 = \_ ->

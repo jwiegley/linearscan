@@ -127,7 +127,7 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
     let x := consr (V.nth rest' (to_vfin v)) in
     V.replace (boundedTransport (ltnSSn _) rest') (to_vfin v) x
   (* jww (2014-10-18): See note above. *)
-  (* | V.cons (inr r) _ vs => undefined *)
+  (* | V.cons (inr r) _ vs => ?? *)
   end.
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=

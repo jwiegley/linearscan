@@ -107,6 +107,42 @@ Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
 Program Instance SSMorphStHasLen_HasWork : HasWork SSMorphStHasLen.
 Obligation 1. destruct H. auto. Defined.
 
+Record SSMorphSplit (sd1 sd2 : ScanStateDesc) : Prop := {
+    split_is_SSMorph       :> SSMorph sd1 sd2;
+    split_is_SSMorphLen    :> SSMorphLen sd1 sd2;
+    split_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2;
+
+    next_unhandled_splittable :
+      Interval_splittable (getInterval
+        (fst (safe_hd (first_nonempty split_is_SSMorphHasLen))))
+}.
+
+(* Definition newSSMorphSplit (sd : ScanStateDesc) *)
+(*   (H : size (unhandled sd) > 0) : SSMorphSplit sd sd. *)
+(* Proof. repeat (constructor; auto). Defined. *)
+
+Class IsSplittable (P : relation ScanStateDesc) := {
+    ssMorphSplittable : forall sd1 sd2, P sd1 sd2 -> SSMorphSplit sd1 sd2
+}.
+
+(* Program Instance SSMorphSplit_HasWork : HasWork SSMorphSplit | 10. *)
+(* Obligation 1. destruct H. auto. Defined. *)
+Program Instance SSMorphSplit_IsSplittable : IsSplittable SSMorphSplit.
+
+Record SSMorphStSplit (sd1 sd2 : ScanStateDesc) : Prop := {
+    stsplit_is_SSMorph         :> SSMorph sd1 sd2;
+    stsplit_is_SSMorphLen      :> SSMorphLen sd1 sd2;
+    stsplit_is_SSMorphSt       :> SSMorphSt sd1 sd2;
+    stsplit_is_SSMorphHasLen   :> SSMorphHasLen sd1 sd2;
+    stsplit_is_SSMorphStHasLen :> SSMorphStHasLen sd1 sd2;
+    stsplit_is_SSMorphSplit    :> SSMorphSplit sd1 sd2
+}.
+
+(* Program Instance SSMorphStSplit_HasWork : HasWork SSMorphStSplit | 10. *)
+(* Obligation 1. destruct H. auto. Defined. *)
+Program Instance SSMorphStSplit_IsSplittable : IsSplittable SSMorphStSplit.
+Obligation 1. destruct H. auto. Defined.
+
 Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
     thisDesc  : ScanStateDesc;
     thisHolds : P startDesc thisDesc;
@@ -223,6 +259,41 @@ Proof.
   assumption.
 Defined.
 
+Lemma unhandledExtent_cons :
+  forall ni i (unh : list (fin ni * nat)) ints fixints
+    act act' inact inact' hnd hnd',
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := unh
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; intervals        := ints
+     ; fixedIntervals   := fixints
+     |} <
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := i :: unh
+     ; active           := act'
+     ; inactive         := inact'
+     ; handled          := hnd'
+     ; intervals        := ints
+     ; fixedIntervals   := fixints
+     |}.
+Proof.
+  intros.
+  induction unh;
+  unfold unhandledExtent;
+  simpl; destruct i as [i beg];
+  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2);
+    first by auto.
+  destruct unh;
+  simpl; destruct a as [a ?];
+  first by (rewrite add0n; exact: ltn_plus).
+  apply fold_fold_lt; rewrite 2!add0n -addnA.
+  exact: ltn_plus.
+Qed.
+
 Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P SSMorphSt unit.
 Proof.
@@ -241,9 +312,8 @@ Proof.
   eapply {| thisState := s |}.
   Grab Existential Variables.
   pose (unhandledExtent_cons (i, n) unhandled0 intervals0
-         (V.replace assignments0 (to_vfin i) (Some reg)) assignments0
          fixedIntervals0
-         (i :: active0) active0 inactive0 inactive0 handled0 handled0)
+         ((i, reg) :: active0) active0 inactive0 inactive0 handled0 handled0)
       as ue_cons.
   rapply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
@@ -251,8 +321,7 @@ Proof.
   exact: (leq_trans ue_cons).
 Defined.
 
-Definition moveActiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H: x \in active sd) :
+Definition moveActiveToHandled `(st : ScanState sd) `(H: x \in active sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
@@ -261,8 +330,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
-Definition moveActiveToInactive `(st : ScanState sd) (x : IntervalId sd)
-  (H: x \in active sd) :
+Definition moveActiveToInactive `(st : ScanState sd) `(H: x \in active sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
@@ -271,8 +339,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
-Definition moveInactiveToActive `(st : ScanState sd) (x : IntervalId sd)
-  (H : x \in inactive sd) :
+Definition moveInactiveToActive `(st : ScanState sd) `(H : x \in inactive sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToActive st H).
@@ -281,8 +348,7 @@ Proof.
   rapply Build_SSMorph; auto.
 Defined.
 
-Definition moveInactiveToHandled `(st : ScanState sd) (x : IntervalId sd)
-  (H : x \in inactive sd) :
+Definition moveInactiveToHandled `(st : ScanState sd) `(H : x \in inactive sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
@@ -290,6 +356,44 @@ Proof.
   rapply Build_SSMorphLen; auto.
   rapply Build_SSMorph; auto.
 Defined.
+
+Lemma unhandledExtent_split :
+  forall ni (i : fin ni) i0 i1 b n (unh : list (fin ni * nat)) ints fixints
+    act inact hnd,
+  unhandledExtent
+    {| nextInterval   := ni.+1
+     ; intervals      :=
+         V.replace (V.shiftin i1 ints)
+                   (Fin.of_nat_lt (ltP (widen_ord_proof i (leqnSn ni)))) i0
+     ; fixedIntervals := fixints
+     ; unhandled      :=
+         insert (λ m : 'I_ni.+1 * nat, lebf snd m (ord_max, b))
+                (ord_max, b)
+                (widen_fst (i, n) :: [seq widen_fst i | i <- unh])
+     ; active         := [seq widen_fst i | i <- act]
+     ; inactive       := [seq widen_fst i | i <- inact]
+     ; handled        := [seq widen_fst i | i <- hnd]
+     |} <
+  unhandledExtent
+    {| nextInterval   := ni
+     ; intervals      := ints
+     ; fixedIntervals := fixints
+     ; unhandled      := (i, n) :: unh
+     ; active         := act
+     ; inactive       := inact
+     ; handled        := hnd
+    |}.
+Proof.
+  intros.
+  induction unh;
+  unfold unhandledExtent; simpl;
+  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
+    admit.
+  destruct unh;
+  simpl; destruct a as [a ?].
+    admit.
+  admit.
+Qed.
 
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
   (before : option nat) : SState pre P SSMorphStHasLen unit.
@@ -299,26 +403,53 @@ Proof.
   destruct W.
   destruct X.
   specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
+  (* specialize (ssMorphSplittable0 pre thisDesc0 thisHolds0). *)
   destruct thisDesc0.
+  (* destruct ssMorphSplittable0. *)
+  (* destruct split_is_SSMorphHasLen0. *)
   destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   destruct haslen_is_SSMorph0.
   destruct unhandled0; simpl in *.
     by specialize (unhandled_nonempty0 first_nonempty0).
   destruct p.
-  have int := (V.nth intervals0 (to_vfin i)).2.
-  pose (@ScanState_splitCurrentInterval (splitPosition int before)
-                                        _ _ _ _ _ _ _ _ _ _ thisState0).
-  eapply {| thisState := s _ |}.
+
+  set int := (V.nth intervals0 (to_vfin i)).
+  have H0  : (1 < NE_length (rds int.1))
+          || (1 < NE_length (ups (NE_head (rds int.1)).1)).
+    apply/orP.
+    admit.
+  have Hlt := Interval_rds_size_bounded H0.
+
+  move: (@splitPosition _ int.2 before (Hlt int.2)) => [pos Hpos].
+  pose (@ScanState_splitCurrentInterval pos _ _ _ _ _ _ _ _ _ thisState0).
+  eapply {| thisState := s Hpos |}.
+
   Grab Existential Variables.
-  - admit.
-  - try rapply Build_SSMorphStHasLen;
-    try rapply Build_SSMorphHasLen;
-    try rapply Build_SSMorphLen;
-    try rapply Build_SSMorphSt;
-    try rapply Build_SSMorph;
-    rewrite ?size_insert ?size_map /unhandled;
-    auto; admit.
+
+  move: (s Hpos) => {s}.
+  rewrite /=.
+  move: (splitInterval_spec Hpos).
+  case: (splitInterval Hpos)
+    => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hint s.
+  simpl in *; subst. clear H3 H4.
+
+  pose (unhandledExtent_split i (exist _ id0 i0) (exist _ id1 i1)
+         (ibeg id1) n unhandled0 intervals0 fixedIntervals0
+         active0 inactive0 handled0)
+      as ue_split.
+
+  have ?: (unhandledExtent (getScanStateDesc s) < unhandledExtent pre)
+    by apply (ltn_leq_trans ue_split total_extent_decreases0).
+
+  rapply Build_SSMorphStHasLen;
+  try rapply Build_SSMorphHasLen;
+  try rapply Build_SSMorphLen;
+  try rapply Build_SSMorphSt;
+  try rapply Build_SSMorph;
+  move=> *;
+  rewrite ?size_insert ?size_map /unhandled //=;
+  try by apply/ltnW.
 Defined.
 
 End MSSMorph.
