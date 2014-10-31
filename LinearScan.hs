@@ -7,10 +7,10 @@ module LinearScan
     , IntervalId
     , handledIntervalIds
     , PhysReg
-    , registerAssignment
     ) where
 
 import           Control.Applicative
+import           Control.Arrow (second)
 import qualified Data.List.NonEmpty as NE
 import           Data.Maybe
 import           LinearScan.Fintype
@@ -55,11 +55,6 @@ allocateRegisters maxVirtReg blockInfo blocks =
                      -- (fmap getPhysReg)
                      refs))
 
-handledIntervalIds :: ScanState -> [IntervalId]
-handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ hnd)) = hnd
-
--- registerAssignment :: ScanState -> IntervalId -> Maybe PhysReg
--- registerAssignment (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ f _)) n =
---     -- jww (2014-10-01): Allow the Haskell caller to specific the maximum
---     -- number of registers.
---     PhysReg <$> _V__nth _LinearScan__maxReg f (to_vfin ni n)
+handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
+handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ hnd)) =
+  map (second PhysReg) hnd
