@@ -1,4 +1,5 @@
 Require Import Coq.Classes.RelationClasses.
+Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Sorted.
 Require Import Coq.Relations.Relations.
 
@@ -31,14 +32,7 @@ Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
     | NE_Cons x xs => cons x (NE_to_list xs)
   end.
 
-Definition destruct_NonEmpty {a} (l : NonEmpty a) :
-  ({x : a & {tl : NonEmpty a | l = NE_Cons x tl}} +
-     {x : a | l = NE_Sing x})%type.
-Proof.
-  destruct l.
-    right. exists a0. reflexivity.
-  left. exists a0. exists l. reflexivity.
-Defined.
+Coercion NE_to_list : NonEmpty >-> list.
 
 Definition NE_head {a} (ne : NonEmpty a) : a :=
   match ne with
@@ -66,32 +60,14 @@ Lemma NE_map_last_spec : forall {a b : Type} (f : a -> b) (xs : NonEmpty a),
   NE_last (NE_map f xs) = f (NE_last xs).
 Proof. induction xs; auto. Qed.
 
-Fixpoint NE_fold_left {a b : Type} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
-  match ne with
-    | NE_Sing x => f z x
-    | NE_Cons x xs => NE_fold_left f xs (f z x)
-  end.
+Definition NE_fold_left {a b : Type} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
+  fold_left f ne z.
 
 Fixpoint NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a :=
   match l1 with
     | NE_Sing x => NE_Cons x l2
     | NE_Cons x xs => NE_Cons x (NE_append xs l2)
   end.
-
-Lemma NE_append_spec : forall {a : Type} {x} {xs ys : NonEmpty a},
-  NE_Sing x = NE_append xs ys -> False.
-Proof. intros. induction xs; destruct ys; simpl in *; inversion H. Qed.
-
-Lemma NE_append_sing : forall {a : Type} {x} {l1 l2 : NonEmpty a},
-  NE_Sing x = NE_append l1 l2 -> False.
-Proof. intros. induction l1; simpl in H; inversion H. Qed.
-
-Lemma NE_map_append_spec : forall {a b : Type} (f : a -> b) {xs ys : NonEmpty a},
-  NE_map f (NE_append xs ys) = NE_append (NE_map f xs) (NE_map f ys).
-Proof.
-  induction xs; intros; simpl; auto.
-  f_equal. apply IHxs.
-Qed.
 
 Lemma NE_head_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_head (NE_append xs ys) = NE_head xs.
@@ -190,47 +166,6 @@ Proof.
 Qed.
 
 End Reverse_Induction.
-
-Fixpoint NE_span {a : Type} (f : a -> bool) (l : NonEmpty a) :
-  (option (NonEmpty a) * option (NonEmpty a)) :=
-  let maybeAppend (x : a) (xs : option (NonEmpty a)) :=
-      match xs with
-        | Some xs' => Some (NE_Cons x xs')
-        | None     => Some (NE_Sing x)
-      end in
-  match l with
-    | NE_Sing x =>
-        if f x
-        then (Some l, None)
-        else (None, Some l)
-    | NE_Cons x xs =>
-        let (xl, xr) := NE_span f xs in
-        if f x
-        then (maybeAppend x xl, xr)
-        else (xl, maybeAppend x xr)
-  end.
-
-Lemma NE_span_spec : forall a (l : NonEmpty a),
-  let (xs,ys) := NE_span (fun _ => true) l in
-  match xs with
-    | Some xs' => match ys with
-        | Some ys' => l = NE_append xs' ys'
-        | None => l = xs'
-      end
-    | None => match ys with
-        | Some ys' => l = ys'
-        | None => False
-      end
-  end.
-Proof.
-  intros.
-  induction l; simpl in *.
-    reflexivity.
-  destruct (NE_span _ l);
-  destruct o; destruct o0; simpl;
-  try (f_equal; apply IHl).
-  contradiction.
-Qed.
 
 Section Sorted.
 

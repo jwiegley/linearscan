@@ -3,6 +3,8 @@ module LinearScan.NonEmpty0 where
 import qualified Prelude
 import qualified Data.List
 import qualified LinearScan.Utils
+import qualified LinearScan.List0 as List0
+
 
 data NonEmpty a =
    NE_Sing a
@@ -28,9 +30,7 @@ coq_NE_last ne =
 
 coq_NE_fold_left :: (a1 -> a2 -> a1) -> (NonEmpty a2) -> a1 -> a1
 coq_NE_fold_left f ne z =
-  case ne of {
-   NE_Sing x -> f z x;
-   NE_Cons x xs -> coq_NE_fold_left f xs (f z x)}
+  List0.fold_left f (coq_NE_to_list ne) z
 
 coq_NE_append :: (NonEmpty a1) -> (NonEmpty a1) -> NonEmpty a1
 coq_NE_append l1 l2 =

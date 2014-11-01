@@ -636,8 +636,9 @@ _LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
                                             LinearScan__PhysReg ->
                                             LinearScan__SState
                                             (Prelude.Maybe Prelude.Int)
-_LinearScan__intersectsWithFixedInterval =
-  Prelude.error "AXIOM TO BE REALIZED"
+_LinearScan__intersectsWithFixedInterval pre reg =
+  (Prelude.$) (_LinearScan__withCursor pre) (\sd _ ->
+    _LinearScan__return_ Prelude.Nothing)
 
 _LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
                                          LinearScan__SState ()
