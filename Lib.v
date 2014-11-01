@@ -303,6 +303,41 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma map_f_notin :
+  forall (T1 T2 : eqType) (f : T1 -> T2) (s : seq T1) (x : T1),
+  injective f -> x \notin s -> f x \notin [seq f i | i <- s].
+Proof.
+  move=> T1 T2 f.
+  elim=> // x xs IHxs x0 Hinj.
+  rewrite in_cons negb_orb => /andP [H1 H2].
+  rewrite map_cons in_cons negb_orb.
+  apply/andP; split.
+    by rewrite inj_eq.
+  exact: IHxs.
+Qed.
+
+Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
+  perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).
+Proof.
+  move=> s1 s2.
+  apply/perm_eqlP.
+  rewrite perm_eq_sym perm_catC cat_cons perm_cons perm_catC.
+  exact: perm_eq_refl.
+Qed.
+
+Lemma perm_rem_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
+  x \in s1 -> perm_eql (rem x s1 ++ x :: s2) (s1 ++ s2).
+Proof.
+  move=> s1 s2 Hin.
+  apply/perm_eqlP.
+  rewrite perm_catC cat_cons perm_cat_cons perm_catC perm_cat2r perm_eq_sym.
+  exact: perm_to_rem.
+Qed.
+
+Lemma proj_rem_uniq (a b : eqType) (f : a -> b) : forall x xs,
+  uniq [seq f i | i <- xs] -> uniq [seq f i | i <- rem x xs].
+Proof. by move=> x xs; apply/subseq_uniq/map_subseq/rem_subseq. Qed.
+
 Lemma lift_bounded : forall n (x : fin n), ord_max != widen_ord (leqnSn n) x.
 Proof.
   move=> n.
@@ -375,12 +410,29 @@ Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
 
 Arguments insert {a} p z l : simpl never.
 
+Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq_predType T),
+  perm_eql (x :: y :: xs) (y :: x :: xs).
+Proof.
+  move=> xs; apply/perm_eqlP.
+  rewrite -cat1s perm_catC cat_cons perm_cons perm_catC cat1s.
+  exact: perm_eq_refl.
+Qed.
+
+Lemma insert_perm (T : eqType) P (x : T) : forall (xs : seq_predType T),
+  perm_eql (insert (P ^~ x) x xs) (x :: xs).
+Proof.
+  elim=> //= [y ys IHys]; rewrite /insert.
+  case: (P y x) => //=; apply/perm_eqlP.
+  rewrite perm_eq_sym perm_cons_swap perm_cons perm_eq_sym -/insert.
+  exact/perm_eqlP/IHys.
+Qed.
+
 Lemma size_insert : forall (a : eqType) P (x : a) xs,
   size (insert (P ^~ x) x xs) = (size xs).+1.
 Proof.
-  move=> a P x; elim=> //= [y ys IHys].
-  rewrite /insert.
-  case: (P y x) => /=; [ by rewrite IHys | by [] ].
+  move=> a P x xs.
+  rewrite (@perm_eq_size _ _ (x :: xs)) => //.
+  exact/perm_eqlP/insert_perm.
 Qed.
 
 Section Mergesort.
