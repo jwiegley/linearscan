@@ -1,0 +1,367 @@
+Require Import Coq.Classes.RelationClasses.
+Require Export Coq.Logic.ProofIrrelevance.
+Require Import Coq.Program.Wf.
+Require Import Coq.Relations.Relations.
+Require Import Coq.Sorting.Sorted.
+
+Require Export Ssreflect.ssreflect.
+Require Export Ssreflect.ssrfun.
+Require Export Ssreflect.ssrbool.
+Require Export Ssreflect.eqtype.
+Require Export Ssreflect.seq.
+Require Export Ssreflect.ssrnat.
+
+Generalizable All Variables.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+(** ** NonEmpty lists *)
+
+Inductive NonEmpty (a : Type) := NE s of @size a s > 0.
+
+Hint Constructors NonEmpty.
+
+Arguments NE [a] s H.
+
+Definition ne_list {a} (ne : NonEmpty a) : seq a :=
+  let: NE x _ := ne in x.
+
+Coercion ne_list : NonEmpty >-> seq.
+
+Definition ne_pred_sort {a : Type} (pT : predType (NonEmpty a)) := pred_sort pT.
+Identity Coercion pred_sort_of_ne : ne_pred_sort >-> pred_sort.
+
+Definition NE_ev {a : Type} (ne : NonEmpty a) : size ne > 0 :=
+  let: NE _ ev := ne in ev.
+
+Notation "[ ::: x1 ]" := (@NE _ [:: x1] (ltn0Sn 0))
+  (at level 0, format "[ :::  x1 ]") : seq_scope.
+
+Notation "[ ::: x & s ]" := (@NE _ (x :: s) (ltn0Sn (size s)))
+  (at level 0, only parsing) : seq_scope.
+
+Notation "[ ::: x1 , x2 , .. , xn & s ]" := (x1 :: x2 :: .. (xn :: s) ..)
+  (at level 0, format
+  "'[hv' [ ::: '['  x1 , '/'  x2 , '/'  .. , '/'  xn ']' '/ '  &  s ] ']'"
+  ) : seq_scope.
+
+Notation "[ ::: x1 ; x2 ; .. ; xn ]" := (x1 :: x2 :: .. [:: xn] ..)
+  (at level 0, format "[ ::: '['  x1 ; '/'  x2 ; '/'  .. ; '/'  xn ']' ]"
+  ) : seq_scope.
+
+Definition ne_ind : forall (A : Type) P,
+  (forall a : A, P [::: a])
+    -> (forall (a : A) (l : NonEmpty A), P l -> P [::: a & l])
+    -> forall l : NonEmpty A, P l.
+Proof.
+  move=> A P H1 H2.
+  case. elim=> [//|x xs IHx] H.
+  case: xs => [|y ys] in IHx H *.
+    have irr: ltn0Sn 0 = H by exact: proof_irrelevance.
+    rewrite -irr.
+    exact: H1.
+  have irr: ltn0Sn (size (y :: ys)) = H by exact: proof_irrelevance.
+  rewrite -irr.
+  eapply (H2 x (@NE _ (y :: ys) _)).
+  apply IHx.
+
+  Grab Existential Variables.
+  by [].
+Defined.
+
+Definition NE_length {a} : NonEmpty a -> nat := size.
+
+Lemma NE_length_spec {a} : forall ne : NonEmpty a, NE_length ne > 0.
+Proof. by case. Qed.
+
+Definition NE_head {a}: NonEmpty a -> a.
+Proof. case. case=> //. Defined.
+
+Program Fixpoint NE_last {a} (ne : NonEmpty a) {measure (size ne)} : a :=
+  let: NE s _ := ne in
+  match s with
+  | x :: xs =>
+    if xs is y :: ys
+    then NE_last (@NE a xs (ltn0Sn (size xs)))
+    else x
+  | nil => _
+  end.
+
+Definition NE_map {a b : Type} (f : a -> b) : NonEmpty a -> NonEmpty b.
+Proof.
+  case=> s H.
+  set s' := map f s.
+  have: 0 < size s' by rewrite size_map.
+  exact: (@NE b s').
+Defined.
+
+Definition NE_fold_left {a b : Type} := @foldl.
+
+Definition NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a.
+Proof.
+  case: l1 => s1 H1.
+  case: l2 => s2 H2.
+  have: 0 < size (s1 ++ s2).
+    rewrite size_cat.
+    exact: ltn_addr.
+  exact: (@NE a (s1 ++ s2)).
+Defined.
+
+Lemma size_combine : forall a (xs ys : seq a),
+  size xs > 0 -> size ys > 0 -> size (xs ++ ys) > 0.
+Proof. move=> a. case=> //. Defined.
+
+Lemma ne_append : forall (a : Type) (xs ys : NonEmpty a),
+  forall (Hx : size xs > 0) (Hy : size ys > 0),
+    NE_append xs ys = @NE a (xs ++ ys) (size_combine Hx Hy).
+Admitted.
+
+Lemma NE_head_append_spec : forall {a : Type} {xs ys : NonEmpty a},
+  NE_head (NE_append xs ys) = NE_head xs.
+Proof. move=> a; elim/ne_ind=> [x|x xs IHxs] ys; by case ys. Qed.
+
+Program Fixpoint ne_rcons {a : Type} (s : NonEmpty a) z {measure (size s)} :=
+  if s is (NE (x :: s') ev)
+  then if s' is y :: ys
+       then [::: x & ne_rcons (@NE a (y :: ys) (ltn0Sn (size ys))) z]
+       else [::: x & [:: z]]
+  else [::: z].
+
+Lemma cat_ne_rcons a x (s1 s2 : NonEmpty a) :
+  NE_append (ne_rcons s1 x) s2 = NE_append s1 [::: x & s2].
+Admitted.
+
+Lemma ne_last_ind : forall (a : Type) P,
+  (forall x, P [::: x])
+    -> (forall (s : NonEmpty a) x, P s -> P (ne_rcons s x))
+    -> forall s : NonEmpty a, P s.
+Proof.
+  move=> a P Hnil Hlast.
+  elim/ne_ind=> //= [x xs IHxs].
+  specialize (Hlast xs x IHxs).
+  have: ne_rcons xs x = NE (x :: xs) (ltn0Sn (size xs)).
+    case: xs Hlast IHxs.
+    elim=> // [y ys /= IHys] H Hlast IHxs /=.
+Admitted.
+
+Lemma NE_last_append_spec : forall {a : Type} {xs ys : NonEmpty a},
+  NE_last (NE_append xs ys) = NE_last ys.
+Admitted.
+
+Definition NE_reverse {a} : NonEmpty a -> NonEmpty a.
+Proof.
+  case=> s H.
+  have: 0 < size (rev s) by rewrite size_rev.
+  exact: (@NE a (rev s)).
+Defined.
+
+Lemma NE_append_assoc : forall {a : Type} (x y z : NonEmpty a),
+  NE_append x (NE_append y z) = NE_append (NE_append x y) z.
+Proof.
+  move=> a [xs Hx] [ys Hy] [zs Hz].
+  rewrite !ne_append /=.
+    admit.
+    admit.
+  move=> H1 H2 /=.
+Admitted.
+
+Lemma NE_distr_reverse : forall {a : Type} (x y : NonEmpty a),
+  NE_reverse (NE_append x y) = NE_append (NE_reverse y) (NE_reverse x).
+Admitted.
+
+Lemma NE_reverse_involutive : forall {a} (l : NonEmpty a),
+  NE_reverse (NE_reverse l) = l.
+Admitted.
+
+Lemma NE_length_plus_1 : forall {a : Type} x (xs : NonEmpty a),
+  NE_length (NE_append xs [::: x]) = S (NE_length xs).
+Admitted.
+
+Lemma NE_length_1_plus : forall {a : Type} x (xs : NonEmpty a),
+  NE_length (NE_append [::: x] xs) = S (NE_length xs).
+Admitted.
+
+Lemma NE_reverse_length : forall {a : Type} (l : NonEmpty a),
+  NE_length (NE_reverse l) = NE_length l.
+Proof.
+  induction l; auto. simpl.
+Admitted.
+
+Section Reverse_Induction.
+
+Variable A : Type.
+
+Unset Implicit Arguments.
+
+Lemma NE_reverse_list_ind : forall P : NonEmpty A -> Prop,
+  (forall (a : A), P (NE_reverse [::: a]))
+    -> (forall (a : A) (l : NonEmpty A), P (NE_reverse l)
+          -> P (NE_reverse [::: a & l]))
+    -> forall l : NonEmpty A, P (NE_reverse l).
+Proof.
+  induction l; auto.
+Admitted.
+
+Set Implicit Arguments.
+
+Theorem NE_reverse_ind : forall P : NonEmpty A -> Prop,
+  (forall (x : A), P [::: x])
+    -> (forall (x : A) (l : NonEmpty A), P l -> P (NE_append l [::: x]))
+    -> forall l : NonEmpty A, P l.
+Proof.
+  intros.
+  generalize (NE_reverse_involutive l).
+  intros E; rewrite <- E.
+  apply (NE_reverse_list_ind P).
+  auto.
+
+  simpl in |- *.
+  intros.
+Admitted.
+(*   apply (H0 a (NE_reverse l0)). *)
+(*   auto. *)
+(* Qed. *)
+
+End Reverse_Induction.
+
+Section Sorted.
+
+Variable A : eqType.
+Variable R : A -> A -> bool.
+Context `{H : Transitive A R}.
+
+Definition NE_Forall (P : A -> bool) : NonEmpty A -> bool := all P.
+
+Arguments NE_Forall P _ /.
+
+Definition NE_all_true  (f : A -> bool) := NE_Forall f.
+Definition NE_all_false (f : A -> bool) := NE_Forall (predC f).
+
+Lemma NE_Forall_inv : forall P (a : A) l, NE_Forall P [::: a & l] -> P a.
+Proof.
+  move=> P a.
+  elim=> [/andP [_ _]|x xs IHxs] //= => /and3P [H1 H2 H3].
+  apply IHxs=> /=.
+  by apply/andP.
+Qed.
+
+Lemma NE_Forall_rect : forall (P : A -> bool) Q,
+  (forall b, P b -> Q [::: b])
+    -> (forall b l, P b -> Q [::: b & l]) -> forall l, NE_Forall P l -> Q l.
+Admitted.
+
+Lemma NE_Forall_impl : forall (P Q : A -> bool), (forall a, P a -> Q a) ->
+  forall l, NE_Forall P l -> NE_Forall Q l.
+Admitted.
+
+Lemma NE_Forall_head : forall P (xs : NonEmpty A),
+  NE_Forall P xs -> P (NE_head xs).
+Admitted.
+
+Lemma NE_Forall_last : forall P (xs : NonEmpty A),
+  NE_Forall P xs -> P (NE_last xs).
+Admitted.
+
+Lemma NE_Forall_append : forall (P : A -> bool) xs ys,
+   NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys).
+Admitted.
+
+Section Membership.
+
+Hypothesis eq_dec : forall x y : A, {x = y} + {x <> y}.
+
+Definition NE_member (z : A) (ne : NonEmpty A) : bool := z \in ne_list ne.
+
+Lemma NE_member_head (ne : NonEmpty A) : NE_member (NE_head ne) ne.
+Admitted.
+
+Lemma NE_member_append_fst (z : A) (xs ys : NonEmpty A) :
+  NE_member z xs -> NE_member z (NE_append xs ys).
+Admitted.
+
+Lemma NE_member_append_snd (z : A) (xs ys : NonEmpty A) :
+  NE_member z ys -> NE_member z (NE_append xs ys).
+Admitted.
+
+Lemma NE_Forall_member_spec (z : A) (ne : NonEmpty A) :
+  forall f, NE_Forall f ne -> NE_member z ne -> f z.
+Admitted.
+
+End Membership.
+
+Inductive NE_StronglySorted : NonEmpty A -> Prop :=
+  | NE_SSorted_sing a   : NE_StronglySorted [::: a]
+  | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
+                            -> NE_StronglySorted [::: a & l].
+
+Lemma NE_StronglySorted_inv : forall a (l : NonEmpty A),
+  NE_StronglySorted [::: a & l]
+    -> NE_StronglySorted l /\ NE_Forall (R a) l.
+Admitted.
+
+Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
+  NE_StronglySorted (NE_append l1 l2)
+    -> NE_StronglySorted l1 /\ NE_StronglySorted l2.
+Admitted.
+
+Lemma NE_StronglySorted_rect :
+  forall P : NonEmpty A -> Type,
+    (forall a, P [::: a]) ->
+    (forall a l, NE_StronglySorted l -> P l -> NE_Forall (R a) l
+                   -> P [::: a & l]) ->
+    forall l, NE_StronglySorted l -> P l.
+Admitted.
+
+Lemma NE_StronglySorted_rec :
+  forall P : NonEmpty A -> Type,
+    (forall a, P [::: a]) ->
+    (forall a l, NE_StronglySorted l -> P l -> NE_Forall (R a) l
+                   -> P [::: a & l]) ->
+   forall l, NE_StronglySorted l -> P l.
+Proof.
+  firstorder using NE_StronglySorted_rect.
+Qed.
+
+Lemma NE_StronglySorted_Sorted : forall l,
+  NE_StronglySorted l -> Sorted R l.
+Proof.
+  induction 1 as [|? ? ? ? HForall]; constructor; trivial.
+Admitted.
+
+Lemma NE_StronglySorted_cons : forall x (xs : NonEmpty A),
+  R x (NE_head xs) -> NE_StronglySorted xs -> NE_StronglySorted [::: x & xs].
+Admitted.
+
+Lemma NE_StronglySorted_cons_middle : forall x (xs ys : NonEmpty A),
+  NE_StronglySorted (NE_append xs [::: x & ys])
+    -> NE_StronglySorted (NE_append xs ys).
+Admitted.
+
+Lemma NE_Forall_Sorted : forall x xs ys,
+  R (NE_last xs) (NE_head ys)
+    -> NE_Forall (R x) xs
+    -> NE_StronglySorted (NE_append xs ys)
+    -> NE_Forall (R x) ys.
+Admitted.
+
+Fixpoint NE_StronglySorted_append {xs ys : NonEmpty A} :
+  R (NE_last xs) (NE_head ys)
+    -> NE_StronglySorted xs
+    -> NE_StronglySorted ys
+    -> NE_StronglySorted (NE_append xs ys).
+Admitted.
+
+Lemma NE_StronglySorted_impl `{Reflexive _ R} : forall xs,
+  NE_StronglySorted xs -> R (NE_head xs) (NE_last xs).
+Admitted.
+
+Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A),
+  NE_StronglySorted (NE_append l1 l2)
+    -> R (NE_last l1) (NE_head l2).
+Admitted.
+
+End Sorted.
+
+Arguments NE_all_true  [A] f _.
+Arguments NE_all_false [A] f _.

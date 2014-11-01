@@ -22,6 +22,36 @@ Record UsePos : Set := {
     regReq : bool
 }.
 
+Section EqUpos.
+
+Variables (T : eqType) (x0 : T).
+Implicit Type s : UsePos.
+
+Fixpoint equpos s1 s2 {struct s2} :=
+  match s1, s2 with
+  | {| uloc := u1; regReq := rr1 |},
+    {| uloc := u2; regReq := rr2 |} => (u1 == u2) && (rr1 == rr2)
+  end.
+
+Lemma equposP : Equality.axiom equpos.
+Proof.
+  move.
+  case=> [u1 rr1].
+  case=> [u2 rr2] /=.
+  case: (u1 =P u2) => [<-|neqx]; last by right; case.
+  case: (rr1 =P rr2) => [<-|neqx]; last by right; case.
+  by constructor.
+Qed.
+
+Canonical upos_eqMixin := EqMixin equposP.
+Canonical upos_eqType := Eval hnf in EqType UsePos upos_eqMixin.
+
+Lemma equposE : equpos = eq_op. Proof. by []. Qed.
+
+Definition UsePos_eqType (A : eqType) := Equality.Pack upos_eqMixin UsePos.
+
+End EqUpos.
+
 Coercion uloc : UsePos >-> nat.
 
 Module UsePosNotations.
