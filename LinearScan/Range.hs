@@ -6,6 +6,7 @@ import qualified LinearScan.Utils
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
+import qualified LinearScan.Specif as Specif
 
 
 __ :: any
@@ -99,18 +100,16 @@ rangeIntersectionPoint x y =
 findRangeUsePos :: RangeDesc -> (UsePos -> Prelude.Bool) -> Prelude.Maybe
                    UsePos
 findRangeUsePos r f =
-  let {
-   check = \u ->
-    case f u of {
+  let {n = ups r} in
+  NonEmpty0.coq_NonEmpty_rec (\u ->
+    let {b = f u} in
+    case b of {
      Prelude.True -> Prelude.Just u;
-     Prelude.False -> Prelude.Nothing}}
-  in
-  let {
-   go us =
-     case us of {
-      NonEmpty0.NE_Sing u -> check u;
-      NonEmpty0.NE_Cons u us' -> Lib.option_choose (check u) (go us')}}
-  in go (ups r)
+     Prelude.False -> Prelude.Nothing}) (\u us iHus ->
+    let {b = f u} in
+    case b of {
+     Prelude.True -> Prelude.Just u;
+     Prelude.False -> iHus}) n
 
 makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc ->
                     (NonEmpty0.NonEmpty UsePos) -> (NonEmpty0.NonEmpty
@@ -138,4 +137,19 @@ rangeSpan f rd =
       case o0 of {
        Prelude.Just n -> (,) Prelude.Nothing (Prelude.Just rd);
        Prelude.Nothing -> Lib.ex_falso_quodlibet}}}
+
+type DefiniteSubRangesOf = ((,) RangeSig RangeSig)
+
+splitRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> (Specif.Coq_sig2
+              UsePos) -> DefiniteSubRangesOf
+splitRange f rd hl =
+  let {s = rangeSpan f rd} in
+  case s of {
+   (,) o o0 ->
+    case o of {
+     Prelude.Just o1 ->
+      case o0 of {
+       Prelude.Just o2 -> (,) o1 o2;
+       Prelude.Nothing -> Logic.coq_False_rec};
+     Prelude.Nothing -> Logic.coq_False_rec}}
 

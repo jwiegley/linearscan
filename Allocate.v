@@ -23,11 +23,14 @@ Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg) :
 Admitted.
 
 Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
-  (* jww (2014-10-02): This needs to say "it has to have Len in it" *)
   SState pre P P (option nat) :=
-  withCursor $ fun sd _ =>
-    let int := (V.nth (fixedIntervals sd) (to_vfin reg)) in
-    return_ None.
+  withCursor $ fun sd cur =>
+    let int := curIntDetails cur in
+    return_ $ V.fold_left (fun mx v =>
+      option_choose mx
+        (if v is Some i
+         then intervalIntersectionPoint int.2 i.2
+         else None)) None (fixedIntervals sd).
 
 Definition assignSpillSlotToCurrent {pre P} `{HasWork P} :
   SState pre P P unit.

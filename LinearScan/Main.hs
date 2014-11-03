@@ -638,7 +638,14 @@ _LinearScan__intersectsWithFixedInterval :: LinearScan__ScanStateDesc ->
                                             (Prelude.Maybe Prelude.Int)
 _LinearScan__intersectsWithFixedInterval pre reg =
   (Prelude.$) (_LinearScan__withCursor pre) (\sd _ ->
-    _LinearScan__return_ Prelude.Nothing)
+    let {int = _LinearScan__curIntDetails sd} in
+    (Prelude.$) _LinearScan__return_
+      (Lib._V__fold_left (\mx v ->
+        Lib.option_choose mx
+          (case v of {
+            Prelude.Just i -> Interval.intervalIntersectionPoint ( int) ( i);
+            Prelude.Nothing -> Prelude.Nothing})) Prelude.Nothing
+        _LinearScan__maxReg (_LinearScan__fixedIntervals sd)))
 
 _LinearScan__assignSpillSlotToCurrent :: LinearScan__ScanStateDesc ->
                                          LinearScan__SState ()

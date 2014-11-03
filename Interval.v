@@ -423,7 +423,7 @@ Proof.
     contradiction.
 Defined.
 
-Lemma splitInterval_spec (before : nat) `(i : Interval d)
+Definition splitInterval_spec (before : nat) `(i : Interval d)
   (H : firstUsePos i < before <= lastUsePos i) :
   let: exist (i1, i2) Hdi := splitInterval H in
   intervalExtent i1.2 + intervalExtent i2.2 < intervalExtent i.

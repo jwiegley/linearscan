@@ -10,6 +10,18 @@ data NonEmpty a =
    NE_Sing a
  | NE_Cons a (NonEmpty a)
 
+coq_NonEmpty_rect :: (a1 -> a2) -> (a1 -> (NonEmpty a1) -> a2 -> a2) ->
+                     (NonEmpty a1) -> a2
+coq_NonEmpty_rect f f0 n =
+  case n of {
+   NE_Sing y -> f y;
+   NE_Cons y n0 -> f0 y n0 (coq_NonEmpty_rect f f0 n0)}
+
+coq_NonEmpty_rec :: (a1 -> a2) -> (a1 -> (NonEmpty a1) -> a2 -> a2) ->
+                    (NonEmpty a1) -> a2
+coq_NonEmpty_rec =
+  coq_NonEmpty_rect
+
 coq_NE_to_list :: (NonEmpty a1) -> [] a1
 coq_NE_to_list ne =
   case ne of {
