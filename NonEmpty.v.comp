@@ -41,6 +41,7 @@ Notation "[ ::: x1 ]" := (@NE _ [:: x1] (ltn0Sn 0))
 Notation "[ ::: x & s ]" := (@NE _ (x :: s) (ltn0Sn (size s)))
   (at level 0, only parsing) : seq_scope.
 
+(*
 Notation "[ ::: x1 , x2 , .. , xn & s ]" := (x1 :: x2 :: .. (xn :: s) ..)
   (at level 0, format
   "'[hv' [ ::: '['  x1 , '/'  x2 , '/'  .. , '/'  xn ']' '/ '  &  s ] ']'"
@@ -49,6 +50,7 @@ Notation "[ ::: x1 , x2 , .. , xn & s ]" := (x1 :: x2 :: .. (xn :: s) ..)
 Notation "[ ::: x1 ; x2 ; .. ; xn ]" := (x1 :: x2 :: .. [:: xn] ..)
   (at level 0, format "[ ::: '['  x1 ; '/'  x2 ; '/'  .. ; '/'  xn ']' ]"
   ) : seq_scope.
+*)
 
 Definition ne_ind : forall (A : Type) P,
   (forall a : A, P [::: a])
@@ -96,6 +98,10 @@ Proof.
   exact: (@NE b s').
 Defined.
 
+(* Lemma NE_cons_uncons : forall (a : Type) (x y : a) ys, *)
+(*   @NE a [:: x, y & ys] H = x :: @NE [::: y & ys]. *)
+(* Proof. by move=> a x y; case=> //. Qed. *)
+
 Definition NE_fold_left {a b : Type} := @foldl.
 
 Definition NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a.
@@ -132,18 +138,40 @@ Lemma cat_ne_rcons a x (s1 s2 : NonEmpty a) :
   NE_append (ne_rcons s1 x) s2 = NE_append s1 [::: x & s2].
 Admitted.
 
+Lemma ne_rcons_impl
+  : forall a (P : NonEmpty a -> Type) (x y : a) (ys : seq a) H H',
+  P (NE [:: y] (ltn0Sn _)) -> P (NE (y :: rcons ys x) H) = P (NE (rcons ys x) H').
+Admitted.
+
+Definition ne_rcons_cons a (P : NonEmpty a -> Type) (x y : a) (ys : seq a)
+  : forall H H',
+  P (NE (rcons (rcons ys y) x) H) = P (ne_rcons (NE (rcons ys y) H') x).
+Proof.
+  move=> H H'.
+  elim/last_ind: ys => // [|z zs IHzs] in H H' *.
+    by have <-: ltn0Sn 1 = H by exact: proof_irrelevance.
+Admitted.
+
 Lemma ne_last_ind : forall (a : Type) P,
   (forall x, P [::: x])
     -> (forall (s : NonEmpty a) x, P s -> P (ne_rcons s x))
     -> forall s : NonEmpty a, P s.
 Proof.
   move=> a P Hnil Hlast.
-  elim/ne_ind=> //= [x xs IHxs].
-  specialize (Hlast xs x IHxs).
-  have: ne_rcons xs x = NE (x :: xs) (ltn0Sn (size xs)).
-    case: xs Hlast IHxs.
-    elim=> // [y ys /= IHys] H Hlast IHxs /=.
-Admitted.
+  case. elim/last_ind=> [//|xs x IHx] H.
+  elim/last_ind: xs => [|ys y _] in IHx H *.
+    have irr: ltn0Sn 0 = H by exact: proof_irrelevance.
+    rewrite -irr.
+    exact: Hnil.
+  have H1: 0 < (size (rcons ys y)).+1.
+    admit.
+  have irr: ltn0Sn (size (rcons ys y)) = H1 by exact: proof_irrelevance.
+  rewrite ne_rcons_cons.
+    by rewrite size_rcons.
+  move=> H'.
+  eapply (Hlast (@NE _ (rcons ys y) _) x).
+  apply IHx.
+Defined.
 
 Lemma NE_last_append_spec : forall {a : Type} {xs ys : NonEmpty a},
   NE_last (NE_append xs ys) = NE_last ys.
