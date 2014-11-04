@@ -9,15 +9,11 @@ module LinearScan
     , PhysReg
     ) where
 
-import           Control.Applicative
 import           Control.Arrow (second)
 import qualified Data.List.NonEmpty as NE
-import           Data.Maybe
-import           LinearScan.Fintype
 import           LinearScan.Lib
 import           LinearScan.Main
 import           LinearScan.NonEmpty0
-import           LinearScan.Vector0 (to_vfin)
 
 type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__ScanStateDesc
@@ -52,5 +48,6 @@ allocateRegisters maxVirtReg blockInfo blocks =
             (length refs) (toCoqV (fmap (fmap getPhysReg) refs))
 
 handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
-handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ hnd)) =
+handledIntervalIds
+    (ScanState (LinearScan__Build_ScanStateDesc _ni _ _ _ _ _ hnd)) =
   map (second PhysReg) hnd
