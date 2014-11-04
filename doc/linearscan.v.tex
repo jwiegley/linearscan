@@ -1,0 +1,693 @@
+\documentclass{llncs}
+
+\usepackage{makeidx}  % allows for indexgeneration
+\usepackage[usenames,dvipsnames]{color}
+
+
+\newif\ifdraft\draftfalse  % draft = comments and half-baked bits
+% \newif\ifdraft\drafttrue  % draft = comments and half-baked bits
+
+% Comments
+\newcommand{\comment}[3]{\ifdraft\textcolor{#1}{[#2: #3]}\else\fi}
+\newcommand{\fixme}[1]{\comment{red}{FIXME}{#1}}
+\newcommand{\todo}[1]{\comment{red}{TO DO}{#1}}
+\newcommand{\gts}[1]{\comment{OliveGreen}{GTS}{#1}}
+
+% should be the last one
+\usepackage[%
+    %pdftex,%
+    %pdfpagelabels,%
+    %bookmarks=true,%
+    % pdfdisplaydoctitle=true,%
+    % pdflang=en-us,%
+    % pdfencoding=auto,%
+    % bookmarksnumbered=true,%
+]{hyperref}
+
+% % s/coq_eval/coqeval/
+% \excludecomment{coqeval}
+% % s/coq_example*/coqexamle/
+% % \excludecomment{coqexample}
+% \newenvironment{coqexample}%
+%    {\endgraf\noindent %
+%     \endgraf\verbatim}%
+%    {\endverbatim}
+
+\begin{document}
+
+\frontmatter          % for the preliminaries
+
+\pagestyle{headings}  % switches on printing of running heads
+
+\mainmatter
+
+\title{Experience Report: Implementing a register allocator for Haskell
+  in Coq}
+
+\author{John Wiegley \and Gregory Sullivan}
+
+\institute{BAE Systems, Burlington MA 01803, USA}
+
+\maketitle
+
+\begin{abstract}
+  We describe the process of formalizing a register allocation algorithm, and
+  its correctness properties, in the Coq proof assistent, and subsequent
+  extraction of a Haskell implementation.  Rather than simply state the final
+  specification in Coq, as if we had constructed it in one pass, we focus on
+  the process of evolving the Coq specification from our initial
+  attempts---which seemed straightforward but later became unwieldy---to a
+  final version that allowed for much easier proof.  Our goal in this
+  experience report is to assist other teams who may be considering similar
+  algorithm verification efforts, in the hope that those teams can learn from
+  our mistakes.
+  
+ \keywords{formal verification, register allocation, Coq, Haskell}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+As part of implementing a cross compiler from a C-like language named
+\emph{Tempest} to a new hardware architecture called \emph{SAFE}, we settled
+on the linear scan register allocation algorithm described by Wimmer and
+M\"{o}ssenb\"{o}ck~\cite{Wimmer:2005}.
+
+To gain confidence in our implementation, consistent with other formal
+verification efforts on the larger SAFE project\footnote{See
+  \url{http://www.crash-safe.org/} for more information on the SAFE project.},
+we have formalized the algorithm in Coq~\cite{coq_manual}. Because the rest of
+our cross-compilation toolchain is implemented in Haskell, we extract Haskell
+code from the Coq development.
+
+Our goal is to take the paper by Wimmer and M\"{o}ssenb\"{o}ck as a
+specification (in English and pseudo-code) and formalize the algorithm in Coq
+so that \emph{only correct implementations typecheck}.  After that, the
+only parameters of choice are choosing which efficiency dimensions to
+optimize for.
+
+\fixme{Rewrite section overview}In Section~\ref{sec:alg}, we give a
+brief overview of the linear scan register allocation algorithm and
+its datatypes, focusing on correctness properties. In
+Section~\ref{sec:evolve}, we describe the design iterations as we
+discovered strategies for applying Coq to this sort of combined
+verification and implementation task.  We conclude with lessons
+learned, in the hope that our experience will help others embrace the
+methodology of formal development, proof, and code extraction (while
+avoiding some of the pitfalls).
+
+\todo{Add pointer to github repo containing all proofs and extracted
+  Haskell (and maybe extended version of this paper).}
+
+
+\section{Design evolution}
+\label{sec:evolve}
+
+\subsection{First design: Purely computational}
+\label{sec:compdesign}
+
+In the first iteration, we approached the task much as any functional
+programmer might: data types carry computationally relevant
+information, functions are implemented in a straightforward fashion,
+and proofs are in terms of those types and functions.  There are
+almost no dependent types involved, and very few inductive types.
+Most of the types used are records.
+
+% In the beginning this was a relatively simple and painless approach,
+% until the requirement of proving termination of the top-level routine
+% of the linear scan algorithm. In Coq, all functions have to be proven
+% to terminate. 
+% the primary Fixpoint
+% definition: the entry-point to the linear scan algorithm.
+
+We quickly encountered two issues with this ``purely computational''
+approach:
+\begin{enumerate}
+\item Proving termination of loops is difficult.
+\item Proving invariants over data structures requires proving that
+  every function maintains all invariants. When we want to modify a
+  function's logic, we need to revisit many proofs.
+\end{enumerate}
+The following function definition illustrates the above
+issues. \texttt{checkActiveIntervals} loops over the current set of
+intervals (an interval corresponds to the range of program locations
+where a single ``virtual register'' is live) and moves selected
+intervals into either the ``handled'' or ``inactive'' sets.
+
+\begin{flushleft}
+\texttt{Coq~{<}~Definition~checkActiveIntervals~st~pos~:~ScanStateDesc~:=}\\
+\texttt{Coq~{<}~~~let~fix~go~st~st0~(ints~:~list~(IntervalId~st))}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~(pos~:~nat)~:=}\\
+\texttt{Coq~{<}~~~~~match~ints~with}\\
+\texttt{Coq~{<}~~~~~|~nil~={>}~st0}\\
+\texttt{Coq~{<}~~~~~|~x~::~xs~={>}}\\
+\texttt{Coq~{<}~~~~~~~~~let~i~:=~getInterval~x~in}\\
+\texttt{Coq~{<}~~~~~~~~~let~st1~:=~if~intervalEnd~i~{<}?~pos}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~~~~~~~then~moveActiveToHandled~x}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~~~~~~~else~if~pos~{<}?~intervalStart~i}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~~~~~~~~~~~~then~moveActiveToInactive~x}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~~~~~~~~~~~~else~st0~in}\\
+\texttt{Coq~{<}~~~~~~~~~go~st~st1~xs~pos}\\
+\texttt{Coq~{<}~~~~~end~in}\\
+\texttt{Coq~{<}~~~go~st~st~(active~st)~pos.}\\
+\end{flushleft}
+
+% At first this seemed straightforward to prove, but quickly became intractable.
+% In effect, proving a purely computational algorithm of this complexity meant
+% using tactics to explore every possibility at each step of the algorithm: in
+% effect, re-implementing the same algorithm in reverse, only now in the tactics
+% language.
+
+% This led to the realization that greater structure at the type level would be
+% necessary to capture evidence determined via computation at the lower levels
+% of the algorithm, so that it could percolate back up to the higher levels
+% where it was needed.
+
+% Case in point driving this need was a function used to move active intervals
+% to either the inactive or unhandled lists:
+
+First, proving termination of any function defined as a fixpoint is
+difficult in Coq; in particular, it is difficult to use induction,
+which is a pervasive proof technique in Coq.
+
+Next, consider the following two Lemmas, which claim that (1)
+\texttt{checkActiveIntervals} does not disrupt the next interval to
+handle; and (2) \texttt{checkActiveIntervals} does not introduce any
+new intervals.
+
+% This required some supporting lemmas, to show that certain properties of the
+% scan state were preserved by the function:
+
+\begin{flushleft}
+\texttt{Coq~{<}~Lemma~checkActiveIntervals\_spec1~:~forall~st~st'~pos,}\\
+\texttt{Coq~{<}~~~st'~=~checkActiveIntervals~st~pos}\\
+\texttt{Coq~{<}~~~~~-{>}~nextInterval~st~=~nextInterval~st'.}\\
+\end{flushleft}
+
+\begin{flushleft}
+\texttt{Coq~{<}~Lemma~checkActiveIntervals\_spec2~:~forall~st~st'~i~pos}\\
+\texttt{Coq~{<}~~~(H~:~st'~=~checkActiveIntervals~st~pos),}\\
+\texttt{Coq~{<}~~~{\char'176}~In~i~(all\_state\_lists~st)}\\
+\texttt{Coq~{<}~~~~~-{>}~{\char'176}~In~(transportId~(checkActiveIntervals\_spec1~H)~i)}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~(all\_state\_lists~st').}\\
+\end{flushleft}
+
+Because the \texttt{checkActiveIntervals} function operates by
+generating a new scan state on \emph{each} iteration of the loop, we
+need to prove that all properties are maintained by each helper
+function. 
+%
+% However, both of these became inordinately difficult to prove, since we are
+% folding over a list of items taken from the original scan state, and using
+% each item to generate new, intermediate scan states.  This is further done by
+% a fixpoint within the function, making it difficult for Coq to simplify.
+%
+As a result, we found ourselves having to break up functions further, and
+prove more and more auxiliary lemmas about each piece.  After losing much time
+to this approach, we decided that evidence should be carried through each
+modification step to prove the desired property.  That is, rather proving
+correctness ``from the outside'', the function itself was changed to manage
+the evidence, which removed the need for helper lemmas.
+
+% The next version shows this change, but became less clear to read as a result:
+% 
+% \begin{coq_example*}
+% Definition checkActiveIntervals st pos
+%   : { st' : ScanStateDesc & nextInterval st' = nextInterval st } :=
+%   let fix go st st0 H ints pos :=
+%     match ints with
+%     | nil => existT _ st0 eq_refl
+%     | x :: xs =>
+%         let i := getInterval (projT1 x) in
+%         let p :=
+%             if intervalEnd i < pos
+%             then let st1 := moveActiveToHandled (projT1 x) (projT2 x) in
+%                  let H'  := moveActiveToHandled_spec1 st st1 _ _ eq_refl in
+%                  existT _ st1 H'
+%             else if negb (intervalCoversPos i pos)
+%                  then let st1 := moveActiveToInactive (projT1 x) (projT2 x) in
+%                       let H'  := moveActiveToInactive_spec1 st st1 _ _
+%                                                             eq_refl in
+%                       existT _ st1 H'
+%                  else existT _ st0 eq_refl in
+%         go st (projT1 p) (projT2 p) xs pos
+%     end in
+%   go st st eq_refl (activeIntervals st) pos.
+% \end{coq_example*}
+
+% To give a picture of how this and subsequent design choices evolved, let us
+% consider the implementation of a quicksort, written in a fashion similar to
+% our register allocator's design at each phase.  First, the purely
+% computational approach:
+
+
+% \begin{coq_example*}
+% Program Fixpoint quicksort (l : list nat)
+%   {measure (length l)} : list nat :=
+%   definition_goes_here.
+% \end{coq_example*}
+% 
+% \begin{coq_eval}
+% Obligation 1. admit. Defined.
+% \end{coq_eval}
+% 
+% \begin{coq_example*}
+% Lemma quicksort_spec (l : list nat) : forall l',
+%   quicksort l = l' -> (Permutation l l' /\
+%                        StronglySorted le l').
+% \end{coq_example*}
+% \begin{coq_eval}
+% Proof. admit. Defined.
+% \end{coq_eval}
+% 
+% \fixme{Explain why the difficulty here is one of ``reversing the algorithm''
+%   of quicksort within the proof using tactics.}
+
+\subsubsection*{Lesson learned}
+
+Proving purely computational algorithms of this complexity meant using proof
+scripts to explore every possibility at each step of the algorithm: in effect,
+re-implementing the same algorithm in reverse, only now using tactics.
+
+% \subsection{Second design: More dependent}
+\subsection{Second design: Proof-Carrying Data}
+\label{sec:depinduct}
+
+In the second design of our algorithm, an attempt was made to reduce the
+complexity of proof scripts by adding evidence to the primary data structures,
+so that such evidence would be available wherever needed.  Take for example an
+excerpt from an earlier version of the \texttt{ScanState} data structure,
+which records the overall state of several intermediary lists:
+\gts{maybe call the record type ``ScanStateV2''?}
+
+\begin{flushleft}
+\texttt{Coq~{<}~Record~OldScanState~:=~\{}\\
+\texttt{Coq~{<}~~~~~unhandled~:~list~(nat~*~nat);}\\
+\texttt{Coq~{<}~~~~~active~~~~:~list~nat;}\\
+\texttt{Coq~{<}~~~~~inactive~~:~list~nat;}\\
+\texttt{Coq~{<}~~~~~handled~~~:~list~nat;}\\
+\texttt{Coq~{<}~}\\
+\texttt{Coq~{<}~~~~~unhandled\_sorted~:~StronglySorted~(lebf~snd)~unhandled;}\\
+\texttt{Coq~{<}~~~~~lists\_are\_unique~:~uniq~(map~fst~unhandled~++~active~++}\\
+\texttt{Coq~{<}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~inactive~++~handled)}\\
+\texttt{Coq~{<}~\}.}\\
+\end{flushleft}
+
+In this structure we have four working lists, and two properties about
+the lists. Property \texttt{unhandled\_sorted} requires that the
+\texttt{unhandled} list is sorted by start position
+(2\textsuperscript{nd} element of each pair in list), and property
+\texttt{lists\_are\_unique} states that no interval index recurs
+across the four lists.
+
+\subsubsection*{Lessons learned}
+
+While the idea of simultaneously maintaining data structures and
+invariants of those data structures is good, mixing data and
+propositions into one type does not quite work out, for the following
+reasons: 
+
+\begin{itemize}
+\item It conflates data with predicates, which is generally a poor choice,
+  because the number of predicates often grows over time.
+
+\item It forces the record type to dwell in \texttt{Type} rather than
+  \texttt{Set}, and so its inhabitants cannot be used by functions or data
+  structures restricted to \texttt{Set}.
+
+\item Any time such values must be mutated, the correctness of the mutation
+  must be separately proven \emph{at each instance where it occurs}.  That is,
+  the properties cannot be proven generally, but must be constantly re-proven
+  in each new context.
+
+\item It forces the propositions to be considered whenever a value is mutated
+  or created, even though it may be preferable to transform such values
+  successively through different functions, and prove correctness of the
+  composed mutation afterward.
+
+  For example, if one were to pass around a sorted list structure, which
+  combined a list with a proof of sortedness, it would disallow the
+  possibility of unsorted intermediate state, which may still be corrected if
+  the overall operation can prove that sortedness is manitained.
+\end{itemize}
+
+A guiding principle is to separate concerns as much as practical, which led
+directly to the third redesign, discussed in the next section.  
+
+\subsection{Third design: Proof-Qualified Data (Regular Datatypes Qualified by Inductive
+  Propositions)}
+\label{sec:splitdesign}
+
+After several iterations, where proving was found to be difficult and
+the resulting code looked quite unlike its non-dependent alternatives,
+we developed a methodology that is the primary message of this
+experience report.  Note that this methodology is in no way novel or
+unknown, but we find it under-documented in the tutorial literature on
+Coq and so present it here to benefit others seeking to use Coq for
+verified programming tasks:
+
+\begin{enumerate}
+\item Design data-carrying types as inductive data types and records in
+  \texttt{Set}, much like in a non-dependently typed language.
+
+\item Constrain how such types may be constructed and mutated by encoding them
+  as inductive propositions (in \texttt{Prop}).  For example, the
+  \texttt{StronglySorted} inductive predicate found in the Coq standard
+  library.
+
+\item High-level functions should take and produce data qualified by these
+  propositions; lower-level worker functions may work on unqualifed,
+  intermediate values, so long as the composition is qualified.
+
+\item Prove theorems about the properties required of the data, by induction
+  on values qualified by the predicate(s).
+
+\item (minor point) If the only role of a proposition is to indicate
+  that a property is held or not (for instance, that a list has a
+  certain length), it is better to do so using a boolean-returning
+  function called from an existential data type that pairs the
+  qualified value with the function's result: an example would be
+  \verb@{ l : list a | size l == 4 }@, or specialized by a data
+  constructor as:
+
+\begin{flushleft}
+\texttt{Coq~{<}~Inductive~listn~\{a\}~:=~mklistn~l~n~of~(@size~a~l~==~n).}\\
+\end{flushleft}
+  
+  This enables use of small-scale reflection (see the \textsf{ssreflect}
+  library), which has benefits beyond the scope of this paper.  We mention it
+  here only to underscore that we do not recommend all propositions be made
+  inductive, but only those more information rich than simple yes/no properties.
+
+\end{enumerate}
+
+Thus, the third iteration of our design divided each of the core data types
+into pairs:
+
+\begin{itemize}
+\item A non-dependent record, carrying computationally-relevant content only,
+  in \texttt{Set}.
+
+\item Dependent, inductive types, carrying propositionally-relevant content
+  only, in \texttt{Prop}.
+\end{itemize}
+
+The pairing of the two provides the ``proof-carrying data'' that
+was original desired in the second design, but in a manner allowing for simple
+transformation of the underlying data when necessary, and induction on
+propositional evidence as required.  The division of labor clarified not only
+the proofs, but made many constructions far simpler to manage.  This is the
+final design that was settled upon, with one additional twist, to be continued
+in the next section.
+
+\subsection{Examples}
+\label{sec:examplesv3}
+
+As before, we define a datatype \emph{ScanStateDesc} that contains
+only data (no propositions). An excerpt is:
+\begin{verbatim}
+Record ScanStateDesc : Type := {
+    nextInterval : nat;
+    IntervalId   := fin nextInterval;
+
+    unhandled : list (IntervalId * nat);   (* starts after pos *)
+    active    : list IntervalId;           (* ranges over pos *)
+    inactive  : list IntervalId;           (* falls in lifetime hole *)
+
+    unhandledIds    := map fst unhandled;
+    unhandledStarts := map snd unhandled;
+...
+    all_state_lists := unhandledIds ++ active ++ inactive ++ handled
+}.
+\end{verbatim}
+
+Next, we define an inductive proposition named \texttt{ScanState}(of
+type Proposition, indexed by \texttt{ScanStateDesc}) that enumerates
+exactly the allowed methods for transitioning from one
+\emph{ScanStateDesc} record satisfying \texttt{ScanState} to another
+\emph{ScanStateDesc} record satisfying \texttt{ScanState}. Following
+are some excerpts:
+
+\begin{verbatim}
+Inductive ScanState : ScanStateDesc -> Prop :=
+  | ScanState_nil :
+    ScanState
+      {| nextInterval     := 0
+       ; unhandled        := nil
+       ; active           := nil
+       ; inactive         := nil
+       ; handled          := nil
+       ; intervals        := V.nil _
+       ; assignments      := V.nil _
+       ; fixedIntervals   := V.const None _
+       |}
+...
+  | ScanState_moveActiveToHandled sd :
+    ScanState sd -> forall `(H : x \in active sd),
+    ScanState
+      {| nextInterval     := nextInterval sd
+       ; unhandled        := unhandled sd
+       ; active           := rem x (active sd)
+       ; inactive         := inactive sd
+       ; handled          := x :: handled sd
+       ; intervals        := intervals sd
+       ; assignments      := assignments sd
+       ; fixedIntervals   := fixedIntervals sd
+       |}
+
+...
+\end{verbatim}
+
+Now, if we want to prove a theorem about a
+\texttt{ScanState}-qualified \texttt{ScanStateDesc} record, we
+consider each case in the definition of \texttt{ScanState}.
+For example, to prove that the unhandled interval list is sorted, the
+proof is:
+
+\begin{verbatim}
+Theorem unhandled_sorted `(st : ScanState sd) :
+  StronglySorted (lebf snd) (unhandled sd).
+Proof.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". constructor.
+  - Case "ScanState_newUnhandled".
+    rewrite /unh.
+    by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
+  - Case "ScanState_moveUnhandledToActive". inv IHst.
+  - Case "ScanState_moveActiveToInactive". apply IHst.
+  - Case "ScanState_moveActiveToHandled". apply IHst.
+  - Case "ScanState_moveInactiveToActive". apply IHst.
+  - Case "ScanState_moveInactiveToHandled".  apply IHst.
+Qed.
+\end{verbatim}
+
+% \subsubsection*{Lesson learned}
+
+% One of the main lessons learned is that Coq is a fantastic environment
+% in which to reason about code and algorithms!  It required me to fully
+% grasp every single nook and cranny of this algorithm, including all of
+% its unwritten assumptions---details which would be all too easy to
+% neglect in a freer language.
+
+% Another lesson is that using Coq well requires both education and
+% experience.
+
+% This effort took far longer than expected, and much, much longer than
+% the equivalent Haskell would have been to write.  That said, many of
+% the worst design mistakes that I made were solely due to inexperience
+% with using Coq in this way, and are not likely to be made again on
+% future projects.
+
+% The Proof General environment in Emacs, the prooftree visualization
+% tool, and the ssreflect library, were all invaluable in providing a
+% better experience at using Coq.  I truly felt I was able to ``dialog
+% with my types'', leading to a richer understanding and better
+% decisions.
+
+\section{Proof morphisms}
+\label{sec:pfmorph}
+
+During the course of development, it became clear that not only was evidence
+required of certain functions, but also a proof that this evidence maintains a
+special relationship with some initial condition.  The primary case of this
+was proving well-foundedness of the main algorithm.
+
+Well-foundedness may be demonstrated in Coq 8.4 by establishing a mapping from
+some input argument to a natural number, and then proving that this value only
+decreases with each recursive call.  If we further view an algorithm as a
+composition of smaller functions, then each member of the composition must
+either preserve this value, or cause it to decrease at least once.
+
+In order to prove that order is maintained, and that we are ultimately
+``productive'' (i.e., a decrease in the initial value, the requirement of
+well-foundedness), we encode this requirement in the type of each composed
+function.  That is, the type must show that the function's input is $\le$ the
+initial value, and that the output is $\le$ or $<$ the initial value.  If at
+least one output is $<$, and each subsequently composed function is only
+$\le$, we have demonstrated well-foundedness overall.
+
+Such specialized composition---where a context is preserved across function
+calls---is a notion captured exactly by monads from category theory.  What we
+are describing above is specifically an \emph{indexed state monad}, where a
+certain state (a relation with our initial value) is maintained throughout the
+composition, and we may specify for each function what its input and output
+requirements are of this relation.
+
+Here is the sort of function type we end up with:
+
+\begin{flushleft}
+\texttt{Coq~{<}~Definition~handleInterval~\{pre\}}\\
+\texttt{Coq~{<}~~~:~SState~pre~SSMorphHasLen~SSMorphSt~(option~PhysReg).}\\
+\end{flushleft}
+
+This function signature tells us that with regard to some original state
+\texttt{pre}, we require that the state upon entering this function is related
+to this original state such that there is work yet to be done (i.e., we have
+proven productivity), and that the output state demonstrates productivity.
+Use of this function alone gives sufficient evidence to prove termination, as
+will any composition that includes this function.
+
+Working with a monad like this permits the management of evidentiary state to
+happen ``behind the scenes'', clarifying the code by removing explicit proof
+management.  In the version of our implementation before this change, proving
+these relationships became quite time-consuming, and obscured the real work
+being done.
+
+By this means, the final well-foundedness proof of the main algorithm became a
+one-liner, while at the same time each component function of the algorithm was
+greatly simplified, reading similarly to an equivalent Haskell implementation.
+
+\begin{verbatim}
+Proof.
+  intros; clear; by case: ssinfo' => ?; case=> /= _ /ltP.
+Qed.
+\end{verbatim}
+
+\section{Code extraction}
+\label{sec:extract}
+
+A primary goal of this endeavor, from the very beginning, was extraction to
+Haskell.  The question was whether Coq and formal methods would be up to the
+task of building a Haskell library in a better way.
+
+About midway through the development, focus was turned toward producing
+reasonable Haskell code through Coq's built-in extraction facilities.  These
+allow for:
+
+\begin{itemize}
+\item Extraction of functions and types (those not in Prop), and their related
+  definitions.
+
+\item Association of some types and constructors with native Haskell types.
+
+\item Renaming some functions to use their direct Haskell counterparts,
+  requiring that one implicit trust these to be both total and correct.
+\end{itemize}
+
+There is unfortunately no published meta-theory for the extraction process
+from Coq to Haskell, and indeed some glaring bugs were encountered during the
+course of this project (including one where type variables were inexplicably
+swapped in a constructor whenever auto-inlining was used).
+
+Even still, the ability to write code in Coq and have it so easily converted
+to naive Haskell was incredibly useful, and an area that we hope sees further
+development.  The result Haskell code was quite simple and straightforward,
+which should lend fairly well to optimization by the GHC compiler.
+
+\section{Register Allocation Algorithm and Correctness Properties}
+\label{sec:alg}
+
+The algorithm we implemented is fully documented in the original
+paper\cite{Wimmer:2005}.  We extend that documentation by presenting several
+requirements that were implicit in their presentation, but became necessarily
+explicit in the Coq formalization.  Each requirement stated below was encoded
+in either a type or a lemma, and proven during the course of development.
+
+\subsection{Use positions}
+\label{sec:usepos}
+
+When code is linearized for the purpose of register allocation, each position
+where a variable is used is termed a \emph{use position}.  There is also a
+boolean flag to indicate whether a register is required at this use position
+or not.
+
+\paragraph{Requirements}
+
+\begin{itemize}
+\item All use positions must be given odd addresses, so that ranges do not
+  extend to the next use position.
+\end{itemize}
+
+\subsection{Ranges}
+\label{sec:ranges}
+
+A list of use positions constitutes a range, from the beginning use position,
+to one beyond the last.  A range may also be extended so that its beginning
+and end fall outside its list of use positions.  This is done in order to
+provide explicit coverage of loop bodies, to avoid reloading registers each
+time the loop body is executed.
+
+\paragraph{Requirements}
+
+\begin{itemize}
+\item The list of use positions is ordered with respect to location.
+\item The list of use positions is unique with respect to location (no
+  recurring use positions).
+\item The beginning of a range is $\le$ its first use position location.
+\item The end of a range is $>$ its last use position location.
+\end{itemize}
+
+\subsection{Intervals}
+\label{sec:intervals}
+
+An ordered list of ranges constitutes an \emph{interval}.  In the majority of
+scenarios, intervals are equivalent to ranges, since only a single range is
+used.  However, adding the concept of intervals allows for \emph{lifetime
+  holes} between component ranges, that are otherwise allocated to the same
+register.
+
+\paragraph{Requirements}
+
+\begin{itemize}
+\item The list of ranges is ordered by the first use position in each range.
+\item The list of ranges is non-overlapping.
+\item The beginning of the interval corresponds to the beginning of its first
+  range.
+\item The end of the interval corresponds to the end of its last range.
+\end{itemize}
+
+\subsection{Scan state}
+\label{sec:scanstate}
+
+During the course of the algorithm, a position counter is iterated from the
+first code position to the last.  Six separate details are managed using a
+collection of lists:
+
+\begin{enumerate}
+\item A list of yet to be allocated intervals (unhandled intervals).
+\item A list of active intervals (those covering the current position, and
+  presently allocated).
+\item A list of inactive intervals (those having a lifetime hole covering the
+  current position).
+\item A list of handled intervals.
+\item A mapping from registers to active/inactive/handled intervals.
+\item A mapping from intervals (those not unhandled) to registers.
+\end{enumerate}
+
+\paragraph{Requirements}
+
+\begin{itemize}
+\item The list of unhandled intervals is ordered by start positions.
+\item The first 4 lists, taken as a set, must contain no recurring
+  intervals, and have no overlapping intervals.
+\item All register indices must be $<$ the maximum register index.
+\item The number of intervals in the active list be $<$ the maximum register
+  index.
+\end{itemize}
+
+
+% ---- Bibliography ----
+\bibliographystyle{splncs03}
+\bibliography{../../safe}
+
+\end{document}

@@ -1,0 +1,2 @@
+#!/bin/bash
+exec coqtop -I . -I $HOME/bae/linearscan -dont-load-proofs -quality "$@"
