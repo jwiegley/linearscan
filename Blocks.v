@@ -29,10 +29,7 @@ Section Block.
 Variable baseType : Set.
 Variable maxVirtReg : nat.
 
-(* jww (2014-10-18): I do not know how to handle explicit register mentions in
-   the input blocks yet. *)
-(* Definition SomeVar := (fin maxVirtReg + fin maxReg)%type. *)
-Definition SomeVar := (fin maxVirtReg)%type.
+Definition SomeVar := (fin maxVirtReg + fin maxReg)%type.
 
 Record Block : Type := {
     original    : baseType;
@@ -45,15 +42,21 @@ Record Block : Type := {
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
 
+Arguments boundedRange pos /.
+
 Definition boundedTriple (pos : nat) :=
   (option nat * option nat * option (boundedRange pos))%type.
 
-Definition boundedRangeVec (pos : nat) := Vec (boundedTriple pos) maxVirtReg.
+Arguments boundedTriple pos /.
 
-Lemma boundedTransport (pos : nat) `(Hlt : pos < n) :
-  boundedRangeVec n -> boundedRangeVec pos.
+Record boundedRangeVec (pos : nat) := {
+  vars : Vec (boundedTriple pos) maxVirtReg;
+  regs : Vec (boundedTriple pos) maxReg
+}.
+
+Lemma boundedTransportVec (pos m : nat) `(Hlt : pos < n) :
+  Vec (boundedTriple n) m -> Vec (boundedTriple pos) m.
 Proof.
-  rewrite /boundedRangeVec /boundedTriple /boundedRange.
   elim=> [|[p [[rd r Hr]| ]] n' v' IHv].
   - by constructor.
   - constructor; last exact: IHv.
@@ -64,6 +67,13 @@ Proof.
   - constructor; last exact: IHv.
     split. apply p.
     exact: None.
+Qed.
+
+Lemma boundedTransport (pos : nat) `(Hlt : pos < n) :
+  boundedRangeVec n -> boundedRangeVec pos.
+Proof.
+  case=> Hvars Hregs.
+  split; exact: (boundedTransportVec Hlt).
 Qed.
 
 Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos.
@@ -106,7 +116,17 @@ Definition applyList (bs : NonEmpty Block)
   go 1 (RangeTests.odd_1) bs.
 
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
-  V.const (None, None, None) maxVirtReg.
+  {| vars := V.const (None, None, None) maxVirtReg
+   ; regs := V.const (None, None, None) maxReg
+   |}.
+
+(* jww (2014-11-04): Still to be done:
+
+   Register constraints at method calls are also modeled using fixed
+   intervals: Because all registers are destroyed when the call is executed,
+   ranges of length 1 are added to all fixed intervals at the call
+   site. Therefore, the allocation pass cannot assign a register to any
+   interval there, and all intervals are spilled before the call. *)
 
 Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
   (rest : boundedRangeVec pos.+2) : boundedRangeVec pos :=
@@ -120,14 +140,18 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
   let consr (x : boundedTriple pos.+2) : boundedTriple pos :=
       let upos := Build_UsePos pos (regRequired b) in
       @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
-  let rest' := V.map savingBound rest in
+  let restVars' := V.map savingBound (vars rest) in
+  let rest' := {| vars := restVars'; regs := regs rest |} in
   match references b with
   | V.nil => boundedTransport (ltnSSn _) rest'
-  | V.cons v _ vs =>
-    let x := consr (V.nth rest' (to_vfin v)) in
-    V.replace (boundedTransport (ltnSSn _) rest') (to_vfin v) x
-  (* jww (2014-10-18): See note above. *)
-  (* | V.cons (inr r) _ vs => ?? *)
+  | V.cons (inl v) _ vs =>
+    let x := consr (V.nth restVars' (to_vfin v)) in
+    let restVars'' :=
+        V.replace (boundedTransportVec (ltnSSn _) restVars')
+                  (to_vfin v) x in
+    let restRegs'' := boundedTransportVec (ltnSSn _) (regs rest) in
+    {| vars := restVars''; regs := restRegs'' |}
+  | V.cons (inr r) _ vs => undefined
   end.
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=
@@ -152,9 +176,10 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
 (** The list of blocks is processed in reverse, so that the resulting
     sub-lists are also in order. *)
 Definition processBlocks (blocks : NonEmpty Block) :
-  Vec (option RangeSig) maxVirtReg :=
-  let res := applyList blocks emptyBoundedRangeVec handleBlock in
-  V.map extractRange res.
+  Vec (option RangeSig) maxVirtReg * Vec (option RangeSig) maxReg :=
+  let: {| vars := vars'; regs := regs' |} :=
+       applyList blocks emptyBoundedRangeVec handleBlock in
+  (V.map extractRange vars', V.map extractRange regs').
 
 Definition determineIntervals (blocks : NonEmpty Block) :
   { sd : ScanStateDesc | ScanState sd } :=
@@ -164,7 +189,7 @@ Definition determineIntervals (blocks : NonEmpty Block) :
         let i := I_Sing r in
         Some (exist Interval (getIntervalDesc i) i)
       end in
-  let go (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
+  let handleVar (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
       match mkint mx with
       | None => ss
       | Some (exist idesc i) =>
@@ -172,13 +197,12 @@ Definition determineIntervals (blocks : NonEmpty Block) :
         let st' := ScanState_newUnhandled st i in
         exist ScanState (getScanStateDesc st') st'
       end in
+  let handleReg (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
+      undefined in
   let s0 := ScanState_nil in
   let s1 : ScanStateSig := exist ScanState (getScanStateDesc s0) s0 in
-  let ranges := processBlocks blocks in
-  (* jww (2014-10-19): I need to sort the ranges by starting position, and
-     then make this ordering a requirement for building up the unhandled
-     intervals in the [ScanState]. *)
-  V.fold_left go s1 ranges.
+  let: (varRanges, regRanges) := processBlocks blocks in
+  V.fold_left handleReg (V.fold_left handleVar s1 varRanges) regRanges.
 
 Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).

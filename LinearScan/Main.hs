@@ -933,7 +933,7 @@ _LinearScan__linearScan sd =
 
 type LinearScan__VirtReg = Prelude.Int
 
-type LinearScan__SomeVar = Vector0.Coq_fin
+type LinearScan__SomeVar = Prelude.Either Vector0.Coq_fin Vector0.Coq_fin
 
 data LinearScan__Block baseType =
    LinearScan__Build_Block baseType Prelude.Bool Prelude.Bool Prelude.Int 
@@ -993,12 +993,46 @@ type LinearScan__Coq_boundedTriple =
   (,) ((,) (Prelude.Maybe Prelude.Int) (Prelude.Maybe Prelude.Int))
   (Prelude.Maybe LinearScan__Coq_boundedRange)
 
-type LinearScan__Coq_boundedRangeVec = Lib.Vec LinearScan__Coq_boundedTriple
+data LinearScan__Coq_boundedRangeVec =
+   LinearScan__Build_boundedRangeVec (Lib.Vec LinearScan__Coq_boundedTriple) 
+ (Lib.Vec LinearScan__Coq_boundedTriple)
 
-_LinearScan__boundedTransport :: Prelude.Int -> Prelude.Int -> Prelude.Int ->
-                                 LinearScan__Coq_boundedRangeVec ->
-                                 LinearScan__Coq_boundedRangeVec
-_LinearScan__boundedTransport maxVirtReg pos n _top_assumption_ =
+_LinearScan__boundedRangeVec_rect :: Prelude.Int -> Prelude.Int -> ((Lib.Vec
+                                     LinearScan__Coq_boundedTriple) ->
+                                     (Lib.Vec LinearScan__Coq_boundedTriple)
+                                     -> a1) ->
+                                     LinearScan__Coq_boundedRangeVec -> a1
+_LinearScan__boundedRangeVec_rect maxVirtReg pos f b =
+  case b of {
+   LinearScan__Build_boundedRangeVec x x0 -> f x x0}
+
+_LinearScan__boundedRangeVec_rec :: Prelude.Int -> Prelude.Int -> ((Lib.Vec
+                                    LinearScan__Coq_boundedTriple) ->
+                                    (Lib.Vec LinearScan__Coq_boundedTriple)
+                                    -> a1) -> LinearScan__Coq_boundedRangeVec
+                                    -> a1
+_LinearScan__boundedRangeVec_rec maxVirtReg pos =
+  _LinearScan__boundedRangeVec_rect maxVirtReg pos
+
+_LinearScan__vars :: Prelude.Int -> Prelude.Int ->
+                     LinearScan__Coq_boundedRangeVec -> Lib.Vec
+                     LinearScan__Coq_boundedTriple
+_LinearScan__vars maxVirtReg pos b =
+  case b of {
+   LinearScan__Build_boundedRangeVec vars0 regs0 -> vars0}
+
+_LinearScan__regs :: Prelude.Int -> Prelude.Int ->
+                     LinearScan__Coq_boundedRangeVec -> Lib.Vec
+                     LinearScan__Coq_boundedTriple
+_LinearScan__regs maxVirtReg pos b =
+  case b of {
+   LinearScan__Build_boundedRangeVec vars0 regs0 -> regs0}
+
+_LinearScan__boundedTransportVec :: Prelude.Int -> Prelude.Int -> Prelude.Int
+                                    -> (Lib.Vec
+                                    LinearScan__Coq_boundedTriple) -> Lib.Vec
+                                    LinearScan__Coq_boundedTriple
+_LinearScan__boundedTransportVec pos m n _top_assumption_ =
   let {_evar_0_ = Lib.V__Coq_nil} in
   let {
    _evar_0_0 = \_top_assumption_0 ->
@@ -1019,7 +1053,19 @@ _LinearScan__boundedTransport maxVirtReg pos n _top_assumption_ =
     case _top_assumption_0 of {
      (,) x x0 -> _evar_0_0 x x0}}
   in
-  Lib._V__t_rec _evar_0_ _evar_0_0 maxVirtReg _top_assumption_
+  Lib._V__t_rec _evar_0_ _evar_0_0 m _top_assumption_
+
+_LinearScan__boundedTransport :: Prelude.Int -> Prelude.Int -> Prelude.Int ->
+                                 LinearScan__Coq_boundedRangeVec ->
+                                 LinearScan__Coq_boundedRangeVec
+_LinearScan__boundedTransport maxVirtReg pos n _top_assumption_ =
+  let {
+   _evar_0_ = \hvars hregs -> LinearScan__Build_boundedRangeVec
+    (_LinearScan__boundedTransportVec pos maxVirtReg n hvars)
+    (_LinearScan__boundedTransportVec pos _LinearScan__maxReg n hregs)}
+  in
+  case _top_assumption_ of {
+   LinearScan__Build_boundedRangeVec x x0 -> _evar_0_ x x0}
 
 _LinearScan__boundedSing :: Range.UsePos -> LinearScan__Coq_boundedRange
 _LinearScan__boundedSing upos =
@@ -1075,8 +1121,11 @@ _LinearScan__applyList maxVirtReg bs base f =
 _LinearScan__emptyBoundedRangeVec :: Prelude.Int -> Prelude.Int ->
                                      LinearScan__Coq_boundedRangeVec
 _LinearScan__emptyBoundedRangeVec maxVirtReg n =
-  Lib._V__const ((,) ((,) Prelude.Nothing Prelude.Nothing) Prelude.Nothing)
-    maxVirtReg
+  LinearScan__Build_boundedRangeVec
+    (Lib._V__const ((,) ((,) Prelude.Nothing Prelude.Nothing)
+      Prelude.Nothing) maxVirtReg)
+    (Lib._V__const ((,) ((,) Prelude.Nothing Prelude.Nothing)
+      Prelude.Nothing) _LinearScan__maxReg)
 
 _LinearScan__handleBlock :: Prelude.Int -> (LinearScan__Block a1) ->
                             Prelude.Int -> LinearScan__Coq_boundedRangeVec ->
@@ -1107,18 +1156,41 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
     _LinearScan__withRanges pos (_LinearScan__regRequired maxVirtReg b) upos
       (Prelude.succ (Prelude.succ pos)) x}
   in
-  let {rest' = Lib._V__map savingBound maxVirtReg rest} in
+  let {
+   restVars' = Lib._V__map savingBound maxVirtReg
+                 (_LinearScan__vars maxVirtReg (Prelude.succ (Prelude.succ
+                   pos)) rest)}
+  in
+  let {
+   rest' = LinearScan__Build_boundedRangeVec restVars'
+    (_LinearScan__regs maxVirtReg (Prelude.succ (Prelude.succ pos)) rest)}
+  in
   case _LinearScan__references maxVirtReg b of {
    Lib.V__Coq_nil ->
     _LinearScan__boundedTransport maxVirtReg pos (Prelude.succ (Prelude.succ
       pos)) rest';
-   Lib.V__Coq_cons v n vs ->
-    let {
-     x = consr (Lib._V__nth maxVirtReg rest' (Vector0.to_vfin maxVirtReg v))}
-    in
-    Lib._V__replace maxVirtReg
-      (_LinearScan__boundedTransport maxVirtReg pos (Prelude.succ
-        (Prelude.succ pos)) rest') (Vector0.to_vfin maxVirtReg v) x}
+   Lib.V__Coq_cons h n vs ->
+    case h of {
+     Prelude.Left v ->
+      let {
+       x = consr
+             (Lib._V__nth maxVirtReg restVars'
+               (Vector0.to_vfin maxVirtReg v))}
+      in
+      let {
+       restVars'' = Lib._V__replace maxVirtReg
+                      (_LinearScan__boundedTransportVec pos maxVirtReg
+                        (Prelude.succ (Prelude.succ pos)) restVars')
+                      (Vector0.to_vfin maxVirtReg v) x}
+      in
+      let {
+       restRegs'' = _LinearScan__boundedTransportVec pos _LinearScan__maxReg
+                      (Prelude.succ (Prelude.succ pos))
+                      (_LinearScan__regs maxVirtReg (Prelude.succ
+                        (Prelude.succ pos)) rest)}
+      in
+      LinearScan__Build_boundedRangeVec restVars'' restRegs'';
+     Prelude.Right r -> Lib.undefined}}
 
 _LinearScan__extractRange :: LinearScan__Coq_boundedTriple -> Prelude.Maybe
                              Range.RangeSig
@@ -1152,15 +1224,16 @@ _LinearScan__extractRange x =
        Prelude.Nothing -> Prelude.Nothing}}}
 
 _LinearScan__processBlocks :: Prelude.Int -> (NonEmpty0.NonEmpty
-                              (LinearScan__Block a1)) -> Lib.Vec
-                              (Prelude.Maybe Range.RangeSig)
+                              (LinearScan__Block a1)) -> (,)
+                              (Lib.Vec (Prelude.Maybe Range.RangeSig))
+                              (Lib.Vec (Prelude.Maybe Range.RangeSig))
 _LinearScan__processBlocks maxVirtReg blocks =
-  let {
-   res = _LinearScan__applyList maxVirtReg blocks
-           (_LinearScan__emptyBoundedRangeVec maxVirtReg) (\x x0 _ ->
-           _LinearScan__handleBlock maxVirtReg x x0)}
-  in
-  Lib._V__map _LinearScan__extractRange maxVirtReg res
+  case _LinearScan__applyList maxVirtReg blocks
+         (_LinearScan__emptyBoundedRangeVec maxVirtReg) (\x x0 _ ->
+         _LinearScan__handleBlock maxVirtReg x x0) of {
+   LinearScan__Build_boundedRangeVec vars' regs' -> (,)
+    (Lib._V__map _LinearScan__extractRange maxVirtReg vars')
+    (Lib._V__map _LinearScan__extractRange _LinearScan__maxReg regs')}
 
 _LinearScan__determineIntervals :: Prelude.Int -> (NonEmpty0.NonEmpty
                                    (LinearScan__Block a1)) ->
@@ -1175,7 +1248,7 @@ _LinearScan__determineIntervals maxVirtReg blocks =
      Prelude.Nothing -> Prelude.Nothing}}
   in
   let {
-   go = \ss mx ->
+   handleVar = \ss mx ->
     case mkint mx of {
      Prelude.Just i0 ->
       _LinearScan__getScanStateDesc (LinearScan__Build_ScanStateDesc
@@ -1202,13 +1275,17 @@ _LinearScan__determineIntervals maxVirtReg blocks =
           (_LinearScan__handled ss)));
      Prelude.Nothing -> ss}}
   in
+  let {handleReg = \ss mx -> Lib.undefined} in
   let {
    s1 = _LinearScan__getScanStateDesc (LinearScan__Build_ScanStateDesc 0
           Lib.V__Coq_nil (Lib._V__const Prelude.Nothing _LinearScan__maxReg)
           [] [] [] [])}
   in
-  let {ranges = _LinearScan__processBlocks maxVirtReg blocks} in
-  Lib._V__fold_left go s1 maxVirtReg ranges
+  case _LinearScan__processBlocks maxVirtReg blocks of {
+   (,) varRanges regRanges ->
+    Lib._V__fold_left handleReg
+      (Lib._V__fold_left handleVar s1 maxVirtReg varRanges)
+      _LinearScan__maxReg regRanges}
 
 _LinearScan__allocateRegisters :: Prelude.Int -> (NonEmpty0.NonEmpty
                                   (LinearScan__Block a1)) ->

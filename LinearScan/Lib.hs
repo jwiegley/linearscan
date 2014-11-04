@@ -292,6 +292,10 @@ _V__to_list n v =
 
 type Vec a = V__Coq_t a
 
+undefined :: a1
+undefined =
+  Prelude.error "AXIOM TO BE REALIZED"
+
 ex_falso_quodlibet :: a1
 ex_falso_quodlibet =
   Logic.coq_False_rect

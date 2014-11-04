@@ -48,12 +48,8 @@ allocateRegisters maxVirtReg blockInfo blocks =
   where
     gather b =
         let (starts, ends, refs) = blockInfo b in
-        LinearScan__Build_Block b (getStartsLoop starts) (getEndsLoop ends) (length refs)
-            (toCoqV (mapMaybe (\x -> case x of
-                                    Left v -> Just v
-                                    Right _ -> Nothing)
-                     -- (fmap getPhysReg)
-                     refs))
+        LinearScan__Build_Block b (getStartsLoop starts) (getEndsLoop ends)
+            (length refs) (toCoqV (fmap (fmap getPhysReg) refs))
 
 handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
 handledIntervalIds (ScanState (LinearScan__Build_ScanStateDesc ni _ _ _ _ _ hnd)) =
