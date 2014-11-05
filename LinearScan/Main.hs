@@ -231,13 +231,6 @@ _LinearScan__registerWithHighestPos =
          Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,) 0 (Prelude.Just
       0)))
 
-_LinearScan__atIntervalReg :: LinearScan__ScanStateDesc ->
-                              LinearScan__IntervalId -> a1 -> Vector0.Coq_fin
-                              -> (Lib.Vec a1) -> Lib.V__Coq_t a1
-_LinearScan__atIntervalReg sd i x r v =
-  Lib._V__replace _LinearScan__maxReg v
-    (Vector0.to_vfin _LinearScan__maxReg r) x
-
 type LinearScan__ScanStateSig = LinearScan__ScanStateDesc
 
 _LinearScan__getScanStateDesc :: LinearScan__ScanStateDesc ->
@@ -266,15 +259,6 @@ _LinearScan__curIntDetails sd =
   Lib._V__nth (_LinearScan__nextInterval sd) (_LinearScan__intervals sd)
     (Vector0.to_vfin (_LinearScan__nextInterval sd)
       ((Prelude.fst) (_LinearScan__curId sd)))
-
-_LinearScan__curStateDesc :: LinearScan__ScanStateDesc ->
-                             LinearScan__ScanStateDesc
-_LinearScan__curStateDesc sd =
-  sd
-
-_LinearScan__curIntDesc :: LinearScan__ScanStateDesc -> Interval.IntervalDesc
-_LinearScan__curIntDesc sd =
-   (_LinearScan__curIntDetails sd)
 
 _LinearScan__curPosition :: LinearScan__ScanStateDesc -> Prelude.Int
 _LinearScan__curPosition sd =
@@ -930,8 +914,6 @@ _LinearScan__linearScan :: LinearScan__ScanStateDesc ->
                            LinearScan__ScanStateDesc
 _LinearScan__linearScan sd =
   _LinearScan__linearScan_func ((,) sd __)
-
-type LinearScan__VirtReg = Prelude.Int
 
 type LinearScan__SomeVar = Prelude.Either Vector0.Coq_fin Vector0.Coq_fin
 

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+for i in $(perl -ne 'print $2, "\n" if /^(Theorem|Lemma|Program [^ ]+ |Fixpoint|Definition|Remark|Function|Axiom|Hypothesis) (\w+)/' *.v | sort | uniq)
+do
+    echo $(cat *.v | egrep -c "\\<$i\\>") $i
+done | sort -n | egrep '^1 ' | awk '{print $2}' | \
+while read i; do
+  egrep -n "\\<$i\\>" *.v
+done | grep -v 'Spec\.v:[0-9]*:Theorem' \
+     | egrep -v ':(Theorem|Lemma) [a-zA-Z_]*_spec'

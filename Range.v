@@ -22,36 +22,6 @@ Record UsePos : Set := {
     regReq : bool
 }.
 
-Section EqUpos.
-
-Variables (T : eqType) (x0 : T).
-Implicit Type s : UsePos.
-
-Fixpoint equpos s1 s2 {struct s2} :=
-  match s1, s2 with
-  | {| uloc := u1; regReq := rr1 |},
-    {| uloc := u2; regReq := rr2 |} => (u1 == u2) && (rr1 == rr2)
-  end.
-
-Lemma equposP : Equality.axiom equpos.
-Proof.
-  move.
-  case=> [u1 rr1].
-  case=> [u2 rr2] /=.
-  case: (u1 =P u2) => [<-|neqx]; last by right; case.
-  case: (rr1 =P rr2) => [<-|neqx]; last by right; case.
-  by constructor.
-Qed.
-
-Canonical upos_eqMixin := EqMixin equposP.
-Canonical upos_eqType := Eval hnf in EqType UsePos upos_eqMixin.
-
-Lemma equposE : equpos = eq_op. Proof. by []. Qed.
-
-Definition UsePos_eqType (A : eqType) := Equality.Pack upos_eqMixin UsePos.
-
-End EqUpos.
-
 Coercion uloc : UsePos >-> nat.
 
 Module UsePosNotations.
@@ -156,46 +126,6 @@ Proof.
   elim: l => [a|a l IHl] res Heqe;
   case: res Heqe => [[[o| ] [o0| ]] H] //.
 Qed.
-
-(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
-    point, the result type must be able to relate the sublists to the original
-    list. *)
-Definition UsePosDefiniteSublistsOf (l : NonEmpty UsePos) :=
-  { p : NonEmpty UsePos * NonEmpty UsePos | l = NE_append (fst p) (snd p) }.
-
-Definition usePosSplit (f : UsePos -> bool)
-  (l : NonEmpty UsePos) (Hlen : NE_length l > 1)
-  (Hfirst_true : f (NE_head l))
-  (Hlast_false : ~~ f (NE_last l)) : UsePosDefiniteSublistsOf l.
-Proof.
-  pose (usePosSpan f l).
-  destruct u.
-  unfold UsePosDefiniteSublistsOf.
-  induction l; simpl in *.
-  inversion Hlen.
-  destruct x.
-
-  destruct o as [o| ];
-  destruct o0 as [o0| ];
-  intuition.
-  - Case "(Some, Some)".
-    inversion y. exists (o, o0).
-    assumption.
-
-  - Case "(Some, None)".
-    apply NE_Forall_last in H0.
-    rewrite <- H in *.
-    simpl in H0. exfalso.
-    apply (eq_true_false_abs (f (NE_last l)));
-      [ by [] | exact: negbTE ].
-
-  - Case "(None, Some)".
-    rewrite <- H in *.
-    simpl in H0. exfalso.
-    apply negbTE in H0.
-    apply (eq_true_false_abs (f a));
-      assumption.
-Defined.
 
 (** ** RangeDesc *)
 

@@ -133,11 +133,6 @@ Theorem limit_active_registers `(st : ScanState sd) :
    determine here by induction. *)
 Admitted.
 
-Lemma move_unhandled_to_active : forall n (x : fin n) unh act inact hnd,
-  uniq ((x :: unh) ++ act ++ inact ++ hnd)
-    -> uniq (unh ++ (x :: act) ++ inact ++ hnd).
-Proof. by intros; rewrite cat_cons -cat1s uniq_catCA cat1s -cat_cons. Qed.
-
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd;
   rewrite (@perm_eq_uniq _ _ s2); first exact: Huniq; H;

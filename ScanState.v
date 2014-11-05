@@ -98,13 +98,6 @@ Definition registerWithHighestPos :
          if n < m then (reg, Some m) else (r, Some n)
        end) (Ordinal registers_exist, Some 0).
 
-(** Given a vector from registers to values, find the slot corresponding to
-    the register assigned to [i] and replace it with [x]. *)
-
-Definition atIntervalReg {sd : ScanStateDesc} (i : IntervalId sd)
-  {a} (x : a) (r : fin maxReg) (v : Vec a maxReg) :=
-  V.replace v (to_vfin r) x.
-
 (** ** ScanState *)
 
 (** The [ScanState] inductive data type describes the allowable state
@@ -308,10 +301,7 @@ Arguments curExists {sd} _.
 Arguments curId {sd} _.
 Arguments curIntDetails {sd} _.
 
-Definition curStateDesc `(cur : ScanStateCursor sd) := sd.
-Definition curIntDesc   `(cur : ScanStateCursor sd) := (curIntDetails cur).1.
-Definition curInterval  `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
-
+Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
 Definition curPosition `(cur : ScanStateCursor sd) :=
   intervalStart (curInterval cur).
 

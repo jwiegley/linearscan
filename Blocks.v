@@ -13,10 +13,6 @@ Include MAllocate M.
 
 Import EqNotations.
 
-(** * Program graphs *)
-
-Definition VirtReg := nat.
-
 (** * Block *)
 
 (** An incoming [Block] is really a conceptual "set" of use-positions

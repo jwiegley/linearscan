@@ -33,9 +33,6 @@ Arguments next_interval_increases [sd1 sd2] _.
 Arguments total_extent_decreases  [sd1 sd2] _.
 Arguments handled_count_increases [sd1 sd2] _.
 
-Definition newSSMorph (s : ScanStateDesc) : SSMorph s s.
-Proof. constructor; auto. Defined.
-
 Program Instance SSMorph_PO : PreOrder SSMorph.
 Obligation 1. constructor; auto. Qed.
 Obligation 2.

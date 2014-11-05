@@ -43,19 +43,9 @@ Definition uncurry_sig {A C} {B : A -> Prop}
   (f : forall x : A, B x -> C) (p : { x : A | B x }) : C :=
   let (x,H) := p in f x H.
 
-Definition uncurry_sigT {A C} {B : A -> Type}
-  (f : forall x : A, B x -> C) (p : { x : A & B x }) : C :=
-  let (x,H) := p in f x H.
-
 Definition fromMaybe {a} (d : a) (mx : option a) : a :=
   match mx with
     | Some x => x
-    | None => d
-  end.
-
-Definition maybe {a b} (d : b) (f : a -> b) (mx : option a) : b :=
-  match mx with
-    | Some x => f x
     | None => d
   end.
 
@@ -125,20 +115,20 @@ Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } 
 Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
-Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) :
-  P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p.
+(* Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : *)
+(*   P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p. *)
 
-Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) :
-  Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q.
+(* Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : *)
+(*   Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q. *)
 
 Definition proj1_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : A :=
   let (x,_,_) := e in x.
 
-Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) :
-  P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p.
+(* Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : *)
+(*   P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p. *)
 
-Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) :
-  Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q.
+(* Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : *)
+(*   Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q. *)
 
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
@@ -189,12 +179,6 @@ Lemma ltn_max : forall m n p, p < n -> p < maxn m n.
 Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
 Proof. intros. ssomega. Qed.
 
-Lemma lt_lt_le_shuffle : forall {x y z w}, x < y -> y < z -> z <= w -> x < w.
-Proof. intros. ssomega. Qed.
-
-Lemma lt_le_le_shuffle : forall {x y z w}, x < y -> y <= z -> z <= w -> x < w.
-Proof. intros. ssomega. Qed.
-
 Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
 Proof. intros. ssomega. Qed.
 
@@ -207,13 +191,7 @@ Qed.
 Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
 Proof. intros; ssomega. Qed.
 
-Lemma ltn_leq_leq : forall n m p : nat, m < n -> n <= p -> m <= p.
-Proof. intros; ssomega. Qed.
-
 Lemma ltnSSn : forall n, n < n.+2.
-Proof. intros; ssomega. Qed.
-
-Lemma leqSSn : forall n, n <= n.+2.
 Proof. intros; ssomega. Qed.
 
 Lemma fold_gt : forall a f n m (xs : list a),
@@ -222,15 +200,6 @@ Proof.
   move=> a f n m xs.
   elim: xs n => // ? ? IHxs *.
   exact /IHxs /ltn_addr.
-Qed.
-
-Lemma fold_fold_le : forall a f n m (xs : list a),
-  n <= m -> foldl (fun n x => n + f x) n xs <=
-            foldl (fun n x => n + f x) m xs.
-Proof.
-  move=> a f n m xs.
-  elim: xs n m => // ? ? IHxs *.
-  exact /IHxs /leq_add.
 Qed.
 
 Lemma fold_fold_lt : forall a f n m (xs : list a),
@@ -243,30 +212,8 @@ Proof.
   by rewrite ltn_add2r.
 Qed.
 
-Lemma fold_left_plus : forall a f xs n,
-   foldl (fun (n : nat) (x : a) => n + f x) n xs =
-   foldl (fun (n : nat) (x : a) => n + f x) 0 xs + n.
-Proof.
-  move=> a f; elim=> // a' ? IHxs n /=.
-  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
-Qed.
-
-Lemma LocallySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
-  LocallySorted R (x :: xs) -> LocallySorted R xs.
-Proof. intros. inversion H; subst; [ constructor | assumption ]. Qed.
-
-Lemma StronglySorted_uncons : forall a (R : a -> a -> Prop) (x : a) xs,
-  StronglySorted R (x :: xs) -> StronglySorted R xs.
-Proof. intros. inversion H; subst. assumption. Qed.
-
 Definition safe_hd {a} (xs : list a) (H : (size xs > 0)) : a.
 Proof. elim: xs H => //. Defined.
-
-Fixpoint safe_last {a} (xs : list a) (H : (size xs > 0)) : a.
-Proof. elim: xs H => //. Defined.
-
-Lemma uniq_nil : forall (a : eqType), @uniq a nil.
-Proof. by done. Qed.
 
 Lemma not_in_app : forall (a : eqType) x (l l' : list a),
   x \notin (l ++ l') -> x \notin l.
@@ -274,33 +221,6 @@ Proof.
   move=> a x l l'.
   rewrite mem_cat negb_orb.
   move=> /andP H. inv H.
-Qed.
-
-Lemma not_in_rem : forall (a : eqType) x y (l : list a),
-  x \notin l -> x != y -> x \notin rem y l.
-Proof.
-  move=> a x y.
-  elim=> // x0 l IHl H Heqe /=.
-  case E: (x0 == y) /eqP;
-  move: in_cons H => ->;
-  move: negb_orb => -> /andP [H1 H2].
-    by [].
-  rewrite in_cons negb_orb.
-  apply/andP.
-  split; [ by [] | exact: IHl ].
-Qed.
-
-Lemma uniq_catCA2 {a : eqType} (s1 s2 s3 : seq a) :
-  uniq (s1 ++ s2 ++ s3) = uniq (s1 ++ s3 ++ s2).
-Proof.
-  rewrite uniq_catC.
-  rewrite uniq_catCA.
-  rewrite uniq_catC.
-  rewrite uniq_catCA.
-  rewrite uniq_catC.
-  rewrite uniq_catCA.
-  rewrite catA.
-  reflexivity.
 Qed.
 
 Lemma map_f_notin :
@@ -334,10 +254,6 @@ Proof.
   exact: perm_to_rem.
 Qed.
 
-Lemma proj_rem_uniq (a b : eqType) (f : a -> b) : forall x xs,
-  uniq [seq f i | i <- xs] -> uniq [seq f i | i <- rem x xs].
-Proof. by move=> x xs; apply/subseq_uniq/map_subseq/rem_subseq. Qed.
-
 Lemma lift_bounded : forall n (x : fin n), ord_max != widen_ord (leqnSn n) x.
 Proof.
   move=> n.
@@ -354,50 +270,6 @@ Proof.
   rewrite /injective => x1 x2.
   by invert; apply ord_inj.
 Qed.
-
-Lemma uniq_fin_cons {n} (l : list (fin n)) :
-  uniq l -> uniq (ord_max :: map (widen_ord (leqnSn n)) l).
-Proof.
-  move=> Huniq.
-  rewrite cons_uniq.
-  apply/andP. split.
-  - elim: l Huniq => // x l IHl Huniq /=.
-    inv Huniq; move: H0 => /andP [H1 H2].
-    rewrite in_cons negb_orb.
-    apply/andP; split; last exact: IHl.
-    apply lift_bounded.
-  - rewrite map_inj_in_uniq //.
-    rewrite /prop_in2 /= => ? ? ? ? /eqP Heqe.
-    apply/eqP; move: Heqe.
-    rewrite inj_eq; first by [].
-    apply widen_ord_inj.
-Qed.
-
-Fixpoint span {a} (p : a -> bool) (l : list a) : (list a * list a) :=
-  match l with
-  | nil => (nil, nil)
-  | x :: xs =>
-    if p x
-    then let: (ys,zs) := span p xs in (x::ys,zs)
-    else (nil,l)
-  end.
-
-Lemma span_spec {a} (l : list a) : forall p l1 l2,
-  (l1, l2) = span p l -> l = l1 ++ l2.
-Proof.
-  move=> p.
-  elim: l => /= [|x xs IHxs] l1 l2 Heqe.
-    by inv Heqe.
-  case E: (p x); rewrite E in Heqe.
-    destruct (span p xs) eqn:S.
-    inv Heqe.
-    specialize (IHxs l l0).
-    rewrite {}IHxs; by reflexivity.
-  inv Heqe.
-Qed.
-
-Definition insert' {a} (p : a -> bool) (z : a) (l : list a) : list a :=
-  let: (l1,l2) := span p l in l1 ++ z :: l2.
 
 Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
   match l with
@@ -612,19 +484,6 @@ Qed.
 
 End Mergesort.
 
-Lemma Forall_map : forall (a : eqType) P
-  (f : a -> P a) (g : P a -> a) (R : a -> a -> bool) (x : a) l,
-  (forall n, g (f n) = n)
-    -> List.Forall (R x) l
-    -> List.Forall (fun n : P a => R x (g n)) [seq f i | i <- l].
-Proof.
-  move=> a P f g R x.
-  elim=> [|z l IHl] H /=.
-    by constructor.
-  constructor. rewrite H. inv H0.
-  apply IHl. apply H. inv H0.
-Qed.
-
 Lemma Forall_leq_map : forall a f x l,
   List.Forall (fun m : a => f x <= f m) l
     -> List.Forall (fun n : nat => f x <= n) [seq f i | i <- l].
@@ -634,22 +493,6 @@ Proof.
     by constructor.
   constructor. by inv H.
   apply: IHl; inv H.
-Qed.
-
-Lemma StronglySorted_map : forall (a b : eqType) P
-  (f : a -> P a) (g : P a -> a) (R : a -> a -> bool) l,
-  (forall n, g (f n) = n)
-    -> StronglySorted R l
-    -> StronglySorted (fun x y : P a => R (g x) (g y)) [seq f i | i <- l].
-Proof.
-  move=> a b P f g R.
-  elim=> [|x l IHl] H /=.
-    by constructor.
-  constructor. apply IHl. apply H. inv H0.
-  apply Forall_map. apply H. inv H0.
-  apply List.Forall_impl with (P := (fun x0 : a => R x x0)).
-    by rewrite H.
-  by [].
 Qed.
 
 Lemma StronglySorted_leq_map : forall a f l,
