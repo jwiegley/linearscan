@@ -66,6 +66,8 @@ Extract Inlined Constant foldr     => "Prelude.foldr".
 Extract Inlined Constant fst       => "(Prelude.fst)".
 (* Extract Inlined Constant funcomp   => "(Prelude..)". *)
 (* Extract Inlined Constant id        => "(Prelude.id)". *)
+Extract Inlined Constant has       => "(Data.List.any)".
+Extract Inlined Constant rem       => "(Prelude.const Data.List.delete)".
 Extract Inlined Constant length    => "(Data.List.length)".
 Extract Inlined Constant leq       => "(Prelude.<=)".
 Extract Inlined Constant map       => "(Prelude.map)".
@@ -87,8 +89,8 @@ Extract Inlined Constant subn      => "(Prelude.-)".
 
 (* Avoid extracting this function, which has no computational value, but Coq
    insists on ignoring its opacity. *)
-(* Extract Inlined Constant boundedTransport *)
-(*   => "LinearScan.Utils.boundedTransport'". *)
+Extract Inlined Constant boundedTransport =>
+  "LinearScan.Utils.boundedTransport'".
 
 Extraction Blacklist String List Vector NonEmpty.
 

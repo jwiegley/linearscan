@@ -312,7 +312,7 @@ Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
   `(i : Interval {| ibeg := ib
                   ; iend := ie
                   ; rds  := rs |}) {struct rs} :
-  { p : (option IntervalSig * option IntervalSig) | SubIntervalsOf before i p }.
+  { p : option IntervalSig * option IntervalSig | SubIntervalsOf before i p }.
 Proof.
   set f := (fun u => (uloc u < before)).
   destruct rs as [r|r rs];
@@ -380,7 +380,7 @@ Proof.
       rewrite Hb in H2.
       rewrite H2 in Hi0.
       rewrite H3.
-      have i1_1i' := (I_Cons i1_1i Hi0).
+      have i1_1i' := I_Cons i1_1i Hi0.
       rewrite -He in i1_1i'.
       by exists (Some (exist _ _ i1_1i'), Some i1_2).
 

@@ -21,7 +21,6 @@ import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Vector0 as Vector0
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
-import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssreflect as Ssreflect
 import qualified LinearScan.Ssrnat as Ssrnat
 
@@ -521,7 +520,7 @@ _LinearScan__moveActiveToHandled sd x =
     (_LinearScan__intervals sd) (_LinearScan__fixedIntervals sd)
     (_LinearScan__unhandled sd)
     (unsafeCoerce
-      (Seq.rem
+      ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__nextInterval sd))
           (Fintype.ordinal_eqType _LinearScan__maxReg)) x
@@ -537,7 +536,7 @@ _LinearScan__moveActiveToInactive sd x =
     (_LinearScan__intervals sd) (_LinearScan__fixedIntervals sd)
     (_LinearScan__unhandled sd)
     (unsafeCoerce
-      (Seq.rem
+      ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__nextInterval sd))
           (Fintype.ordinal_eqType _LinearScan__maxReg)) x
@@ -554,7 +553,7 @@ _LinearScan__moveInactiveToActive sd x =
     (_LinearScan__unhandled sd) ((:) (unsafeCoerce x)
     (_LinearScan__active sd))
     (unsafeCoerce
-      (Seq.rem
+      ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__nextInterval sd))
           (Fintype.ordinal_eqType _LinearScan__maxReg)) x
@@ -569,7 +568,7 @@ _LinearScan__moveInactiveToHandled sd x =
     (_LinearScan__intervals sd) (_LinearScan__fixedIntervals sd)
     (_LinearScan__unhandled sd) (_LinearScan__active sd)
     (unsafeCoerce
-      (Seq.rem
+      ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__nextInterval sd))
           (Fintype.ordinal_eqType _LinearScan__maxReg)) x
@@ -1063,18 +1062,6 @@ _LinearScan__transportVecBounds pos m n _top_assumption_ =
   in
   Vector0._V__t_rec _evar_0_ _evar_0_0 m _top_assumption_
 
-_LinearScan__boundedTransport :: Prelude.Int -> Prelude.Int -> Prelude.Int ->
-                                 LinearScan__Coq_boundedRangeVec ->
-                                 LinearScan__Coq_boundedRangeVec
-_LinearScan__boundedTransport maxVirtReg pos n _top_assumption_ =
-  let {
-   _evar_0_ = \hvars hregs -> LinearScan__Build_boundedRangeVec
-    (_LinearScan__transportVecBounds pos maxVirtReg n hvars)
-    (_LinearScan__transportVecBounds pos _LinearScan__maxReg n hregs)}
-  in
-  case _top_assumption_ of {
-   LinearScan__Build_boundedRangeVec x x0 -> _evar_0_ x x0}
-
 _LinearScan__boundedSing :: Range.UsePos -> LinearScan__Coq_boundedRange
 _LinearScan__boundedSing upos =
   Range.Build_RangeDesc (Range.uloc upos) (Prelude.succ (Range.uloc upos))
@@ -1176,8 +1163,9 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
   in
   case _LinearScan__references maxVirtReg b of {
    Vector0.V__Coq_nil ->
-    _LinearScan__boundedTransport maxVirtReg pos (Prelude.succ (Prelude.succ
-      pos)) (LinearScan__Build_boundedRangeVec restVars' restRegs');
+    LinearScan.Utils.boundedTransport' maxVirtReg pos (Prelude.succ
+      (Prelude.succ pos)) (LinearScan__Build_boundedRangeVec restVars'
+      restRegs');
    Vector0.V__Coq_cons h n vs ->
     case h of {
      Prelude.Left v ->

@@ -20,6 +20,7 @@ LinearScan/Main.hs: Main.vo
 	@perl -i -pe 's/module LinearScan..+?.Utils where/module LinearScan.Utils where/' LinearScan/Utils.hs
 	@perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' LinearScan/IState.hs
 	@perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' LinearScan/Main.hs
+	@perl -i -pe 's/data Coq_simpl_fun/newtype Coq_simpl_fun/' LinearScan/*.hs
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o $@

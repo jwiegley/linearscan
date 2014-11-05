@@ -8,7 +8,6 @@ import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
-import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssreflect as Ssreflect
 import qualified LinearScan.Ssrfun as Ssrfun
 
@@ -55,7 +54,8 @@ intervalExtent d =
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
   let {f = \x y -> Range.rangesIntersect ( x) ( y)} in
-  Seq.has (\x -> Seq.has (f x) (NonEmpty0.coq_NE_to_list (rds j)))
+  (Data.List.any) (\x ->
+    (Data.List.any) (f x) (NonEmpty0.coq_NE_to_list (rds j)))
     (NonEmpty0.coq_NE_to_list (rds i))
 
 intervalIntersectionPoint :: IntervalDesc -> IntervalDesc -> Prelude.Maybe
