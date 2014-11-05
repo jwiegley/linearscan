@@ -72,19 +72,6 @@ Variable A : Set.
 Variable R : relation A.
 Context `{H : Transitive A R}.
 
-Fixpoint NE_In (a : A) (l : NonEmpty A) : Prop :=
-  match l with
-    | NE_Sing b => b = a
-    | NE_Cons b m => b = a \/ NE_In a m
-  end.
-
-Inductive NE_Exists (P : A -> Prop) : NonEmpty A -> Prop :=
- | NE_Exists_sing    : forall x,   P x -> NE_Exists P (NE_Sing x)
- | NE_Exists_cons_hd : forall x l, P x -> NE_Exists P (NE_Cons x l)
- | NE_Exists_cons_tl : forall x l, NE_Exists P l -> NE_Exists P (NE_Cons x l).
-
-Hint Constructors NE_Exists.
-
 Inductive NE_Forall (P : A -> Prop) : NonEmpty A -> Prop :=
  | NE_Forall_sing : forall x, P x -> NE_Forall P (NE_Sing x)
  | NE_Forall_cons : forall x l, P x -> NE_Forall P l -> NE_Forall P (NE_Cons x l).
