@@ -41,10 +41,8 @@ Lemma NE_StronglySorted_UsePos_impl : forall xs,
   NE_StronglySorted upos_lt xs -> NE_head xs <= NE_last xs.
 Proof.
   intros.
-  induction xs; simpl in *; first by [].
-  move: H. invert.
-  move/NE_Forall_last: H2.
-  rewrite /upos_lt /upos_le.
+  induction xs using ne_ind; simpl in *; first by [].
+  move: H. invert. subst.
   apply/ltnW.
 Qed.
 
