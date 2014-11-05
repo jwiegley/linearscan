@@ -1,5 +1,6 @@
 Require Import Allocate.
 Require Import Lib.
+Require Import NonEmpty.
 
 Open Scope nat_scope.
 
@@ -59,7 +60,8 @@ Proof.
     split. apply p.
     apply Some.
     exists rd. apply r.
-    by abstract ssomega.
+    apply ltnW in Hlt.
+    exact: (leq_trans Hlt).
   - constructor; last exact: IHv.
     split. apply p.
     exact: None.
@@ -148,19 +150,17 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
                {| vars := restVars'; regs := restRegs' |}
 
   | V.cons (inl v) _ vs =>
-    let x := consr (V.nth restVars' (to_vfin v)) in
+    let x := consr (vnth restVars' v) in
     let restVars'' :=
-        V.replace (transportVecBounds (ltnSSn _) restVars')
-                  (to_vfin v) x in
+        replace (transportVecBounds (ltnSSn _) restVars') v x in
     let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in
     {| vars := restVars''; regs := restRegs'' |}
 
   | V.cons (inr r) _ vs =>
-    let x := consr (V.nth restRegs' (to_vfin r)) in
+    let x := consr (vnth restRegs' r) in
     let restVars'' := transportVecBounds (ltnSSn _) restVars' in
     let restRegs'' :=
-        V.replace (transportVecBounds (ltnSSn _) restRegs')
-                  (to_vfin r) x in
+        replace (transportVecBounds (ltnSSn _) restRegs') r x in
     {| vars := restVars''; regs := restRegs'' |}
   end.
 
@@ -176,11 +176,9 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
       | (Some b, Some e) => Some (b, e)
       end in
     Some (match mres with
-          | None => exist Range rd r
-          | Some (b, e) =>
-            let r' := R_Extend b e r in
-            exist Range (getRangeDesc r') r'
-          end)
+            | None        => packRange r
+            | Some (b, e) => packRange (R_Extend b e r)
+            end)
   end.
 
 (** The list of blocks is processed in reverse, so that the resulting
@@ -191,28 +189,34 @@ Definition processBlocks (blocks : NonEmpty Block) :
        applyList blocks emptyBoundedRangeVec handleBlock in
   (V.map extractRange vars', V.map extractRange regs').
 
-Definition determineIntervals (blocks : NonEmpty Block) :
-  { sd : ScanStateDesc | ScanState sd } :=
-  let mkint (mx : option RangeSig) : option IntervalSig := match mx with
-      | None => None
-      | Some (exist _ r) =>
-        let i := I_Sing r in
-        Some (exist Interval (getIntervalDesc i) i)
-      end in
-  let handleVar (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
-      match mkint mx with
+Inductive Foo {a} : list a -> Prop := Foo_ : Foo nil.
+
+Definition mkFoo {a : Set} := @Foo_.
+
+Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
+  let mkint (ss : ScanStateSig) (mx : option RangeSig)
+            (f : forall sd, ScanState sd -> forall d, Interval d
+                   -> ScanStateSig) :=
+      let: (exist sd st) := ss in
+      match mx with
+      | Some (exist _ r) => f _ st _ (I_Sing r)
       | None => ss
-      | Some (exist idesc i) =>
-        let: (exist sd st) := ss in
-        let st' := ScanState_newUnhandled st i in
-        exist ScanState (getScanStateDesc st') st'
       end in
-  let handleReg (ss : ScanStateSig) (mx : option RangeSig) : ScanStateSig :=
-      undefined in
+
+  let handleVar ss mx :=
+      mkint ss mx $ fun _ st _ i =>
+        packScanState (ScanState_newUnhandled st i) in
+
+  let handleReg reg ss mx :=
+      mkint ss mx $ fun _ st _ i =>
+        packScanState (ScanState_newUnhandled st i) in
+
   let s0 := ScanState_nil in
-  let s1 : ScanStateSig := exist ScanState (getScanStateDesc s0) s0 in
+  let s1 := packScanState s0 in
+
   let: (varRanges, regRanges) := processBlocks blocks in
-  V.fold_left handleReg (V.fold_left handleVar s1 varRanges) regRanges.
+  fold_left_with_index handleReg
+    (V.fold_left handleVar s1 varRanges) regRanges.
 
 Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).

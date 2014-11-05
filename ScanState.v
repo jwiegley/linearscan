@@ -25,9 +25,9 @@ Definition registers_exist := registers_exist.
 
 Record ScanStateDesc : Type := {
     nextInterval : nat;
-    IntervalId  := fin nextInterval;
+    IntervalId := fin nextInterval;
 
-    intervals    : Vec { d : IntervalDesc | Interval d } nextInterval;
+    intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
     fixedIntervals :
       Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
 
@@ -68,15 +68,14 @@ Definition widen_id {n} := widen_ord (leqnSn n).
 
 Definition widen_fst {n a} p := (@widen_id n (@fst _ a p), snd p).
 
-Definition getInterval `(i : IntervalId sd) :=
- (V.nth (intervals sd) (to_vfin i)).2.
+Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandledIds sd with
   | nil => 0
-  | [:: i] => intervalExtent (V.nth (intervals sd) (to_vfin i)).2
+  | [:: i] => intervalExtent (vnth (intervals sd) i).2
   | xs  =>
-    let f n x := n + intervalExtent (V.nth (intervals sd) (to_vfin x)).2 in
+    let f n x := n + intervalExtent (vnth (intervals sd) x).2 in
     foldl f 0 xs
   end.
 
@@ -229,7 +228,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; fixedIntervals   := fixints
        |} ->
-    let xi := (V.nth ints (to_vfin xid)).2 in
+    let xi := (vnth ints xid).2 in
     forall (H : firstUsePos xi < pos <= lastUsePos xi),
 
     let xe   := splitInterval H in
@@ -241,8 +240,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := map widen_fst act
        ; inactive         := map widen_fst inact
        ; handled          := map widen_fst hnd
-       ; intervals        := V.replace (V.shiftin (snd xe.1) ints)
-                                       (to_vfin (widen_id xid)) (fst xe.1)
+       ; intervals        := replace (V.shiftin (snd xe.1) ints)
+                                     (widen_id xid) (fst xe.1)
        ; fixedIntervals   := fixints
        |}.
 
@@ -258,27 +257,31 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_splitCurrentInterval"
   ].
 
-Definition ScanStateSig := { sd : ScanStateDesc | ScanState sd }.
+Notation ScanStateSig := { sd : ScanStateDesc | ScanState sd }.
 
 Definition getScanStateDesc `(st : ScanState sd) := sd.
+Arguments getScanStateDesc [sd] st /.
+
+Definition packScanState `(st : ScanState sd) := exist ScanState sd st.
+Arguments packScanState [sd] st /.
 
 (** [ScanState_unhandledExtent] relates the [unhandledExtent] of a [ScanState]
     with the [intervalExtent] of the first member of its [unhandled] list. *)
 Theorem ScanState_unhandledExtent `(st : ScanState sd) :
   let ue := unhandledExtent sd in
   match unhandled sd with
-  | nil    => ue = 0
-  | [:: i] => ue = intervalExtent (V.nth (intervals sd) (to_vfin (fst i))).2
-  | i :: _ => ue > intervalExtent (V.nth (intervals sd) (to_vfin (fst i))).2
+  | nil    => ue == 0
+  | [:: i] => ue == intervalExtent (vnth (intervals sd) (fst i)).2
+  | i :: _ => ue > intervalExtent (vnth (intervals sd) (fst i)).2
   end.
 Proof.
   destruct sd.
   destruct unhandled0 eqn:Heqe;
-  unfold unhandledExtent; simpl. reflexivity.
-  destruct l eqn:Heqe2; simpl. reflexivity.
+  unfold unhandledExtent; simpl. by [].
+  destruct l eqn:Heqe2; simpl. by [].
   apply fold_gt.
   destruct p0.
-  pose (Interval_extent_nonzero (V.nth intervals0 (to_vfin i)).2).
+  pose (Interval_extent_nonzero (vnth intervals0 i).2).
   by rewrite add0n addnC ltn_plus.
 Qed.
 
@@ -292,8 +295,8 @@ Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
     curState  : ScanState sd;
     curExists : size (unhandled sd) > 0;
 
-    curId := safe_hd curExists;
-    curIntDetails := V.nth (intervals sd) (to_vfin (fst curId))
+    curId := safe_hd _ curExists;
+    curIntDetails := vnth (intervals sd) (fst curId)
 }.
 
 Arguments curState {sd} _.

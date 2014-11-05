@@ -3,6 +3,14 @@ Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Sorted.
 Require Import Coq.Relations.Relations.
 
+Require Import Ssreflect.ssreflect.
+Require Import Ssreflect.ssrfun.
+Require Import Ssreflect.ssrbool.
+Require Import Ssreflect.eqtype.
+Require Import Ssreflect.seq.
+Require Import Ssreflect.ssrnat.
+Require Import Ssreflect.fintype.
+
 Generalizable All Variables.
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -16,6 +24,18 @@ Inductive NonEmpty (a : Type) : Type :=
 
 Arguments NE_Sing [_] _.
 Arguments NE_Cons [_] _ _.
+
+Notation "[ ::: x1 ]" := (NE_Sing x1)
+  (at level 0, format "[ :::  x1 ]") : seq_scope.
+
+Fixpoint NE_from_list {a} (x : a) (xs : seq a) : NonEmpty a :=
+  match xs with
+    | nil => NE_Sing x
+    | cons y ys => NE_Cons x (NE_from_list y ys)
+  end.
+
+Notation "[ ::: x & s ]" := (NE_from_list x s)
+  (at level 0, only parsing) : seq_scope.
 
 Fixpoint NE_length {a} (ne : NonEmpty a) : nat :=
   match ne with
@@ -50,7 +70,7 @@ Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
   end.
 
 Definition NE_fold_left {a b : Type} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
-  fold_left f ne z.
+  foldl f z ne.
 
 Fixpoint NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a :=
   match l1 with

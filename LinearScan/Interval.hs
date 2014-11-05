@@ -9,6 +9,7 @@ import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
 import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssreflect as Ssreflect
+import qualified LinearScan.Ssrfun as Ssrfun
 
 
 __ :: any
@@ -16,7 +17,7 @@ __ = Prelude.error "Logical or arity value used"
 
 data IntervalDesc =
    Build_IntervalDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty
-                                              Range.RangeSig)
+                                              Range.RangeDesc)
 
 ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
@@ -28,14 +29,10 @@ iend i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
 
-rds :: IntervalDesc -> NonEmpty0.NonEmpty Range.RangeSig
+rds :: IntervalDesc -> NonEmpty0.NonEmpty Range.RangeDesc
 rds i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> rds0}
-
-getIntervalDesc :: IntervalDesc -> IntervalDesc
-getIntervalDesc d =
-  d
 
 intervalStart :: IntervalDesc -> Prelude.Int
 intervalStart i =
@@ -74,7 +71,7 @@ intervalIntersectionPoint i j =
         (rds j) Prelude.Nothing}) (rds i) Prelude.Nothing
 
 findIntervalUsePos :: IntervalDesc -> (Range.UsePos -> Prelude.Bool) ->
-                      Prelude.Maybe ((,) Range.RangeSig Range.UsePos)
+                      Prelude.Maybe ((,) Range.RangeDesc Range.UsePos)
 findIntervalUsePos i f =
   let {
    f0 = \r ->
@@ -91,7 +88,7 @@ findIntervalUsePos i f =
 
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
-  Lib.option_map ((Prelude..) Range.uloc (Prelude.snd))
+  Lib.option_map (Ssrfun.funcomp () Range.uloc (Prelude.snd))
     (findIntervalUsePos d (\u ->
       (Prelude.<=) (Prelude.succ pos) (Range.uloc u)))
 
@@ -102,15 +99,13 @@ firstUsePos d =
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
-  Lib.option_map ((Prelude..) Range.uloc (Prelude.snd))
+  Lib.option_map (Ssrfun.funcomp () Range.uloc (Prelude.snd))
     (findIntervalUsePos d Range.regReq)
 
 lastUsePos :: IntervalDesc -> Prelude.Int
 lastUsePos d =
   Range.uloc
     (NonEmpty0.coq_NE_last (Range.ups ( (NonEmpty0.coq_NE_last (rds d)))))
-
-type IntervalSig = IntervalDesc
 
 splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Int
 splitPosition d before =
@@ -120,9 +115,10 @@ splitPosition d before =
     ((Prelude.min) final
       (Lib.fromMaybe final (Lib.option_choose before (firstUseReqReg d))))
 
-intervalSpan :: (NonEmpty0.NonEmpty Range.RangeSig) -> Prelude.Int ->
+intervalSpan :: (NonEmpty0.NonEmpty Range.RangeDesc) -> Prelude.Int ->
                 Prelude.Int -> Prelude.Int ->
-                ((,) (Prelude.Maybe IntervalSig) (Prelude.Maybe IntervalSig))
+                ((,) (Prelude.Maybe IntervalDesc)
+                (Prelude.Maybe IntervalDesc))
 intervalSpan rs before ib ie =
   let {f = \u -> (Prelude.<=) (Prelude.succ (Range.uloc u)) before} in
   case rs of {
@@ -375,7 +371,8 @@ intervalSpan rs before ib ie =
     case _top_assumption_ of {
      (,) x x0 -> _evar_0_ x x0 __}}
 
-splitInterval :: Prelude.Int -> IntervalDesc -> ((,) IntervalSig IntervalSig)
+splitInterval :: Prelude.Int -> IntervalDesc ->
+                 ((,) IntervalDesc IntervalDesc)
 splitInterval before d =
   let {
    _evar_0_ = \ib ie rds0 ->

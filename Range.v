@@ -1,4 +1,5 @@
 Require Import Lib.
+Require Import NonEmpty.
 
 Open Scope nat_scope.
 Open Scope program_scope.
@@ -29,10 +30,7 @@ Notation " (| x |) " := {| uloc := x; regReq := false |}.
 Notation " (! x !) " := {| uloc := x; regReq := true |}.
 End UsePosNotations.
 
-Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
-
-Arguments upos_le x y /.
 Arguments upos_lt x y /.
 
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
@@ -42,7 +40,6 @@ Proof.
   induction xs; simpl in *; first by [].
   move: H. invert.
   move/NE_Forall_last: H2.
-  rewrite /upos_lt /upos_le.
   apply/ltnW.
 Qed.
 
@@ -161,7 +158,7 @@ Inductive Range : RangeDesc -> Prop :=
   | R_Sing u : odd (uloc u) ->
     Range {| rbeg := uloc u
            ; rend := (uloc u).+1
-           ; ups  := NE_Sing u
+           ; ups  := [::: u]
            |}
 
   (** A [Range] can be extended by adding a use position to the beginning.
@@ -195,11 +192,13 @@ Arguments getRangeDesc [d] r /.
 
 Coercion getRangeDesc : Range >-> RangeDesc.
 
+Definition packRange `(r : Range d) := exist Range d r.
+Arguments packRange [d] r /.
+
 Definition rangeExtent `(Range r) := rend r - rbeg r.
 Arguments rangeExtent [r] _ /.
 
-Definition RangeSig := { rd : RangeDesc | Range rd }.
-Arguments RangeSig /.
+Notation RangeSig := { rd : RangeDesc | Range rd }.
 
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
 Proof. induction r; auto. simpl. apply leq_min. assumption. Qed.
@@ -219,7 +218,7 @@ Proof.
   - Case "R_Extend". assumption.
 Qed.
 
-Theorem Range_all_odd `(r : Range rd) : NE_Forall (odd ∘ uloc) (ups rd).
+Theorem Range_all_odd `(r : Range rd) : NE_Forall (odd \o uloc) (ups rd).
 Proof.
   Range_cases (induction r) Case; simpl.
   - Case "R_Sing". by constructor.
@@ -237,7 +236,6 @@ Proof.
     pose (Range_end_bounded r).
     pose (Range_sorted r).
     apply NE_StronglySorted_UsePos_impl in n.
-    unfold upos_lt, upos_le in *.
     exact (lt_le_shuffle H0 n i0).
   - Case "R_Extend".
     exact /ltn_min /ltn_max.
@@ -247,13 +245,13 @@ Lemma Range_ups_bounded `(r : Range rd) : NE_head (ups rd) <= NE_last (ups rd).
 Proof.
   Range_cases (induction r) Case; simpl in *.
   - Case "R_Sing".   by [].
-  - Case "R_Cons".   unfold upos_lt in *; ssomega.
+  - Case "R_Cons".   apply ltnW in H0. exact: (leq_trans H0).
   - Case "R_Extend". by [].
 Qed.
 
 Definition Range_fromList `(us : NonEmpty UsePos) :
   NE_StronglySorted upos_lt us
-    -> NE_Forall (odd ∘ uloc) us
+    -> NE_Forall (odd \o uloc) us
     -> Range {| rbeg := uloc (NE_head us)
               ; rend := (uloc (NE_last us)).+1
               ; ups  := us |}.
@@ -473,7 +471,7 @@ Proof.
   rewrite -ltn_subRL -subnDA.
   apply ltn_sub2l; rewrite subnKC //;
     try exact: ltnW.
-  by ssomega.
+  exact: (ltn_trans H2).
 Qed.
 
 Lemma splitRange_spec (f : UsePos -> bool) `(r : Range rd)
@@ -504,9 +502,9 @@ Fixpoint generateRangeBuilder
   (start index : nat) (Hodd : odd start) {struct index} :
   { rd : RangeDesc | Range rd & uloc (NE_head (ups rd)) = start }.
 Proof.
-  destruct index.
+  destruct index as [|index].
     pose (@R_Sing (|start|) Hodd).
-    exists (getRangeDesc r). apply r. auto.
+    exists r. apply r. auto.
   pose (generateRangeBuilder start.+2 index) as r.
   destruct r as [rd r Hr].
     assert (upos_lt (|start|) (|start.+2|)) as Hlt.
@@ -515,9 +513,7 @@ Proof.
   have: (|start|) < NE_head (ups rd) by rewrite Hr.
   move=> Hlt.
   pose (@R_Cons (|start|) rd Hodd r Hlt) as r'.
-  exists (getRangeDesc r').
-    apply r'.
-  auto.
+  exists r'. apply r'. auto.
 Defined.
 
 Definition generateRange (start finish : nat) (Hodd : odd start)
@@ -543,7 +539,7 @@ Example testRangeSpan_1 :
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_2 :
-  testRangeSpan odd_1 lt_1_9 3 = (Some (NE_Sing (|1|)), Some [(|3|); (|5|); (|7|)]).
+  testRangeSpan odd_1 lt_1_9 3 = (Some [::: (|1|)], Some [(|3|); (|5|); (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_3 :
@@ -551,7 +547,7 @@ Example testRangeSpan_3 :
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_4 :
-  testRangeSpan odd_1 lt_1_9 7 = (Some [(|1|); (|3|); (|5|)], Some (NE_Sing (|7|))).
+  testRangeSpan odd_1 lt_1_9 7 = (Some [(|1|); (|3|); (|5|)], Some [::: (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_5 :

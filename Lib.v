@@ -1,18 +1,5 @@
-Require Export Coq.Bool.Bool.
-Require Export Coq.Logic.ProofIrrelevance.
-Require Export Coq.Numbers.Natural.Peano.NPeano.
-Require Export Coq.Program.Basics.
-Require Export Coq.Program.Tactics.
-Require Export Coq.Sorting.Sorting.
-Require Export Coq.Structures.Orders.
-Require Export NonEmpty.
-Require Export Omega.
 Require Export Tactics.
-
 Require Export Vector.
-Require Coq.Vectors.Vector.
-Module V := Coq.Vectors.Vector.
-Definition Vec := V.t.
 
 Require Export Ssreflect.ssreflect.
 Require Export Ssreflect.ssrfun.
@@ -20,6 +7,7 @@ Require Export Ssreflect.ssrbool.
 Require Export Ssreflect.eqtype.
 Require Export Ssreflect.seq.
 Require Export Ssreflect.ssrnat.
+Require Export Ssreflect.fintype.
 
 Generalizable All Variables.
 Set Implicit Arguments.
@@ -29,6 +17,11 @@ Unset Printing Implicit Defensive.
 (** The following are extensions to the Coq standard library. *)
 
 Definition undefined {a : Type} : a. Admitted.
+
+Definition apply {A B} (f : A -> B) (x : A) := f x.
+
+Infix "$" := apply (at level 60, right associativity, only parsing)
+  : program_scope.
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
 Proof. intros P. contra. Defined.
@@ -133,11 +126,12 @@ Definition proj1_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : A :=
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
-  rewrite -subn_gt0 odd_gt0 // odd_sub // modd /= negb_involutive //.
+  rewrite -subn_gt0 odd_gt0 // odd_sub // modd /=.
+  exact/negPn.
 Qed.
 
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
-Proof. rewrite /= negb_involutive //. Qed.
+Proof. by rewrite /=; apply/negPn; case: (odd n). Qed.
 
 Lemma lt_dec : forall n m, (n < m) -> (n < m)%coq_nat.
 Proof. move=> n m H. destruct (@ltP n m); [ done | inv H ]. Qed.
@@ -157,16 +151,6 @@ Proof.
   move=> H. destruct (@leP n m); [ done | inv H ].
 Qed.
 
-Ltac ssomega :=
-  repeat match goal with
-    | [ H : is_true (leq (S ?N) ?M)  |- _ ] =>
-        destruct (@ltP N M); last done
-    | [ H : is_true (leq ?N ?M)  |- _ ] =>
-        destruct (@leP N M); last done
-    | [ |- is_true (leq (S _) _) ] => apply lt_dec_iff
-    | [ |- is_true (leq _ _) ] => apply le_dec_iff
-  end; omega.
-
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.
 
@@ -177,10 +161,13 @@ Lemma ltn_max : forall m n p, p < n -> p < maxn m n.
  Proof. move=> *. by rewrite leq_max; intuition. Qed.
 
 Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
-Proof. intros. ssomega. Qed.
+Proof.
+  move=> x y z w H1 H2 H3.
+  by apply/(leq_trans H1)/(leq_trans H2)/ltnW.
+Qed.
 
 Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
-Proof. intros. ssomega. Qed.
+Proof. exact: ltnW. Qed.
 
 Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
   elim=> [|m IHm] // n H;
@@ -189,10 +176,13 @@ Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
 Qed.
 
 Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
-Proof. intros; ssomega. Qed.
+Proof.
+  move=> n m p H1 H2.
+  exact: (leq_trans H1).
+Qed.
 
 Lemma ltnSSn : forall n, n < n.+2.
-Proof. intros; ssomega. Qed.
+Proof. move=> n. exact: ltnW. Qed.
 
 Lemma fold_gt : forall a f n m (xs : list a),
   n > m -> foldl (fun n x => n + f x) n xs > m.
@@ -212,15 +202,39 @@ Proof.
   by rewrite ltn_add2r.
 Qed.
 
-Definition safe_hd {a} (xs : list a) (H : (size xs > 0)) : a.
-Proof. elim: xs H => //. Defined.
+Definition safe_hd {a} (xs : list a) : size xs > 0 -> a.
+Proof. case: xs => //. Defined.
+
+Arguments safe_hd [a] xs H.
+
+Definition safe_last {a} (xs : list a) : size xs > 0 -> a.
+Proof.
+  case: xs => [//|y ys] /= H.
+  exact: (last y ys).
+Defined.
+
+Arguments safe_last [a] xs H.
+
+Lemma lt_size_rev : forall a (xs : seq a), 0 < size xs -> 0 < size (rev xs).
+Proof.
+  move=> a.
+  elim=> //= [x xs IHxs] H.
+  by rewrite size_rev /=.
+Qed.
+
+(* Lemma hd_last_spec : forall a (xs : seq a) (H : 0 < size xs), *)
+(*   safe_hd xs H = safe_last (rev xs) (lt_size_rev H). *)
+(* Proof. *)
+(*   move=> a xs. *)
+(*   case: xs => [//|y ys] /= H. *)
 
 Lemma not_in_app : forall (a : eqType) x (l l' : list a),
   x \notin (l ++ l') -> x \notin l.
 Proof.
   move=> a x l l'.
-  rewrite mem_cat negb_orb.
-  move=> /andP H. inv H.
+  rewrite mem_cat.
+  move/norP.
+  move=> H. inv H.
 Qed.
 
 Lemma map_f_notin :
@@ -229,9 +243,10 @@ Lemma map_f_notin :
 Proof.
   move=> T1 T2 f.
   elim=> // x xs IHxs x0 Hinj.
-  rewrite in_cons negb_orb => /andP [H1 H2].
-  rewrite map_cons in_cons negb_orb.
-  apply/andP; split.
+  rewrite in_cons.
+  move/norP => [H1 H2].
+  rewrite map_cons in_cons.
+  apply/norP; split.
     by rewrite inj_eq.
   exact: IHxs.
 Qed.
@@ -260,8 +275,8 @@ Proof.
   case=> /= m Hlt.
   rewrite /ord_max /lift.
   apply/eqP; invert.
-  move: H0 Hlt => -> H.
-  abstract ssomega.
+  move: H0 Hlt => ->.
+  by rewrite ltnn.
 Qed.
 
 Lemma widen_ord_inj : forall m n (H : m <= n), injective (widen_ord H).
@@ -346,6 +361,8 @@ Definition isort := iter_imerge [::].
 
 (** The proof of correctness *)
 
+Require Export Coq.Sorting.Sorting.
+
 Definition lebf := fun n m => f n <= f m.
 
 Local Notation Sorted := (LocallySorted lebf) (only parsing).
@@ -427,15 +444,14 @@ Corollary StronglySorted_isort : forall l,
 Proof.
   move=> l.
   apply Sorted_StronglySorted.
-  rewrite /Relations_1.Transitive.
-  move=> x y z.
-  rewrite /lebf.
-  intros; ssomega.
-  apply LocallySorted_isort.
+    rewrite /Relations_1.Transitive.
+    move=> x y z.
+    rewrite /lebf.
+    exact: leq_trans.
+  exact: LocallySorted_isort.
 Qed.
 
 Import EqNotations.
-Require Import Recdef.
 
 Lemma Forall_insert_spec : forall x xs z,
   List.Forall (lebf x) xs -> lebf x z
@@ -477,8 +493,8 @@ Proof.
     rewrite /lebf.
     move=> /negP.
     rewrite -ltnNge.
-    move=> L.
-    ssomega.
+    move=> /ltnW L.
+    exact: (leq_trans L).
   by [].
 Qed.
 

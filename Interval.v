@@ -1,4 +1,5 @@
 Require Import Lib.
+Require Import NonEmpty.
 
 Require Export Range.
 
@@ -70,6 +71,9 @@ Definition getIntervalDesc `(i : Interval d) := d.
 Arguments getIntervalDesc [d] i /.
 
 Coercion getIntervalDesc : Interval >-> IntervalDesc.
+
+Definition packInterval `(i : Interval d) := exist Interval d i.
+Arguments packInterval [d] i /.
 
 Definition intervalStart `(Interval i) : nat := ibeg i.
 Definition intervalEnd   `(Interval i) : nat := iend i.
@@ -146,7 +150,7 @@ Definition findIntervalUsePos `(Interval i) (f : UsePos -> bool) :
   go (rds i).
 
 Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
-  option_map (uloc ∘ @snd _ _) (findIntervalUsePos i (fun u => pos < uloc u)).
+  option_map (uloc \o @snd _ _) (findIntervalUsePos i (fun u => pos < uloc u)).
 Arguments nextUseAfter [d] i pos /.
 
 Definition firstUsePos `(i : Interval d) : nat :=
@@ -154,7 +158,7 @@ Definition firstUsePos `(i : Interval d) : nat :=
 Arguments firstUsePos [d] i /.
 
 Definition firstUseReqReg `(i : Interval d) : option nat :=
-  option_map (uloc ∘ @snd _ _) (findIntervalUsePos i regReq).
+  option_map (uloc \o @snd _ _) (findIntervalUsePos i regReq).
 Arguments firstUseReqReg [d] i /.
 
 Definition lastUsePos `(i : Interval d) : nat :=
@@ -168,15 +172,14 @@ Proof.
   move=> d. elim=> [rd r|rs i H [rd r] Hend] * /=;
     first exact: Range_bounded.
   move: (Range_bounded r).
-  simpl in *.
-  by intros; ssomega.
+  move=> H0.
+  exact/(ltn_trans H0)/(ltn_trans Hend).
 Qed.
 
 Lemma Interval_extent_nonzero : forall `(i : Interval d), intervalExtent i > 0.
 Proof. move=> d i; move: subn_gt0 (Interval_nonempty i) => -> //. Qed.
 
-Definition IntervalSig := { d : IntervalDesc | Interval d }.
-Arguments IntervalSig /.
+Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
 Record DividedInterval `(i : Interval d) (f : UsePos -> bool)
   `(i1 : Interval d1) `(i2 : Interval d2) : Prop := {
@@ -257,7 +260,12 @@ Proof.
     move: (Range_ups_bounded r.2) => H2.
     move: (Range_end_bounded r.2) => H3.
     move: (Range_beg_bounded (NE_head xs).2) => H4.
-    by ssomega.
+    apply (leq_trans H2).
+    apply ltnW in H3.
+    apply (leq_trans H3).
+    apply ltnW in H0.
+    apply (leq_trans H0).
+    by apply (leq_trans H4).
 Qed.
 
 Definition Interval_splittable `(i : Interval d) : bool :=
@@ -280,7 +288,10 @@ Proof.
     move: (Range_ups_bounded r.2) => H3.
     move: (Range_end_bounded r.2) => H4.
     move: (Range_beg_bounded (NE_head xs).2) => H5.
-    by ssomega.
+    apply (leq_ltn_trans H3).
+    apply (ltn_trans H4).
+    apply (ltn_leq_trans H0).
+    by apply (leq_trans H5).
 Qed.
 
 Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
@@ -289,7 +300,8 @@ Proof.
   move: (Interval_beg_bounded i) => /= H1.
   move: (Interval_end_bounded i) => /= H2.
   move: (Interval_rds_bounded i) => /= H3.
-  by ssomega.
+  apply (leq_ltn_trans H1).
+  by apply (leq_ltn_trans H3).
 Qed.
 
 (** Split the current interval before the position [before].  This must

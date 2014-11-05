@@ -290,17 +290,11 @@ _V__to_list n v =
       V__Coq_cons a n1 w -> (:) a (fold_right_fix n1 w b)}}
   in fold_right_fix n v []
 
-type Vec a = V__Coq_t a
-
-type Coq_fin = Fintype.Coq_ordinal
-
-type Coq_vfin = Fin.Coq_t
-
-fin_contra :: Coq_fin -> a1
+fin_contra :: Fintype.Coq_ordinal -> a1
 fin_contra _top_assumption_ =
   Logic.coq_False_rect
 
-to_vfin :: Prelude.Int -> Coq_fin -> Coq_vfin
+to_vfin :: Prelude.Int -> Fintype.Coq_ordinal -> Fin.Coq_t
 to_vfin n x =
   let {_evar_0_ = \h -> fin_contra h} in
   let {
@@ -314,8 +308,17 @@ to_vfin n x =
     _evar_0_0 x0 x)
     n
 
-fold_left_with_index :: Prelude.Int -> (Coq_fin -> a2 -> a1 -> a2) -> a2 ->
-                        (Vec a1) -> a2
+fold_left_with_index :: Prelude.Int -> (Fintype.Coq_ordinal -> a2 -> a1 ->
+                        a2) -> a2 -> (V__Coq_t a1) -> a2
 fold_left_with_index n f b v =
   _V__t_rect (\f0 -> b) (\h n0 v0 iHv f0 -> iHv (\x x0 x1 -> x0)) n v f
+
+replace :: Prelude.Int -> (V__Coq_t a1) -> Fintype.Coq_ordinal -> a1 ->
+           V__Coq_t a1
+replace n v i =
+  _V__replace n v (to_vfin n i)
+
+vnth :: Prelude.Int -> (V__Coq_t a1) -> Fintype.Coq_ordinal -> a1
+vnth n v i =
+  _V__nth n v (to_vfin n i)
 

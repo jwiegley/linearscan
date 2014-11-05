@@ -12,3 +12,7 @@ fun_of_simpl f x =
   case f of {
    SimplFun lam -> lam x}
 
+funcomp :: () -> (a2 -> a1) -> (a3 -> a2) -> a3 -> a1
+funcomp u f g x =
+  f (g x)
+

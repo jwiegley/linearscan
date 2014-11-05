@@ -14,6 +14,7 @@ import qualified Data.List.NonEmpty as NE
 import           LinearScan.Lib
 import           LinearScan.Main
 import           LinearScan.NonEmpty0
+import           LinearScan.Vector0
 
 type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__ScanStateDesc

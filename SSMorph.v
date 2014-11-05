@@ -1,14 +1,13 @@
+Require Import Coq.Classes.RelationClasses.
+
 Require Import Lib.
-Require Import Coq.Arith.Wf_nat.
+Require Import NonEmpty.
 Require Import Hask.IEndo.
 Require Import Hask.IApplicative.
 Require Import Hask.IMonad.
 Require Import Hask.IState.
 
 Require Export ScanState.
-
-Open Scope nat_scope.
-Open Scope program_scope.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -88,7 +87,7 @@ Definition newSSMorphHasLen (sd : ScanStateDesc)
   (H : size (unhandled sd) > 0) : SSMorphHasLen sd sd.
 Proof. repeat (constructor; auto). Defined.
 
-Class HasWork (P : relation ScanStateDesc) := {
+Class HasWork P := {
     ssMorphHasLen : forall sd1 sd2, P sd1 sd2 -> SSMorphHasLen sd1 sd2
 }.
 
@@ -111,14 +110,14 @@ Record SSMorphSplit (sd1 sd2 : ScanStateDesc) : Prop := {
 
     next_unhandled_splittable :
       Interval_splittable (getInterval
-        (fst (safe_hd (first_nonempty split_is_SSMorphHasLen))))
+        (fst (safe_hd _ (first_nonempty split_is_SSMorphHasLen))))
 }.
 
 (* Definition newSSMorphSplit (sd : ScanStateDesc) *)
 (*   (H : size (unhandled sd) > 0) : SSMorphSplit sd sd. *)
 (* Proof. repeat (constructor; auto). Defined. *)
 
-Class IsSplittable (P : relation ScanStateDesc) := {
+Class IsSplittable P := {
     ssMorphSplittable : forall sd1 sd2, P sd1 sd2 -> SSMorphSplit sd1 sd2
 }.
 
@@ -140,7 +139,7 @@ Record SSMorphStSplit (sd1 sd2 : ScanStateDesc) : Prop := {
 Program Instance SSMorphStSplit_IsSplittable : IsSplittable SSMorphStSplit.
 Obligation 1. destruct H. auto. Defined.
 
-Record SSInfo (startDesc : ScanStateDesc) (P : relation ScanStateDesc) := {
+Record SSInfo (startDesc : ScanStateDesc) P := {
     thisDesc  : ScanStateDesc;
     thisHolds : P startDesc thisDesc;
     thisState : ScanState thisDesc
@@ -150,10 +149,10 @@ Arguments thisDesc  {_ P} _.
 Arguments thisHolds {_ P} _.
 Arguments thisState {_ P} _.
 
-Definition SState (sd : ScanStateDesc) (P Q : relation ScanStateDesc) :=
+Definition SState (sd : ScanStateDesc) P Q :=
   IState (SSInfo sd P) (SSInfo sd Q).
 
-Definition withScanState {a pre} {P Q : relation ScanStateDesc}
+Definition withScanState {a pre} {P Q}
   (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a) :
   SState pre P Q a := iget >>>= fun i => f (thisDesc i) (thisState i).
 
@@ -201,7 +200,7 @@ Proof.
   destruct p.
   split. apply a0.
   eexists.
-  rapply Build_SSMorphHasLen.
+  apply Build_SSMorphHasLen.
   apply haslen_is_SSMorph0.
   apply haslen_is_SSMorphLen0.
   apply first_nonempty0.
@@ -282,7 +281,7 @@ Proof.
   induction unh;
   unfold unhandledExtent;
   simpl; destruct i as [i beg];
-  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2);
+  pose (Interval_extent_nonzero (vnth ints i).2);
     first by auto.
   destruct unh;
   simpl; destruct a as [a ?];
@@ -384,7 +383,7 @@ Proof.
   intros.
   induction unh;
   unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (V.nth ints (to_vfin i)).2).
+  pose (Interval_extent_nonzero (vnth ints i).2).
     admit.
   destruct unh;
   simpl; destruct a as [a ?].
@@ -411,7 +410,7 @@ Proof.
     by specialize (unhandled_nonempty0 first_nonempty0).
   destruct p.
 
-  set int := (V.nth intervals0 (to_vfin i)).
+  set int := (vnth intervals0 i).
   have H0  : (1 < NE_length (rds int.1))
           || (1 < NE_length (ups (NE_head (rds int.1)).1)).
     apply/orP.

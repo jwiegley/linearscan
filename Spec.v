@@ -188,8 +188,8 @@ Lemma no_ord_max : forall n (xs : seq (fin n)),
   ord_max \notin [ seq widen_id i | i <- xs ].
 Proof.
   move=> n; elim=> // [x xs IHxs] /=.
-  rewrite in_cons negb_orb /=.
-  apply/andP; split; last assumption.
+  rewrite in_cons /=.
+  apply/norP; split; last assumption.
   exact: lift_bounded.
 Qed.
 
@@ -214,8 +214,8 @@ Proof.
     rewrite (@perm_eq_uniq _ _ s2) /s2 /unh /n.
       rewrite map_cons !map_widen_fst /=.
       apply/andP; split.
-        rewrite mem_cat negb_orb.
-        apply/andP; split; exact: no_ord_max.
+        rewrite mem_cat.
+        apply/norP; split; exact: no_ord_max.
       rewrite -map_cat map_inj_uniq; first exact: IHst.
       exact: widen_ord_inj.
     rewrite perm_cat2r.
@@ -246,18 +246,20 @@ Proof.
     rewrite (@perm_eq_uniq _ _ s2) /s2 /unh' /x /x2.
       rewrite map_cons !map_widen_fst /=.
       apply/andP; split.
-        rewrite in_cons negb_orb.
-        apply/andP; split.
+        rewrite in_cons.
+        apply/norP; split.
           exact: lift_bounded.
-        rewrite mem_cat negb_orb.
-        apply/andP; split; exact: no_ord_max.
+        rewrite mem_cat.
+        apply/norP; split; exact: no_ord_max.
       apply/andP; split.
-        rewrite mem_cat negb_orb.
-        apply/andP; split.
+        rewrite mem_cat.
+        apply/norP; split.
           apply map_f_notin; first exact: widen_ord_inj.
           by move/not_in_app in Hin.
         apply map_f_notin; first exact: widen_ord_inj.
-        by move: Hin; rewrite mem_cat negb_orb => /andP [_ Hin].
+        move: Hin.
+        rewrite mem_cat.
+        by move/norP => [_ Hin].
       rewrite -map_cat map_inj_uniq; first exact: IHst.
       exact: widen_ord_inj.
     rewrite perm_cat2r.

@@ -1,8 +1,5 @@
 Require Import Lib.
-Require Import Recdef.
-Require Import Hask.IApplicative.
-Require Import Hask.IMonad.
-Require Import Hask.IState.
+Require Hask.IState.
 
 Require Export SSMorph.
 
@@ -49,16 +46,15 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go n := fold_left (fun v p => let: (i, r) := p in
-                                      V.replace v (to_vfin r) (n i)) in
+    let go n := foldl (fun v p => let: (i, r) := p in replace v r (n i)) in
     let freeUntilPos' := go (fun _ => Some 0)
-                            (active sd) (V.const None maxReg) in
+                            (V.const None maxReg) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
     let freeUntilPos :=
         go (fun i => intervalIntersectionPoint (getInterval i) current)
-           intersectingIntervals freeUntilPos' in
+           freeUntilPos' intersectingIntervals in
 
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
@@ -84,7 +80,7 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
                // register available for the first part of the interval
                current.reg = reg
                split current before freeUntilPos[reg] *)
-          if beq_nat n 0
+          if n == 0
           then None
           else Some (if intervalEnd current < n
                      then success
@@ -108,15 +104,14 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
          nextUsePos[it.reg] = next use of it after start of current
        for each interval it in inactive intersecting with current do
          nextUsePos[it.reg] = next use of it after start of current *)
-    let go := fold_left (fun v p =>
+    let go := foldl (fun v p =>
                 let: (i, r) := p in
-                V.replace v (to_vfin r)
-                          (nextUseAfter (getInterval i) start)) in
-    let nextUsePos' := go (active sd) (V.const None maxReg) in
+                replace v r (nextUseAfter (getInterval i) start)) in
+    let nextUsePos' := go (V.const None maxReg) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
-    let nextUsePos := go intersectingIntervals nextUsePos' in
+    let nextUsePos := go nextUsePos' intersectingIntervals in
 
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
@@ -189,10 +184,9 @@ Definition checkActiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let (sd',st',H) := go sd st unchanged (list_membership (active sd)) in
-    iput {| thisDesc  := sd'
-          ; thisHolds := H
-          ; thisState := st'
-          |}.
+    Hask.IState.iput {| thisDesc  := sd'
+                      ; thisHolds := H
+                      ; thisState := st' |}.
 
 Definition checkInactiveIntervals {pre} (pos : nat) :
   SState pre SSMorphLen SSMorphLen unit :=
@@ -217,10 +211,9 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let (sd',st',H) := go sd st unchanged (list_membership (inactive sd)) in
-    iput {| thisDesc  := sd'
-          ; thisHolds := H
-          ; thisState := st'
-          |}.
+    Hask.IState.iput {| thisDesc  := sd'
+                      ; thisHolds := H
+                      ; thisState := st' |}.
 
 Definition handleInterval {pre} :
   SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
@@ -240,7 +233,7 @@ Definition handleInterval {pre} :
          add current to active (done by the helper functions) *)
     mres <<- tryAllocateFreeReg ;;
     match mres with
-    | Some x => imap (@Some _) x
+    | Some x => Hask.IEndo.imap (@Some _) x
     | None   => allocateBlockedReg
     end.
 
@@ -249,13 +242,13 @@ Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  match destruct_list (unhandled sd) with
+  match List.destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
     let ssinfo := {| thisDesc  := sd
                    ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
-    let (_, ssinfo') := runIState handleInterval ssinfo in
+    let (_, ssinfo') := Hask.IState.runIState handleInterval ssinfo in
     linearScan (thisDesc ssinfo') (thisState ssinfo')
   | inright _ => (sd; st)
   end.

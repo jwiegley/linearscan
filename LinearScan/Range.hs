@@ -83,7 +83,9 @@ getRangeDesc :: RangeDesc -> RangeDesc
 getRangeDesc d =
   d
 
-type RangeSig = RangeDesc
+packRange :: RangeDesc -> RangeDesc
+packRange d =
+  d
 
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
@@ -114,7 +116,7 @@ findRangeUsePos r f =
 makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc ->
                     (NonEmpty0.NonEmpty UsePos) -> (NonEmpty0.NonEmpty
                     UsePos) ->
-                    ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
+                    ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))
 makeDividedRange f rd l1 l2 =
   case rd of {
    Build_RangeDesc rbeg0 rend0 ups0 ->
@@ -124,7 +126,7 @@ makeDividedRange f rd l1 l2 =
       rend0 l2))) ups0 __}
 
 rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
-             ((,) (Prelude.Maybe RangeSig) (Prelude.Maybe RangeSig))
+             ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))
 rangeSpan f rd =
   case usePosSpan f (ups rd) of {
    (,) o o0 ->
@@ -138,7 +140,7 @@ rangeSpan f rd =
        Prelude.Just n -> (,) Prelude.Nothing (Prelude.Just rd);
        Prelude.Nothing -> Lib.ex_falso_quodlibet}}}
 
-type DefiniteSubRangesOf = ((,) RangeSig RangeSig)
+type DefiniteSubRangesOf = ((,) RangeDesc RangeDesc)
 
 splitRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> (Specif.Coq_sig2
               UsePos) -> DefiniteSubRangesOf
