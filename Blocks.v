@@ -50,7 +50,7 @@ Record boundedRangeVec (pos : nat) := {
   regs : Vec (boundedTriple pos) maxReg
 }.
 
-Lemma boundedTransportVec (pos m : nat) `(Hlt : pos < n) :
+Lemma transportVecBounds (pos m : nat) `(Hlt : pos < n) :
   Vec (boundedTriple n) m -> Vec (boundedTriple pos) m.
 Proof.
   elim=> [|[p [[rd r Hr]| ]] n' v' IHv].
@@ -69,7 +69,7 @@ Lemma boundedTransport (pos : nat) `(Hlt : pos < n) :
   boundedRangeVec n -> boundedRangeVec pos.
 Proof.
   case=> Hvars Hregs.
-  split; exact: (boundedTransportVec Hlt).
+  split; exact: (transportVecBounds Hlt).
 Qed.
 
 Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos.
@@ -126,6 +126,8 @@ Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
 
 Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
   (rest : boundedRangeVec pos.+2) : boundedRangeVec pos :=
+  (** If the instruction at this position begins or ends a loop, extend the
+      current range so that it starts at, or end at, this boundary. *)
   let liftOr f mx y :=
       Some (match mx with Some x => f x y | None => y end) in
   let savingBound x :=
@@ -133,21 +135,33 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
       then let: (mb, me, r) := x in
            (liftOr minn mb pos, liftOr maxn me pos, r)
       else x in
+
+  (** Add a new use position to the beginning of the current range. *)
   let consr (x : boundedTriple pos.+2) : boundedTriple pos :=
       let upos := Build_UsePos pos (regRequired b) in
       @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
+
   let restVars' := V.map savingBound (vars rest) in
-  let rest' := {| vars := restVars'; regs := regs rest |} in
+  let restRegs' := V.map savingBound (regs rest) in
   match references b with
-  | V.nil => boundedTransport (ltnSSn _) rest'
+  | V.nil => boundedTransport (ltnSSn _)
+               {| vars := restVars'; regs := restRegs' |}
+
   | V.cons (inl v) _ vs =>
     let x := consr (V.nth restVars' (to_vfin v)) in
     let restVars'' :=
-        V.replace (boundedTransportVec (ltnSSn _) restVars')
+        V.replace (transportVecBounds (ltnSSn _) restVars')
                   (to_vfin v) x in
-    let restRegs'' := boundedTransportVec (ltnSSn _) (regs rest) in
+    let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in
     {| vars := restVars''; regs := restRegs'' |}
-  | V.cons (inr r) _ vs => undefined
+
+  | V.cons (inr r) _ vs =>
+    let x := consr (V.nth restRegs' (to_vfin r)) in
+    let restVars'' := transportVecBounds (ltnSSn _) restVars' in
+    let restRegs'' :=
+        V.replace (transportVecBounds (ltnSSn _) restRegs')
+                  (to_vfin r) x in
+    {| vars := restVars''; regs := restRegs'' |}
   end.
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=

@@ -1010,11 +1010,10 @@ _LinearScan__regs maxVirtReg pos b =
   case b of {
    LinearScan__Build_boundedRangeVec vars0 regs0 -> regs0}
 
-_LinearScan__boundedTransportVec :: Prelude.Int -> Prelude.Int -> Prelude.Int
-                                    -> (Lib.Vec
-                                    LinearScan__Coq_boundedTriple) -> Lib.Vec
-                                    LinearScan__Coq_boundedTriple
-_LinearScan__boundedTransportVec pos m n _top_assumption_ =
+_LinearScan__transportVecBounds :: Prelude.Int -> Prelude.Int -> Prelude.Int
+                                   -> (Lib.Vec LinearScan__Coq_boundedTriple)
+                                   -> Lib.Vec LinearScan__Coq_boundedTriple
+_LinearScan__transportVecBounds pos m n _top_assumption_ =
   let {_evar_0_ = Lib.V__Coq_nil} in
   let {
    _evar_0_0 = \_top_assumption_0 ->
@@ -1043,8 +1042,8 @@ _LinearScan__boundedTransport :: Prelude.Int -> Prelude.Int -> Prelude.Int ->
 _LinearScan__boundedTransport maxVirtReg pos n _top_assumption_ =
   let {
    _evar_0_ = \hvars hregs -> LinearScan__Build_boundedRangeVec
-    (_LinearScan__boundedTransportVec pos maxVirtReg n hvars)
-    (_LinearScan__boundedTransportVec pos _LinearScan__maxReg n hregs)}
+    (_LinearScan__transportVecBounds pos maxVirtReg n hvars)
+    (_LinearScan__transportVecBounds pos _LinearScan__maxReg n hregs)}
   in
   case _top_assumption_ of {
    LinearScan__Build_boundedRangeVec x x0 -> _evar_0_ x x0}
@@ -1144,13 +1143,14 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
                    pos)) rest)}
   in
   let {
-   rest' = LinearScan__Build_boundedRangeVec restVars'
-    (_LinearScan__regs maxVirtReg (Prelude.succ (Prelude.succ pos)) rest)}
+   restRegs' = Lib._V__map savingBound _LinearScan__maxReg
+                 (_LinearScan__regs maxVirtReg (Prelude.succ (Prelude.succ
+                   pos)) rest)}
   in
   case _LinearScan__references maxVirtReg b of {
    Lib.V__Coq_nil ->
     _LinearScan__boundedTransport maxVirtReg pos (Prelude.succ (Prelude.succ
-      pos)) rest';
+      pos)) (LinearScan__Build_boundedRangeVec restVars' restRegs');
    Lib.V__Coq_cons h n vs ->
     case h of {
      Prelude.Left v ->
@@ -1161,18 +1161,32 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
       in
       let {
        restVars'' = Lib._V__replace maxVirtReg
-                      (_LinearScan__boundedTransportVec pos maxVirtReg
+                      (_LinearScan__transportVecBounds pos maxVirtReg
                         (Prelude.succ (Prelude.succ pos)) restVars')
                       (Vector0.to_vfin maxVirtReg v) x}
       in
       let {
-       restRegs'' = _LinearScan__boundedTransportVec pos _LinearScan__maxReg
-                      (Prelude.succ (Prelude.succ pos))
-                      (_LinearScan__regs maxVirtReg (Prelude.succ
-                        (Prelude.succ pos)) rest)}
+       restRegs'' = _LinearScan__transportVecBounds pos _LinearScan__maxReg
+                      (Prelude.succ (Prelude.succ pos)) restRegs'}
       in
       LinearScan__Build_boundedRangeVec restVars'' restRegs'';
-     Prelude.Right r -> Lib.undefined}}
+     Prelude.Right r ->
+      let {
+       x = consr
+             (Lib._V__nth _LinearScan__maxReg restRegs'
+               (Vector0.to_vfin _LinearScan__maxReg r))}
+      in
+      let {
+       restVars'' = _LinearScan__transportVecBounds pos maxVirtReg
+                      (Prelude.succ (Prelude.succ pos)) restVars'}
+      in
+      let {
+       restRegs'' = Lib._V__replace _LinearScan__maxReg
+                      (_LinearScan__transportVecBounds pos
+                        _LinearScan__maxReg (Prelude.succ (Prelude.succ pos))
+                        restRegs') (Vector0.to_vfin _LinearScan__maxReg r) x}
+      in
+      LinearScan__Build_boundedRangeVec restVars'' restRegs''}}
 
 _LinearScan__extractRange :: LinearScan__Coq_boundedTriple -> Prelude.Maybe
                              Range.RangeSig
