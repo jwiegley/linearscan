@@ -8,6 +8,7 @@
 *)
 Require Import Arith.
 Require Import Lib.
+Require Import NonEmpty.
 Require Import Blocks.
 Require Import Machine.
 
@@ -35,6 +36,8 @@ Set Extraction AccessOpaque.
     bounds. *)
 Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "Prelude.succ"]
   "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
+Extract Inductive ordinal => "(Data.Functor.Identity.Identity Prelude.Int)"
+  ["Data.Functor.Identity.Identity"].
 
 Extract Inductive unit    => "()" [ "()" ].
 Extract Inductive bool    => "Prelude.Bool" ["Prelude.True" "Prelude.False"].
@@ -89,7 +92,8 @@ Extract Inlined Constant subn      => "(Prelude.-)".
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction LinearScan.allocateRegisters Interval.splitInterval Range.splitRange.
+Separate Extraction LinearScan.allocateRegisters
+         Interval.splitInterval Range.splitRange NE_map.
 
 (* Show which axioms we depend on for this development. *)
 Print Assumptions LinearScan.allocateRegisters.

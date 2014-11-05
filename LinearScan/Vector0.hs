@@ -5,11 +5,11 @@ module LinearScan.Vector0 where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.Fin as Fin
 import qualified LinearScan.Logic as Logic
-import qualified LinearScan.Fintype as Fintype
 
 
 
@@ -290,16 +290,21 @@ _V__to_list n v =
       V__Coq_cons a n1 w -> (:) a (fold_right_fix n1 w b)}}
   in fold_right_fix n v []
 
-fin_contra :: Fintype.Coq_ordinal -> a1
+fin_contra :: (Data.Functor.Identity.Identity Prelude.Int) -> a1
 fin_contra _top_assumption_ =
-  Logic.coq_False_rect
+  let {_evar_0_ = \m -> Logic.coq_False_rect} in
+  case _top_assumption_ of {
+   Data.Functor.Identity.Identity x -> _evar_0_ x}
 
-to_vfin :: Prelude.Int -> Fintype.Coq_ordinal -> Fin.Coq_t
+to_vfin :: Prelude.Int -> (Data.Functor.Identity.Identity Prelude.Int) ->
+           Fin.Coq_t
 to_vfin n x =
   let {_evar_0_ = \h -> fin_contra h} in
   let {
    _evar_0_0 = \n0 _top_assumption_ ->
-    Fin.of_nat_lt _top_assumption_ (Prelude.succ n0)}
+    let {_evar_0_0 = \m -> Fin.of_nat_lt m (Prelude.succ n0)} in
+    case _top_assumption_ of {
+     Data.Functor.Identity.Identity x0 -> _evar_0_0 x0}}
   in
   (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
     (\_ ->
@@ -308,17 +313,20 @@ to_vfin n x =
     _evar_0_0 x0 x)
     n
 
-fold_left_with_index :: Prelude.Int -> (Fintype.Coq_ordinal -> a2 -> a1 ->
-                        a2) -> a2 -> (V__Coq_t a1) -> a2
+fold_left_with_index :: Prelude.Int ->
+                        ((Data.Functor.Identity.Identity Prelude.Int) -> a2
+                        -> a1 -> a2) -> a2 -> (V__Coq_t a1) -> a2
 fold_left_with_index n f b v =
   _V__t_rect (\f0 -> b) (\h n0 v0 iHv f0 -> iHv (\x x0 x1 -> x0)) n v f
 
-replace :: Prelude.Int -> (V__Coq_t a1) -> Fintype.Coq_ordinal -> a1 ->
-           V__Coq_t a1
+replace :: Prelude.Int -> (V__Coq_t a1) ->
+           (Data.Functor.Identity.Identity Prelude.Int) -> a1 -> V__Coq_t 
+           a1
 replace n v i =
   _V__replace n v (to_vfin n i)
 
-vnth :: Prelude.Int -> (V__Coq_t a1) -> Fintype.Coq_ordinal -> a1
+vnth :: Prelude.Int -> (V__Coq_t a1) ->
+        (Data.Functor.Identity.Identity Prelude.Int) -> a1
 vnth n v i =
   _V__nth n v (to_vfin n i)
 

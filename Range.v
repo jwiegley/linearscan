@@ -33,39 +33,8 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
-Lemma NE_StronglySorted_UsePos_impl : forall xs,
-  NE_StronglySorted upos_lt xs -> NE_head xs <= NE_last xs.
-Proof.
-  intros.
-  induction xs; simpl in *; first by [].
-  move: H. invert.
-  move/NE_Forall_last: H2.
-  apply/ltnW.
-Qed.
-
-Lemma NE_StronglySorted_UsePos_size_impl : forall xs,
-  NE_StronglySorted upos_lt xs -> NE_length xs > 1
-    -> NE_head xs < NE_last xs.
-Proof.
-  intros.
-  induction xs; simpl in *; first by [].
-  move: H. invert. subst.
-  by move/NE_Forall_last: H3.
-Qed.
-
-Lemma NE_StronglySorted_lt_trans : forall (x : UsePos) (xs : NonEmpty UsePos),
-  x < NE_head xs -> NE_StronglySorted upos_lt xs -> NE_Forall (upos_lt x) xs.
-Proof.
-  intros. induction xs; simpl in *.
-    constructor. assumption.
-  constructor. assumption.
-  apply IHxs.
-  apply NE_StronglySorted_inv in H0. inversion H0.
-    apply NE_Forall_head in H2.
-    unfold upos_lt in *.
-    exact: (ltn_trans H).
-  inversion H0. assumption.
-Qed.
+Program Instance upos_lt_trans : RelationClasses.Transitive upos_lt.
+Obligation 1. exact: (ltn_trans H). Qed.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
@@ -213,9 +182,18 @@ Proof.
   - Case "R_Cons".
     pose (Range_beg_bounded r).
     constructor. apply IHr.
-    apply NE_StronglySorted_lt_trans.
-    assumption. assumption.
-  - Case "R_Extend". assumption.
+    inversion IHr as [? H2|? ? ? ? H2];
+    rewrite <- H2 in *; simpl in *.
+      by constructor.
+    constructor. by [].
+    apply NE_Forall_impl
+      with (P := (fun y : UsePos => a < y))
+           (R := upos_lt).
+    + exact: upos_lt_trans.
+    + move=> *.
+      exact: (ltn_trans H0).
+    + by [].
+  - Case "R_Extend". by [].
 Qed.
 
 Theorem Range_all_odd `(r : Range rd) : NE_Forall (odd \o uloc) (ups rd).
@@ -235,10 +213,13 @@ Proof.
     pose (Range_beg_bounded r).
     pose (Range_end_bounded r).
     pose (Range_sorted r).
-    apply NE_StronglySorted_UsePos_impl in n.
-    exact (lt_le_shuffle H0 n i0).
+    inversion n as [? H2|? ? ? ? H2];
+    rewrite <- H2 in *; simpl in *.
+      exact: (ltn_trans H0).
+    apply NE_Forall_last in H3.
+    exact/(ltn_trans H0)/(ltn_trans H3).
   - Case "R_Extend".
-    exact /ltn_min /ltn_max.
+    exact/ltn_min/ltn_max.
 Qed.
 
 Lemma Range_ups_bounded `(r : Range rd) : NE_head (ups rd) <= NE_last (ups rd).

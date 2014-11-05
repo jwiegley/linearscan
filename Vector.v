@@ -35,7 +35,7 @@ Definition to_vfin {n} (x : fin n) : vfin n.
 Proof.
   case: n x => [H|n [m Hm]].
     exact: fin_contra.
-  by apply/(@Coq.Vectors.Fin.of_nat_lt m)/ltP.
+  exact/(@Coq.Vectors.Fin.of_nat_lt m)/ltP.
 Defined.
 
 Coercion to_vfin : fin >-> vfin.

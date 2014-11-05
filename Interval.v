@@ -279,9 +279,9 @@ Proof.
   - Case "I_Sing".
     rewrite -{}H => /= H.
     move: (Range_sorted r).
-    case: (ups x) H => //= [u us] H.
-    move/NE_StronglySorted_UsePos_size_impl => /=.
-    auto.
+    case: (ups x) H => //= [u us] H H1.
+    inversion H1; subst.
+    by apply NE_Forall_last in H4.
   - Case "I_Cons".
     rewrite -{}H1 => /= H2.
     move: (Interval_rds_bounded H) => /= {H} H1.

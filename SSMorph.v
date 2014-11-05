@@ -354,17 +354,14 @@ Proof.
 Defined.
 
 Lemma unhandledExtent_split :
-  forall ni (i : fin ni) i0 i1 b n (unh : list (fin ni * nat)) ints fixints
-    act inact hnd,
+  forall ni (i : fin ni) i0 i1 b n (unh : list (fin ni * nat))
+    ints fixints act inact hnd,
   unhandledExtent
     {| nextInterval   := ni.+1
-     ; intervals      :=
-         V.replace (V.shiftin i1 ints)
-                   (Fin.of_nat_lt (ltP (widen_ord_proof i (leqnSn ni)))) i0
+     ; intervals      := replace (V.shiftin i1 ints) (widen_id i) i0
      ; fixedIntervals := fixints
      ; unhandled      :=
-         insert (λ m : 'I_ni.+1 * nat, lebf snd m (ord_max, b))
-                (ord_max, b)
+         insert (fun m => lebf snd m (ord_max, b)) (ord_max, b)
                 (widen_fst (i, n) :: [seq widen_fst i | i <- unh])
      ; active         := [seq widen_fst i | i <- act]
      ; inactive       := [seq widen_fst i | i <- inact]

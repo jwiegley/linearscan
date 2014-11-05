@@ -125,6 +125,13 @@ Proof.
   intuition.
 Qed.
 
+Lemma NE_Forall_impl : forall (P Q : A -> Prop), (forall a, P a -> Q a) ->
+  forall l, NE_Forall P l -> NE_Forall Q l.
+Proof.
+  intros P Q Himp l H1.
+  induction H1; firstorder.
+Qed.
+
 Section Membership.
 
 Fixpoint NE_member (z : A) (ne : NonEmpty A) : Prop :=

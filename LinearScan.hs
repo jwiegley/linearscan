@@ -9,39 +9,31 @@ module LinearScan
     , PhysReg
     ) where
 
-import           Control.Arrow (second)
-import qualified Data.List.NonEmpty as NE
-import           LinearScan.Lib
-import           LinearScan.Main
-import           LinearScan.NonEmpty0
-import           LinearScan.Vector0
+import Control.Arrow ((***))
+import Data.Functor.Identity
+import LinearScan.Lib
+import LinearScan.Main
+import LinearScan.NonEmpty0
+import LinearScan.Vector0
 
-type    VirtReg    = Int
+type    VirtReg    = Identity Int
 newtype ScanState  = ScanState LinearScan__ScanStateDesc
 newtype PhysReg    = PhysReg { getPhysReg :: LinearScan__PhysReg }
 newtype StartsLoop = StartsLoop { getStartsLoop :: Bool }
 newtype EndsLoop   = EndsLoop { getEndsLoop :: Bool }
 type    IntervalId = Int
 
-toNonEmpty :: NE.NonEmpty a -> NonEmpty a
-toNonEmpty (x NE.:| []) = NE_Sing x
-toNonEmpty (x NE.:| (y:ys)) = NE_Cons x (toNonEmpty (y NE.:| ys))
-
 toCoqV :: [a] -> V__Coq_t a
 toCoqV [] = V__Coq_nil
 toCoqV (x:xs) = V__Coq_cons x 0 (toCoqV xs)
 
--- fromCoqV :: LinearScan__V__Coq_t a -> [a]
--- fromCoqV LinearScan__V__Coq_nil = []
--- fromCoqV (LinearScan__V__Coq_cons x _ xs) = x : fromCoqV xs
-
 allocateRegisters
     :: Int
     -> (block -> (StartsLoop, EndsLoop, [Either VirtReg PhysReg]))
-    -> NE.NonEmpty block -> ScanState
+    -> NonEmpty block -> ScanState
 allocateRegisters maxVirtReg blockInfo blocks =
     ScanState $ _LinearScan__allocateRegisters
-        maxVirtReg (toNonEmpty (NE.map gather blocks))
+        maxVirtReg (coq_NE_map gather blocks)
   where
     gather b =
         let (starts, ends, refs) = blockInfo b in
@@ -51,4 +43,4 @@ allocateRegisters maxVirtReg blockInfo blocks =
 handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
 handledIntervalIds
     (ScanState (LinearScan__Build_ScanStateDesc _ni _ _ _ _ _ hnd)) =
-  map (second PhysReg) hnd
+  map (runIdentity *** PhysReg) hnd

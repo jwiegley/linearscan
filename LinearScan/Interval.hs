@@ -2,6 +2,7 @@ module LinearScan.Interval where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic

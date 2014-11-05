@@ -5,6 +5,7 @@ module LinearScan.Main where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
@@ -53,32 +54,35 @@ _LinearScan__maxReg :: Prelude.Int
 _LinearScan__maxReg =
   _MyMachine__maxReg
 
-type LinearScan__PhysReg = Fintype.Coq_ordinal
+type LinearScan__PhysReg = (Data.Functor.Identity.Identity Prelude.Int)
 
 data LinearScan__ScanStateDesc =
    LinearScan__Build_ScanStateDesc Prelude.Int (Vector0.V__Coq_t
                                                Interval.IntervalDesc) 
  (Vector0.V__Coq_t (Prelude.Maybe Interval.IntervalDesc)) ([]
                                                           ((,)
-                                                          Fintype.Coq_ordinal
+                                                          (Data.Functor.Identity.Identity Prelude.Int)
                                                           Prelude.Int)) 
- ([] ((,) Fintype.Coq_ordinal LinearScan__PhysReg)) ([]
-                                                    ((,) Fintype.Coq_ordinal
-                                                    LinearScan__PhysReg)) 
- ([] ((,) Fintype.Coq_ordinal LinearScan__PhysReg))
+ ([] ((,) (Data.Functor.Identity.Identity Prelude.Int) LinearScan__PhysReg)) 
+ ([] ((,) (Data.Functor.Identity.Identity Prelude.Int) LinearScan__PhysReg)) 
+ ([] ((,) (Data.Functor.Identity.Identity Prelude.Int) LinearScan__PhysReg))
 
 _LinearScan__coq_ScanStateDesc_rect :: (Prelude.Int -> (Vector0.V__Coq_t
                                        Interval.IntervalDesc) ->
                                        (Vector0.V__Coq_t
                                        (Prelude.Maybe Interval.IntervalDesc))
                                        -> ([]
-                                       ((,) Fintype.Coq_ordinal Prelude.Int))
-                                       -> ([]
-                                       ((,) Fintype.Coq_ordinal
+                                       ((,)
+                                       (Data.Functor.Identity.Identity Prelude.Int)
+                                       Prelude.Int)) -> ([]
+                                       ((,)
+                                       (Data.Functor.Identity.Identity Prelude.Int)
                                        LinearScan__PhysReg)) -> ([]
-                                       ((,) Fintype.Coq_ordinal
+                                       ((,)
+                                       (Data.Functor.Identity.Identity Prelude.Int)
                                        LinearScan__PhysReg)) -> ([]
-                                       ((,) Fintype.Coq_ordinal
+                                       ((,)
+                                       (Data.Functor.Identity.Identity Prelude.Int)
                                        LinearScan__PhysReg)) -> a1) ->
                                        LinearScan__ScanStateDesc -> a1
 _LinearScan__coq_ScanStateDesc_rect f s =
@@ -91,13 +95,17 @@ _LinearScan__coq_ScanStateDesc_rec :: (Prelude.Int -> (Vector0.V__Coq_t
                                       (Vector0.V__Coq_t
                                       (Prelude.Maybe Interval.IntervalDesc))
                                       -> ([]
-                                      ((,) Fintype.Coq_ordinal Prelude.Int))
-                                      -> ([]
-                                      ((,) Fintype.Coq_ordinal
+                                      ((,)
+                                      (Data.Functor.Identity.Identity Prelude.Int)
+                                      Prelude.Int)) -> ([]
+                                      ((,)
+                                      (Data.Functor.Identity.Identity Prelude.Int)
                                       LinearScan__PhysReg)) -> ([]
-                                      ((,) Fintype.Coq_ordinal
+                                      ((,)
+                                      (Data.Functor.Identity.Identity Prelude.Int)
                                       LinearScan__PhysReg)) -> ([]
-                                      ((,) Fintype.Coq_ordinal
+                                      ((,)
+                                      (Data.Functor.Identity.Identity Prelude.Int)
                                       LinearScan__PhysReg)) -> a1) ->
                                       LinearScan__ScanStateDesc -> a1
 _LinearScan__coq_ScanStateDesc_rec =
@@ -109,7 +117,7 @@ _LinearScan__nextInterval s =
    LinearScan__Build_ScanStateDesc nextInterval0 intervals0 fixedIntervals0
     unhandled0 active0 inactive0 handled0 -> nextInterval0}
 
-type LinearScan__IntervalId = Fintype.Coq_ordinal
+type LinearScan__IntervalId = (Data.Functor.Identity.Identity Prelude.Int)
 
 _LinearScan__intervals :: LinearScan__ScanStateDesc -> Vector0.V__Coq_t
                           Interval.IntervalDesc
@@ -180,13 +188,17 @@ _LinearScan__all_state_lists s =
     ((Prelude.++) (_LinearScan__activeIds s)
       ((Prelude.++) (_LinearScan__inactiveIds s) (_LinearScan__handledIds s)))
 
-_LinearScan__widen_id :: Prelude.Int -> Fintype.Coq_ordinal ->
-                         Fintype.Coq_ordinal
+_LinearScan__widen_id :: Prelude.Int ->
+                         (Data.Functor.Identity.Identity Prelude.Int) ->
+                         (Data.Functor.Identity.Identity Prelude.Int)
 _LinearScan__widen_id n =
   Fintype.widen_ord n (Prelude.succ n)
 
-_LinearScan__widen_fst :: Prelude.Int -> ((,) Fintype.Coq_ordinal a1) -> (,)
-                          Fintype.Coq_ordinal a1
+_LinearScan__widen_fst :: Prelude.Int -> ((,)
+                          (Data.Functor.Identity.Identity Prelude.Int) 
+                          a1) -> (,)
+                          (Data.Functor.Identity.Identity Prelude.Int) 
+                          a1
 _LinearScan__widen_fst n p =
   (,) (_LinearScan__widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
 
@@ -214,7 +226,7 @@ _LinearScan__unhandledExtent sd =
 
 _LinearScan__registerWithHighestPos :: (Vector0.V__Coq_t
                                        (Prelude.Maybe Prelude.Int)) -> (,)
-                                       Fintype.Coq_ordinal
+                                       (Data.Functor.Identity.Identity Prelude.Int)
                                        (Prelude.Maybe Prelude.Int)
 _LinearScan__registerWithHighestPos =
   Vector0.fold_left_with_index _LinearScan__maxReg (\reg res x ->
@@ -228,7 +240,8 @@ _LinearScan__registerWithHighestPos =
            Prelude.True -> (,) reg (Prelude.Just m);
            Prelude.False -> (,) r (Prelude.Just n)};
          Prelude.Nothing -> (,) reg Prelude.Nothing};
-       Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,) 0 (Prelude.Just 0))
+       Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,)
+    (Data.Functor.Identity.Identity 0) (Prelude.Just 0))
 
 _LinearScan__getScanStateDesc :: LinearScan__ScanStateDesc ->
                                  LinearScan__ScanStateDesc
@@ -923,7 +936,8 @@ _LinearScan__linearScan sd =
   _LinearScan__linearScan_func ((,) sd __)
 
 type LinearScan__SomeVar =
-  Prelude.Either Fintype.Coq_ordinal Fintype.Coq_ordinal
+  Prelude.Either (Data.Functor.Identity.Identity Prelude.Int)
+  (Data.Functor.Identity.Identity Prelude.Int)
 
 data LinearScan__Block baseType =
    LinearScan__Build_Block baseType Prelude.Bool Prelude.Bool Prelude.Int 

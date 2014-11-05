@@ -2,6 +2,7 @@ module LinearScan.Datatypes where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 nat_rect :: a1 -> (Prelude.Int -> a1 -> a1) -> Prelude.Int -> a1

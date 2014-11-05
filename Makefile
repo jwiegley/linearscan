@@ -13,7 +13,7 @@ LinearScan/Main.hs: Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
 	@perl -i -pe 's/import qualified (.*)/import qualified LinearScan.\1 as \1/' LinearScan/*.hs
-	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified LinearScan.Utils/' LinearScan/*.hs
+	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified Data.Functor.Identity\nimport qualified LinearScan.Utils/' LinearScan/*.hs
 	@perl -i -pe 's/import qualified LinearScan\.GHC/import qualified GHC/' LinearScan/*.hs
 	@perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' LinearScan/*.hs
 	@perl -i -pe 's/module (.+?) where/module LinearScan.\1 where/' LinearScan/*.hs

@@ -2,6 +2,7 @@ module LinearScan.NonEmpty0 where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 data NonEmpty a =
@@ -37,6 +38,12 @@ coq_NE_last ne =
   case ne of {
    NE_Sing x -> x;
    NE_Cons x xs -> coq_NE_last xs}
+
+coq_NE_map :: (a1 -> a2) -> (NonEmpty a1) -> NonEmpty a2
+coq_NE_map f ne =
+  case ne of {
+   NE_Sing x -> NE_Sing (f x);
+   NE_Cons x xs -> NE_Cons (f x) (coq_NE_map f xs)}
 
 coq_NE_fold_left :: (a1 -> a2 -> a1) -> (NonEmpty a2) -> a1 -> a1
 coq_NE_fold_left f ne z =
