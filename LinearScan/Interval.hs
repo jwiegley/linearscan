@@ -34,6 +34,10 @@ rds i =
   case i of {
    Build_IntervalDesc ibeg0 iend0 rds0 -> rds0}
 
+packInterval :: IntervalDesc -> IntervalDesc
+packInterval d =
+  d
+
 intervalStart :: IntervalDesc -> Prelude.Int
 intervalStart i =
   ibeg i

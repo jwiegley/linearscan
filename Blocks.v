@@ -203,20 +203,20 @@ Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
       | None => ss
       end in
 
-  let handleVar ss mx :=
-      mkint ss mx $ fun _ st _ i =>
+  let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
-
-  let handleReg reg ss mx :=
-      mkint ss mx $ fun _ st _ i =>
-        packScanState (ScanState_newUnhandled st i) in
-
-  let s0 := ScanState_nil in
-  let s1 := packScanState s0 in
 
   let: (varRanges, regRanges) := processBlocks blocks in
-  fold_left_with_index handleReg
-    (V.fold_left handleVar s1 varRanges) regRanges.
+  let regs := V.map (fun mr =>
+                if mr is Some r
+                then Some (packInterval (I_Sing r.2))
+                else None) regRanges in
+
+  let s0 := ScanState_nil in
+  let s1 := ScanState_setFixedIntervals s0 regs in
+  let s2 := packScanState s1 in
+
+  V.fold_left handleVar s2 varRanges.
 
 Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).

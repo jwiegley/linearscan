@@ -56,6 +56,8 @@ Proof.
     rewrite /unh.
     by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
 
+  - Case "ScanState_setInterval". apply IHst.
+  - Case "ScanState_setFixedIntervals". apply IHst.
   - Case "ScanState_moveUnhandledToActive". inv IHst.
   - Case "ScanState_moveActiveToInactive". apply IHst.
   - Case "ScanState_moveActiveToHandled". apply IHst.
@@ -79,6 +81,8 @@ Proof.
   - Case "ScanState_newUnhandled".
     by rewrite /widen_fst -!map_cat -!map_comp /funcomp //.
 
+  - Case "ScanState_setInterval". apply IHst.
+  - Case "ScanState_setFixedIntervals". apply IHst.
   - Case "ScanState_moveUnhandledToActive".
     move=> /= in IHst *; apply/andP; split=> //.
 
@@ -222,6 +226,8 @@ Proof.
     apply/perm_map.
     by rewrite insert_perm.
 
+  - Case "ScanState_setInterval". apply IHst.
+  - Case "ScanState_setFixedIntervals". apply IHst.
   - Case "ScanState_moveUnhandledToActive".
     move: IHst; rewrite /= -cons_uniq -!map_cat => IHst.
     set s2 := fst x :: [seq fst i | i <- unh] ++
@@ -270,6 +276,9 @@ Qed.
 Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
 Proof. move=> a x; elim=> //. Qed.
 
+Definition activeFixedInternals sd : nat :=
+  V.fold_left (fun n x => if x is None then n else n.+1) 0 (fixedIntervals sd).
+
 Theorem all_intervals_represented `(st : ScanState sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
@@ -281,6 +290,9 @@ Proof.
 
   - Case "ScanState_newUnhandled".
     by rewrite /unh size_insert !size_map addSn.
+
+  - Case "ScanState_setInterval". apply IHst.
+  - Case "ScanState_setFixedIntervals". apply IHst.
 
   - Case "ScanState_moveUnhandledToActive".
     by rewrite addnA addnS -addSn -addnA.

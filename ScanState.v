@@ -23,13 +23,15 @@ Definition registers_exist := registers_exist.
     through the sequentialized instruction stream over which registers are
     allocated. *)
 
+Definition fixedIntervalsType :=
+  Vec (option { d : IntervalDesc | FixedInterval d }) maxReg.
+
 Record ScanStateDesc : Type := {
     nextInterval : nat;
     IntervalId := fin nextInterval;
 
     intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
-    fixedIntervals :
-      Vec (option { d : IntervalDesc | FixedInterval d }) maxReg;
+    fixedIntervals : fixedIntervalsType;
 
     unhandled : list (IntervalId * nat);     (* starts after pos *)
     active    : list (IntervalId * PhysReg); (* ranges over pos *)
@@ -138,12 +140,39 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     let unh := map widen_fst (unhandled sd) in
     ScanState
       {| nextInterval     := (nextInterval sd).+1
-       ; unhandled        := insert (fun m => lebf snd m n) n unh
+       ; unhandled        := insert (lebf snd ^~ n) n unh
        ; active           := map widen_fst (active sd)
        ; inactive         := map widen_fst (inactive sd)
        ; handled          := map widen_fst (handled sd)
        ; intervals        := V.shiftin (d; i) (intervals sd)
        ; fixedIntervals   := fixedIntervals sd
+       |}
+
+  | ScanState_setInterval sd :
+    ScanState sd -> forall xid `(i : Interval d),
+    let xi := (vnth (intervals sd) xid).2 in
+    intervalExtent i < intervalExtent xi ->
+    intervalStart i == intervalStart xi ->
+    ScanState
+      {| nextInterval     := nextInterval sd
+       ; unhandled        := unhandled sd
+       ; active           := active sd
+       ; inactive         := inactive sd
+       ; handled          := handled sd
+       ; intervals        := replace (intervals sd) xid (d; i)
+       ; fixedIntervals   := fixedIntervals sd
+       |}
+
+  | ScanState_setFixedIntervals sd :
+    ScanState sd -> forall (regs : fixedIntervalsType),
+    ScanState
+      {| nextInterval     := nextInterval sd
+       ; unhandled        := unhandled sd
+       ; active           := active sd
+       ; inactive         := inactive sd
+       ; handled          := handled sd
+       ; intervals        := intervals sd
+       ; fixedIntervals   := regs
        |}
 
   | ScanState_moveUnhandledToActive
@@ -157,6 +186,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; fixedIntervals   := fixints
        |} ->
+    (* jww (2014-11-05): NYI *)
     (* reg \notin [seq snd i | i <- act ++ inact] -> *)
     ScanState
       {| nextInterval     := ni
@@ -236,7 +266,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     let unh' := map widen_fst (x :: unh) in
     ScanState
       {| nextInterval     := ni.+1
-       ; unhandled        := insert (fun m => lebf snd m x2) x2 unh'
+       ; unhandled        := insert (lebf snd ^~ x2) x2 unh'
        ; active           := map widen_fst act
        ; inactive         := map widen_fst inact
        ; handled          := map widen_fst hnd
@@ -249,6 +279,8 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
   | Case_aux c "ScanState_newUnhandled"
+  | Case_aux c "ScanState_setInterval"
+  | Case_aux c "ScanState_setFixedIntervals"
   | Case_aux c "ScanState_moveUnhandledToActive"
   | Case_aux c "ScanState_moveActiveToInactive"
   | Case_aux c "ScanState_moveActiveToHandled"
