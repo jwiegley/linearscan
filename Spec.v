@@ -64,13 +64,13 @@ Proof.
   - Case "ScanState_moveInactiveToActive". apply IHst.
   - Case "ScanState_moveInactiveToHandled".  apply IHst.
 
-  - Case "ScanState_splitCurrentInterval".
-    rewrite /unhandled /unh' in IHst *.
-    apply: StronglySorted_insert_spec.
-    apply StronglySorted_inv in IHst.
-    move: IHst => [H1 H2].
-    apply: StronglySorted_widen.
-    by constructor.
+  (* - Case "ScanState_splitCurrentInterval". *)
+  (*   rewrite /unhandled /unh' in IHst *. *)
+  (*   apply: StronglySorted_insert_spec. *)
+  (*   apply StronglySorted_inv in IHst. *)
+  (*   move: IHst => [H1 H2]. *)
+  (*   apply: StronglySorted_widen. *)
+  (*   by constructor. *)
 Qed.
 
 Theorem allocated_regs_are_unique `(st : ScanState sd) :
@@ -123,8 +123,8 @@ Proof.
       first exact: subseq_refl.
     exact: rem_subseq.
 
-  - Case "ScanState_splitCurrentInterval".
-    by rewrite /widen_fst -!map_cat -!map_comp /funcomp //.
+  (* - Case "ScanState_splitCurrentInterval". *)
+  (*   by rewrite /widen_fst -!map_cat -!map_comp /funcomp //. *)
 Qed.
 
 (** The number of active or inactive registers cannot exceed the number of
@@ -244,33 +244,33 @@ Proof.
   - Case "ScanState_moveInactiveToHandled".
     exact: (@move_inactive_to_handled _ x IHst H).
 
-  - Case "ScanState_splitCurrentInterval".
-    move: IHst; rewrite/= -cons_uniq -!map_cat => /= /andP [Hin IHst].
-    set s2 := [seq fst i | i <- x2 :: unh'] ++
-              [seq fst i | i <- [seq widen_fst i
-                                | i <- act ++ inact ++ hnd]].
-    rewrite (@perm_eq_uniq _ _ s2) /s2 /unh' /x /x2.
-      rewrite map_cons !map_widen_fst /=.
-      apply/andP; split.
-        rewrite in_cons.
-        apply/norP; split.
-          exact: lift_bounded.
-        rewrite mem_cat.
-        apply/norP; split; exact: no_ord_max.
-      apply/andP; split.
-        rewrite mem_cat.
-        apply/norP; split.
-          apply map_f_notin; first exact: widen_ord_inj.
-          by move/not_in_app in Hin.
-        apply map_f_notin; first exact: widen_ord_inj.
-        move: Hin.
-        rewrite mem_cat.
-        by move/norP => [_ Hin].
-      rewrite -map_cat map_inj_uniq; first exact: IHst.
-      exact: widen_ord_inj.
-    rewrite perm_cat2r.
-    apply/perm_map.
-    by rewrite insert_perm.
+  (* - Case "ScanState_splitCurrentInterval". *)
+  (*   move: IHst; rewrite/= -cons_uniq -!map_cat => /= /andP [Hin IHst]. *)
+  (*   set s2 := [seq fst i | i <- x2 :: unh'] ++ *)
+  (*             [seq fst i | i <- [seq widen_fst i *)
+  (*                               | i <- act ++ inact ++ hnd]]. *)
+  (*   rewrite (@perm_eq_uniq _ _ s2) /s2 /unh' /x /x2. *)
+  (*     rewrite map_cons !map_widen_fst /=. *)
+  (*     apply/andP; split. *)
+  (*       rewrite in_cons. *)
+  (*       apply/norP; split. *)
+  (*         exact: lift_bounded. *)
+  (*       rewrite mem_cat. *)
+  (*       apply/norP; split; exact: no_ord_max. *)
+  (*     apply/andP; split. *)
+  (*       rewrite mem_cat. *)
+  (*       apply/norP; split. *)
+  (*         apply map_f_notin; first exact: widen_ord_inj. *)
+  (*         by move/not_in_app in Hin. *)
+  (*       apply map_f_notin; first exact: widen_ord_inj. *)
+  (*       move: Hin. *)
+  (*       rewrite mem_cat. *)
+  (*       by move/norP => [_ Hin]. *)
+  (*     rewrite -map_cat map_inj_uniq; first exact: IHst. *)
+  (*     exact: widen_ord_inj. *)
+  (*   rewrite perm_cat2r. *)
+  (*   apply/perm_map. *)
+  (*   by rewrite insert_perm. *)
 Qed.
 
 Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
@@ -317,8 +317,8 @@ Proof.
     rewrite addnS -addSn prednK //.
     exact: has_size.
 
-  - Case "ScanState_splitCurrentInterval".
-    by rewrite size_insert /= !size_map.
+  (* - Case "ScanState_splitCurrentInterval". *)
+  (*   by rewrite size_insert /= !size_map. *)
 Qed.
 
 End MLinearSpec.

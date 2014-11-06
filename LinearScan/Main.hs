@@ -599,44 +599,35 @@ _LinearScan__splitCurrentInterval pre before x =
                  let {
                   _top_assumption_ = Interval.splitPosition ( int) before}
                  in
-                 LinearScan__Build_SSInfo (LinearScan__Build_ScanStateDesc
-                 (Prelude.succ nextInterval0)
-                 (Vector0.replace (Prelude.succ nextInterval0)
-                   (Vector0._V__shiftin nextInterval0
-                     ((Prelude.snd)
-                       (
-                         (Interval.splitInterval _top_assumption_
-                           ( (Vector0.vnth nextInterval0 intervals0 i)))))
-                     intervals0) (_LinearScan__widen_id nextInterval0 i)
-                   ((Prelude.fst)
-                     (
-                       (Interval.splitInterval _top_assumption_
-                         ( (Vector0.vnth nextInterval0 intervals0 i))))))
-                 fixedIntervals0
-                 (Lib.insert (\x0 ->
-                   Lib.lebf (Prelude.snd) x0 ((,)
+                 let {
+                  _top_assumption_0 = Interval.splitInterval _top_assumption_
+                                        ( int)}
+                 in
+                 let {
+                  _evar_0_ = \_top_assumption_1 _top_assumption_2 ->
+                   LinearScan__Build_SSInfo (LinearScan__Build_ScanStateDesc
+                   (Prelude.succ nextInterval0)
+                   (Vector0._V__shiftin nextInterval0 _top_assumption_2
+                     (Vector0.replace nextInterval0 intervals0 i
+                       _top_assumption_1)) fixedIntervals0
+                   (Lib.insert (\x0 ->
+                     Lib.lebf (Prelude.snd) x0 ((,)
+                       (Fintype.ord_max nextInterval0)
+                       (Interval.ibeg _top_assumption_2))) ((,)
                      (Fintype.ord_max nextInterval0)
-                     (Interval.ibeg
-                       (
-                         ((Prelude.snd)
-                           (
-                             (Interval.splitInterval _top_assumption_
-                               ( (Vector0.vnth nextInterval0 intervals0 i)))))))))
-                   ((,) (Fintype.ord_max nextInterval0)
-                   (Interval.ibeg
-                     (
-                       ((Prelude.snd)
-                         (
-                           (Interval.splitInterval _top_assumption_
-                             ( (Vector0.vnth nextInterval0 intervals0 i))))))))
-                   ((Prelude.map) (_LinearScan__widen_fst nextInterval0) ((:)
-                     ((,) i n) unhandled1)))
-                 ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                   active0)
-                 ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                   inactive0)
-                 ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                   handled0)) __))}}}})
+                     (Interval.ibeg _top_assumption_2)) ((:)
+                     (_LinearScan__widen_fst nextInterval0 ((,) i n))
+                     ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
+                       unhandled1)))
+                   ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
+                     active0)
+                   ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
+                     inactive0)
+                   ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
+                     handled0)) __}
+                 in
+                 case _top_assumption_0 of {
+                  (,) x0 x1 -> _evar_0_ x0 x1}))}}}})
 
 _LinearScan__splitActiveIntervalForReg :: LinearScan__ScanStateDesc ->
                                           LinearScan__PhysReg -> Prelude.Int

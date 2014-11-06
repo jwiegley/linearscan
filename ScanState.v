@@ -245,7 +245,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
        |}
-
+(*
   | ScanState_splitCurrentInterval
       pos ni xid xbeg unh act inact hnd ints fixints :
     let x := (xid, xbeg) in
@@ -273,7 +273,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := replace (V.shiftin (snd xe.1) ints)
                                      (widen_id xid) (fst xe.1)
        ; fixedIntervals   := fixints
-       |}.
+       |}
+*)
+.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
@@ -286,7 +288,6 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveActiveToHandled"
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
-  | Case_aux c "ScanState_splitCurrentInterval"
   ].
 
 Notation ScanStateSig := { sd : ScanStateDesc | ScanState sd }.

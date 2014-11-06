@@ -227,9 +227,10 @@ Proof.
   constructor. intros HS.
   split. apply tt.
   destruct HS.
-  rapply Build_SSInfo.
-  - apply thisHolds0.
-  - assumption.
+  apply: Build_SSInfo.
+  - exact: thisDesc0.
+  - exact: thisHolds0.
+  - by [].
 Defined.
 
 Definition withCursor {P Q a pre} `{HasWork P}
@@ -250,9 +251,7 @@ Proof.
   specialize (f thisDesc0 p).
   destruct f as [res].
   apply res.
-  rapply Build_SSInfo.
-  apply thisHolds0.
-  assumption.
+  exact: Build_SSInfo.
 Defined.
 
 Lemma unhandledExtent_cons :
@@ -311,7 +310,7 @@ Proof.
          fixedIntervals0
          ((i, reg) :: active0) active0 inactive0 inactive0 handled0 handled0)
       as ue_cons.
-  rapply Build_SSMorphSt; auto;
+  apply Build_SSMorphSt; auto;
   unfold lt in *; intuition;
   [ apply le_Sn_le in ue_cons | ];
   exact: (leq_trans ue_cons).
@@ -322,8 +321,8 @@ Definition moveActiveToHandled `(st : ScanState sd) `(H: x \in active sd) :
 Proof.
   pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
-  rapply Build_SSMorphLen; auto.
-  rapply Build_SSMorph; auto.
+  apply Build_SSMorphLen; auto.
+  apply Build_SSMorph; auto.
 Defined.
 
 Definition moveActiveToInactive `(st : ScanState sd) `(H: x \in active sd) :
@@ -331,8 +330,8 @@ Definition moveActiveToInactive `(st : ScanState sd) `(H: x \in active sd) :
 Proof.
   pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
-  rapply Build_SSMorphLen; auto.
-  rapply Build_SSMorph; auto.
+  apply Build_SSMorphLen; auto.
+  apply Build_SSMorph; auto.
 Defined.
 
 Definition moveInactiveToActive `(st : ScanState sd) `(H : x \in inactive sd) :
@@ -340,8 +339,8 @@ Definition moveInactiveToActive `(st : ScanState sd) `(H : x \in inactive sd) :
 Proof.
   pose (ScanState_moveInactiveToActive st H).
   eexists. apply s.
-  rapply Build_SSMorphLen; auto.
-  rapply Build_SSMorph; auto.
+  apply Build_SSMorphLen; auto.
+  apply Build_SSMorph; auto.
 Defined.
 
 Definition moveInactiveToHandled `(st : ScanState sd) `(H : x \in inactive sd) :
@@ -349,8 +348,8 @@ Definition moveInactiveToHandled `(st : ScanState sd) `(H : x \in inactive sd) :
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
   eexists. apply s.
-  rapply Build_SSMorphLen; auto.
-  rapply Build_SSMorph; auto.
+  apply Build_SSMorphLen; auto.
+  apply Build_SSMorph; auto.
 Defined.
 
 Lemma unhandledExtent_split :
@@ -415,34 +414,50 @@ Proof.
   have Hlt := Interval_rds_size_bounded H0.
 
   move: (@splitPosition _ int.2 before (Hlt int.2)) => [pos Hpos].
-  pose (@ScanState_splitCurrentInterval pos _ _ _ _ _ _ _ _ _ thisState0).
-  eapply {| thisState := s Hpos |}.
+  move: (splitInterval_spec Hpos).
+  case: (splitInterval Hpos)
+    => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hint.
+
+  pose (@ScanState_setInterval _ thisState0 i _ i0
+                               undefined undefined) as st'.
+  pose (@ScanState_newUnhandled _ st' _ i1). simpl in *.
+  eapply {| thisState := s |}.
 
   Grab Existential Variables.
 
-  move: (s Hpos) => {s}.
-  rewrite /=.
-  move: (splitInterval_spec Hpos).
-  case: (splitInterval Hpos)
-    => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hint s.
-  simpl in *; subst. clear H3 H4.
-
-  pose (unhandledExtent_split i (exist _ id0 i0) (exist _ id1 i1)
-         (ibeg id1) n unhandled0 intervals0 fixedIntervals0
-         active0 inactive0 handled0)
-      as ue_split.
-
-  have ?: (unhandledExtent (getScanStateDesc s) < unhandledExtent pre)
-    by apply (ltn_leq_trans ue_split total_extent_decreases0).
-
-  rapply Build_SSMorphStHasLen;
-  try rapply Build_SSMorphHasLen;
-  try rapply Build_SSMorphLen;
-  try rapply Build_SSMorphSt;
-  try rapply Build_SSMorph;
+  apply Build_SSMorphStHasLen;
+  try apply Build_SSMorphHasLen;
+  try apply Build_SSMorphLen;
+  try apply Build_SSMorphSt;
+  try apply Build_SSMorph;
   move=> *;
   rewrite ?size_insert ?size_map /unhandled //=;
-  try by apply/ltnW.
+  try by apply/ltnW;
+  admit.
+
+  (* move: (s Hpos) => {s}. *)
+  (* rewrite /=. *)
+  (* move: (splitInterval_spec Hpos). *)
+  (* case: (splitInterval Hpos) *)
+  (*   => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hint s. *)
+  (* simpl in *; subst. clear H3 H4. *)
+
+  (* pose (unhandledExtent_split i (exist _ id0 i0) (exist _ id1 i1) *)
+  (*        (ibeg id1) n unhandled0 intervals0 fixedIntervals0 *)
+  (*        active0 inactive0 handled0) *)
+  (*     as ue_split. *)
+
+  (* have ?: (unhandledExtent (getScanStateDesc s) < unhandledExtent pre) *)
+  (*   by apply (ltn_leq_trans ue_split total_extent_decreases0). *)
+
+  (* apply Build_SSMorphStHasLen; *)
+  (* try apply Build_SSMorphHasLen; *)
+  (* try apply Build_SSMorphLen; *)
+  (* try apply Build_SSMorphSt; *)
+  (* try apply Build_SSMorph; *)
+  (* move=> *; *)
+  (* rewrite ?size_insert ?size_map /unhandled //=; *)
+  (* try by apply/ltnW. *)
 Defined.
 
 End MSSMorph.
