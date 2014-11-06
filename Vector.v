@@ -52,3 +52,7 @@ Defined.
 Definition replace {A : Type} {n} v i := @V.replace A _ v (@to_vfin n i).
 
 Definition vnth {A : Type} {n} v i := @V.nth A _ v (@to_vfin n i).
+
+Lemma nth_replace : forall A n v i (x : A), vnth (@replace A n v i x) i = x.
+Proof.
+Admitted.

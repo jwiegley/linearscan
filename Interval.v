@@ -86,7 +86,6 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
 Arguments intervalCoversPos [d] i pos /.
 
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
-Arguments intervalExtent [d] i /.
 
 Definition Interval_is_singleton `(i : Interval d) :=
   (NE_length (rds d) == 1)
@@ -442,6 +441,7 @@ Definition splitInterval_spec (before : nat) `(i : Interval d)
   intervalExtent i1.2 + intervalExtent i2.2 < intervalExtent i.
 Proof.
   case: (splitInterval H) => [[i1 i2] [_ _ /eqP H1 /eqP H2 ?]] /=.
+  rewrite /intervalExtent /=.
   rewrite {}H1 {}H2 {H i d}.
   apply four_points.
   apply/andP; split.

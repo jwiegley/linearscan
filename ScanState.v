@@ -273,6 +273,20 @@ Proof.
   by rewrite add0n addnC ltn_plus.
 Qed.
 
+Theorem ScanState_newUnhandled_spec `(st : ScanState sd) : forall d i,
+  let st' := @ScanState_newUnhandled _ st d i in
+  let sd' := getScanStateDesc st' in
+    unhandledExtent sd' == unhandledExtent sd + intervalExtent i.
+Admitted.
+
+Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
+  let st' := @ScanState_setInterval _ st xid d i H1 H2 in
+  let sd' := getScanStateDesc st' in
+    unhandledExtent sd'
+      == (unhandledExtent sd - intervalExtent (vnth (intervals sd) xid).2) +
+         intervalExtent i.
+Admitted.
+
 (** ** ScanStateCursor *)
 
 (** A [ScannStateCursor] gives us a view of the first unhandled element within

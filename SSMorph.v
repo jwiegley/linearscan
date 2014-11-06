@@ -352,6 +352,39 @@ Proof.
   apply Build_SSMorph; auto.
 Defined.
 
+Definition distance (n m : nat) : nat := if n < m then m - n else n - m.
+
+Lemma unhandledExtent_zero :
+  forall ni i (unh : list (fin ni * nat)) ints fixints act inact hnd,
+  0 <
+  unhandledExtent
+    {| nextInterval     := ni
+     ; unhandled        := i :: unh
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; intervals        := ints
+     ; fixedIntervals   := fixints
+     |}.
+Proof.
+  intros.
+  induction unh;
+  unfold unhandledExtent;
+  simpl; destruct i as [i beg];
+  pose (Interval_extent_nonzero (vnth ints i).2);
+    first by auto.
+  destruct unh;
+  simpl; destruct a as [a ?].
+    rewrite add0n addn_gt0.
+    by apply/orP; left.
+  rewrite add0n /=.
+  apply fold_gt.
+  rewrite addn_gt0.
+  apply/orP; left.
+  rewrite addn_gt0.
+  by apply/orP; left.
+Qed.
+
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
   (before : option nat) : SState pre P SSMorphStHasLen unit.
 Proof.
@@ -367,32 +400,47 @@ Proof.
   case: unhandled0 => //= [|[uid beg] us];
     first abstract by intuition.
   set desc := Build_ScanStateDesc _ _ _ _ _ _; simpl in desc.
-  move=> ? ? ? holds _ H unhandled_nonempty0.
+  move=> ? extent_decreases ? holds _ H unhandled_nonempty0.
   move: H (unhandled_nonempty0) => H /H {H} ? state.
 
   set int := vnth intervals0 uid.
-  have Hnotsing : ~~ Interval_is_singleton int.2 by admit.
+  have Hnotsing : ~~ Interval_is_singleton int.2.
+    (* jww (2014-11-06): This information must come from the input state,
+       which would be something along the lines of SSMorphSplit, above. *)
+    admit.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
   move: (@splitPosition _ int.2 before Hlt) => [pos Hmid].
   move: (splitInterval_spec Hmid).
   case: (splitInterval Hmid)
-    => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
+    => [[[id0 i0] [id1 i1]] [/= H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
 
-  have := @ScanState_setInterval _ state uid _ i0 _ _.
-  rewrite -[vnth _ _]/int /= {state}.
+  move: (Hdim) => /ltn_add1l /= H6.
+  move: H3 => /eqP H3.
+  rewrite eq_sym in H3.
 
-  move: (Hdim) => /ltn_add1l /= H /(_ H).
-  move: eq_sym H3 => -> /eqP H0 /(_ H0) state.
+  have := ScanState_setInterval state H6 H3.
+  have := ScanState_setInterval_spec state H6 H3.
+  rewrite /= -[vnth _ _]/int => {state}.
+  set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
+  simpl in set_int_desc.
+  move=> Hintdesc state.
 
-  have := @ScanState_newUnhandled _ state _ i1 => /= {state}.
-  set new_unhandled_added := (X in ScanState X) => state.
-  rewrite /= in new_unhandled_added state *.
+  have := ScanState_newUnhandled state i1.
+  have := ScanState_newUnhandled_spec state i1.
+  rewrite /= => {state}.
+  set new_unhandled_added := Build_ScanStateDesc _ _ _ _ _ _.
+  simpl in new_unhandled_added.
+  move=> Hunhandled state.
 
   apply: (Build_SSInfo _ state).
 
   have is_productive :
       unhandledExtent new_unhandled_added < unhandledExtent pre.
+    apply: (leq_trans _ extent_decreases).
+    move: Hunhandled => /eqP ->.
+    move: Hintdesc => /eqP ->.
+    rewrite -ltn_subRL.
     admit.
 
   abstract
