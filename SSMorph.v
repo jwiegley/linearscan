@@ -397,14 +397,13 @@ Proof.
   case: ssi => desc holds.
   case: W => /(_ pre desc holds).
   case=> H; case; case: H holds.
-  case: desc => /= nextInterval0
-                   intervals0 fixedIntervals0
-                   unhandled0 active0 inactive0 handled0.
+  case: desc => /= ? intervals0 ? unhandled0 ? ? ?.
 
   case: unhandled0 => //= [|[uid beg] us];
     first abstract by intuition.
   set desc := Build_ScanStateDesc _ _ _ _ _ _; simpl in desc.
-  intuition.
+  move=> ? ? ? holds _ H unhandled_nonempty0.
+  move: H (unhandled_nonempty0) => H /H {H} ? state.
 
   set int := vnth intervals0 uid.
   have Hnotsing : ~~ Interval_is_singleton int.2 by admit.
@@ -415,19 +414,27 @@ Proof.
   case: (splitInterval Hmid)
     => /= [[[id0 i0] [id1 i1]] [H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
 
-  pose st'  := @ScanState_setInterval _ thisState0 uid _ i0
-                                      undefined undefined.
-  pose st'' := @ScanState_newUnhandled _ st' _ i1.
+  have := @ScanState_setInterval _ state uid _ i0 _ _.
+  rewrite -[vnth _ _]/int /= {state}.
 
-  move: st' st'' => /=.
-  set desc_interval_set   := (X in ScanState X) => st'.
-  set new_unhandled_added := (X in ScanState X) => st''.
-  simpl in *.
+  have ltn_add1l: forall n m o, n + m < o -> n < o.
+    elim=> [|n IHn] m o H.
+      case: o => //= in H *.
+    case: o => //= [o] in H *.
+    exact: (IHn m).
 
-  apply: (Build_SSInfo _ st'').
+  move: (Hdim) => /ltn_add1l /= H /(_ H).
+  move: eq_sym H3 => -> /eqP H0 /(_ H0) state.
+
+  have := @ScanState_newUnhandled _ state _ i1 => /= {state}.
+  set new_unhandled_added := (X in ScanState X) => state.
+  rewrite /= in new_unhandled_added state *.
+
+  apply: (Build_SSInfo _ state).
 
   have is_productive :
-    unhandledExtent new_unhandled_added < unhandledExtent pre by admit.
+      unhandledExtent new_unhandled_added < unhandledExtent pre.
+    admit.
 
   abstract
     (apply Build_SSMorphStHasLen;

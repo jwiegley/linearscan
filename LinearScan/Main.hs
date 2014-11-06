@@ -595,10 +595,10 @@ _LinearScan__splitCurrentInterval_subproof :: LinearScan__ScanStateDesc ->
                                               (Data.Functor.Identity.Identity Prelude.Int)
                                               LinearScan__PhysReg)) -> a1 ->
                                               LinearScan__SSInfo ()
-_LinearScan__splitCurrentInterval_subproof pre before nextInterval0 intervals0 fixedIntervals0 active0 inactive0 handled0 holds =
+_LinearScan__splitCurrentInterval_subproof pre before _nextInterval_ intervals0 _fixedIntervals_ _active_ _inactive_ _handled_ holds =
   _LinearScan__coq_SSMorph_rect pre (LinearScan__Build_ScanStateDesc
-    nextInterval0 intervals0 fixedIntervals0 [] active0 inactive0 handled0)
-    (\_ _ _ -> Logic.coq_False_rect)
+    _nextInterval_ intervals0 _fixedIntervals_ [] _active_ _inactive_
+    _handled_) (\_ _ _ -> Logic.coq_False_rect)
 
 _LinearScan__splitCurrentInterval :: LinearScan__ScanStateDesc ->
                                      (Prelude.Maybe Prelude.Int) ->
@@ -608,65 +608,78 @@ _LinearScan__splitCurrentInterval pre before ssi =
     (let {
       _evar_0_ = \desc holds ->
        let {
-        _evar_0_ = \nextInterval0 intervals0 fixedIntervals0 unhandled0 active0 inactive0 handled0 ->
+        _evar_0_ = \_nextInterval_ intervals0 _fixedIntervals_ unhandled0 _active_ _inactive_ _handled_ ->
          let {
           _evar_0_ = \x ->
            _LinearScan__splitCurrentInterval_subproof pre before
-             nextInterval0 intervals0 fixedIntervals0 active0 inactive0
-             handled0 x}
+             _nextInterval_ intervals0 _fixedIntervals_ _active_ _inactive_
+             _handled_ x}
          in
          let {
           _evar_0_0 = \_top_assumption_ ->
            let {
-            _evar_0_0 = \uid beg us ->
-             let {
-              desc0 = LinearScan__Build_ScanStateDesc nextInterval0
-               intervals0 fixedIntervals0 ((:) ((,) uid beg) us) active0
-               inactive0 handled0}
-             in
-             (\_ _ _ holds0 _ _ _ _ ->
-             _LinearScan__coq_SSMorph_rect pre desc0 (\_ _ _ ->
-               let {int = Vector0.vnth nextInterval0 intervals0 uid} in
+            _evar_0_0 = \uid beg us holds0 ->
+             let {int = Vector0.vnth _nextInterval_ intervals0 uid} in
+             Ssreflect.ssr_have __ (\_ ->
                Ssreflect.ssr_have __ (\_ ->
-                 Ssreflect.ssr_have __ (\_ ->
-                   let {
-                    _top_assumption_0 = Interval.splitPosition ( int) before}
-                   in
-                   let {
-                    _top_assumption_1 = Interval.splitInterval
-                                          _top_assumption_0 ( int)}
-                   in
-                   let {
-                    _evar_0_0 = \_top_assumption_2 _top_assumption_3 ->
-                     let {
-                      new_unhandled_added = LinearScan__Build_ScanStateDesc
-                       (Prelude.succ nextInterval0)
-                       (Vector0._V__shiftin nextInterval0 _top_assumption_3
-                         (Vector0.replace nextInterval0 intervals0 uid
-                           _top_assumption_2)) fixedIntervals0
-                       (Lib.insert (\x ->
-                         Lib.lebf (Prelude.snd) x ((,)
-                           (Fintype.ord_max nextInterval0)
-                           (Interval.ibeg _top_assumption_3))) ((,)
-                         (Fintype.ord_max nextInterval0)
-                         (Interval.ibeg _top_assumption_3)) ((:)
-                         (_LinearScan__widen_fst nextInterval0 ((,) uid beg))
-                         ((Prelude.map)
-                           (_LinearScan__widen_fst nextInterval0) us)))
-                       ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                         active0)
-                       ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                         inactive0)
-                       ((Prelude.map) (_LinearScan__widen_fst nextInterval0)
-                         handled0)}
-                     in
-                     LinearScan__Build_SSInfo new_unhandled_added __}
-                   in
-                   case _top_assumption_1 of {
-                    (,) x x0 -> _evar_0_0 x x0}))))}
+                 let {
+                  _top_assumption_0 = Interval.splitPosition ( int) before}
+                 in
+                 let {
+                  _top_assumption_1 = Interval.splitInterval
+                                        _top_assumption_0 ( int)}
+                 in
+                 let {
+                  _evar_0_0 = \_top_assumption_2 _top_assumption_3 ->
+                   Ssreflect.ssr_have __
+                     (Ssreflect.ssr_have __ (\_ _ ->
+                       let {
+                        _evar_0_0 = \_ _ ->
+                         Ssreflect.ssr_have __ (\_ ->
+                           let {
+                            new_unhandled_added = LinearScan__Build_ScanStateDesc
+                             (Prelude.succ _nextInterval_)
+                             (Vector0._V__shiftin _nextInterval_
+                               _top_assumption_3
+                               (Vector0.replace _nextInterval_ intervals0 uid
+                                 _top_assumption_2)) _fixedIntervals_
+                             (Lib.insert (\x ->
+                               Lib.lebf (Prelude.snd) x ((,)
+                                 (Fintype.ord_max _nextInterval_)
+                                 (Interval.ibeg _top_assumption_3))) ((,)
+                               (Fintype.ord_max _nextInterval_)
+                               (Interval.ibeg _top_assumption_3)) ((:)
+                               (_LinearScan__widen_fst _nextInterval_ ((,)
+                                 uid beg))
+                               ((Prelude.map)
+                                 (_LinearScan__widen_fst _nextInterval_) us)))
+                             ((Prelude.map)
+                               (_LinearScan__widen_fst _nextInterval_)
+                               _active_)
+                             ((Prelude.map)
+                               (_LinearScan__widen_fst _nextInterval_)
+                               _inactive_)
+                             ((Prelude.map)
+                               (_LinearScan__widen_fst _nextInterval_)
+                               _handled_)}
+                           in
+                           LinearScan__Build_SSInfo new_unhandled_added __)}
+                       in
+                       Logic.eq_rect_r
+                         (Eqtype.eq_op Ssrnat.nat_eqType
+                           (unsafeCoerce (Interval.ibeg ( int)))
+                           (unsafeCoerce (Interval.ibeg _top_assumption_2)))
+                         _evar_0_0
+                         (Eqtype.eq_op Ssrnat.nat_eqType
+                           (unsafeCoerce (Interval.ibeg _top_assumption_2))
+                           (unsafeCoerce (Interval.ibeg ( int)))) __ __))}
+                 in
+                 case _top_assumption_1 of {
+                  (,) x x0 -> _evar_0_0 x x0}))}
            in
+           (\us _ _ _ holds0 _ _ _ _ ->
            case _top_assumption_ of {
-            (,) x x0 -> _evar_0_0 x x0}}
+            (,) x x0 -> _evar_0_0 x x0 us holds0})}
          in
          case unhandled0 of {
           [] -> (\_ _ _ x _ _ _ _ -> _evar_0_ x);
