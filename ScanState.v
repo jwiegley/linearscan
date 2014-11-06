@@ -38,26 +38,6 @@ Record ScanStateDesc : Type := {
     inactive  : list (IntervalId * PhysReg); (* falls in lifetime hole *)
     handled   : list (IntervalId * PhysReg); (* ends before pos *)
 
-    (** Fixed Intervals
-
-        Some machine instructions require their operands in fixed
-        registers. Such constraints are already considered during the
-        construction of the LIR by emitting physical register operands instead
-        of virtual register operands. Although the register allocator must
-        leave these operands unchanged, they must be considered during
-        register allocation because they limit the number of available
-        registers. Information about physical registers is collected in fixed
-        intervals.
-
-        For each physical register, one fixed interval stores where the
-        register is not available for allocation. Use positions are not needed
-        for fixed intervals because they are never split and spilled. Register
-        constraints at method calls are also modeled using fixed intervals:
-        Because all registers are destroyed when the call is executed, ranges
-        of length 1 are added to all fixed intervals at the call site.
-        Therefore, the allocation pass cannot assign a register to any
-        interval there, and all intervals are spilled before the call. *)
-
     unhandledIds := [seq fst i | i <- unhandled];
     activeIds    := [seq fst i | i <- active];
     inactiveIds  := [seq fst i | i <- inactive];
@@ -67,10 +47,16 @@ Record ScanStateDesc : Type := {
 }.
 
 Definition widen_id {n} := widen_ord (leqnSn n).
-
+Arguments widen_id [n] i /.
 Definition widen_fst {n a} p := (@widen_id n (@fst _ a p), snd p).
 
+Lemma map_widen_fst : forall (a : eqType) n (xs : seq (fin n * a)),
+  [seq fst i | i <- [seq (@widen_fst n a) i | i <- xs]] =
+  [seq (@widen_id n) i | i <- [seq fst i | i <- xs]].
+Proof. move=> a n xs. by rewrite -!map_comp. Qed.
+
 Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
+Arguments getInterval [sd] i /.
 
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   match unhandledIds sd with
@@ -244,38 +230,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; handled          := x :: handled sd
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
-       |}
-(*
-  | ScanState_splitCurrentInterval
-      pos ni xid xbeg unh act inact hnd ints fixints :
-    let x := (xid, xbeg) in
-    ScanState
-      {| nextInterval     := ni
-       ; unhandled        := x :: unh
-       ; active           := act
-       ; inactive         := inact
-       ; handled          := hnd
-       ; intervals        := ints
-       ; fixedIntervals   := fixints
-       |} ->
-    let xi := (vnth ints xid).2 in
-    forall (H : firstUsePos xi < pos <= lastUsePos xi),
-
-    let xe   := splitInterval H in
-    let x2   := (ord_max, ibeg (snd xe.1).1) in
-    let unh' := map widen_fst (x :: unh) in
-    ScanState
-      {| nextInterval     := ni.+1
-       ; unhandled        := insert (lebf snd ^~ x2) x2 unh'
-       ; active           := map widen_fst act
-       ; inactive         := map widen_fst inact
-       ; handled          := map widen_fst hnd
-       ; intervals        := replace (V.shiftin (snd xe.1) ints)
-                                     (widen_id xid) (fst xe.1)
-       ; fixedIntervals   := fixints
-       |}
-*)
-.
+       |}.
 
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
@@ -338,7 +293,9 @@ Arguments curId {sd} _.
 Arguments curIntDetails {sd} _.
 
 Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
+Arguments curInterval [sd] cur /.
 Definition curPosition `(cur : ScanStateCursor sd) :=
   intervalStart (curInterval cur).
+Arguments curPosition [sd] cur /.
 
 End MScanState.

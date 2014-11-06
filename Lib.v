@@ -14,8 +14,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(** The following are extensions to the Coq standard library. *)
-
 Definition undefined {a : Type} : a. Admitted.
 
 Definition apply {A B} (f : A -> B) (x : A) := f x.
@@ -105,24 +103,6 @@ Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } 
       end in
   go l.
 
-Definition projTT1 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : A :=
-  let (x,_,_) := e in x.
-
-(* Definition projTT2 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : *)
-(*   P (projTT1 e) := let (x,p,_) as x return (P (projTT1 x)) := e in p. *)
-
-(* Definition projTT3 {A} {P Q : A -> Type} (e : {x : A & P x & Q x}) : *)
-(*   Q (projTT1 e) := let (x,_,q) as x return (Q (projTT1 x)) := e in q. *)
-
-Definition proj1_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : A :=
-  let (x,_,_) := e in x.
-
-(* Definition proj2_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : *)
-(*   P (proj1_sigg e) := let (x,p,_) as x return (P (proj1_sigg x)) := e in p. *)
-
-(* Definition proj3_sigg {A} {P Q : A -> Prop} (e : {x : A | P x & Q x}) : *)
-(*   Q (proj1_sigg e) := let (x,_,q) as x return (Q (proj1_sigg x)) := e in q. *)
-
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
@@ -133,24 +113,6 @@ Qed.
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
 Proof. by rewrite /=; apply/negPn; case: (odd n). Qed.
 
-Lemma lt_dec : forall n m, (n < m) -> (n < m)%coq_nat.
-Proof. move=> n m H. destruct (@ltP n m); [ done | inv H ]. Qed.
-
-Lemma lt_dec_iff : forall n m, (n < m) <-> (n < m)%coq_nat.
-Proof.
-  split. apply lt_dec.
-  move=> H. destruct (@ltP n m); [ done | inv H ].
-Qed.
-
-Lemma le_dec : forall n m, (n <= m) -> (n <= m)%coq_nat.
-Proof. move=> n m H. destruct (@leP n m); [ done | inv H ]. Qed.
-
-Lemma le_dec_iff : forall n m, (n <= m) <-> (n <= m)%coq_nat.
-Proof.
-  split. apply le_dec.
-  move=> H. destruct (@leP n m); [ done | inv H ].
-Qed.
-
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.
 
@@ -160,10 +122,12 @@ Proof. intros. rewrite gtn_min. by elim: (m < p). Qed.
 Lemma ltn_max : forall m n p, p < n -> p < maxn m n.
  Proof. move=> *. by rewrite leq_max; intuition. Qed.
 
-Lemma lt_le_shuffle : forall {x y z w}, x < y -> y <= z -> z < w -> x < w.
+Lemma ltn_add1l : forall n m o, n + m < o -> n < o.
 Proof.
-  move=> x y z w H1 H2 H3.
-  by apply/(leq_trans H1)/(leq_trans H2)/ltnW.
+  elim=> [|n IHn] m o H.
+    case: o => //= in H *.
+  case: o => //= [o] in H *.
+  exact: (IHn m).
 Qed.
 
 Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
@@ -202,14 +166,14 @@ Proof.
   by rewrite ltn_add2r.
 Qed.
 
-Definition safe_hd {a} (xs : list a) : size xs > 0 -> a.
+Definition safe_hd {a} (xs : list a) : 0 < size xs -> a.
 Proof. case: xs => //. Defined.
 
 Arguments safe_hd [a] xs H.
 
-Definition safe_last {a} (xs : list a) : size xs > 0 -> a.
+Definition safe_last {a} (xs : list a) : 0 < size xs -> a.
 Proof.
-  case: xs => [//|y ys] /= H.
+  case: xs => [//|y ys] /= *.
   exact: (last y ys).
 Defined.
 
@@ -225,31 +189,8 @@ Qed.
 (* Lemma hd_last_spec : forall a (xs : seq a) (H : 0 < size xs), *)
 (*   safe_hd xs H = safe_last (rev xs) (lt_size_rev H). *)
 (* Proof. *)
-(*   move=> a xs. *)
-(*   case: xs => [//|y ys] /= H. *)
-
-Lemma not_in_app : forall (a : eqType) x (l l' : list a),
-  x \notin (l ++ l') -> x \notin l.
-Proof.
-  move=> a x l l'.
-  rewrite mem_cat.
-  move/norP.
-  move=> H. inv H.
-Qed.
-
-Lemma map_f_notin :
-  forall (T1 T2 : eqType) (f : T1 -> T2) (s : seq T1) (x : T1),
-  injective f -> x \notin s -> f x \notin [seq f i | i <- s].
-Proof.
-  move=> T1 T2 f.
-  elim=> // x xs IHxs x0 Hinj.
-  rewrite in_cons.
-  move/norP => [H1 H2].
-  rewrite map_cons in_cons.
-  apply/norP; split.
-    by rewrite inj_eq.
-  exact: IHxs.
-Qed.
+(*   move=> a. *)
+(*   case=> [//|y ys] /= H. *)
 
 Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).
@@ -383,7 +324,7 @@ Fixpoint flatten_stack (stack : list (option (list t))) :=
   | Some l :: stack' => l ++ flatten_stack stack'
   end.
 
-Theorem Sorted_imerge : forall l1 l2,
+Lemma Sorted_imerge : forall l1 l2,
   Sorted l1 -> Sorted l2 -> Sorted (imerge l1 l2).
 Proof.
   induction l1; induction l2; intros; simpl; auto.
@@ -403,7 +344,7 @@ Proof.
       destruct (f a <= f b); constructor; auto.
 Qed.
 
-Theorem Sorted_imerge_list_to_stack : forall stack l,
+Lemma Sorted_imerge_list_to_stack : forall stack l,
   SortedStack stack -> Sorted l -> SortedStack (imerge_list_to_stack stack l).
 Proof.
   induction stack as [|[|]]; intros; simpl.
@@ -413,7 +354,7 @@ Proof.
       auto.
 Qed.
 
-Theorem Sorted_imerge_stack : forall stack,
+Lemma Sorted_imerge_stack : forall stack,
   SortedStack stack -> Sorted (imerge_stack stack).
 Proof.
 induction stack as [|[|]]; simpl; intros.
@@ -422,7 +363,7 @@ induction stack as [|[|]]; simpl; intros.
   auto.
 Qed.
 
-Theorem Sorted_iter_imerge : forall stack l,
+Lemma Sorted_iter_imerge : forall stack l,
   SortedStack stack -> Sorted (iter_imerge stack l).
 Proof.
   intros stack l H; induction l in stack, H |- *; simpl.
@@ -432,26 +373,7 @@ Proof.
 Qed.
 
 Theorem Sorted_isort : forall l, Sorted (isort l).
-Proof.
-intro; apply Sorted_iter_imerge. constructor.
-Qed.
-
-Corollary LocallySorted_isort : forall l, Sorted.Sorted lebf (isort l).
-Proof. intro; eapply Sorted_LocallySorted_iff, Sorted_isort; auto. Qed.
-
-Corollary StronglySorted_isort : forall l,
-  StronglySorted lebf (isort l).
-Proof.
-  move=> l.
-  apply Sorted_StronglySorted.
-    rewrite /Relations_1.Transitive.
-    move=> x y z.
-    rewrite /lebf.
-    exact: leq_trans.
-  exact: LocallySorted_isort.
-Qed.
-
-Import EqNotations.
+Proof. intro; apply Sorted_iter_imerge. constructor. Qed.
 
 Lemma Forall_insert_spec : forall x xs z,
   List.Forall (lebf x) xs -> lebf x z
@@ -499,39 +421,3 @@ Proof.
 Qed.
 
 End Mergesort.
-
-Lemma Forall_leq_map : forall a f x l,
-  List.Forall (fun m : a => f x <= f m) l
-    -> List.Forall (fun n : nat => f x <= n) [seq f i | i <- l].
-Proof.
-  move=> a f x.
-  elim=> [|z l IHl] H /=.
-    by constructor.
-  constructor. by inv H.
-  apply: IHl; inv H.
-Qed.
-
-Lemma StronglySorted_leq_map : forall a f l,
-  StronglySorted (fun n m : a => f n <= f m) l
-    -> StronglySorted (fun m n : nat => m <= n) [seq f i | i <- l].
-Proof.
-  move=> a f.
-  elim=> [|x l IHl] H /=.
-    by constructor.
-  constructor. by apply IHl; inv H.
-  by apply Forall_leq_map; inv H.
-Qed.
-
-Corollary StronglySorted_isort_f : forall a (f : a -> nat) l,
-  StronglySorted leq [seq f i | i <- isort f l ].
-Proof.
-  move=> a f l.
-  pose (StronglySorted_isort f l) as Hsort.
-  unfold lebf in Hsort.
-  elim: l Hsort => /= [|x l IHl] Hsort.
-    by constructor.
-  inv Hsort. constructor.
-  constructor.
-    exact: StronglySorted_leq_map.
-  exact: Forall_leq_map.
-Qed.

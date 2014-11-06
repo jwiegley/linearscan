@@ -189,10 +189,6 @@ Definition processBlocks (blocks : NonEmpty Block) :
        applyList blocks emptyBoundedRangeVec handleBlock in
   (V.map extractRange vars', V.map extractRange regs').
 
-Inductive Foo {a} : list a -> Prop := Foo_ : Foo nil.
-
-Definition mkFoo {a : Set} := @Foo_.
-
 Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
   let mkint (ss : ScanStateSig) (mx : option RangeSig)
             (f : forall sd, ScanState sd -> forall d, Interval d

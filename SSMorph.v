@@ -352,41 +352,6 @@ Proof.
   apply Build_SSMorph; auto.
 Defined.
 
-Lemma unhandledExtent_split :
-  forall ni (i : fin ni) i0 i1 b n (unh : list (fin ni * nat))
-    ints fixints act inact hnd,
-  unhandledExtent
-    {| nextInterval   := ni.+1
-     ; intervals      := replace (V.shiftin i1 ints) (widen_id i) i0
-     ; fixedIntervals := fixints
-     ; unhandled      :=
-         insert (lebf snd ^~ (ord_max, b)) (ord_max, b)
-                (widen_fst (i, n) :: [seq widen_fst i | i <- unh])
-     ; active         := [seq widen_fst i | i <- act]
-     ; inactive       := [seq widen_fst i | i <- inact]
-     ; handled        := [seq widen_fst i | i <- hnd]
-     |} <
-  unhandledExtent
-    {| nextInterval   := ni
-     ; intervals      := ints
-     ; fixedIntervals := fixints
-     ; unhandled      := (i, n) :: unh
-     ; active         := act
-     ; inactive       := inact
-     ; handled        := hnd
-    |}.
-Proof.
-  intros.
-  induction unh;
-  unfold unhandledExtent; simpl;
-  pose (Interval_extent_nonzero (vnth ints i).2).
-    admit.
-  destruct unh;
-  simpl; destruct a as [a ?].
-    admit.
-  admit.
-Qed.
-
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
   (before : option nat) : SState pre P SSMorphStHasLen unit.
 Proof.
@@ -416,12 +381,6 @@ Proof.
 
   have := @ScanState_setInterval _ state uid _ i0 _ _.
   rewrite -[vnth _ _]/int /= {state}.
-
-  have ltn_add1l: forall n m o, n + m < o -> n < o.
-    elim=> [|n IHn] m o H.
-      case: o => //= in H *.
-    case: o => //= [o] in H *.
-    exact: (IHn m).
 
   move: (Hdim) => /ltn_add1l /= H /(_ H).
   move: eq_sym H3 => -> /eqP H0 /(_ H0) state.

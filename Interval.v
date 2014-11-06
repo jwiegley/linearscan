@@ -453,7 +453,9 @@ Qed.
 
 (** * Fixed Intervals *)
 
-(** Some machine instructions require their operands in fixed registers. Such
+(** Effectively these are just pre-allocated registers.
+
+    Some machine instructions require their operands in fixed registers. Such
     constraints are already considered during the construction of the LIR by
     emitting physical register operands instead of virtual register
     operands. Although the register allocator must leave these operands

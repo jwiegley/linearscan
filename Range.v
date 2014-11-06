@@ -469,8 +469,6 @@ Proof.
   by move: (Range_bounded r2.2).
 Qed.
 
-(**************************************************************************)
-
 Module RangeTests.
 
 Module Import E := NonEmptyNotations.

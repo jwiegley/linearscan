@@ -159,10 +159,10 @@ Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
                             -> NE_StronglySorted (NE_Cons a l).
 
-Lemma NE_StronglySorted_inv : forall a l,
-  NE_StronglySorted (NE_Cons a l)
-    -> NE_StronglySorted l /\ NE_Forall (R a) l.
-Proof. intros; inversion H0; auto. Qed.
+(* Lemma NE_StronglySorted_inv : forall a l, *)
+(*   NE_StronglySorted (NE_Cons a l) *)
+(*     -> NE_StronglySorted l /\ NE_Forall (R a) l. *)
+(* Proof. intros; inversion H0; auto. Qed. *)
 
 Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2)
