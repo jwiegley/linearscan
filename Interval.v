@@ -88,6 +88,11 @@ Arguments intervalCoversPos [d] i pos /.
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 Arguments intervalExtent [d] i /.
 
+Definition Interval_is_singleton `(i : Interval d) :=
+  (NE_length (rds d) == 1)
+    && (NE_length (ups (NE_head (rds d)).1) == 1).
+Arguments Interval_is_singleton [d] i /.
+
 Lemma intervalConnected
   `(i : Interval {| ibeg := ib
                   ; iend := ie
@@ -268,12 +273,8 @@ Proof.
     by apply (leq_trans H4).
 Qed.
 
-Definition Interval_splittable `(i : Interval d) : bool :=
-  (NE_length (rds d) > 1) || (NE_length (ups (NE_head (rds d)).1) > 1).
-Arguments Interval_splittable [d] i /.
-
 Definition Interval_rds_size_bounded `(i : Interval d) :
-  Interval_splittable i -> firstUsePos i < lastUsePos i.
+  ~~ Interval_is_singleton i -> firstUsePos i < lastUsePos i.
 Proof.
   Interval_cases (inversion i) Case; simpl in *.
   - Case "I_Sing".

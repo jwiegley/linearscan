@@ -91,7 +91,7 @@ Proof.
 
        This will need to come from the [ScanState_moveUnhandledToActive]
        constructor, but doing so will require obtaining it from the algorithm,
-       which will be a more substantial change. *)
+       which may be a substantial change. *)
     admit.
 
   - Case "ScanState_moveActiveToInactive".
@@ -134,7 +134,7 @@ Theorem limit_active_registers `(st : ScanState sd) :
   size (active sd ++ inactive sd) <= minn maxReg (nextInterval sd).
 (* jww (2014-10-31): Implementing this will need supporting evidence from the
    algorithm; I don't think the constructors give us enough detail to
-   determine here by induction. *)
+   determine it here by induction. *)
 Admitted.
 
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=

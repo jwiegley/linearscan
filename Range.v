@@ -338,8 +338,7 @@ Defined.
 Record SplittableUsePos `(Range r) := {
     splittable_UsePos : UsePos;
     splittable_WithinRange :
-         upos_lt (NE_head (ups r)) splittable_UsePos
-      /\ upos_lt splittable_UsePos (NE_last (ups r))
+      NE_head (ups r) < splittable_UsePos < NE_last (ups r)
 }.
 
 Record DividedRange `(r : Range rd) (f : UsePos -> bool)

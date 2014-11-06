@@ -11,7 +11,7 @@ Generalizable All Variables.
 Module MAllocate (M : Machine).
 Include MSSMorph M.
 
-Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (position : nat) :
+Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (pos : nat) :
   SState pre P P unit.
 Admitted.
 

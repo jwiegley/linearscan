@@ -469,7 +469,7 @@ Qed.
 
 Lemma StronglySorted_insert_spec (l : list t) : forall z,
   StronglySorted lebf l
-    -> StronglySorted lebf (insert (fun x => lebf x z) z l).
+    -> StronglySorted lebf (insert (lebf ^~ z) z l).
 Proof.
   move=> z.
   elim: l => /= [|x xs IHxs] Hsort.
