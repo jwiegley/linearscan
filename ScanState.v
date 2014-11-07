@@ -277,6 +277,11 @@ Theorem ScanState_newUnhandled_spec `(st : ScanState sd) : forall d i,
   let st' := @ScanState_newUnhandled _ st d i in
   let sd' := getScanStateDesc st' in
     unhandledExtent sd' == unhandledExtent sd + intervalExtent i.
+Proof.
+  move=> d i /=.
+  case: sd st => /= ? ? ?.
+  elim=> [|u us IHus] * => //=.
+    rewrite /insert /unhandledExtent /=.
 Admitted.
 
 Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
@@ -285,6 +290,11 @@ Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
     unhandledExtent sd'
       == (unhandledExtent sd - intervalExtent (vnth (intervals sd) xid).2) +
          intervalExtent i.
+Admitted.
+
+Theorem ScanState_hasInterval_spec `(st : ScanState sd) : forall xid,
+  let int := vnth (intervals sd) xid in
+  xid \in unhandledIds sd -> intervalExtent int.2 <= unhandledExtent sd.
 Admitted.
 
 (** ** ScanStateCursor *)

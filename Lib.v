@@ -210,6 +210,14 @@ Proof.
   exact: perm_to_rem.
 Qed.
 
+Lemma cons_impl_in : forall (a : eqType) (x : a) l xs,
+  l = x :: xs -> x \in l.
+Proof.
+  move=> a x l xs H.
+  rewrite H.
+  exact: mem_head.
+Qed.
+
 Lemma lift_bounded : forall n (x : fin n), ord_max != widen_ord (leqnSn n) x.
 Proof.
   move=> n.

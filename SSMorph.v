@@ -397,7 +397,7 @@ Proof.
   case=> H; case; case: H holds.
   case: desc => /= ? intervals0 ? unhandled0 ? ? ?.
 
-  case: unhandled0 => //= [|[uid beg] us];
+  case E: unhandled0 => //= [|[uid beg] us];
     first abstract by intuition.
   set desc := Build_ScanStateDesc _ _ _ _ _ _; simpl in desc.
   move=> ? extent_decreases ? holds _ H unhandled_nonempty0.
@@ -419,12 +419,17 @@ Proof.
   move: H3 => /eqP H3.
   rewrite eq_sym in H3.
 
+  have Hmem: uid \in unhandledIds desc.
+    rewrite /desc /unhandledIds /=.
+    exact: mem_head.
+  have := @ScanState_hasInterval_spec _ state uid Hmem.
+
   have := ScanState_setInterval state H6 H3.
   have := ScanState_setInterval_spec state H6 H3.
   rewrite /= -[vnth _ _]/int => {state}.
   set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
   simpl in set_int_desc.
-  move=> Hintdesc state.
+  move=> Hintdesc state Hcontent.
 
   have := ScanState_newUnhandled state i1.
   have := ScanState_newUnhandled_spec state i1.
@@ -440,8 +445,7 @@ Proof.
     apply: (leq_trans _ extent_decreases).
     move: Hunhandled => /eqP ->.
     move: Hintdesc => /eqP ->.
-    rewrite -ltn_subRL.
-    admit.
+    by rewrite -addnA -ltn_subRL subKn.
 
   abstract
     (apply Build_SSMorphStHasLen;
