@@ -290,28 +290,11 @@ _V__to_list n v =
       V__Coq_cons a n1 w -> (:) a (fold_right_fix n1 w b)}}
   in fold_right_fix n v []
 
-fin_contra :: (Data.Functor.Identity.Identity Prelude.Int) -> a1
-fin_contra _top_assumption_ =
-  let {_evar_0_ = \m -> Logic.coq_False_rect} in
-  case _top_assumption_ of {
-   Data.Functor.Identity.Identity x -> _evar_0_ x}
-
 to_vfin :: Prelude.Int -> (Data.Functor.Identity.Identity Prelude.Int) ->
            Fin.Coq_t
 to_vfin n x =
-  let {_evar_0_ = \h -> fin_contra h} in
-  let {
-   _evar_0_0 = \n0 _top_assumption_ ->
-    let {_evar_0_0 = \m -> Fin.of_nat_lt m (Prelude.succ n0)} in
-    case _top_assumption_ of {
-     Data.Functor.Identity.Identity x0 -> _evar_0_0 x0}}
-  in
-  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
-    (\_ ->
-    _evar_0_ x)
-    (\x0 ->
-    _evar_0_0 x0 x)
-    n
+  case x of {
+   Data.Functor.Identity.Identity m -> Fin.of_nat_lt m n}
 
 fold_left_with_index :: Prelude.Int ->
                         ((Data.Functor.Identity.Identity Prelude.Int) -> a2

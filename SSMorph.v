@@ -418,6 +418,7 @@ Proof.
   rewrite /= -[vnth _ _]/int => {state}.
   set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
   simpl in set_int_desc.
+  move/(_ Hmem).
   move=> Hintdesc state Hcontent.
 
   have := ScanState_newUnhandled state i1.
@@ -434,7 +435,10 @@ Proof.
     apply: (leq_trans _ extent_decreases).
     move: Hunhandled => /eqP ->.
     move: Hintdesc => /eqP ->.
-    by rewrite -addnA -ltn_subRL subKn.
+    rewrite -ltn_subRL subKn.
+      by rewrite ltn_subRL.
+    rewrite -[_ desc]subn0.
+    by apply leq_sub.
 
   abstract
     (apply Build_SSMorphStHasLen;

@@ -148,6 +148,23 @@ Qed.
 Lemma ltnSSn : forall n, n < n.+2.
 Proof. move=> n. exact: ltnW. Qed.
 
+Lemma addsubnS : forall n m, n > 0 -> n.-1 + m = (n + m).-1.
+Proof. elim=> [|n IHn] m //=. Qed.
+
+Lemma subneq : forall n m, n == m -> n.-1 == m.-1.
+Proof. elim=> [|n IHn] //= m /eqP H; by rewrite -H. Qed.
+
+Lemma add_sub : forall k n p, n <= k -> k - n + p == k + p - n.
+Proof.
+  move=> k n p.
+  elim: n => [|n IHn] H.
+    by rewrite !subn0.
+  rewrite !subnS addsubnS.
+    apply/subneq/IHn.
+    exact: ltnW.
+  by rewrite subn_gt0.
+Qed.
+
 Lemma fold_gt : forall a f n m (xs : list a),
   n > m -> foldl (fun n x => n + f x) n xs > m.
 Proof.
@@ -164,6 +181,47 @@ Proof.
   elim: xs n m => // ? ? IHxs *.
   apply IHxs.
   by rewrite ltn_add2r.
+Qed.
+
+Lemma fold_left_plus : forall a (f : a -> nat) xs n,
+   foldl (fun n x => n + f x) n xs =
+   foldl (fun n x => n + f x) 0 xs + n.
+Proof.
+  move=> a f; elim=> // a' ? IHxs n /=.
+  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
+Qed.
+
+Lemma fold_left_minus_plus : forall a (f : a -> nat) xs n m,
+   let k i := foldl (fun n x => n + f x) i xs in
+   m <= k 0 -> k n - m = k 0 - m + n.
+Proof.
+  move=> a f xs /=.
+  elim=> [|n IHn] m H /=.
+    by rewrite addn0.
+  rewrite -addn1 addnA -(IHn _ H) fold_left_plus IHn; last by [].
+  set k := foldl _ _ _.
+  move: (@add_sub k m (n + 1) H) => /eqP <-.
+  by rewrite addnA.
+Qed.
+
+Definition sumf {a} (f : a -> nat) : seq a -> nat :=
+  foldl (fun n x => n + f x) 0.
+
+Lemma sumf_cons : forall a f xs (x : a),
+  sumf f (x :: xs) = f x + sumf f xs.
+Proof.
+  move=> a f.
+  rewrite /sumf /= => xs x.
+  by rewrite fold_left_plus addnC add0n.
+Qed.
+
+Lemma sumf_map : forall a b (f : b -> nat) (g : a -> b) xs,
+  sumf (fun x : b => f x) [seq g i | i <- xs] =
+  sumf (fun x : a => f (g x)) xs.
+Proof.
+  move=> a b f g.
+  elim=> [|x xs IHxs] //=.
+  by rewrite sumf_cons IHxs sumf_cons.
 Qed.
 
 Definition safe_hd {a} (xs : list a) : 0 < size xs -> a.
@@ -269,6 +327,29 @@ Proof.
   move=> a P x xs.
   rewrite (@perm_eq_size _ _ (x :: xs)) => //.
   exact/perm_eqlP/insert_perm.
+Qed.
+
+Lemma foldl_insert :
+  forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T),
+  (forall x y z, f (f z x) y = f (f z y) x)
+    -> foldl f z (insert (P ^~ x) x xs) = foldl f z (x :: xs).
+Proof.
+  move=> T R f z P x xs.
+  rewrite /insert.
+  elim: xs z => [|y ys IHys] //= z H.
+  case E: (P y x) => //=.
+  rewrite -/insert in IHys *.
+  rewrite IHys /=; last by [].
+  by rewrite H.
+Qed.
+
+Lemma sumf_insert : forall a f P (x : a) xs,
+  sumf f (insert (P ^~ x) x xs) = sumf f (x :: xs).
+Proof.
+  move=> a f P x xs.
+  rewrite /sumf foldl_insert; first by [].
+  move=> x0 y0 z0.
+  by rewrite -addnA [f _ + f _]addnC addnA.
 Qed.
 
 Section Mergesort.

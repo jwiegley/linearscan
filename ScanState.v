@@ -58,53 +58,6 @@ Proof. move=> a n xs. by rewrite -!map_comp. Qed.
 Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 Arguments getInterval [sd] i /.
 
-Lemma foldl_insert :
-  forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T),
-  (forall x y z, f (f z x) y = f (f z y) x)
-    -> foldl f z (insert (P ^~ x) x xs) = foldl f z (x :: xs).
-Proof.
-  move=> T R f z P x xs.
-  rewrite /insert.
-  elim: xs z => [|y ys IHys] //= z H.
-  case E: (P y x) => //=.
-  rewrite -/insert in IHys *.
-  rewrite IHys /=; last by [].
-  by rewrite H.
-Qed.
-
-Lemma fold_left_plus : forall a f xs n,
-   foldl (fun (n : nat) (x : a) => n + f x) n xs =
-   foldl (fun (n : nat) (x : a) => n + f x) 0 xs + n.
-Proof.
-  move=> a f; elim=> // a' ? IHxs n /=.
-  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
-Qed.
-
-Definition sumf {a} (f : a -> nat) : seq a -> nat :=
-  foldl (fun n x => n + f x) 0.
-
-Lemma sumf_cons : forall a f xs (x : a),
-  sumf f (x :: xs) = f x + sumf f xs.
-Proof.
-  move=> a f.
-  rewrite /sumf /= => xs x.
-  by rewrite fold_left_plus addnC add0n.
-Qed.
-
-Lemma sumf_insert : forall a f P (x : a) xs,
-  sumf f (insert (P ^~ x) x xs) = sumf f (x :: xs).
-Proof.
-  move=> a f P x xs.
-  rewrite /sumf foldl_insert; first by [].
-  move=> x0 y0 z0.
-  by rewrite -addnA [f _ + f _]addnC addnA.
-Qed.
-
-Lemma sumf_map : forall a b (f : b -> nat) (g : a -> b) xs,
-   sumf (fun x : b => f x) [seq g i | i <- xs] =
-   sumf (fun x : a => f (g x)) xs.
-Admitted.
-
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
   sumf (fun x => intervalExtent (getInterval (fst x))) (unhandled sd).
 
@@ -366,17 +319,44 @@ Proof.
   by rewrite vnth_shiftin.
 Qed.
 
-Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
-  let st' := @ScanState_setInterval _ st xid d i H1 H2 in
-  let sd' := getScanStateDesc st' in
-    unhandledExtent sd'
-      == (unhandledExtent sd - intervalExtent (vnth (intervals sd) xid).2) +
-         intervalExtent i.
+Lemma predU1decP : forall (T : eqType) (x y : T) (b : bool),
+  reflect (x = y \/ (x <> y /\ b)) ((x == y) || b).
 Admitted.
 
 Theorem ScanState_hasInterval_spec `(st : ScanState sd) : forall xid,
   let int := vnth (intervals sd) xid in
   xid \in unhandledIds sd -> intervalExtent int.2 <= unhandledExtent sd.
+Admitted.
+
+Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
+  let st' := @ScanState_setInterval _ st xid d i H1 H2 in
+  let sd' := getScanStateDesc st' in
+  xid \in unhandledIds sd
+    -> unhandledExtent sd' ==
+       unhandledExtent sd - (intervalExtent (vnth (intervals sd) xid).2 -
+                             intervalExtent i).
+Proof.
+  move=> xid d i H1 H2 /= Hin.
+  case: sd => ? IntervalId0 ? ? unh /= ? ? ? /= in xid st H1 H2 Hin *.
+  set sd  := (X in unhandledExtent X).
+  set sd' := (X in unhandledExtent X == _).
+  rewrite /= in sd sd' *.
+  move: Hin; rewrite /unhandledIds /= => Hin.
+  rewrite /unhandledExtent /= {}/IntervalId /nextInterval /sumf /= {st}.
+  elim: unh => [//|u us IHus] /= in Hin sd sd' *.
+  move: in_cons Hin => -> /predU1decP [->|[Hneq Hin]].
+    clear.
+    rewrite vnth_replace.
+    admit.
+  rewrite /= !add0n fold_left_plus.
+  move: IHus => /(_ Hin) /= /eqP ->.
+  set f := (X in foldl X).
+  rewrite vnth_replace_neq; last exact/eqP.
+  set n := intervalExtent _ - _.
+  set m := intervalExtent _.
+  apply/eqP/esym.
+  apply fold_left_minus_plus.
+  admit.
 Admitted.
 
 (** ** ScanStateCursor *)

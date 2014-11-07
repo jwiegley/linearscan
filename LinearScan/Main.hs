@@ -21,6 +21,7 @@ import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Vector0 as Vector0
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
+import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssreflect as Ssreflect
 import qualified LinearScan.Ssrnat as Ssrnat
 
@@ -204,13 +205,9 @@ _LinearScan__widen_fst :: Prelude.Int -> ((,)
 _LinearScan__widen_fst n p =
   (,) (_LinearScan__widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
 
-_LinearScan__sumf :: (a1 -> Prelude.Int) -> ([] a1) -> Prelude.Int
-_LinearScan__sumf f =
-  Data.List.foldl' (\n x -> (Prelude.+) n (f x)) 0
-
 _LinearScan__unhandledExtent :: LinearScan__ScanStateDesc -> Prelude.Int
 _LinearScan__unhandledExtent sd =
-  _LinearScan__sumf (\x ->
+  Lib.sumf (\x ->
     Interval.intervalExtent
       (
         (Vector0.vnth (_LinearScan__nextInterval sd)
@@ -245,6 +242,13 @@ _LinearScan__packScanState :: LinearScan__ScanStateDesc ->
                               LinearScan__ScanStateDesc
 _LinearScan__packScanState sd =
   sd
+
+_LinearScan__predU1decP :: Eqtype.Equality__Coq_type ->
+                           Eqtype.Equality__Coq_sort ->
+                           Eqtype.Equality__Coq_sort -> Prelude.Bool ->
+                           Ssrbool.Coq_reflect
+_LinearScan__predU1decP =
+  Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__coq_ScanStateCursor_rect :: LinearScan__ScanStateDesc -> (() ->
                                          () -> a1) -> a1

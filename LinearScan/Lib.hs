@@ -51,6 +51,10 @@ list_membership a l =
    (:) x xs -> (:) x
     ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
 
+sumf :: (a1 -> Prelude.Int) -> ([] a1) -> Prelude.Int
+sumf f =
+  Data.List.foldl' (\n x -> (Prelude.+) n (f x)) 0
+
 insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
 insert p z l =
   case l of {
