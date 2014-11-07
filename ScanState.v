@@ -58,14 +58,108 @@ Proof. move=> a n xs. by rewrite -!map_comp. Qed.
 Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 Arguments getInterval [sd] i /.
 
+Lemma foldl_insert :
+  forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T),
+  (forall x y z, f (f z x) y = f (f z y) x)
+    -> foldl f z (insert (P ^~ x) x xs) = foldl f z (x :: xs).
+Proof.
+  move=> T R f z P x xs.
+  rewrite /insert.
+  elim: xs z => [|y ys IHys] //= z H.
+  case E: (P y x) => //=.
+  rewrite -/insert in IHys *.
+  rewrite IHys /=; last by [].
+  by rewrite H.
+Qed.
+
+Lemma fold_left_plus : forall a f xs n,
+   foldl (fun (n : nat) (x : a) => n + f x) n xs =
+   foldl (fun (n : nat) (x : a) => n + f x) 0 xs + n.
+Proof.
+  move=> a f; elim=> // a' ? IHxs n /=.
+  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
+Qed.
+
+Definition sumf {a} (f : a -> nat) : seq a -> nat :=
+  foldl (fun n x => n + f x) 0.
+
+Lemma sumf_cons : forall a f xs (x : a),
+  sumf f (x :: xs) = f x + sumf f xs.
+Proof.
+  move=> a f.
+  rewrite /sumf /= => xs x.
+  by rewrite fold_left_plus addnC add0n.
+Qed.
+
+Lemma sumf_insert : forall a f P (x : a) xs,
+  sumf f (insert (P ^~ x) x xs) = sumf f (x :: xs).
+Proof.
+  move=> a f P x xs.
+  rewrite /sumf foldl_insert; first by [].
+  move=> x0 y0 z0.
+  by rewrite -addnA [f _ + f _]addnC addnA.
+Qed.
+
+Lemma sumf_map : forall a b (f : b -> nat) (g : a -> b) xs,
+   sumf (fun x : b => f x) [seq g i | i <- xs] =
+   sumf (fun x : a => f (g x)) xs.
+Admitted.
+
 Definition unhandledExtent `(sd : ScanStateDesc) : nat :=
-  match unhandledIds sd with
-  | nil => 0
-  | [:: i] => intervalExtent (vnth (intervals sd) i).2
-  | xs  =>
-    let f n x := n + intervalExtent (vnth (intervals sd) x).2 in
-    foldl f 0 xs
-  end.
+  sumf (fun x => intervalExtent (getInterval (fst x))) (unhandled sd).
+
+(*
+Definition ue_ind' : forall (P : nat -> Prop),
+  P 0 -> (forall n `(i : Interval d), P n -> P (intervalExtent i + n))
+      -> forall sd : ScanStateDesc, P (unhandledExtent sd).
+Proof.
+  move=> P Hbase Hind.
+  case=> /= ? ? ? unh *.
+  rewrite /unhandledExtent /=.
+  elim: unh => [//|u us IHus] /=.
+  rewrite add0n fold_left_plus addnC.
+  exact/Hind/IHus.
+Qed.
+
+Definition ue_ind :
+  forall ni act inact hnd ints fixints (P : ScanStateDesc -> Prop),
+  P {| nextInterval     := ni
+     ; unhandled        := nil
+     ; active           := act
+     ; inactive         := inact
+     ; handled          := hnd
+     ; intervals        := ints
+     ; fixedIntervals   := fixints |}
+    -> (forall x unh,
+          P {| nextInterval     := ni
+             ; unhandled        := unh
+             ; active           := act
+             ; inactive         := inact
+             ; handled          := hnd
+             ; intervals        := ints
+             ; fixedIntervals   := fixints |} ->
+          P {| nextInterval     := ni
+             ; unhandled        := x :: unh
+             ; active           := act
+             ; inactive         := inact
+             ; handled          := hnd
+             ; intervals        := ints
+             ; fixedIntervals   := fixints |})
+    -> forall unh,
+       P {| nextInterval     := ni
+          ; unhandled        := unh
+          ; active           := act
+          ; inactive         := inact
+          ; handled          := hnd
+          ; intervals        := ints
+          ; fixedIntervals   := fixints |}.
+Proof.
+  move=> ? ? ? ? ? ? P Hbase Hind.
+  elim=> [//|u us IHus] /=.
+  apply: Hind.
+  exact: IHus.
+Qed.
+*)
 
 (** Given a vector of optional positions associated with register, return the
     first register (counting downwards) which is either [None], or the highest
@@ -253,36 +347,24 @@ Arguments getScanStateDesc [sd] st /.
 Definition packScanState `(st : ScanState sd) := exist ScanState sd st.
 Arguments packScanState [sd] st /.
 
-(** [ScanState_unhandledExtent] relates the [unhandledExtent] of a [ScanState]
-    with the [intervalExtent] of the first member of its [unhandled] list. *)
-Theorem ScanState_unhandledExtent `(st : ScanState sd) :
-  let ue := unhandledExtent sd in
-  match unhandled sd with
-  | nil    => ue == 0
-  | [:: i] => ue == intervalExtent (vnth (intervals sd) (fst i)).2
-  | i :: _ => ue > intervalExtent (vnth (intervals sd) (fst i)).2
-  end.
-Proof.
-  destruct sd.
-  destruct unhandled0 eqn:Heqe;
-  unfold unhandledExtent; simpl. by [].
-  destruct l eqn:Heqe2; simpl. by [].
-  apply fold_gt.
-  destruct p0.
-  pose (Interval_extent_nonzero (vnth intervals0 i).2).
-  by rewrite add0n addnC ltn_plus.
-Qed.
-
 Theorem ScanState_newUnhandled_spec `(st : ScanState sd) : forall d i,
   let st' := @ScanState_newUnhandled _ st d i in
   let sd' := getScanStateDesc st' in
     unhandledExtent sd' == unhandledExtent sd + intervalExtent i.
 Proof.
   move=> d i /=.
-  case: sd st => /= ? ? ?.
-  elim=> [|u us IHus] * => //=.
-    rewrite /insert /unhandledExtent /=.
-Admitted.
+  case: sd st => ? IntervalId0 ? ? unh /= ? ? ? st /=.
+  rewrite /unhandledExtent /= {}/IntervalId /nextInterval {st}.
+  rewrite sumf_insert sumf_cons sumf_map /= addnC vnth_last /sumf /=.
+  apply/eqP; congr (_ + _).
+  elim: unh => [//|u us IHus] /=.
+  rewrite !add0n.
+  apply/esym; rewrite fold_left_plus.
+  apply/esym; rewrite fold_left_plus.
+  congr (_ + _).
+  rewrite IHus; first by [].
+  by rewrite vnth_shiftin.
+Qed.
 
 Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
   let st' := @ScanState_setInterval _ st xid d i H1 H2 in

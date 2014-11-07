@@ -52,3 +52,52 @@ Defined.
 Definition replace {A : Type} {n} v i := @V.replace A _ v (@to_vfin n i).
 
 Definition vnth {A : Type} {n} v i := @V.nth A _ v (@to_vfin n i).
+
+Definition vnth_last {A : Type} {n} : forall (x : A) v,
+  vnth (V.shiftin x v) (@ord_max n) = x.
+Proof.
+  move=> x; rewrite /vnth /=.
+  elim=> [|v vn vs IHvs] //=.
+  have ->: Lt.lt_S_n vn vn.+1 (ltP (ltnSn vn.+1)) = ltP (ltnSn vn)
+    by exact: le_irrelevance.
+  by [].
+Qed.
+
+Definition fin_ind {n} : forall (P : 'I_n.+1 -> Prop),
+  P ord0
+    -> (forall m, P (inord m) -> P (inord m.+1))
+    -> forall (f : 'I_n.+1), P f.
+Proof.
+  move=> nP Hbase Hind.
+Admitted.
+(*   case; case: n => [|n] //=. *)
+(*   elim=> [|m IHm] H. *)
+(*     rewrite /ord0 in Hbase. *)
+(*     have <-: ltn0Sn n = H by exact: eq_irrelevance. *)
+(*     exact: Hbase. *)
+(*   set v := Ordinal _. *)
+(*   have <-: inord m.+1 = v by rewrite (inord_val v). *)
+(*   move=> {Hbase v}. *)
+(*   apply: Hind. *)
+(*   have H1: m < n.+1 by exact: ltnW. *)
+(*   move: IHm {H}. *)
+(*   move/(_ H1). *)
+(*   set v := Ordinal _. *)
+(*   have ->: inord m = v by rewrite (inord_val v). *)
+(*   exact. *)
+(* Qed. *)
+
+Definition vnth_shiftin {A : Type} {n} : forall i (x : A) xs,
+  vnth (V.shiftin x xs) (widen_ord (leqnSn n) i) = vnth xs i.
+Proof.
+  move=> i x xs.
+  elim: xs i => *.
+    admit.
+Admitted.
+(*   case: n => [|n] in i xs *. *)
+(*     exact: fin_contra. *)
+(*   elim/(@fin_ind n): i => [y|y IHy] /= in xs *. *)
+(*     admit. *)
+  
+(*   rewrite IHns. *)
+(* Admitted. *)

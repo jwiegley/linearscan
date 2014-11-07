@@ -204,27 +204,18 @@ _LinearScan__widen_fst :: Prelude.Int -> ((,)
 _LinearScan__widen_fst n p =
   (,) (_LinearScan__widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
 
+_LinearScan__sumf :: (a1 -> Prelude.Int) -> ([] a1) -> Prelude.Int
+_LinearScan__sumf f =
+  Data.List.foldl' (\n x -> (Prelude.+) n (f x)) 0
+
 _LinearScan__unhandledExtent :: LinearScan__ScanStateDesc -> Prelude.Int
 _LinearScan__unhandledExtent sd =
-  case _LinearScan__unhandledIds sd of {
-   [] -> 0;
-   (:) i l ->
-    case l of {
-     [] ->
-      Interval.intervalExtent
-        (
-          (Vector0.vnth (_LinearScan__nextInterval sd)
-            (_LinearScan__intervals sd) i));
-     (:) i0 l0 ->
-      let {
-       f = \n x ->
-        (Prelude.+) n
-          (Interval.intervalExtent
-            (
-              (Vector0.vnth (_LinearScan__nextInterval sd)
-                (_LinearScan__intervals sd) x)))}
-      in
-      Data.List.foldl' f 0 ((:) i ((:) i0 l0))}}
+  _LinearScan__sumf (\x ->
+    Interval.intervalExtent
+      (
+        (Vector0.vnth (_LinearScan__nextInterval sd)
+          (_LinearScan__intervals sd) ((Prelude.fst) x))))
+    (_LinearScan__unhandled sd)
 
 _LinearScan__registerWithHighestPos :: (Vector0.V__Coq_t
                                        (Prelude.Maybe Prelude.Int)) -> (,)

@@ -281,11 +281,8 @@ Proof.
   unfold unhandledExtent;
   simpl; destruct i as [i beg];
   pose (Interval_extent_nonzero (vnth ints i).2);
-    first by auto.
-  destruct unh;
-  simpl; destruct a as [a ?];
-  first by (rewrite add0n; exact: ltn_plus).
-  apply fold_fold_lt; rewrite 2!add0n -addnA.
+    first by [].
+  rewrite /IntervalId /= !sumf_cons.
   exact: ltn_plus.
 Qed.
 
@@ -372,16 +369,8 @@ Proof.
   unfold unhandledExtent;
   simpl; destruct i as [i beg];
   pose (Interval_extent_nonzero (vnth ints i).2);
-    first by auto.
-  destruct unh;
-  simpl; destruct a as [a ?].
-    rewrite add0n addn_gt0.
-    by apply/orP; left.
-  rewrite add0n /=.
-  apply fold_gt.
-  rewrite addn_gt0.
-  apply/orP; left.
-  rewrite addn_gt0.
+    first by [].
+  rewrite /IntervalId /= !sumf_cons /= addn_gt0.
   by apply/orP; left.
 Qed.
 
