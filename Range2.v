@@ -30,6 +30,9 @@ Notation " (| x |) " := {| uloc := x; regReq := false |}.
 Notation " (! x !) " := {| uloc := x; regReq := true |}.
 End UsePosNotations.
 
+Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
+Arguments upos_lt x y /.
+
 Section EqUpos.
 
 Variables (T : eqType) (x0 : T).
