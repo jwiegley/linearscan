@@ -11,9 +11,7 @@ Generalizable All Variables.
 Module MScanState (Mach : Machine).
 Import Mach.
 
-Definition maxReg := maxReg.
 Definition PhysReg := fin maxReg.
-Definition registers_exist := registers_exist.
 
 (** ** ScanStateDesc *)
 
