@@ -357,29 +357,6 @@ Defined.
 
 Definition distance (n m : nat) : nat := if n < m then m - n else n - m.
 
-Lemma unhandledExtent_zero :
-  forall ni i (unh : list (fin ni * nat)) ints fixints act inact hnd,
-  0 <
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := i :: unh
-     ; active           := act
-     ; inactive         := inact
-     ; handled          := hnd
-     ; intervals        := ints
-     ; fixedIntervals   := fixints
-     |}.
-Proof.
-  intros.
-  induction unh;
-  unfold unhandledExtent;
-  simpl; destruct i as [i beg];
-  pose (Interval_extent_nonzero (vnth ints i).2);
-    first by [].
-  rewrite !sumlist_cons /= addn_gt0.
-  by apply/orP; left.
-Qed.
-
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
   (before : option nat) : SState pre P SSMorphStHasLen unit.
 Proof.

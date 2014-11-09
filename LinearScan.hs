@@ -17,8 +17,8 @@ import LinearScan.NonEmpty0
 import LinearScan.Vector0
 
 type    VirtReg    = Identity Int
-newtype ScanState  = ScanState LinearScan__ScanStateDesc
-newtype PhysReg    = PhysReg { getPhysReg :: LinearScan__PhysReg }
+newtype ScanState  = ScanState LinearScan__MLS__MS__ScanStateDesc
+newtype PhysReg    = PhysReg { getPhysReg :: LinearScan__MLS__MS__PhysReg }
 newtype StartsLoop = StartsLoop { getStartsLoop :: Bool }
 newtype EndsLoop   = EndsLoop { getEndsLoop :: Bool }
 type    IntervalId = Int
@@ -42,5 +42,5 @@ allocateRegisters maxVirtReg blockInfo blocks =
 
 handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
 handledIntervalIds
-    (ScanState (LinearScan__Build_ScanStateDesc _ni _ _ _ _ _ hnd)) =
+    (ScanState (LinearScan__MLS__MS__Build_ScanStateDesc _ni _ _ _ _ _ hnd)) =
   map (runIdentity *** PhysReg) hnd
