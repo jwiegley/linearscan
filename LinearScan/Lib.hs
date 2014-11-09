@@ -6,6 +6,7 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.Eqtype as Eqtype
+import qualified LinearScan.Fintype as Fintype
 
 
 __ :: any
@@ -51,9 +52,20 @@ list_membership a l =
    (:) x xs -> (:) x
     ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
 
-sumf :: (a1 -> Prelude.Int) -> ([] a1) -> Prelude.Int
-sumf f =
-  Data.List.foldl' (\n x -> (Prelude.+) n (f x)) 0
+sumlist :: ([] Prelude.Int) -> Prelude.Int
+sumlist =
+  Data.List.foldl' (Prelude.+) 0
+
+widen_id :: Prelude.Int -> (Data.Functor.Identity.Identity Prelude.Int) ->
+            (Data.Functor.Identity.Identity Prelude.Int)
+widen_id n =
+  Fintype.widen_ord n (Prelude.succ n)
+
+widen_fst :: Prelude.Int -> ((,) (Data.Functor.Identity.Identity Prelude.Int)
+             a1) -> (,) (Data.Functor.Identity.Identity Prelude.Int) 
+             a1
+widen_fst n p =
+  (,) (widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
 
 insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
 insert p z l =

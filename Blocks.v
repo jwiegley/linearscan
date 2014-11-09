@@ -2,17 +2,15 @@ Require Import Allocate.
 Require Import Lib.
 Require Import NonEmpty.
 
-Open Scope nat_scope.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Module MLinearScan (M : Machine).
-Include MAllocate M.
 
-Import EqNotations.
+Include MAllocate M.
+Import MLS.MS.
 
 (** * Block *)
 
@@ -100,6 +98,10 @@ Proof.
   - by exists rd.
 Defined.
 
+Section applyList.
+
+Import EqNotations.
+
 Definition applyList (bs : NonEmpty Block)
   (base : forall l, boundedRangeVec l.+2)
   (f : Block -> forall (pos : nat) (Hodd : odd pos),
@@ -112,6 +114,8 @@ Definition applyList (bs : NonEmpty Block)
           f x i Hoddi (go i.+2 (rew <- (odd_succ_succ _) in Hoddi) xs)
       end in
   go 1 (RangeTests.odd_1) bs.
+
+End applyList.
 
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
   {| vars := V.const (None, None, None) maxVirtReg

@@ -3,13 +3,16 @@ Require Hask.IState.
 
 Require Export SSMorph.
 
-Open Scope nat_scope.
-Open Scope program_scope.
-
 Generalizable All Variables.
 
+Require Spec.
+
 Module MAllocate (M : Machine).
+
 Include MSSMorph M.
+Import MLS.MS.
+
+Open Scope program_scope.
 
 Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (pos : nat) :
   SState pre P P unit.

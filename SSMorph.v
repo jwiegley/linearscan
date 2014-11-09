@@ -14,8 +14,14 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
+Require Spec.
+
 Module MSSMorph (M : Machine).
-Include MScanState M.
+
+Module Import MLS := Spec.MLinearSpec M.
+Import MLS.MS.
+
+Open Scope nat_scope.
 
 (** ** SSMorph *)
 
@@ -282,7 +288,7 @@ Proof.
   simpl; destruct i as [i beg];
   pose (Interval_extent_nonzero (vnth ints i).2);
     first by [].
-  rewrite /IntervalId /= !sumf_cons.
+  rewrite !sumlist_cons.
   exact: ltn_plus.
 Qed.
 
@@ -370,7 +376,7 @@ Proof.
   simpl; destruct i as [i beg];
   pose (Interval_extent_nonzero (vnth ints i).2);
     first by [].
-  rewrite /IntervalId /= !sumf_cons /= addn_gt0.
+  rewrite !sumlist_cons /= addn_gt0.
   by apply/orP; left.
 Qed.
 
@@ -433,8 +439,8 @@ Proof.
   have is_productive :
       unhandledExtent new_unhandled_added < unhandledExtent pre.
     apply: (leq_trans _ extent_decreases).
-    move: Hunhandled => /eqP ->.
-    move: Hintdesc => /eqP ->.
+    move/eqP: Hunhandled => ->.
+    move/eqP: Hintdesc => ->.
     rewrite -ltn_subRL subKn.
       by rewrite ltn_subRL.
     rewrite -[_ desc]subn0.
@@ -446,7 +452,7 @@ Proof.
      try apply Build_SSMorphLen;
      try apply Build_SSMorphSt;
      try apply Build_SSMorph;
-     rewrite ?size_insert ?size_map //;
+     rewrite ?insert_size ?size_map //;
      by apply/ltnW).
 Defined.
 

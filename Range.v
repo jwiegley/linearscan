@@ -1,11 +1,6 @@
 Require Import Lib.
 Require Import NonEmpty.
 
-Open Scope nat_scope.
-Open Scope program_scope.
-
-Import EqNotations.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -384,6 +379,10 @@ Proof.
   - apply (Range_append_fst r).
 Defined.
 
+Section rangeSpan.
+
+Import EqNotations.
+
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
@@ -405,6 +404,8 @@ Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) :
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.
+
+End rangeSpan.
 
 Lemma rangeSpan_spec (f : UsePos -> bool) `(r : Range rd) :
   forall res, res = rangeSpan f r -> res.1 <> (None, None).

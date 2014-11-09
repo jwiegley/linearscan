@@ -3,8 +3,6 @@ Require Import NonEmpty.
 
 Require Export Range.
 
-Open Scope nat_scope.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

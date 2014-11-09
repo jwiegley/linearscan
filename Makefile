@@ -1,6 +1,7 @@
 COQFLAGS = ""
 MISSING  = \
-	find . -name '*.v' ! -name Notes.v ! -name CpdtTactics.v |	\
+	find . -name '*.v' ! -name Notes.v ! -name CpdtTactics.v	\
+                ! -name '*2.v'                                   |	\
 		xargs egrep -i -Hn '(admit|abort|undefined)'     |	\
 		      egrep -v 'Definition undefined'
 
@@ -12,14 +13,21 @@ all: Makefile.coq
 LinearScan/Main.hs: Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
-	@perl -i -pe 's/import qualified (.*)/import qualified LinearScan.\1 as \1/' LinearScan/*.hs
-	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified Data.Functor.Identity\nimport qualified LinearScan.Utils/' LinearScan/*.hs
-	@perl -i -pe 's/import qualified LinearScan\.GHC/import qualified GHC/' LinearScan/*.hs
-	@perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' LinearScan/*.hs
-	@perl -i -pe 's/module (.+?) where/module LinearScan.\1 where/' LinearScan/*.hs
-	@perl -i -pe 's/module LinearScan..+?.Utils where/module LinearScan.Utils where/' LinearScan/Utils.hs
+	@perl -i -pe 's/import qualified (.*)/import qualified LinearScan.\1 as \1/' \
+		LinearScan/*.hs
+	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified Data.Functor.Identity\nimport qualified LinearScan.Utils/' \
+		LinearScan/*.hs
+	@perl -i -pe 's/import qualified LinearScan\.GHC/import qualified GHC/'	\
+		LinearScan/*.hs
+	@perl -i -pe 's/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/' \
+		LinearScan/*.hs
+	@perl -i -pe 's/module (.+?) where/module LinearScan.\1 where/' \
+		LinearScan/*.hs
+	@perl -i -pe 's/module LinearScan..+?.Utils where/module LinearScan.Utils where/' \
+		LinearScan/Utils.hs
 	@perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' LinearScan/IState.hs
-	@perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' LinearScan/Main.hs
+	@perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' \
+		LinearScan/Main.hs
 	@perl -i -pe 's/data Coq_simpl_fun/newtype Coq_simpl_fun/' LinearScan/*.hs
 
 Makefile.coq: _CoqProject

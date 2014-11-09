@@ -1,11 +1,6 @@
 Require Import Lib.
 Require Import NonEmpty.
 
-Open Scope nat_scope.
-Open Scope program_scope.
-
-Import EqNotations.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

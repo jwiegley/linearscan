@@ -1,7 +1,5 @@
 Require Import Lib.
 
-Require Export Machine.
-Require Export Interval.
 Require Export ScanState.
 
 Set Implicit Arguments.
@@ -12,12 +10,6 @@ Generalizable All Variables.
 Module MLinearSpec (Mach : Machine).
 Import Mach.
 Module Import MS := MScanState Mach.
-
-Import EqNotations.
-
-Definition maxReg := maxReg.
-Definition PhysReg := fin maxReg.
-Definition registers_exist := registers_exist.
 
 (** * Linear scan specification *)
 
@@ -177,15 +169,6 @@ Proof.
   uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
 Qed.
 
-Lemma no_ord_max : forall n (xs : seq (fin n)),
-  ord_max \notin [ seq widen_id i | i <- xs ].
-Proof.
-  move=> n; elim=> // [x xs IHxs] /=.
-  rewrite in_cons /=.
-  apply/norP; split; last assumption.
-  exact: lift_bounded.
-Qed.
-
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists
@@ -229,9 +212,6 @@ Proof.
     exact: (@move_inactive_to_handled _ x IHst H).
 Qed.
 
-Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
-Proof. move=> a x; elim=> //. Qed.
-
 Theorem all_intervals_represented `(st : ScanState sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
@@ -242,7 +222,7 @@ Proof.
   - Case "ScanState_nil". by [].
 
   - Case "ScanState_newUnhandled".
-    by rewrite /unh size_insert !size_map addSn.
+    by rewrite /unh insert_size !size_map addSn.
 
   - Case "ScanState_setInterval". apply IHst.
   - Case "ScanState_setFixedIntervals". apply IHst.
@@ -269,6 +249,70 @@ Proof.
     rewrite size_rem; last assumption.
     rewrite addnS -addSn prednK //.
     exact: has_size.
+Qed.
+
+Theorem ScanState_newUnhandled_spec `(st : ScanState sd) : forall d i,
+  unhandledExtent (getScanStateDesc (@ScanState_newUnhandled _ st d i)) ==
+  unhandledExtent sd + intervalExtent i.
+Proof.
+  move=> d i /=.
+  rewrite /unhandledExtent /=.
+  case: sd st => ni IntervalId0 ? ? unh /= ? ? ? _ /=.
+  rewrite -!map_comp insert_f_sumlist map_cons -map_comp /funcomp
+          sumlist_cons vnth_last /= addnC.
+  apply/eqP; congr (_ + _).
+  elim: unh => [//|u us IHus] /=.
+  rewrite !sumlist_cons IHus.
+  congr (_ + _).
+  by rewrite vnth_shiftin.
+Qed.
+
+Theorem ScanState_hasInterval_spec `(st : ScanState sd) : forall xid,
+  let int := vnth (intervals sd) xid in
+  xid \in unhandledIds sd -> intervalExtent int.2 <= unhandledExtent sd.
+Proof.
+  move=> xid /= Hin.
+  rewrite /unhandledExtent /=.
+  set g := (X in sumlist (map X _)).
+  have ->: intervalExtent (vnth (intervals sd) xid).2 = g xid by [].
+  exact: in_sumlist.
+Qed.
+
+Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
+  let st'  := @ScanState_setInterval _ st xid d i H1 H2 in
+  let sd'  := getScanStateDesc st' in
+  let diff := intervalExtent (vnth (intervals sd) xid).2 - intervalExtent i in
+  xid \in unhandledIds sd -> unhandledExtent sd' == unhandledExtent sd - diff.
+Proof.
+  move=> xid d i Hlt Heqe /= Hin {st}.
+  case: sd => ni IntervalId0 ints fixints unh /= act inact hnd /=
+    in xid Hlt Heqe Hin *.
+  rewrite /unhandledExtent /=.
+  rewrite -!map_comp /funcomp => {act inact hnd}.
+  rewrite {}/IntervalId0 in unh Hin *.
+  set f := (X in sumlist (map X _)).
+  set g := (X in sumlist (map X _) - _).
+  elim: unh => [//|u us IHus] /= in Hin *.
+  rewrite !sumlist_cons {1}/f {1}/g /=.
+  have Huniq: uniq (fst u :: [seq fst i | i <- us]) by admit.
+  move: in_cons Hin => -> /orP [/eqP Heq {IHus}|Hin].
+    rewrite Heq in f Hlt Heqe *.
+    (* This should follow from the fact that unh is uniq. *)
+    have ->: sumlist (map f us) = sumlist (map g us) by admit.
+    rewrite vnth_replace addsubsubeq; first by [].
+    exact: ltnW.
+  move: cons_uniq Huniq => -> /andP [Huniq1 Huniq2].
+  move: IHus => /(_ Hin) /= /eqP ->.
+  rewrite vnth_replace_neq.
+    rewrite -addnBA; first by [].
+    apply: subn_leq.
+    pose h y := intervalExtent (vnth ints y).2.
+    have ->: [seq g i | i <- us] = [ seq (h \o fst) x | x <- us ]
+      by exact: eq_map.
+    have ->: intervalExtent (vnth ints xid).2 = h xid by [].
+    rewrite (map_comp _ fst).
+    exact: in_sumlist.
+  exact: (in_notin Hin).
 Qed.
 
 End MLinearSpec.
