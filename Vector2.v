@@ -8,11 +8,11 @@ Require Import Ssreflect.fintype.
 
 Notation fin := ordinal.
 
-Inductive Void : Type :=.
-
 Section Vector.
 
 Variable A : Type.
+
+Inductive Void : Type :=.
 
 Definition Vec : nat -> Type :=
   fix vec n := match n return Type with
@@ -21,8 +21,7 @@ Definition Vec : nat -> Type :=
                | S n => prod A (vec n)
                end.
 
-Definition vsing (x : A) : Vec 1.
-Proof. apply x. Defined.
+Definition vsing (x : A) : Vec 1 := x.
 
 Definition vcons {n} (x : A) (v : Vec n) : Vec n.+1.
 Proof. case: n => [|n] in v *; [ exact: x | exact: (x, v) ]. Defined.
@@ -96,15 +95,29 @@ Proof.
   exact: (x, IHxs).
 Defined.
 
-Definition foldl_with_index
-  {B : Type} {n} (f : nat -> B -> A -> B) (b : B) (v : Vec n) : B.
+Definition vfoldl_with_index
+  {B : Type} {n} (f : fin n -> B -> A -> B) (b : B) (v : Vec n) : B.
 Proof.
+  elim: n => [|n IHn] in f v *.
+    contradiction.
   elim/vec_rect: v => [x|sz x ? IHxs].
-    exact: (f n b x).
-  exact: (f (n - sz) IHxs x).
+    exact: (f (inord n) b x).
+  exact: (f (inord (n - sz)) IHxs x).
 Defined.
 
-Definition replace {n} (v : Vec n) (p : fin n) (i : A) : Vec n.
+Definition vfoldl
+  {B : Type} {n} (f : B -> A -> B) (b : B) (v : Vec n) : B :=
+  vfoldl_with_index (fun _ => f) b v.
+
+Definition vconst {n} (i : A) : n > 0 -> Vec n.
+Proof.
+  elim: n => // [n IHn].
+  case: n => // [n] in IHn *.
+  move=> H.
+  exact: (vcons i (IHn _)).
+Defined.
+
+Definition vreplace {n} (v : Vec n) (p : fin n) (i : A) : Vec n.
 Proof.
   elim/vec_rect: v => [_|? x xs IHxs] in p *.
     exact: (vsing i).
@@ -120,7 +133,7 @@ Proof.
   exact: (IHxs (@Ordinal _ p _)).
 Defined.
 
-Definition shiftin {n} (v : Vec n) (i : A) : Vec n.+1.
+Definition vshiftin {n} (v : Vec n) (i : A) : Vec n.+1.
 Proof.
   elim/vec_rect: v => [x|? x ? IHxs].
     exact: (x, i).
@@ -166,44 +179,44 @@ Proof.
   exact: eq_irrelevance.
 Qed.
 
-Lemma shiftin_cons : forall n z (v : Vec n) i,
-  shiftin (vcons z v) i = vcons z (shiftin v i).
+Lemma vshiftin_cons : forall n z (v : Vec n) i,
+  vshiftin (vcons z v) i = vcons z (vshiftin v i).
 Proof. move=> n z; by elim/vec_ind. Qed.
 
 Lemma vnth_last : forall n (i : A) (v : Vec n),
-  vnth (shiftin v i) ord_max = i.
+  vnth (vshiftin v i) ord_max = i.
 Proof.
   move=> n i.
   elim/vec_ind=> // [sz x xs IHxs].
-  rewrite shiftin_cons vnth_consn.
+  rewrite vshiftin_cons vnth_consn.
   have ->: Ordinal (n:=sz.+1) (m:=sz) (ltnSn sz.+1) = ord_max.
     congr (Ordinal _).
     exact: eq_irrelevance.
   exact: IHxs.
 Qed.
 
-Lemma replace_cons0 n (k : fin n.+1) : forall i (v : Vec n) z,
-  k == ord0 -> replace (vcons i v) k z = vcons z v.
+Lemma vreplace_cons0 n (k : fin n.+1) : forall i (v : Vec n) z,
+  k == ord0 -> vreplace (vcons i v) k z = vcons z v.
 Proof.
   move=> i v z H.
   elim/vec_ind: v => [x|sz x xs IHxs] in k H *;
   by elim/@fin_ind: k => // in H *.
 Qed.
 
-Lemma replace_consn : forall n m i (v : Vec n) z, forall H: m < n,
-  replace (vcons i v) (@Ordinal n.+1 m.+1 H) z
-    = vcons i (replace v (@Ordinal n m H) z).
+Lemma vreplace_consn : forall n m i (v : Vec n) z, forall H: m < n,
+  vreplace (vcons i v) (@Ordinal n.+1 m.+1 H) z
+    = vcons i (vreplace v (@Ordinal n m H) z).
 Proof. move=> n m i; elim/vec_ind=> //. Qed.
 
-Lemma vnth_replace : forall n (v : Vec n) k z,
-  vnth (replace v k z) k = z.
+Lemma vnth_vreplace : forall n (v : Vec n) k z,
+  vnth (vreplace v k z) k = z.
 Proof.
   move=> n v k z.
   elim/vec_ind: v => // [sz x xs IHxs] in k *.
   elim/@fin_ind: k => [H|k ? IHk].
-    rewrite replace_cons0; last by [].
+    rewrite vreplace_cons0; last by [].
     by rewrite vnth_cons0.
-  by rewrite replace_consn vnth_consn IHxs.
+  by rewrite vreplace_consn vnth_consn IHxs.
 Qed.
 
 Lemma fin1_eq : forall (j k : fin 1), j == k.
@@ -215,8 +228,8 @@ Proof.
   discriminate.
 Qed.
 
-Lemma vnth_replace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
-  k != j -> vnth (replace v k z) j = vnth v j.
+Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
+  k != j -> vnth (vreplace v k z) j = vnth v j.
 Proof.
   move=> n v k j z.
   elim/vec_ind: v => // [x|sz x xs IHxs] in k j *.
@@ -224,18 +237,18 @@ Proof.
   elim/@fin_ind: k; elim/@fin_ind: j;
     try by elim: sz => // in xs IHxs *.
   move=> ? ? _ ? ? _ Hneg.
-  rewrite replace_consn !vnth_consn IHxs; first by [].
+  rewrite vreplace_consn !vnth_consn IHxs; first by [].
   exact: Hneg.
 Qed.
 
-Definition vnth_shiftin {n} : forall k (z : A) (v : Vec n),
-  vnth (shiftin v z) (widen_id k) = vnth v k.
+Definition vnth_vshiftin {n} : forall k (z : A) (v : Vec n),
+  vnth (vshiftin v z) (widen_id k) = vnth v k.
 Proof.
   move=> k z v.
   elim/vec_ind: v => [x|sz x xs IHxs] in k *.
-    rewrite /shiftin /=.
+    rewrite /vshiftin /=.
     by elim/@fin_ind: k => //.
-  rewrite shiftin_cons.
+  rewrite vshiftin_cons.
   elim/@fin_ind: k => [Hk|k Hk IHk].
     have ->: Hk = ltn0Sn sz by exact: eq_irrelevance.
     by rewrite /widen_id /widen_ord /= !vnth_cons0.
@@ -246,27 +259,39 @@ Qed.
 
 End Vector.
 
+Definition vmap {A B : Type} {n} (f : A -> B) (v : Vec A n) : Vec B n.
+Proof.
+  elim: n => // [n IHn] in v *.
+  elim/vec_rect: v => [x|sz x xs IHxs] in IHn *.
+    exact: (f x).
+  exact: (vcons _ (f x) (IHxs IHn)).
+Defined.
+
 Module VectorSpec.
 
 Arguments vsing [A] _.
 Arguments vcons [A n] _ _.
-Arguments foldl_with_index [A B n] f b v.
-Arguments replace [A n] v p i.
+Arguments vconst [A n] i H.
+Arguments vfoldl_with_index [A B n] f b v.
+Arguments vfoldl [A B n] f b v.
+Arguments vreplace [A n] v p i.
 Arguments vnth [A n] v p.
 Arguments vapp [A n m] v u.
+Arguments vmap [A B n] f v.
 
 Example flwi_check :
-  foldl_with_index (fun i acc x => (i, x) :: acc) nil
-    (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
-    == [:: (1, 1); (2, 2); (3, 3); (4, 4); (5, 5)].
-Proof. reflexivity. Qed.
+  map (fun x => (@nat_of_ord 5 (fst x), (snd x)))
+      (vfoldl_with_index (fun i acc x => (i, x) :: acc) nil
+         (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5))))))
+    == [:: (0, 1); (1, 2); (2, 3); (3, 4); (4, 5)].
+Proof. rewrite /= !inordK; by []. Qed.
 
 Lemma _2_ltn_5 : 2 < 5. Proof. by []. Qed.
 
-Example replace_check :
-  replace (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
+Example vreplace_check :
+  vreplace (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
           (@Ordinal 5 2 _2_ltn_5) 6
-    = (vcons 1 (vcons 2 (vcons 6 (vcons 4 (vsing 5))))).
+    == (vcons 1 (vcons 2 (vcons 6 (vcons 4 (vsing 5))))).
 Proof. reflexivity. Qed.
 
 Lemma _3_ltn_5 : 3 < 5. Proof. by []. Defined.
@@ -280,6 +305,17 @@ Example vapp_check :
   vapp (vcons 1 (vsing 2))
        (vcons 3 (vcons 4 (vsing 5))) ==
   vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))).
+Proof. reflexivity. Qed.
+
+Lemma _5_gt_0 : 0 < 5. Proof. by []. Qed.
+
+Example const_check :
+  vconst 42 _5_gt_0 == vcons 42 (vcons 42 (vcons 42 (vcons 42 (vsing 42)))).
+Proof. reflexivity. Qed.
+
+Example vmap_check :
+  vmap (addn 2) (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
+    == (vcons 3 (vcons 4 (vcons 5 (vcons 6 (vsing 7))))).
 Proof. reflexivity. Qed.
 
 End VectorSpec.

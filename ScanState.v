@@ -67,7 +67,7 @@ Definition unhandledExtent (sd : ScanStateDesc) : nat :=
 
 Definition registerWithHighestPos :
   Vec (option nat) maxReg -> fin maxReg * option nat :=
-  fold_left_with_index
+  vfoldl_with_index
     (fun reg (res : fin maxReg * option nat) x =>
        match (res, x) with
        | ((r, None), _) => (r, None)
@@ -108,7 +108,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; inactive         := nil
        ; handled          := nil
        ; intervals        := V.nil _
-       ; fixedIntervals   := V.const None _
+       ; fixedIntervals   := vconst None _
        |}
 
   | ScanState_newUnhandled sd :
@@ -121,7 +121,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := map widen_fst (active sd)
        ; inactive         := map widen_fst (inactive sd)
        ; handled          := map widen_fst (handled sd)
-       ; intervals        := V.shiftin (d; i) (intervals sd)
+       ; intervals        := vshiftin (d; i) (intervals sd)
        ; fixedIntervals   := fixedIntervals sd
        |}
 

@@ -27,7 +27,7 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P P (option nat) :=
   withCursor $ fun sd cur =>
     let int := curIntDetails cur in
-    return_ $ V.fold_left (fun mx v =>
+    return_ $ vfoldl (fun mx v =>
       option_choose mx
         (if v is Some i
          then intervalIntersectionPoint int.2 i.2
@@ -52,7 +52,7 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = next intersection of it with current *)
     let go n := foldl (fun v p => let: (i, r) := p in replace v r (n i)) in
     let freeUntilPos' := go (fun _ => Some 0)
-                            (V.const None maxReg) (active sd) in
+                            (vconst None registers_exist) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
@@ -111,7 +111,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
     let go := foldl (fun v p =>
                 let: (i, r) := p in
                 replace v r (nextUseAfter (getInterval i) start)) in
-    let nextUsePos' := go (V.const None maxReg) (active sd) in
+    let nextUsePos' := go (vconst None registers_exist) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in

@@ -119,8 +119,8 @@ Definition applyList (bs : NonEmpty Block)
 End applyList.
 
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
-  {| vars := V.const (None, None, None) maxVirtReg
-   ; regs := V.const (None, None, None) maxReg
+  {| vars := vconst (None, None, None) variables_exist
+   ; regs := vconst (None, None, None) registers_exist
    |}.
 
 (* jww (2014-11-04): Still to be done:
@@ -148,8 +148,8 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
       let upos := Build_UsePos pos (regRequired b) in
       @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
 
-  let restVars' := V.map savingBound (vars rest) in
-  let restRegs' := V.map savingBound (regs rest) in
+  let restVars' := vmap savingBound (vars rest) in
+  let restRegs' := vmap savingBound (regs rest) in
   match references b with
   | V.nil => boundedTransport (ltnSSn _)
                {| vars := restVars'; regs := restRegs' |}
@@ -192,7 +192,7 @@ Definition processBlocks (blocks : NonEmpty Block) :
   Vec (option RangeSig) maxVirtReg * Vec (option RangeSig) maxReg :=
   let: {| vars := vars'; regs := regs' |} :=
        applyList blocks emptyBoundedRangeVec handleBlock in
-  (V.map extractRange vars', V.map extractRange regs').
+  (vmap extractRange vars', V.map extractRange regs').
 
 Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
   let mkint (ss : ScanStateSig) (mx : option RangeSig)
@@ -208,7 +208,7 @@ Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
         packScanState (ScanState_newUnhandled st i) in
 
   let: (varRanges, regRanges) := processBlocks blocks in
-  let regs := V.map (fun mr =>
+  let regs := vmap (fun mr =>
                 if mr is Some r
                 then Some (packInterval (I_Sing r.2))
                 else None) regRanges in
@@ -217,7 +217,7 @@ Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
   let s1 := ScanState_setFixedIntervals s0 regs in
   let s2 := packScanState s1 in
 
-  V.fold_left handleVar s2 varRanges.
+  vfoldl handleVar s2 varRanges.
 
 Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
   proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).
