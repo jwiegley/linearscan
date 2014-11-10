@@ -284,25 +284,34 @@ Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
   let diff := intervalExtent (vnth (intervals sd) xid).2 - intervalExtent i in
   xid \in unhandledIds sd -> unhandledExtent sd' == unhandledExtent sd - diff.
 Proof.
-  move=> xid d i Hlt Heqe /= Hin {st}.
+  move=> xid d i Hlt Heqe /= Hin.
+  move: (lists_are_unique st) => {st}.
+  rewrite /all_state_lists cat_uniq => /and3P [Hlau _ _].
   case: sd => ni IntervalId0 ints fixints unh /= act inact hnd /=
-    in xid Hlt Heqe Hin *.
+    in xid Hlt Heqe Hin Hlau *.
   rewrite /unhandledExtent /=.
   rewrite -!map_comp /funcomp => {act inact hnd}.
-  rewrite {}/IntervalId0 in unh Hin *.
+  rewrite {}/IntervalId0 in unh Hin Hlau *.
   set f := (X in sumlist (map X _)).
   set g := (X in sumlist (map X _) - _).
-  elim: unh => [//|u us IHus] /= in Hin *.
+  elim: unh => [//|u us IHus] /= in Hin Hlau *.
   rewrite !sumlist_cons {1}/f {1}/g /=.
-  have Huniq: uniq (fst u :: [seq fst i | i <- us]) by admit.
+  have Huniq: uniq (fst u :: [seq fst i | i <- us]) by exact: Hlau.
   move: in_cons Hin => -> /orP [/eqP Heq {IHus}|Hin].
     rewrite Heq in f Hlt Heqe *.
-    (* This should follow from the fact that unh is uniq. *)
-    have ->: sumlist (map f us) = sumlist (map g us) by admit.
+    have ->: sumlist (map f us) = sumlist (map g us).
+      rewrite /f /g.
+      elim: us => //= [y ys IHys] in Hlau Huniq *.
+      rewrite !sumlist_cons IHys;
+      move: Hlau => /and3P [H1 _ ?];
+      move: in_cons H1 => -> /norP [? ?];
+        first rewrite vnth_vreplace_neq //=;
+      by apply/andP.
     rewrite vnth_vreplace addsubsubeq; first by [].
     exact: ltnW.
   move: cons_uniq Huniq => -> /andP [Huniq1 Huniq2].
-  move: IHus => /(_ Hin) /= /eqP ->.
+  move: Hlau => /andP [_ Hlau].
+  move: IHus => /(_ Hin Hlau) /= /eqP ->.
   rewrite vnth_vreplace_neq.
     rewrite -addnBA; first by [].
     apply: subn_leq.
