@@ -206,25 +206,27 @@ Proof.
   by rewrite replace_consn vnth_consn IHxs.
 Qed.
 
-Lemma vnth_replace_neq : forall n (v : Vec n) k j z,
+Lemma fin1_eq : forall (j k : fin 1), j == k.
+Proof.
+  elim/@fin_ind=> [Hj|j Hj IHj].
+    elim/@fin_ind=> [Hk|k Hk IHk].
+      by [].
+    discriminate.
+  discriminate.
+Qed.
+
+Lemma vnth_replace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
   k != j -> vnth (replace v k z) j = vnth v j.
 Proof.
-  move=> n v j k z Hneq.
-  (* elim/@fin_ind: j => [Hj|j Hj IHj]. *)
-  (* elim/vec_ind=> // [x|sz x xs IHxs] k j z. *)
-  (*   by elim/@fin_ind: j => //; elim/@fin_ind: k => //. *)
-  (*   elim/@fin_ind: k => [Hk|k Hk IHk]. *)
-  (*     have ->: Hk = Hj by exact: eq_irrelevance. *)
-  (*     by move/negbTE. *)
-  (*   rewrite replace_consn -IHk. *)
-  (*     move=> Hneq. *)
-  (*     rewrite -replace_consn. *)
-  (*     congr (vnth _ _). *)
-  (*     congr (replace _ _ _). *)
-  (*     (* ERROR: k != k.+1 *) *)
-  (* elim/@fin_ind: k => [Hk|k Hk IHk] in IHj *. *)
-  (* rewrite replace_cons0; last by []. *)
-Admitted.
+  move=> n v k j z.
+  elim/vec_ind: v => // [x|sz x xs IHxs] in k j *.
+    by move: (fin1_eq k j) => /eqP ? /eqP ?.
+  elim/@fin_ind: k; elim/@fin_ind: j;
+    try by elim: sz => // in xs IHxs *.
+  move=> ? ? _ ? ? _ Hneg.
+  rewrite replace_consn !vnth_consn IHxs; first by [].
+  exact: Hneg.
+Qed.
 
 Definition vnth_shiftin {n} : forall k (z : A) (v : Vec n),
   vnth (shiftin v z) (widen_id k) = vnth v k.
