@@ -50,9 +50,8 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go n := foldl (fun v p => let: (i, r) := p in replace v r (n i)) in
-    let freeUntilPos' := go (fun _ => Some 0)
-                            (vconst None registers_exist) (active sd) in
+    let go n := foldl (fun v p => let: (i, r) := p in vreplace v r (n i)) in
+    let freeUntilPos' := go (fun _ => Some 0) (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
@@ -110,8 +109,8 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
          nextUsePos[it.reg] = next use of it after start of current *)
     let go := foldl (fun v p =>
                 let: (i, r) := p in
-                replace v r (nextUseAfter (getInterval i) start)) in
-    let nextUsePos' := go (vconst None registers_exist) (active sd) in
+                vreplace v r (nextUseAfter (getInterval i) start)) in
+    let nextUsePos' := go (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in

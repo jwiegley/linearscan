@@ -1,16 +1,3 @@
-Require Import Coq.Vectors.Vector.
-Require Import Coq.Vectors.VectorSpec.
-
-Lemma to_nat_of_nat {p}{n} (h : p < n) :
-  Fin.to_nat (Fin.of_nat_lt h) = exist _ p h.
-Proof.
- revert n h.
- induction p;
- (destruct n ; intros h; [ destruct (Lt.lt_n_O _ h) | simpl]);
- try rewrite (IHp _ (Lt.lt_S_n p n h));
- f_equal; apply Peano_dec.le_unique.
-Qed.
-
 Require Import Ssreflect.ssreflect.
 Require Import Ssreflect.ssrfun.
 Require Import Ssreflect.ssrbool.
@@ -19,116 +6,336 @@ Require Import Ssreflect.seq.
 Require Import Ssreflect.ssrnat.
 Require Import Ssreflect.fintype.
 
-Module V := Coq.Vectors.Vector.
-Notation Vec := V.t.
+Notation fin := ordinal.
 
-(* Extract Inductive Vec => "[]" ["[]" "(\x _ xs -> (x:xs))"]. *)
+Section Vector.
 
-(* Extract Inlined Constant V.hd      => "(const Prelude.head)". *)
-(* Extract Inlined Constant V.last    => "(const Prelude.last)". *)
-(* Extract Inlined Constant V.tl      => "(const Prelude.tail)". *)
-(* Extract Inlined Constant V.shiftin => "(const Data.List.(:))". *)
-(* Extract Inlined Constant V.const   => "(const Prelude.repeat)". *)
-(* Extract Inlined Constant V.append  => "(\_ _ -> Prelude.(++))". *)
-(* Extract Inlined Constant V.map     => "(const Prelude.map)". *)
-(* Extract Inlined Constant V.nth     => "(const Prelude.nth)". *)
+Variable A : Type.
 
-Notation fin  := ordinal.
-Notation vfin := Coq.Vectors.Fin.t.
+Definition Vec : nat -> Type :=
+  fix vec n := match n return Type with
+               | O   => unit
+               | S n => prod A (vec n)
+               end.
 
-Definition vfin_contra : forall {x}, vfin 0 -> x.
-Proof. by move=> x v; inversion v. Defined.
+Definition vnil : Vec 0 := tt.
+
+Definition vsing (x : A) : Vec 1 := (x, tt).
+
+Definition vcons {n} (x : A) (v : Vec n) : Vec n.+1 := (x, v).
 
 Definition fin_contra : forall {x}, fin 0 -> x.
 Proof. by move=> x; case=> m; move/eqP: (ltn0 m) => Hcontra //. Defined.
 
-Definition to_vfin {n} (x : fin n) : vfin n :=
-  let: Ordinal m H := x in @Fin.of_nat_lt m n (ltP H).
-
-Definition from_vfin {n} (x : vfin n) : fin n :=
-  let: exist m H := Fin.to_nat x in @Ordinal n m (introT ltP H).
-
-Theorem fin_vfin_spec : forall n (x : fin n), from_vfin (to_vfin x) = x.
+Definition fin_rect {n} : forall (P : fin n.+1 -> Type),
+  (forall {H}, P (@Ordinal n.+1 0 H))
+    -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
+          -> P (@Ordinal n.+1 m.+1 H))
+    -> forall (x : fin n.+1), P x.
 Proof.
-  rewrite /from_vfin /to_vfin.
-  move=> n; case=> m H.
-  rewrite to_nat_of_nat.
-  congr (Ordinal _).
+  move=> P Hz HSn; case=> m H.
+  elim: m => [|m IHm] in H *; [ exact: Hz | exact/HSn/IHm ].
+Defined.
+
+Definition fin_rec {n} : forall (P : fin n.+1 -> Set),
+  (forall {H}, P (@Ordinal n.+1 0 H))
+    -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
+          -> P (@Ordinal n.+1 m.+1 H))
+    -> forall (x : fin n.+1), P x := [eta fin_rect].
+
+Definition fin_ind {n} : forall (P : fin n.+1 -> Prop),
+  (forall {H}, P (@Ordinal n.+1 0 H))
+    -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
+          -> P (@Ordinal n.+1 m.+1 H))
+    -> forall (x : fin n.+1), P x := [eta fin_rect].
+
+Definition vec_rect : forall (P : forall {n}, Vec n -> Type),
+  P vnil
+    -> (forall {n} (x : A) (v : Vec n), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n), P v.
+Proof.
+  move=> P Hnil Hcons n v.
+  elim: n => [|n IHn] in Hnil Hcons v *.
+    case: v; exact: Hnil.
+  case: v => *; exact/Hcons/IHn.
+Defined.
+
+Definition vec_rec : forall (P : forall {n}, Vec n -> Set),
+  P vnil
+    -> (forall {n} (x : A) (v : Vec n), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n), P v := [eta vec_rect].
+
+Definition vec_ind : forall (P : forall {n}, Vec n -> Prop),
+  P vnil
+    -> (forall {n} (x : A) (v : Vec n), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n), P v := [eta vec_rect].
+
+Definition vecn_rect : forall (P : forall {n}, Vec n -> Type),
+  (forall x : A, P (vsing x))
+    -> (forall {n} (x : A) (v : Vec n.+1), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n.+1), P v.
+Proof.
+  move=> P Hsing Hcons n v.
+  elim: n => [|n IHn] in Hsing Hcons v *.
+    case: v => a b; case: b; exact: Hsing.
+  case: v => *; exact/Hcons/IHn.
+Defined.
+
+Definition vecn_rec : forall (P : forall {n}, Vec n -> Set),
+  (forall x : A, P (vsing x))
+    -> (forall {n} (x : A) (v : Vec n.+1), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n.+1), P v := [eta vecn_rect].
+
+Definition vecn_ind : forall (P : forall {n}, Vec n -> Prop),
+  (forall x : A, P (vsing x))
+    -> (forall {n} (x : A) (v : Vec n.+1), P v -> P (vcons x v))
+    -> forall {n} (v : Vec n.+1), P v := [eta vecn_rect].
+
+Definition vrcons {n} (v : Vec n) (i : A) : Vec n.+1.
+Proof.
+  elim/vec_rect: v => [|sz x xs IHxs];
+    [ exact: (vsing i) | exact: (vcons x IHxs) ].
+Defined.
+
+Definition vfoldl_with_index
+  {B : Type} {n} (f : fin n -> B -> A -> B) (b : B) (v : Vec n) : B.
+Proof.
+  case: n => [//|n] in f v *.
+  elim/vecn_rect: v => [x|sz x xs IHxs].
+    exact: (f (inord n) b x).
+  exact: (f (inord (n - sz.+1)) IHxs x).
+Defined.
+
+Definition vfoldl
+  {B : Type} {n} (f : B -> A -> B) (b : B) (v : Vec n) : B :=
+  vfoldl_with_index (fun _ => f) b v.
+
+Definition vconst {n} (i : A) : Vec n.
+Proof.
+  elim: n => [|n IHn]; [ exact: vnil | exact: (vcons i IHn) ].
+Defined.
+
+Definition vreplace {n} (v : Vec n) (p : fin n) (i : A) : Vec n.
+Proof.
+  case: n => [|n] in v p *;
+    first exact: fin_contra.
+  elim/vecn_rect: v => [x|? x xs IHxs] in p *.
+    exact: (vsing i).
+  elim/@fin_rect: p => [_|p ? _].
+    exact: (vcons i xs).
+  exact: (vcons x (IHxs (@Ordinal _ p _))).
+Defined.
+
+Definition vnth {n} (v : Vec n) (p : fin n) : A.
+Proof.
+  case: n => [|n] in v p *;
+    first exact: fin_contra.
+  elim/vecn_rect: v => [x|? x _ IHxs] in p *; first exact: x.
+  elim/@fin_rect: p => [_|p ? _]; first exact: x.
+  exact: (IHxs (@Ordinal _ p _)).
+Defined.
+
+Definition vshiftin {n} (v : Vec n) (i : A) : Vec n.+1.
+Proof.
+  elim/vec_rect: v => [|? x ? IHxs]; [ exact: (vsing i) | exact: (x, IHxs) ].
+Defined.
+
+Definition vapp {n m} (v : Vec n) (u : Vec m) : Vec (n + m).
+Proof.
+  elim/vec_rect: v => [|? x _ IHxs]; [ exact: u | exact: (vcons x IHxs) ].
+Defined.
+
+Lemma vapp_cons : forall n i (v : Vec n),
+  vcons i v = vapp (vsing i) v.
+Proof. by move=> n i; elim/vec_ind. Qed.
+
+Lemma vnth_cons0 : forall n i (v : Vec n) H,
+  vnth (vcons i v) (@Ordinal n.+1 0 H) = i.
+Proof. by move=> n i; elim/vec_ind. Qed.
+
+Definition widen_id {n} := widen_ord (leqnSn n).
+
+Lemma vnth_consn : forall n i (v : Vec n) m, forall H: m < n,
+  vnth (vcons i v) (@Ordinal n.+1 m.+1 H) = vnth v (@Ordinal n m H).
+Proof. by move=> n i; elim/vec_ind. Qed.
+
+Lemma vrcons_cons : forall n z (v : Vec n) i,
+  vrcons (vcons z v) i = vcons z (vrcons v i).
+Proof. by move=> n i; elim/vec_ind. Qed.
+
+Lemma vnth_rcons : forall n m i (v : Vec n) H,
+  vnth (vrcons v i) (@Ordinal n.+1 m (ltnW H)) = vnth v (@Ordinal n m H).
+Proof.
+  move=> n m i v H.
+  elim/vec_ind: v => [|? x xs IHxs] in m H *.
+    by case: m => // in H *.
+  rewrite vrcons_cons.
+  case: m => [|m] in H IHxs *.
+    by rewrite !vnth_cons0.
+  rewrite !vnth_consn -IHxs.
+  congr (vnth _ (Ordinal _)).
   exact: eq_irrelevance.
 Qed.
 
-Theorem vfin_fin_spec : forall n (x : vfin n), to_vfin (from_vfin x) = x.
+Lemma vshiftin_cons : forall n z (v : Vec n) i,
+  vshiftin (vcons z v) i = vcons z (vshiftin v i).
+Proof. by move=> n z; elim/vec_ind. Qed.
+
+Lemma vnth_last : forall n (i : A) (v : Vec n),
+  vnth (vshiftin v i) ord_max = i.
 Proof.
-  rewrite /from_vfin /to_vfin.
-  move=> n; elim=> [m|m ms IHm] //=.
-  rewrite -[X in Fin.FS X]IHm.
-  case: (Fin.to_nat ms) => o H /=.
-  congr (Fin.FS (Fin.of_nat_lt _)).
-  exact: Peano_dec.le_unique.
+  move=> n i.
+  elim/vec_ind=> // [sz x xs IHxs].
+  rewrite vshiftin_cons vnth_consn.
+  have ->: Ordinal (n:=sz.+1) (m:=sz) (ltnSn sz.+1) = ord_max.
+    congr (Ordinal _).
+    exact: eq_irrelevance.
+  exact: IHxs.
 Qed.
 
-(* Definition fin_ind : forall n (H : 0 < n) (P : forall {n}, fin n -> Type), *)
-(*   P (@Ordinal n 0 H) *)
-(*     -> (forall m (H : m.+1 < n), *)
-(*           P (@Ordinal n m (ltnW H)) -> P (@Ordinal n m.+1 H)) *)
-(*     -> forall m (H : m < n), P (@Ordinal n m H). *)
-
-Lemma L_R_FS : forall n (x : vfin n),
-  Fin.L_R 1 (Fin.FS x) = Fin.FS (Fin.L_R 1 x).
-Proof. by case. Qed.
-
-Definition widen_vfin {n} (x : vfin n) :
-  Fin.L_R 1 x = to_vfin (widen_ord (leqnSn n) (from_vfin x)).
+Lemma vreplace_cons0 n (k : fin n.+1) : forall i (v : Vec n) z,
+  k == ord0 -> vreplace (vcons i v) k z = vcons z v.
 Proof.
-  elim: x => // [m x IHx].
-  rewrite L_R_FS {}IHx.
-Admitted.
+  move=> i v z H.
+  elim/vec_ind: v => [|? ? ? _] in k H *;
+  by elim/@fin_ind: k => // in H *.
+Qed.
 
-Definition widen_fin {n} (x : fin n) :
-  widen_ord (leqnSn n) x = from_vfin (Fin.L_R 1 (to_vfin x)).
-Proof. by rewrite widen_vfin !fin_vfin_spec. Defined.
+Lemma vreplace_consn : forall n m i (v : Vec n) z, forall H: m < n,
+  vreplace (vcons i v) (@Ordinal n.+1 m.+1 H) z
+    = vcons i (vreplace v (@Ordinal n m H) z).
+Proof. by move=> n m i; elim/vec_ind. Qed.
 
-Definition fold_left_with_index {A B : Type} {n} (f : fin n -> B -> A -> B) :
-  forall (b : B) (v : Vec A n), B.
-  intros b v.
-  induction v.
-    apply b.
-  apply IHv.
-  intros. apply X0.
+Lemma vnth_vreplace : forall n (v : Vec n) k z,
+  vnth (vreplace v k z) k = z.
+Proof.
+  move=> n v k z.
+  case: n => [|n] in k v *;
+    first exact: fin_contra.
+  elim/vecn_ind: v => // [sz x xs IHxs] in k *.
+  elim/@fin_ind: k => [H|k ? IHk].
+    rewrite vreplace_cons0; last by [].
+    by rewrite vnth_cons0.
+  by rewrite vreplace_consn vnth_consn IHxs.
+Qed.
+
+Lemma fin1_eq : forall (j k : fin 1), j == k.
+Proof.
+  elim/@fin_ind=> [?|? ? _];
+  elim/@fin_ind=> [?|? ? _]; first by [];
+  discriminate.
+Qed.
+
+Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
+  k != j -> vnth (vreplace v k z) j = vnth v j.
+Proof.
+  move=> n v k j z.
+  case: n => [|n] in k j v *;
+    first exact: fin_contra.
+  elim/vecn_ind: v => // [x|sz x xs IHxs] in k j *.
+    by move: (fin1_eq k j) => /eqP ? /eqP ?.
+  elim/@fin_ind: k; elim/@fin_ind: j;
+    try by elim: sz => // in xs IHxs *.
+  move=> ? ? _ ? ? _ Hneg.
+  rewrite vreplace_consn !vnth_consn IHxs; first by [].
+  exact: Hneg.
+Qed.
+
+Definition vnth_vshiftin {n} : forall k (z : A) (v : Vec n),
+  vnth (vshiftin v z) (widen_id k) = vnth v k.
+Proof.
+  move=> k z v.
+  case: n => [|n] in k v *;
+    first exact: fin_contra.
+  elim/vecn_ind: v => [x|sz x xs IHxs] in k *.
+    rewrite /vshiftin /=.
+    by elim/@fin_ind: k => //.
+  rewrite vshiftin_cons.
+  elim/@fin_ind: k => [Hk|? ? _].
+    have ->: Hk = ltn0Sn sz by exact: eq_irrelevance.
+    by rewrite vnth_cons0.
+  rewrite !vnth_consn -IHxs.
+  congr (vnth _ (Ordinal _)).
+  exact: eq_irrelevance.
+Qed.
+
+End Vector.
+
+Definition vmap {A B : Type} {n} (f : A -> B) (v : Vec A n) : Vec B n.
+Proof.
+  elim: n => // [n IHn] in v *.
+  elim/vecn_rect: v => [x|sz x xs IHxs] in IHn *.
+    exact: (vsing _ (f x)).
+  exact: (vcons _ (f x) (IHxs IHn)).
 Defined.
 
-Definition replace {A : Type} {n} v i := @V.replace A _ v (@to_vfin n i).
+Module VectorSpec.
 
-Definition vnth {A : Type} {n} v i := @V.nth A _ v (@to_vfin n i).
+Arguments vsing [A] _ /.
+Arguments vcons [A n] _ _ /.
+Arguments vconst [A n] !i.
+Arguments vfoldl_with_index [A B n] f !b !v.
+Arguments vfoldl [A B n] f !b !v.
+Arguments vreplace [A n] !v !p !i.
+Arguments vnth [A n] !v !p.
+Arguments vapp [A n m] !v !u.
+Arguments vshiftin [A n] !v !i.
+Arguments vmap [A B n] f !v.
 
-Lemma vnth_last {A : Type} {n} : forall (x : A) v,
-  vnth (V.shiftin x v) (@ord_max n) = x.
-Proof.
-  move=> ?; rewrite /vnth /=.
-  elim=> [|? vn ? ?] //=.
-  have ->: Lt.lt_S_n vn vn.+1 (ltP (ltnSn vn.+1)) = ltP (ltnSn vn)
-    by exact: le_irrelevance.
-  by [].
-Qed.
+Example flwi_check :
+  map (fun x => (@nat_of_ord 5 (fst x), (snd x)))
+      (vfoldl_with_index (fun i acc x => (i, x) :: acc) nil
+         (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5))))))
+    == [:: (0, 1); (1, 2); (2, 3); (3, 4); (4, 5)].
+Proof. rewrite /= !inordK; by []. Qed.
 
-Lemma vnth_replace {A : Type} : forall n (v : Vec A n) k x,
-  vnth (replace v k x) k = x.
-Proof.
-  move=> n v k x.
-Admitted.
+Lemma _2_ltn_5 : 2 < 5. Proof. by []. Qed.
 
-Lemma vnth_replace_neq {A : Type} : forall n (v : Vec A n) k j x,
-  k != j -> vnth (replace v k x) j = vnth v j.
-Admitted.
+Example vreplace_check :
+  vreplace (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
+          (@Ordinal 5 2 _2_ltn_5) 6
+    == (vcons 1 (vcons 2 (vcons 6 (vcons 4 (vsing 5))))).
+Proof. reflexivity. Qed.
 
-Definition vnth_shiftin {A : Type} {n} : forall i (x : A) xs,
-  vnth (V.shiftin x xs) (widen_ord (leqnSn n) i) = vnth xs i.
-Proof.
-  move=> i x xs; rewrite /vnth.
-  rewrite -(@V.shiftin_nth A x n xs (to_vfin i) (to_vfin i)); last by [].
-  congr (V.nth _ _) => {x xs}.
-  by rewrite widen_fin vfin_fin_spec.
-Qed.
+Lemma _3_ltn_5 : 3 < 5. Proof. by []. Defined.
 
-Coercion to_vfin : fin >-> vfin.
-(* Coercion from_vfin : vfin >-> fin. *)
+Example vnth_check :
+  vnth (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
+       (@Ordinal 5 3 _3_ltn_5) == 4.
+Proof. reflexivity. Qed.
+
+Example vapp_check :
+  vapp (vcons 1 (vsing 2))
+       (vcons 3 (vcons 4 (vsing 5))) ==
+  vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))).
+Proof. reflexivity. Qed.
+
+Example const_check :
+  vconst 42 = vcons 42 (vcons 42 (vcons 42 (vcons 42 (vsing 42)))).
+Proof. reflexivity. Qed.
+
+Example vmap_check :
+  vmap (addn 2) (vcons 1 (vcons 2 (vcons 3 (vcons 4 (vsing 5)))))
+    == (vcons 3 (vcons 4 (vcons 5 (vcons 6 (vsing 7))))).
+Proof. reflexivity. Qed.
+
+End VectorSpec.
+
+Extract Inductive fin => "(Prelude.Int)" [""].
+
+Extract Constant Vec "a" => "[a]".
+
+Extract Inlined Constant vnil     => "([])".
+Extract Inlined Constant vsing    => "([])".
+Extract Inlined Constant vcons    => "((:))".
+Extract Inlined Constant vshiftin => "(LinearScan.Utils.snoc)".
+Extract Inlined Constant vreplace => "(LinearScan.Utils.set_nth)".
+Extract Inlined Constant vec_rect => "(LinearScan.Utils.list_rect)".
+Extract Inlined Constant vconst   => "(Data.List.replicate)".
+Extract Inlined Constant vfoldl   => "(LinearScan.Utils.vfoldl')".
+Extract Inlined Constant vapp     => "(Prelude.(++))".
+Extract Inlined Constant vmap     => "(LinearScan.Utils.vmap)".
+Extract Inlined Constant vnth     => "(LinearScan.Utils.nth)".
+
+Extract Inlined Constant vfoldl_with_index
+  => "(LinearScan.Utils.foldl'_with_index)".

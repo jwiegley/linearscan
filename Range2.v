@@ -1,5 +1,5 @@
 Require Import Lib.
-Require Import NonEmpty.
+Require Import NonEmpty2.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -58,9 +58,6 @@ Definition UsePos_eqType (A : eqType) := Equality.Pack upos_eqMixin UsePos.
 
 End EqUpos.
 
-Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
-Arguments upos_lt x y /.
-
 Program Instance upos_lt_trans : RelationClasses.Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
@@ -68,7 +65,7 @@ Obligation 1. exact: (ltn_trans H). Qed.
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
-  { p : (option (NonEmpty UsePos) * option (NonEmpty UsePos))
+  { p : option (NonEmpty UsePos) * option (NonEmpty UsePos)
   | match p with
     | (Some l1, Some l2) =>
         [ /\ l = NE_append l1 l2
@@ -84,7 +81,7 @@ Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
 
 (** Return two sublists of [l] such that for every element in the first
     sublist, [f elem] return [true]. *)
-Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos) {struct l} :
+Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos) :
   UsePosSublistsOf f l.
 Proof.
   elim/ne_ind Heqe: l => [x|x xs].
@@ -400,7 +397,7 @@ Record DividedRange `(r : Range rd) (f : UsePos -> bool)
 }.
 
 Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
-  (p : (option RangeSig * option RangeSig)) :=
+  (p : option RangeSig * option RangeSig) :=
   match p with
   | (Some r1, Some r2) => DividedRange r f r1.2 r2.2
   | (Some r1, None)    => ups rd = ups r1.1 /\ all f (ups r1.1)
@@ -430,24 +427,29 @@ Proof.
   - apply (Range_append_fst r).
 Defined.
 
+Lemma rewrite_ups_in_all : forall {rd l1 f},
+  ups rd = l1 -> all f l1 -> all f (ups rd).
+Proof. by move=> rd l1 f ->. Defined.
+
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
 Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) :
-  { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
+  { p : option RangeSig * option RangeSig | SubRangesOf f r p } :=
   match usePosSpan f (ups rd) with
   | exist (Some l1, Some l2) (And3 Heqe Hu1 Hu2) =>
       makeDividedRange r Heqe Hu1 Hu2
 
-  | exist (Some _, None) (conj Heqe Hu) =>
+  | exist (Some l1, None) (conj Heqe Hall) =>
       exist (SubRangesOf f r)
         (Some (exist Range rd r), None)
-        (conj refl_equal undefined (* (rew <- Heqe in Hu) *))
+        (conj refl_equal (rewrite_ups_in_all Heqe Hall))
 
-  | exist (None, Some _) (conj Heqe Hu) =>
+  | exist (None, Some l2) (conj Heqe Hall) =>
       exist (SubRangesOf f r)
         (None, Some (exist Range rd r))
-        (conj refl_equal (eq_rect_r (fun x => ~~ f (NE_head x)) Hu Heqe))
+        (conj refl_equal
+              (eq_rect_r (fun x => ~~ f (NE_head x)) Hall Heqe))
 
   | exist (None, None) Hu => ex_falso_quodlibet Hu
   end.

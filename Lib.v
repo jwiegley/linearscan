@@ -1,4 +1,4 @@
-Require Export Vector2.
+Require Export Vector.
 
 Require Export Ssreflect.ssreflect.
 Require Export Ssreflect.ssrfun.

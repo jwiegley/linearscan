@@ -1,7 +1,7 @@
 Require Import Lib.
 Require Import NonEmpty.
 
-Require Export Range.
+Require Export Range2.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

@@ -264,7 +264,7 @@ Proof.
   elim: unh => [//|u us IHus] /=.
   rewrite !sumlist_cons IHus.
   congr (_ + _).
-  by rewrite vnth_shiftin.
+  by rewrite vnth_vshiftin.
 Qed.
 
 Theorem ScanState_hasInterval_spec `(st : ScanState sd) : forall xid,
@@ -299,11 +299,11 @@ Proof.
     rewrite Heq in f Hlt Heqe *.
     (* This should follow from the fact that unh is uniq. *)
     have ->: sumlist (map f us) = sumlist (map g us) by admit.
-    rewrite vnth_replace addsubsubeq; first by [].
+    rewrite vnth_vreplace addsubsubeq; first by [].
     exact: ltnW.
   move: cons_uniq Huniq => -> /andP [Huniq1 Huniq2].
   move: IHus => /(_ Hin) /= /eqP ->.
-  rewrite vnth_replace_neq.
+  rewrite vnth_vreplace_neq.
     rewrite -addnBA; first by [].
     apply: subn_leq.
     pose h y := intervalExtent (vnth ints y).2.

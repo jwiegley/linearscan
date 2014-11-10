@@ -24,6 +24,7 @@ Section Block.
 
 Variable baseType : Set.
 Variable maxVirtReg : nat.
+Hypothesis variables_exist : maxVirtReg > 0.
 
 Definition SomeVar := (fin maxVirtReg + fin maxReg)%type.
 
@@ -53,15 +54,15 @@ Record boundedRangeVec (pos : nat) := {
 Lemma transportVecBounds (pos m : nat) `(Hlt : pos < n) :
   Vec (boundedTriple n) m -> Vec (boundedTriple pos) m.
 Proof.
-  elim=> [|[p [[rd r Hr]| ]] n' v' IHv].
-  - by constructor.
-  - constructor; last exact: IHv.
+  elim/vec_rect=> [|sz [p [[rd r Hr]| ]] xs IHxs].
+    exact: vnil.
+  - constructor; last exact: IHxs.
     split. apply p.
     apply Some.
     exists rd. apply r.
     apply ltnW in Hlt.
     exact: (leq_trans Hlt).
-  - constructor; last exact: IHv.
+  - constructor; last exact: IHxs.
     split. apply p.
     exact: None.
 Qed.
@@ -119,8 +120,8 @@ Definition applyList (bs : NonEmpty Block)
 End applyList.
 
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
-  {| vars := vconst (None, None, None) variables_exist
-   ; regs := vconst (None, None, None) registers_exist
+  {| vars := vconst (None, None, None)
+   ; regs := vconst (None, None, None)
    |}.
 
 (* jww (2014-11-04): Still to be done:
@@ -150,24 +151,25 @@ Definition handleBlock (b : Block) (pos : nat) (Hodd : odd pos)
 
   let restVars' := vmap savingBound (vars rest) in
   let restRegs' := vmap savingBound (regs rest) in
-  match references b with
-  | V.nil => boundedTransport (ltnSSn _)
-               {| vars := restVars'; regs := restRegs' |}
+  vec_rect SomeVar (fun _ _ => boundedRangeVec pos)
+    (boundedTransport (ltnSSn _) {| vars := restVars'; regs := restRegs' |})
+    (fun _ x _ _ =>
+       match x with
+       | inl v =>
+         let x := consr (vnth restVars' v) in
+         let restVars'' :=
+             vreplace (transportVecBounds (ltnSSn _) restVars') v x in
+         let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in
+         {| vars := restVars''; regs := restRegs'' |}
 
-  | V.cons (inl v) _ vs =>
-    let x := consr (vnth restVars' v) in
-    let restVars'' :=
-        replace (transportVecBounds (ltnSSn _) restVars') v x in
-    let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in
-    {| vars := restVars''; regs := restRegs'' |}
-
-  | V.cons (inr r) _ vs =>
-    let x := consr (vnth restRegs' r) in
-    let restVars'' := transportVecBounds (ltnSSn _) restVars' in
-    let restRegs'' :=
-        replace (transportVecBounds (ltnSSn _) restRegs') r x in
-    {| vars := restVars''; regs := restRegs'' |}
-  end.
+       | inr r =>
+         let x := consr (vnth restRegs' r) in
+         let restVars'' := transportVecBounds (ltnSSn _) restVars' in
+         let restRegs'' :=
+             vreplace (transportVecBounds (ltnSSn _) restRegs') r x in
+         {| vars := restVars''; regs := restRegs'' |}
+      end)
+    (references b).
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=
   let: (mb, me, mr) := x in
@@ -192,7 +194,7 @@ Definition processBlocks (blocks : NonEmpty Block) :
   Vec (option RangeSig) maxVirtReg * Vec (option RangeSig) maxReg :=
   let: {| vars := vars'; regs := regs' |} :=
        applyList blocks emptyBoundedRangeVec handleBlock in
-  (vmap extractRange vars', V.map extractRange regs').
+  (vmap extractRange vars', vmap extractRange regs').
 
 Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
   let mkint (ss : ScanStateSig) (mx : option RangeSig)

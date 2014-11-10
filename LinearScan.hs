@@ -9,23 +9,18 @@ module LinearScan
     , PhysReg
     ) where
 
-import Control.Arrow ((***))
-import Data.Functor.Identity
+import Control.Arrow (second)
 import LinearScan.Lib
 import LinearScan.Main
 import LinearScan.NonEmpty0
 import LinearScan.Vector0
 
-type    VirtReg    = Identity Int
+type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__MLS__MS__ScanStateDesc
 newtype PhysReg    = PhysReg { getPhysReg :: LinearScan__MLS__MS__PhysReg }
 newtype StartsLoop = StartsLoop { getStartsLoop :: Bool }
 newtype EndsLoop   = EndsLoop { getEndsLoop :: Bool }
 type    IntervalId = Int
-
-toCoqV :: [a] -> V__Coq_t a
-toCoqV [] = V__Coq_nil
-toCoqV (x:xs) = V__Coq_cons x 0 (toCoqV xs)
 
 allocateRegisters
     :: Int
@@ -38,9 +33,9 @@ allocateRegisters maxVirtReg blockInfo blocks =
     gather b =
         let (starts, ends, refs) = blockInfo b in
         LinearScan__Build_Block b (getStartsLoop starts) (getEndsLoop ends)
-            (length refs) (toCoqV (fmap (fmap getPhysReg) refs))
+            (length refs) (map (fmap getPhysReg) refs)
 
 handledIntervalIds :: ScanState -> [(IntervalId, PhysReg)]
 handledIntervalIds
     (ScanState (LinearScan__MLS__MS__Build_ScanStateDesc _ni _ _ _ _ _ hnd)) =
-  map (runIdentity *** PhysReg) hnd
+  map (second PhysReg) hnd

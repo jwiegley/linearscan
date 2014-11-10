@@ -107,8 +107,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := nil
        ; inactive         := nil
        ; handled          := nil
-       ; intervals        := V.nil _
-       ; fixedIntervals   := vconst None _
+       ; intervals        := vnil _
+       ; fixedIntervals   := vconst None
        |}
 
   | ScanState_newUnhandled sd :
@@ -121,7 +121,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := map widen_fst (active sd)
        ; inactive         := map widen_fst (inactive sd)
        ; handled          := map widen_fst (handled sd)
-       ; intervals        := vshiftin (d; i) (intervals sd)
+       ; intervals        := vshiftin (intervals sd) (d; i)
        ; fixedIntervals   := fixedIntervals sd
        |}
 
@@ -136,7 +136,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; active           := active sd
        ; inactive         := inactive sd
        ; handled          := handled sd
-       ; intervals        := replace (intervals sd) xid (d; i)
+       ; intervals        := vreplace (intervals sd) xid (d; i)
        ; fixedIntervals   := fixedIntervals sd
        |}
 

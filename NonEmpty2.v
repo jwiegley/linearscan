@@ -31,9 +31,7 @@ Definition NE_to_list {a} (ne : NonEmpty a) : list a :=
 Coercion NE_to_list : NonEmpty >-> list.
 
 Definition NE_from_list {a} (l : seq a) : 0 < size l -> NonEmpty a.
-Proof.
-  move=> H; constructor; case: l => // [|x xs] in H *.
-Defined.
+Proof. move=> H; constructor; case: l => // [|x xs] in H *. Defined.
 
 Arguments NE_from_list [a] l _.
 
@@ -42,12 +40,10 @@ Definition ne_ind : forall a (P : NonEmpty a -> Type),
     -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & l])
     -> forall l : NonEmpty a, P l.
 Proof.
-  move=> a P H1 H2.
-  case=> [x xs].
+  move=> a P H1 H2; case=> [x xs].
   elim: xs => [|y ys IHys] in x *.
     exact: H1.
-  apply (H2 x (NE y ys)).
-  apply IHys.
+  exact/(H2 x (NE y ys))/IHys.
 Defined.
 
 Definition NE_length {a} (ne : NonEmpty a) : nat := (size ne).+1.
@@ -77,9 +73,7 @@ Arguments NE_append [a] l1 l2 /.
 
 Lemma NE_head_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_head (NE_append xs ys) = NE_head xs.
-Proof.
-  move=> a; case=> x; case=> /= [|z zs] ys; by case: ys.
-Qed.
+Proof. move=> a; case=> x; case=> /= [|z zs] ys; by case: ys. Qed.
 
 Lemma NE_last_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_last (NE_append xs ys) = NE_last ys.
@@ -143,31 +137,6 @@ Definition NE_StronglySorted (ne : NonEmpty A) : Prop :=
   let: NE x xs := ne in all id (pairmap R x xs).
 Arguments NE_StronglySorted ne /.
 
-(*
-Lemma NE_StronglySorted_inv : forall a l,
-  NE_StronglySorted [::: a & l]
-    -> StronglySorted R l /\ Forall (R a) l.
-Admitted.
-(* Proof. intros; inversion H0; auto. Qed. *)
-
-Lemma StronglySorted_split : forall (l1 l2 : seq A),
-  StronglySorted R (l1 ++ l2)
-    -> StronglySorted R l1 /\ StronglySorted R l2.
-Proof.
-  induction l1; simpl; intros.
-    split; [ constructor | assumption ].
-  inversion H0.
-  apply IHl1 in H3.
-  inversion H3.
-  split.
-    constructor. assumption.
-    apply Forall_split in H4.
-    inversion H4.
-    assumption.
-  assumption.
-Qed.
-*)
-
 Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2)
     -> NE_StronglySorted l1 /\ NE_StronglySorted l2.
@@ -181,17 +150,14 @@ Qed.
 
 Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2) -> R (NE_last l1) (NE_head l2).
-Admitted.
-(* Proof. *)
-(*   intros. *)
-(*   induction l1; simpl in *. *)
-(*     inversion H0; subst. *)
-(*     apply NE_Forall_head in H4. *)
-(*     assumption. *)
-(*   apply IHl1. *)
-(*   inversion H0. *)
-(*   assumption. *)
-(* Qed. *)
+Proof.
+  elim/ne_ind=> [x|x xs IHxs] //=.
+    elim/ne_ind=> [y|y ys IHys] //=;
+    by move/andP => [? ?].
+  elim/ne_ind=> [y|y ys IHys] //=;
+  rewrite pairmap_cat all_cat /=;
+  by move/and3P => [? ? ?].
+Qed.
 
 End Sorted.
 
@@ -203,25 +169,11 @@ Arguments NE_member [a] z ne /.
 
 Lemma NE_Forall_member_spec {a : eqType} (z : a) (ne : NonEmpty a) :
   forall f, NE_Forall f ne -> NE_member z ne -> f z.
-Admitted.
-(* Proof. *)
-(*   case: ne => [x xs] f /= H1 /orP H2. *)
-(*   inversion H1; subst. *)
-(*   case: H2. move=> /eqP <- //. *)
-(* Admitted. *)
-(*   elim: H4 => [|y ys ? ? IHys] Hin. by []. *)
-(*   apply IHys. *)
-(*   rewrite in_cons in Hin. *)
-(*   move/orP in Hin. *)
-(*   inversion Hin. *)
-(*   case: ne in H1 H2 *. *)
-(*   induction ne; simpl; intros. *)
-(*     inversion H0. subst. assumption. *)
-(*   inversion H1. *)
-(*     inversion H0. subst. assumption. *)
-(*   apply IHne. *)
-(*     inversion H0. assumption. *)
-(*   assumption. *)
-(* Qed. *)
+Proof.
+  case: ne => [x xs] f /= /andP [H1 H2] /orP [/eqP H3|H3].
+    by subst.
+  move/allP in H2.
+  exact: H2.
+Qed.
 
 End Membership.

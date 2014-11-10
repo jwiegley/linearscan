@@ -56,14 +56,11 @@ sumlist :: ([] Prelude.Int) -> Prelude.Int
 sumlist =
   Data.List.foldl' (Prelude.+) 0
 
-widen_id :: Prelude.Int -> (Data.Functor.Identity.Identity Prelude.Int) ->
-            (Data.Functor.Identity.Identity Prelude.Int)
+widen_id :: Prelude.Int -> (Prelude.Int) -> (Prelude.Int)
 widen_id n =
   Fintype.widen_ord n (Prelude.succ n)
 
-widen_fst :: Prelude.Int -> ((,) (Data.Functor.Identity.Identity Prelude.Int)
-             a1) -> (,) (Data.Functor.Identity.Identity Prelude.Int) 
-             a1
+widen_fst :: Prelude.Int -> ((,) (Prelude.Int) a1) -> (,) (Prelude.Int) a1
 widen_fst n p =
   (,) (widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
 
