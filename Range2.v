@@ -525,6 +525,7 @@ Proof.
   by move: (Range_bounded r2.2).
 Qed.
 
+(*
 Module RangeTests.
 
 Module Import U := UsePosNotations.
@@ -588,3 +589,4 @@ Example testRangeSpan_5 :
 Proof. reflexivity. Qed.
 
 End RangeTests.
+*)
