@@ -11,6 +11,7 @@ Module MAllocate (M : Machine).
 
 Include MSSMorph M.
 Import MLS.MS.
+Import M.
 
 Open Scope program_scope.
 

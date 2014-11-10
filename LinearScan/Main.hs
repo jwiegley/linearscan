@@ -49,10 +49,6 @@ _MyMachine__maxReg =
     (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ (Prelude.succ
     (Prelude.succ (Prelude.succ 0)))))))))))))))))))))))))))))))
 
-_LinearScan__MLS__MS__maxReg :: Prelude.Int
-_LinearScan__MLS__MS__maxReg =
-  _MyMachine__maxReg
-
 type LinearScan__MLS__MS__PhysReg =
   (Data.Functor.Identity.Identity Prelude.Int)
 
@@ -237,7 +233,7 @@ _LinearScan__MLS__MS__registerWithHighestPos :: (Vector0.V__Coq_t
                                                 (Data.Functor.Identity.Identity Prelude.Int)
                                                 (Prelude.Maybe Prelude.Int)
 _LinearScan__MLS__MS__registerWithHighestPos =
-  Vector0.fold_left_with_index _LinearScan__MLS__MS__maxReg (\reg res x ->
+  Vector0.fold_left_with_index _MyMachine__maxReg (\reg res x ->
     case res of {
      (,) r o ->
       case o of {
@@ -543,7 +539,7 @@ _LinearScan__moveActiveToHandled sd x =
       ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-          (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg)) x
+          (Fintype.ordinal_eqType _MyMachine__maxReg)) x
         (unsafeCoerce (_LinearScan__MLS__MS__active sd)))) ((:)
     (unsafeCoerce x) (_LinearScan__MLS__MS__inactive sd))
     (_LinearScan__MLS__MS__handled sd)
@@ -562,7 +558,7 @@ _LinearScan__moveActiveToInactive sd x =
       ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-          (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg)) x
+          (Fintype.ordinal_eqType _MyMachine__maxReg)) x
         (unsafeCoerce (_LinearScan__MLS__MS__active sd)))) ((:)
     (unsafeCoerce x) (_LinearScan__MLS__MS__inactive sd))
     (_LinearScan__MLS__MS__handled sd)
@@ -582,7 +578,7 @@ _LinearScan__moveInactiveToActive sd x =
       ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-          (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg)) x
+          (Fintype.ordinal_eqType _MyMachine__maxReg)) x
         (unsafeCoerce (_LinearScan__MLS__MS__inactive sd))))
     (_LinearScan__MLS__MS__handled sd)
 
@@ -600,7 +596,7 @@ _LinearScan__moveInactiveToHandled sd x =
       ((Prelude.const Data.List.delete)
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-          (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg)) x
+          (Fintype.ordinal_eqType _MyMachine__maxReg)) x
         (unsafeCoerce (_LinearScan__MLS__MS__inactive sd)))) ((:)
     (unsafeCoerce x) (_LinearScan__MLS__MS__handled sd))
 
@@ -762,8 +758,7 @@ _LinearScan__intersectsWithFixedInterval pre reg =
           (case v of {
             Prelude.Just i -> Interval.intervalIntersectionPoint ( int) ( i);
             Prelude.Nothing -> Prelude.Nothing})) Prelude.Nothing
-        _LinearScan__MLS__MS__maxReg
-        (_LinearScan__MLS__MS__fixedIntervals sd)))
+        _MyMachine__maxReg (_LinearScan__MLS__MS__fixedIntervals sd)))
 
 _LinearScan__assignSpillSlotToCurrent :: LinearScan__MLS__MS__ScanStateDesc
                                          -> LinearScan__SState a1 a1 
@@ -782,12 +777,11 @@ _LinearScan__tryAllocateFreeReg pre =
      go = \n ->
       Data.List.foldl' (\v p ->
         case p of {
-         (,) i r -> Vector0.replace _LinearScan__MLS__MS__maxReg v r (n i)})}
+         (,) i r -> Vector0.replace _MyMachine__maxReg v r (n i)})}
     in
     let {
      freeUntilPos' = go (\x -> Prelude.Just 0)
-                       (Vector0._V__const Prelude.Nothing
-                         _LinearScan__MLS__MS__maxReg)
+                       (Vector0._V__const Prelude.Nothing _MyMachine__maxReg)
                        (_LinearScan__MLS__MS__active sd)}
     in
     let {
@@ -854,16 +848,14 @@ _LinearScan__allocateBlockedReg pre =
      go = Data.List.foldl' (\v p ->
             case p of {
              (,) i r ->
-              Vector0.replace _LinearScan__MLS__MS__maxReg v r
+              Vector0.replace _MyMachine__maxReg v r
                 (Interval.nextUseAfter
                   (
                     (Vector0.vnth (_LinearScan__MLS__MS__nextInterval sd)
                       (_LinearScan__MLS__MS__intervals sd) i)) start)})}
     in
     let {
-     nextUsePos' = go
-                     (Vector0._V__const Prelude.Nothing
-                       _LinearScan__MLS__MS__maxReg)
+     nextUsePos' = go (Vector0._V__const Prelude.Nothing _MyMachine__maxReg)
                      (_LinearScan__MLS__MS__active sd)}
     in
     let {
@@ -960,7 +952,7 @@ _LinearScan__checkActiveIntervals pre pos =
         (Lib.list_membership
           (Eqtype.prod_eqType
             (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-            (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg))
+            (Fintype.ordinal_eqType _MyMachine__maxReg))
           (unsafeCoerce (_LinearScan__MLS__MS__active sd)))) __))
 
 _LinearScan__checkInactiveIntervals :: LinearScan__MLS__MS__ScanStateDesc ->
@@ -1005,7 +997,7 @@ _LinearScan__checkInactiveIntervals pre pos =
         (Lib.list_membership
           (Eqtype.prod_eqType
             (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
-            (Fintype.ordinal_eqType _LinearScan__MLS__MS__maxReg))
+            (Fintype.ordinal_eqType _MyMachine__maxReg))
           (unsafeCoerce (_LinearScan__MLS__MS__inactive sd)))) __))
 
 _LinearScan__handleInterval :: LinearScan__MLS__MS__ScanStateDesc ->
@@ -1238,7 +1230,7 @@ _LinearScan__emptyBoundedRangeVec maxVirtReg n =
     (Vector0._V__const ((,) ((,) Prelude.Nothing Prelude.Nothing)
       Prelude.Nothing) maxVirtReg)
     (Vector0._V__const ((,) ((,) Prelude.Nothing Prelude.Nothing)
-      Prelude.Nothing) _LinearScan__MLS__MS__maxReg)
+      Prelude.Nothing) _MyMachine__maxReg)
 
 _LinearScan__handleBlock :: Prelude.Int -> (LinearScan__Block a1) ->
                             Prelude.Int -> LinearScan__Coq_boundedRangeVec ->
@@ -1275,7 +1267,7 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
                    pos)) rest)}
   in
   let {
-   restRegs' = Vector0._V__map savingBound _LinearScan__MLS__MS__maxReg
+   restRegs' = Vector0._V__map savingBound _MyMachine__maxReg
                  (_LinearScan__regs maxVirtReg (Prelude.succ (Prelude.succ
                    pos)) rest)}
   in
@@ -1294,23 +1286,20 @@ _LinearScan__handleBlock maxVirtReg b pos rest =
                         (Prelude.succ (Prelude.succ pos)) restVars') v x}
       in
       let {
-       restRegs'' = _LinearScan__transportVecBounds pos
-                      _LinearScan__MLS__MS__maxReg (Prelude.succ
-                      (Prelude.succ pos)) restRegs'}
+       restRegs'' = _LinearScan__transportVecBounds pos _MyMachine__maxReg
+                      (Prelude.succ (Prelude.succ pos)) restRegs'}
       in
       LinearScan__Build_boundedRangeVec restVars'' restRegs'';
      Prelude.Right r ->
-      let {x = consr (Vector0.vnth _LinearScan__MLS__MS__maxReg restRegs' r)}
-      in
+      let {x = consr (Vector0.vnth _MyMachine__maxReg restRegs' r)} in
       let {
        restVars'' = _LinearScan__transportVecBounds pos maxVirtReg
                       (Prelude.succ (Prelude.succ pos)) restVars'}
       in
       let {
-       restRegs'' = Vector0.replace _LinearScan__MLS__MS__maxReg
-                      (_LinearScan__transportVecBounds pos
-                        _LinearScan__MLS__MS__maxReg (Prelude.succ
-                        (Prelude.succ pos)) restRegs') r x}
+       restRegs'' = Vector0.replace _MyMachine__maxReg
+                      (_LinearScan__transportVecBounds pos _MyMachine__maxReg
+                        (Prelude.succ (Prelude.succ pos)) restRegs') r x}
       in
       LinearScan__Build_boundedRangeVec restVars'' restRegs''}}
 
@@ -1357,8 +1346,7 @@ _LinearScan__processBlocks maxVirtReg blocks =
          _LinearScan__handleBlock maxVirtReg x x0) of {
    LinearScan__Build_boundedRangeVec vars' regs' -> (,)
     (Vector0._V__map _LinearScan__extractRange maxVirtReg vars')
-    (Vector0._V__map _LinearScan__extractRange _LinearScan__MLS__MS__maxReg
-      regs')}
+    (Vector0._V__map _LinearScan__extractRange _MyMachine__maxReg regs')}
 
 _LinearScan__determineIntervals :: Prelude.Int -> (NonEmpty0.NonEmpty
                                    (LinearScan__Block a1)) ->
@@ -1409,36 +1397,36 @@ _LinearScan__determineIntervals maxVirtReg blocks =
                  (Interval.packInterval (Interval.Build_IntervalDesc
                    (Range.rbeg ( r)) (Range.rend ( r)) (NonEmpty0.NE_Sing
                    ( r))));
-                Prelude.Nothing -> Prelude.Nothing})
-               _LinearScan__MLS__MS__maxReg regRanges}
+                Prelude.Nothing -> Prelude.Nothing}) _MyMachine__maxReg
+               regRanges}
     in
     let {
      s2 = _LinearScan__MLS__MS__packScanState
             (LinearScan__MLS__MS__Build_ScanStateDesc
             (_LinearScan__MLS__MS__nextInterval
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] []))
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              []))
             (_LinearScan__MLS__MS__intervals
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] [])) regs0
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              [])) regs0
             (_LinearScan__MLS__MS__unhandled
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] []))
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              []))
             (_LinearScan__MLS__MS__active
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] []))
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              []))
             (_LinearScan__MLS__MS__inactive
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] []))
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              []))
             (_LinearScan__MLS__MS__handled
               (LinearScan__MLS__MS__Build_ScanStateDesc 0 Vector0.V__Coq_nil
-              (Vector0._V__const Prelude.Nothing
-                _LinearScan__MLS__MS__maxReg) [] [] [] [])))}
+              (Vector0._V__const Prelude.Nothing _MyMachine__maxReg) [] [] []
+              [])))}
     in
     Vector0._V__fold_left handleVar s2 maxVirtReg varRanges}
 

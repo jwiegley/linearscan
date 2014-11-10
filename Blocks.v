@@ -11,6 +11,7 @@ Module MLinearScan (M : Machine).
 
 Include MAllocate M.
 Import MLS.MS.
+Import M.
 
 (** * Block *)
 
