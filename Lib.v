@@ -1,4 +1,3 @@
-Require Export Tactics.
 Require Export Vector.
 
 Require Export Ssreflect.ssreflect.
@@ -13,6 +12,13 @@ Generalizable All Variables.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
+Ltac inv H  := inversion H; subst; simpl; auto.
+Ltac contra := intros top; contradiction top; clear top.
+Ltac invert := intros top; inversion top; clear top.
+
+Tactic Notation "invert" "as" simple_intropattern(pat) :=
+  intros top; inversion top as pat; clear top.
 
 Definition undefined {a : Type} : a. Admitted.
 

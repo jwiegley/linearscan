@@ -10,5 +10,4 @@ Range.v
 SSMorph.v
 ScanState.v
 Spec.v
-Tactics.v
 Vector.v

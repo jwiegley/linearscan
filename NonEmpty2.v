@@ -1,8 +1,3 @@
-Require Import Coq.Classes.RelationClasses.
-Require Import Coq.Lists.List.
-Require Import Coq.Sorting.Sorted.
-Require Import Coq.Relations.Relations.
-
 Require Import Ssreflect.ssreflect.
 Require Import Ssreflect.ssrfun.
 Require Import Ssreflect.ssrbool.
@@ -117,31 +112,6 @@ Proof.
   case: l => //= => [y ys] => H2.
   exact/H2/mem_last.
 Qed.
-
-Lemma Forall_app (l1 l2 : list A) (P : A -> Prop) :
-  Forall P l1 -> Forall P l2 -> Forall P (l1 ++ l2).
-Proof.
-  induction l1; simpl; intuition; auto.
-Admitted.
-(*   constructor. by inversion H0. *)
-(*   apply IHl1. by inversion H0. *)
-(*   exact: H1. *)
-(* Qed. *)
-
-Hint Resolve Forall_app.
-
-Lemma Forall_split (l1 l2 : list A) (P : A -> Prop) :
-  Forall P (l1 ++ l2) -> Forall P l1 /\ Forall P l2.
-Admitted.
-(* Proof. *)
-(*   induction l1; simpl; intuition; auto. *)
-(*     inversion H0. *)
-(*     constructor. by []. *)
-(*     apply IHl1. by []. *)
-(*   apply IHl1. by inversion H0. *)
-(* Qed. *)
-
-Hint Resolve Forall_app.
 
 Lemma NE_Forall_append : forall (P : A -> bool) xs ys,
    NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys).
