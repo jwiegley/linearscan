@@ -145,10 +145,6 @@ Proof.
   elim/vec_rect: v => [|? x _ IHxs]; [ exact: u | exact: (vcons x IHxs) ].
 Defined.
 
-Lemma vapp_cons : forall n i (v : Vec n),
-  vcons i v = vapp (vsing i) v.
-Proof. by move=> n i; elim/vec_ind. Qed.
-
 Lemma vnth_cons0 : forall n i (v : Vec n) H,
   vnth (vcons i v) (@Ordinal n.+1 0 H) = i.
 Proof. by move=> n i; elim/vec_ind. Qed.
@@ -162,20 +158,6 @@ Proof. by move=> n i; elim/vec_ind. Qed.
 Lemma vrcons_cons : forall n z (v : Vec n) i,
   vrcons (vcons z v) i = vcons z (vrcons v i).
 Proof. by move=> n i; elim/vec_ind. Qed.
-
-Lemma vnth_rcons : forall n m i (v : Vec n) H,
-  vnth (vrcons v i) (@Ordinal n.+1 m (ltnW H)) = vnth v (@Ordinal n m H).
-Proof.
-  move=> n m i v H.
-  elim/vec_ind: v => [|? x xs IHxs] in m H *.
-    by case: m => // in H *.
-  rewrite vrcons_cons.
-  case: m => [|m] in H IHxs *.
-    by rewrite !vnth_cons0.
-  rewrite !vnth_consn -IHxs.
-  congr (vnth _ (Ordinal _)).
-  exact: eq_irrelevance.
-Qed.
 
 Lemma vshiftin_cons : forall n z (v : Vec n) i,
   vshiftin (vcons z v) i = vcons z (vshiftin v i).
