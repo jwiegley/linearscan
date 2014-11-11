@@ -627,7 +627,8 @@ _LinearScan__splitCurrentInterval pre before ssi =
              Ssreflect.ssr_have __ (\_ ->
                Ssreflect.ssr_have __ (\_ ->
                  let {
-                  _top_assumption_0 = Interval.splitPosition ( int) before}
+                  _top_assumption_0 = Interval.splitPosition ( int) before
+                                        Prelude.True}
                  in
                  let {
                   _top_assumption_1 = Interval.splitInterval
@@ -700,45 +701,59 @@ _LinearScan__splitCurrentInterval pre before ssi =
      case ssi of {
       LinearScan__Build_SSInfo x x0 -> _evar_0_ x x0 __})
 
-_LinearScan__splitActiveIntervalForReg_admitted :: LinearScan__MLS__MS__ScanStateDesc
-                                                   ->
-                                                   LinearScan__MLS__MS__PhysReg
-                                                   -> Prelude.Int ->
-                                                   Prelude.Int ->
-                                                   (Vector0.Vec
-                                                   Interval.IntervalDesc) ->
-                                                   LinearScan__MLS__MS__Coq_fixedIntervalsType
-                                                   -> ([]
-                                                   ((,) Prelude.Int
-                                                   Prelude.Int)) -> ([]
-                                                   ((,) Prelude.Int
-                                                   LinearScan__MLS__MS__PhysReg))
-                                                   -> ([]
-                                                   ((,) Prelude.Int
-                                                   LinearScan__MLS__MS__PhysReg))
-                                                   -> ([]
-                                                   ((,) Prelude.Int
-                                                   LinearScan__MLS__MS__PhysReg))
-                                                   -> a1 ->
-                                                   LinearScan__SSInfo 
-                                                   ()
-_LinearScan__splitActiveIntervalForReg_admitted =
+_LinearScan__splitAssignedIntervalForReg_admitted :: LinearScan__MLS__MS__ScanStateDesc
+                                                     ->
+                                                     LinearScan__MLS__MS__PhysReg
+                                                     -> (Prelude.Maybe
+                                                     Prelude.Int) ->
+                                                     Prelude.Bool ->
+                                                     Prelude.Int ->
+                                                     (Vector0.Vec
+                                                     Interval.IntervalDesc)
+                                                     ->
+                                                     LinearScan__MLS__MS__Coq_fixedIntervalsType
+                                                     -> ([]
+                                                     ((,) Prelude.Int
+                                                     Prelude.Int)) -> ([]
+                                                     ((,) Prelude.Int
+                                                     LinearScan__MLS__MS__PhysReg))
+                                                     -> ([]
+                                                     ((,) Prelude.Int
+                                                     LinearScan__MLS__MS__PhysReg))
+                                                     -> ([]
+                                                     ((,) Prelude.Int
+                                                     LinearScan__MLS__MS__PhysReg))
+                                                     -> a1 ->
+                                                     LinearScan__SSInfo 
+                                                     ()
+_LinearScan__splitAssignedIntervalForReg_admitted =
+  Prelude.error "AXIOM TO BE REALIZED"
+
+_LinearScan__splitAssignedIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
+                                            -> LinearScan__MLS__MS__PhysReg
+                                            -> (Prelude.Maybe Prelude.Int) ->
+                                            Prelude.Bool ->
+                                            LinearScan__SState a1 () 
+                                            ()
+_LinearScan__splitAssignedIntervalForReg =
   Prelude.error "AXIOM TO BE REALIZED"
 
 _LinearScan__splitActiveIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
                                           -> LinearScan__MLS__MS__PhysReg ->
                                           Prelude.Int -> LinearScan__SState
                                           a1 () ()
-_LinearScan__splitActiveIntervalForReg =
-  Prelude.error "AXIOM TO BE REALIZED"
+_LinearScan__splitActiveIntervalForReg pre reg pos =
+  _LinearScan__splitAssignedIntervalForReg pre reg (Prelude.Just pos)
+    Prelude.True
 
 _LinearScan__splitAnyInactiveIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
                                                ->
                                                LinearScan__MLS__MS__PhysReg
                                                -> LinearScan__SState 
-                                               a1 a1 ()
-_LinearScan__splitAnyInactiveIntervalForReg =
-  Prelude.error "AXIOM TO BE REALIZED"
+                                               a1 () ()
+_LinearScan__splitAnyInactiveIntervalForReg pre reg =
+  _LinearScan__splitAssignedIntervalForReg pre reg Prelude.Nothing
+    Prelude.False
 
 _LinearScan__intersectsWithFixedInterval :: LinearScan__MLS__MS__ScanStateDesc
                                             -> LinearScan__MLS__MS__PhysReg

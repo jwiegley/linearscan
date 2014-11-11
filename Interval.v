@@ -207,8 +207,10 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
   | (None, None) => False
   end.
 
+(* jww (2014-11-11): Need to implement behavior for
+   [splitBeforeLifetimeHole]. *)
 Program Definition splitPosition `(i : Interval d) (before : option nat)
-  (H : firstUsePos i < lastUsePos i) :
+  (splitBeforeLifetimeHole : bool) (H : firstUsePos i < lastUsePos i) :
   { n : nat | firstUsePos i < n <= lastUsePos i } :=
   let initial := firstUsePos i in
   let final := lastUsePos i in

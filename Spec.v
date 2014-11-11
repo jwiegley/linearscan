@@ -27,8 +27,8 @@ Require Import Coq.Sorting.Sorted.
 Require Import Ssreflect.seq.
 
 Lemma Forall_widen : forall n x (xs : list (fin n * nat)),
-  Forall (lebf snd x) xs
-    -> Forall (lebf snd (widen_id (fst x), snd x))
+  Forall (lebf (@snd _ _) x) xs
+    -> Forall (lebf (@snd _ _) (widen_id (fst x), snd x))
                    [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ? x xs.
@@ -38,8 +38,9 @@ Proof.
 Qed.
 
 Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
-  StronglySorted (lebf snd) xs
-    -> StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
+  StronglySorted (lebf (@snd _ _)) xs
+    -> StronglySorted (lebf (@snd _ _))
+                      [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
@@ -48,22 +49,22 @@ Proof.
 Qed.
 
 Lemma Forall_insert_spec : forall a x (xs : seq (a * nat)) z,
-  Forall (lebf snd x) xs -> lebf snd x z
-    -> Forall (lebf snd x) (insert (lebf snd ^~ z) z xs).
+  Forall (lebf (@snd _ _) x) xs -> lebf (@snd _ _) x z
+    -> Forall (lebf (@snd _ _) x) (insert (lebf (@snd _ _) ^~ z) z xs).
 Proof.
   move=> a x.
   elim=> /= [|y ys IHys] z H Hlt.
     by constructor.
   rewrite /insert.
-  case L: (lebf snd y z).
+  case L: (lebf (@snd _ _) y z).
     constructor. by inv H.
     by apply: IHys; inv H.
   by constructor.
 Qed.
 
 Lemma StronglySorted_insert_spec a (l : list (a * nat)) : forall z,
-  StronglySorted (lebf snd) l
-    -> StronglySorted (lebf snd) (insert (lebf snd ^~ z) z l).
+  StronglySorted (lebf (@snd _ _)) l
+    -> StronglySorted (lebf (@snd _ _)) (insert (lebf (@snd _ _) ^~ z) z l).
 Proof.
   move=> z.
   elim: l => /= [|x xs IHxs] Hsort.
@@ -71,7 +72,7 @@ Proof.
   inv Hsort. clear Hsort.
   specialize (IHxs H1).
   rewrite /insert.
-  case L: (lebf snd x z).
+  case L: (lebf (@snd _ _) x z).
     constructor. exact: IHxs.
     exact: Forall_insert_spec.
   constructor.
@@ -80,7 +81,7 @@ Proof.
     unfold lebf in *.
     apply ltnW. rewrite ltnNge.
     apply/negP/eqP. by rewrite L.
-  apply Forall_impl with (P := (fun m : a * nat => lebf snd x m)).
+  apply Forall_impl with (P := (fun m : a * nat => lebf (@snd _ _) x m)).
     rewrite /lebf.
     move=> a0 Hlt.
     move: L => /negP.
@@ -93,7 +94,7 @@ Proof.
 Qed.
 
 Theorem unhandled_sorted `(st : ScanState sd) :
-  StronglySorted (lebf snd) (unhandled sd).
+  StronglySorted (lebf (@snd _ _)) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil". by constructor.
@@ -371,10 +372,10 @@ Proof.
     rewrite -addnBA; first by [].
     apply: subn_leq.
     pose h y := intervalExtent (vnth ints y).2.
-    have ->: [seq g i | i <- us] = [ seq (h \o fst) x | x <- us ]
+    have ->: [seq g i | i <- us] = [ seq (h \o @fst _ _) x | x <- us ]
       by exact: eq_map.
     have ->: intervalExtent (vnth ints xid).2 = h xid by [].
-    rewrite (map_comp _ fst).
+    rewrite (map_comp _ (@fst _ _)).
     exact: in_sumlist.
   exact: (in_notin Hin).
 Qed.

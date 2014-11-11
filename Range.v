@@ -440,6 +440,8 @@ Proof.
   - Case "(None, Some)".
     exfalso; destruct s.
     by move: H H0 Hf => <- /negbTE /= ->.
+  - Case "(None, None)".
+    destruct s.
 Defined.
 
 Lemma four_points : forall n m o p,

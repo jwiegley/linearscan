@@ -14,10 +14,6 @@ Import M.
 
 Open Scope program_scope.
 
-Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg) :
-  SState pre P P unit.
-Admitted.
-
 Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P P (option nat) :=
   withCursor $ fun sd cur =>
@@ -234,6 +230,8 @@ Definition handleInterval {pre} :
     | Some x => IEndo.imap (@Some _) x
     | None   => allocateBlockedReg
     end.
+
+Require Import Coq.Program.Wf.
 
 Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
   {measure (unhandledExtent sd)} : { sd' : ScanStateDesc | ScanState sd' } :=

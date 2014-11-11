@@ -154,5 +154,8 @@ splitRange f rd hl =
       case o0 of {
        Prelude.Just o2 -> (,) o1 o2;
        Prelude.Nothing -> Logic.coq_False_rec};
-     Prelude.Nothing -> Logic.coq_False_rec}}
+     Prelude.Nothing ->
+      case o0 of {
+       Prelude.Just o1 -> Logic.coq_False_rec;
+       Prelude.Nothing -> Prelude.error "absurd case"}}}
 

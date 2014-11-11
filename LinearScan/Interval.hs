@@ -112,8 +112,9 @@ lastUsePos d =
   Range.uloc
     (NonEmpty0.coq_NE_last (Range.ups ( (NonEmpty0.coq_NE_last (rds d)))))
 
-splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Int
-splitPosition d before =
+splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Bool
+                 -> Prelude.Int
+splitPosition d before splitBeforeLifetimeHole =
   let {initial = firstUsePos d} in
   let {final = lastUsePos d} in
   Prelude.max (Prelude.succ initial)

@@ -373,7 +373,7 @@ Proof.
     admit.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
-  move: (@splitPosition _ int.2 before Hlt) => [pos Hmid].
+  move: (@splitPosition _ int.2 before true Hlt) => [pos Hmid].
   move: (splitInterval_spec Hmid).
   case: (splitInterval Hmid)
     => [[[id0 i0] [id1 i1]] [/= H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
@@ -424,22 +424,25 @@ Proof.
      by apply/ltnW).
 Defined.
 
-Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
-  (reg : PhysReg) (pos : nat) : SState pre P SSMorphHasLen unit.
+(** If [pos] is None, it means "split at the end of its lifetime hole". *)
+Definition splitAssignedIntervalForReg {pre P} `{W : HasWork P}
+  (reg : PhysReg) (pos : option nat) (trueForActives : bool) :
+  SState pre P SSMorphHasLen unit.
 Proof.
   rewrite /SState.
   apply: mkIState => ssi.
   apply: (tt, _).
 
   case: ssi => desc holds st.
-  have intids := intervals_for_reg (active desc) reg.
+  have intids := intervals_for_reg (if trueForActives
+                                    then active desc
+                                    else inactive desc) reg.
   case: W => /(_ pre desc holds).
   case=> /=; case.
   case: desc => /= ? intervals0 ? ? active0 ? ? in holds intids st *.
 
   case: intids => //= [|aid _].
-    (* jww (2014-11-11): Evidence is needed that there is indeed an
-       interval to be split. *)
+    (* jww (2014-11-11): What to do if there is no interval to split? *)
     admit.
 
   move=> *.
@@ -451,7 +454,8 @@ Proof.
     admit.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
-  move: (@splitPosition _ int.2 (Some pos) Hlt) => [pos' Hmid].
+  move: (@splitPosition _ int.2 pos false Hlt)
+    => [pos' Hmid].
   move: (splitInterval_spec Hmid).
   case: (splitInterval Hmid)
     => [[[id0 i0] [id1 i1]] [/= H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
@@ -486,5 +490,13 @@ Proof.
   try apply Build_SSMorph;
   rewrite ?insert_size ?size_map //; auto.
 Admitted.
+
+Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
+  (reg : PhysReg) (pos : nat) : SState pre P SSMorphHasLen unit :=
+  splitAssignedIntervalForReg reg (Some pos) true.
+
+Definition splitAnyInactiveIntervalForReg {pre P} `{W : HasWork P}
+  (reg : PhysReg) : SState pre P SSMorphHasLen unit :=
+  splitAssignedIntervalForReg reg None false.
 
 End MSSMorph.
