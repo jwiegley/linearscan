@@ -1137,7 +1137,7 @@ _LinearScan__transportVecBounds pos m n _top_assumption_ =
     case _top_assumption_0 of {
      (,) x x0 -> _evar_0_ x x0}}
   in
-  LinearScan.Utils.list_rect ([]) (unsafeCoerce _evar_0_) m _top_assumption_
+  LinearScan.Utils.list_rect [] (unsafeCoerce _evar_0_) m _top_assumption_
 
 _LinearScan__boundedSing :: Range.UsePos -> LinearScan__Coq_boundedRange
 _LinearScan__boundedSing upos =
@@ -1367,27 +1367,27 @@ _LinearScan__determineIntervals maxVirtReg blocks =
      s2 = _LinearScan__MLS__MS__packScanState
             (LinearScan__MLS__MS__Build_ScanStateDesc
             (_LinearScan__MLS__MS__nextInterval
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] []))
             (_LinearScan__MLS__MS__intervals
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] [])) regs0
             (_LinearScan__MLS__MS__unhandled
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] []))
             (_LinearScan__MLS__MS__active
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] []))
             (_LinearScan__MLS__MS__inactive
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] []))
             (_LinearScan__MLS__MS__handled
-              (LinearScan__MLS__MS__Build_ScanStateDesc 0 ([])
+              (LinearScan__MLS__MS__Build_ScanStateDesc 0 []
               (Data.List.replicate _MyMachine__maxReg Prelude.Nothing) [] []
               [] [])))}
     in

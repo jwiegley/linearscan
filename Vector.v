@@ -307,15 +307,15 @@ Extract Inductive fin => "Prelude.Int" [""].
 
 Extract Constant Vec "a" => "[a]".
 
-Extract Inlined Constant vnil     => "([])".
-Extract Inlined Constant vsing    => "([])".
-Extract Inlined Constant vcons    => "((:))".
+Extract Inlined Constant vnil     => "[]".
+Extract Inlined Constant vsing    => "[]".
+Extract Inlined Constant vcons    => "(:)".
 Extract Inlined Constant vshiftin => "LinearScan.Utils.snoc".
 Extract Inlined Constant vreplace => "LinearScan.Utils.set_nth".
 Extract Inlined Constant vec_rect => "LinearScan.Utils.list_rect".
 Extract Inlined Constant vconst   => "Data.List.replicate".
 Extract Inlined Constant vfoldl   => "LinearScan.Utils.vfoldl'".
-Extract Inlined Constant vapp     => "(Prelude.(++))".
+Extract Inlined Constant vapp     => "Prelude.(++)".
 Extract Inlined Constant vmap     => "LinearScan.Utils.vmap".
 Extract Inlined Constant vnth     => "LinearScan.Utils.nth".
 
