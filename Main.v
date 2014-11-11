@@ -12,8 +12,6 @@ Require Import NonEmpty.
 Require Import Blocks.
 Require Import Machine.
 
-Module V := Coq.Vectors.Vector.
-
 Module MyMachine <: Machine.
 
 Definition maxReg := 32.

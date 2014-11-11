@@ -244,7 +244,7 @@ Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  match (unhandled sd) with
+  match unhandled sd with
   | x :: xs =>
     let H := list_cons_nonzero (erefl (x :: xs)) in
     let ssinfo := {| thisDesc  := sd

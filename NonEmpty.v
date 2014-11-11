@@ -83,10 +83,8 @@ Proof. induction xs; auto. Qed.
 
 Section Sorted.
 
-Require Import Coq.Relations.Relations.
-
 Variable A : Set.
-Variable R : relation A.
+Variable R : A -> A -> Prop.
 Context `{H : Transitive A R}.
 
 Inductive NE_Forall (P : A -> Prop) : NonEmpty A -> Prop :=

@@ -1,6 +1,8 @@
 Require Import Lib.
 Require Import NonEmpty.
 
+Require Import Coq.Classes.RelationClasses.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -28,7 +30,7 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
-Program Instance upos_lt_trans : RelationClasses.Transitive upos_lt.
+Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific

@@ -22,11 +22,13 @@ Module SortednessProof.
 (* SSReflect doesn't provide a scheme for determining sortedness, so we
    confine the import of the Sorted library to this section. *)
 
+Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Sorted.
+Require Import Ssreflect.seq.
 
 Lemma Forall_widen : forall n x (xs : list (fin n * nat)),
-  List.Forall (lebf snd x) xs
-    -> List.Forall (lebf snd (widen_id (fst x), snd x))
+  Forall (lebf snd x) xs
+    -> Forall (lebf snd (widen_id (fst x), snd x))
                    [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ? x xs.
@@ -36,8 +38,8 @@ Proof.
 Qed.
 
 Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
-  Sorted.StronglySorted (lebf snd) xs
-    -> Sorted.StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
+  StronglySorted (lebf snd) xs
+    -> StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
@@ -46,8 +48,8 @@ Proof.
 Qed.
 
 Lemma Forall_insert_spec : forall a x (xs : seq (a * nat)) z,
-  List.Forall (lebf snd x) xs -> lebf snd x z
-    -> List.Forall (lebf snd x) (insert (lebf snd ^~ z) z xs).
+  Forall (lebf snd x) xs -> lebf snd x z
+    -> Forall (lebf snd x) (insert (lebf snd ^~ z) z xs).
 Proof.
   move=> a x.
   elim=> /= [|y ys IHys] z H Hlt.
@@ -60,8 +62,8 @@ Proof.
 Qed.
 
 Lemma StronglySorted_insert_spec a (l : list (a * nat)) : forall z,
-  Sorted.StronglySorted (lebf snd) l
-    -> Sorted.StronglySorted (lebf snd) (insert (lebf snd ^~ z) z l).
+  StronglySorted (lebf snd) l
+    -> StronglySorted (lebf snd) (insert (lebf snd ^~ z) z l).
 Proof.
   move=> z.
   elim: l => /= [|x xs IHxs] Hsort.
@@ -78,7 +80,7 @@ Proof.
     unfold lebf in *.
     apply ltnW. rewrite ltnNge.
     apply/negP/eqP. by rewrite L.
-  apply List.Forall_impl with (P := (fun m : a * nat => lebf snd x m)).
+  apply Forall_impl with (P := (fun m : a * nat => lebf snd x m)).
     rewrite /lebf.
     move=> a0 Hlt.
     move: L => /negP.
@@ -91,7 +93,7 @@ Proof.
 Qed.
 
 Theorem unhandled_sorted `(st : ScanState sd) :
-  Sorted.StronglySorted (lebf snd) (unhandled sd).
+  StronglySorted (lebf snd) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil". by constructor.
