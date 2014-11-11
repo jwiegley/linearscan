@@ -265,6 +265,16 @@ Proof.
   by rewrite ltnn.
 Qed.
 
+Lemma four_points : forall n m o p,
+  (n < m < o) && (o < p) -> (m - n) + (p - o) < p - n.
+Proof.
+  move=> n m o p /andP [/andP [H1 H2] H3].
+  rewrite -ltn_subRL -subnDA.
+  apply ltn_sub2l; rewrite subnKC //;
+    try exact: ltnW.
+  exact: (ltn_trans H2).
+Qed.
+
 Definition widen_id {n} := widen_ord (leqnSn n).
 Arguments widen_id [n] i /.
 Definition widen_fst {n a} p := (@widen_id n (@fst _ a p), snd p).

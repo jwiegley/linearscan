@@ -28,6 +28,9 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
+Lemma upos_lt_trans : transitive upos_lt.
+Proof. elim=> //= *; exact: ltn_trans. Defined.
+
 Section EqUpos.
 
 Variables (T : eqType) (x0 : T).
@@ -58,9 +61,6 @@ Definition UsePos_eqType (A : eqType) := Equality.Pack upos_eqMixin UsePos.
 
 End EqUpos.
 
-Program Instance upos_lt_trans : RelationClasses.Transitive upos_lt.
-Obligation 1. exact: (ltn_trans H). Qed.
-
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
@@ -84,7 +84,8 @@ Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
 Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos) :
   UsePosSublistsOf f l.
 Proof.
-  elim/ne_ind Heqe: l => [x|x xs].
+  destruct l as [x xs].
+  destruct xs as [|y ys] eqn:Heqe.
     case Heqef: (f x).
       exists (Some [::: x], None) => /=.
       split; [ by [] | by apply/andP ].
@@ -93,8 +94,7 @@ Proof.
 
   case Heqef: (f x).
   - Case "f x = true".
-    destruct (usePosSpan f xs)
-      as [[[[y1 l1]| ] [[y2 l2]| ]] Hsublists];
+    destruct (usePosSpan f xs) as [[[[y1 l1]| ] [[y2 l2]| ]] Hsublists];
     inversion Hsublists; clear Hsublists;
     inversion H; clear H; simpl in *.
 
@@ -111,10 +111,9 @@ Proof.
       by split; auto; apply/andP.
 
   - Case "f x = false".
-    eexists (None, Some (NE x xs)).
+    eexists (None, Some [::: x & NE_to_list xs]).
     by split; try apply negbT.
-Admitted.
-(* Defined. *)
+Defined.
 
 Lemma usePosSpan_spec (f : UsePos -> bool) (l : NonEmpty UsePos) :
   forall res, res = usePosSpan f l -> res.1 <> (None, None).
@@ -427,7 +426,7 @@ Proof.
   - apply (Range_append_fst r).
 Defined.
 
-Lemma rewrite_ups_in_all : forall {rd l1 f},
+Definition rewrite_ups_in_all : forall {rd l1 f},
   ups rd = l1 -> all f l1 -> all f (ups rd).
 Proof. by move=> rd l1 f ->. Defined.
 
@@ -500,16 +499,6 @@ Proof.
     by move: H H0 Hf => <- /negbTE /= ->.
 Defined.
 
-Lemma four_points : forall n m o p,
-  (n < m < o) && (o < p) -> (m - n) + (p - o) < p - n.
-Proof.
-  move=> n m o p /andP [/andP [H1 H2] H3].
-  rewrite -ltn_subRL -subnDA.
-  apply ltn_sub2l; rewrite subnKC //;
-    try exact: ltnW.
-  exact: (ltn_trans H2).
-Qed.
-
 Lemma splitRange_spec (f : UsePos -> bool) `(r : Range rd)
   (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
   let: exist (r1, r2) Hdr := splitRange r Hf Hl in
@@ -525,7 +514,6 @@ Proof.
   by move: (Range_bounded r2.2).
 Qed.
 
-(*
 Module RangeTests.
 
 Module Import U := UsePosNotations.
@@ -569,24 +557,31 @@ Example lt_1_9 : 1 < 9. done. Qed.
 Definition odd_1 : odd 1. done. Qed.
 
 Example testRangeSpan_1 :
-  testRangeSpan odd_1 lt_1_9 1 = (None, Some [::: (|1|) & [:: (|3|); (|5|); (|7|)]]).
+  testRangeSpan odd_1 lt_1_9 1 =
+    (None, Some [::: (|1|) & [:: (|3|); (|5|); (|7|)]]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_2 :
-  testRangeSpan odd_1 lt_1_9 3 = (Some [::: (|1|)], Some [(|3|); (|5|); (|7|)]).
+  testRangeSpan odd_1 lt_1_9 3 =
+    (Some [::: (|1|)], Some [::: (|3|) & [:: (|5|); (|7|)]]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_3 :
-  testRangeSpan odd_1 lt_1_9 5 = (Some [(|1|); (|3|)], Some [(|5|); (|7|)]).
-Proof. reflexivity. Qed.
+  testRangeSpan odd_1 lt_1_9 5 =
+    (Some [::: (|1|) & [:: (|3|)]], Some [::: (|5|) & [:: (|7|)]]).
+Proof.
+  rewrite /testRangeSpan. simpl.
+
+  reflexivity. Qed.
 
 Example testRangeSpan_4 :
-  testRangeSpan odd_1 lt_1_9 7 = (Some [(|1|); (|3|); (|5|)], Some [::: (|7|)]).
+  testRangeSpan odd_1 lt_1_9 7 =
+    (Some [::: (|1|) & [:: (|3|); (|5|)]], Some [::: (|7|)]).
 Proof. reflexivity. Qed.
 
 Example testRangeSpan_5 :
-  testRangeSpan odd_1 lt_1_9 9 = (Some [(|1|); (|3|); (|5|); (|7|)], None).
+  testRangeSpan odd_1 lt_1_9 9 =
+    (Some [::: (|1|) & [:: (|3|); (|5|); (|7|)]], None).
 Proof. reflexivity. Qed.
 
 End RangeTests.
-*)

@@ -13,20 +13,16 @@ Unset Printing Implicit Defensive.
 
 (** ** NonEmpty lists *)
 
-Inductive NonEmpty a := NE of a & seq a.
+Definition NonEmpty a := (a * seq a)%type.
 
-Arguments NE [_] _ _.
-
-Hint Constructors NonEmpty.
-
-Notation "[ ::: x1 ]" := (NE x1 nil)
+Notation "[ ::: x1 ]" := (x1, nil)
   (at level 0, format "[ :::  x1 ]") : seq_scope.
 
-Notation "[ ::: x & s ]" := (NE x s)
+Notation "[ ::: x & s ]" := (x, s)
   (at level 0, only parsing) : seq_scope.
 
 Definition NE_to_list {a} (ne : NonEmpty a) : list a :=
-  let: NE x xs := ne in x :: xs.
+  let: (x, xs) := ne in x :: xs.
 
 Coercion NE_to_list : NonEmpty >-> list.
 
@@ -37,29 +33,29 @@ Arguments NE_from_list [a] l _.
 
 Definition ne_ind : forall a (P : NonEmpty a -> Type),
   (forall x : a, P [::: x])
-    -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & l])
+    -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & NE_to_list l])
     -> forall l : NonEmpty a, P l.
 Proof.
   move=> a P H1 H2; case=> [x xs].
   elim: xs => [|y ys IHys] in x *.
     exact: H1.
-  exact/(H2 x (NE y ys))/IHys.
+  exact/(H2 x (y, ys))/IHys.
 Defined.
 
 Definition NE_length {a} (ne : NonEmpty a) : nat := (size ne).+1.
 Arguments NE_length [a] ne /.
 
-Definition NE_head {a} (ne : NonEmpty a) := let: NE x _ := ne in x.
+Definition NE_head {a} (ne : NonEmpty a) := let: (x, _) := ne in x.
 Arguments NE_head [a] ne /.
 
-Definition NE_last {a} (ne : NonEmpty a) := let: NE x xs := ne in last x xs.
+Definition NE_last {a} (ne : NonEmpty a) := let: (x, xs) := ne in last x xs.
 Arguments NE_last [a] ne /.
 
 Lemma last_ne : forall a x (xs : NonEmpty a), NE_last xs = last x xs.
 Proof. by move=> a x; case=> [y ys]. Qed.
 
 Definition NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
-  let: NE x xs := ne in NE (f x) (map f xs).
+  let: (x, xs) := ne in (f x, map f xs).
 Arguments NE_map [a b] f ne /.
 
 Definition NE_fold_left {a b} (f : a -> b -> a) (ne : NonEmpty b) (z : a) :=
@@ -67,8 +63,8 @@ Definition NE_fold_left {a b} (f : a -> b -> a) (ne : NonEmpty b) (z : a) :=
 Arguments NE_fold_left [a b] f ne z /.
 
 Definition NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a :=
-  let: NE x1 xs1 := l1 in
-  let: NE x2 xs2 := l2 in NE x1 (xs1 ++ x2 :: xs2).
+  let: (x1, xs1) := l1 in
+  let: (x2, xs2) := l2 in (x1, xs1 ++ x2 :: xs2).
 Arguments NE_append [a] l1 l2 /.
 
 Lemma NE_head_append_spec : forall {a} {xs ys : NonEmpty a},
@@ -91,12 +87,12 @@ Variable A : eqType.
 Variable R : A -> A -> bool.
 
 Definition NE_Forall (P : A -> bool) (ne : NonEmpty A) : bool :=
-  let: NE x xs := ne in P x && all P xs.
+  let: (x, xs) := ne in P x && all P xs.
 Arguments NE_Forall P ne /.
 
 Lemma NE_Forall_head : forall P (xs : NonEmpty A),
   NE_Forall P xs -> P (NE_head xs).
-Proof. by move=> P; case=> [x xs] /= /andP [H1 _]. Qed.
+Proof. by move=> P; case=> [x xs] /= /andP [H1 _]. Defined.
 
 Lemma NE_Forall_last : forall P (xs : NonEmpty A),
   NE_Forall P xs -> P (NE_last xs).
@@ -105,7 +101,7 @@ Proof.
   move: H2 => /allP /(_ (last x l)) /=.
   case: l => //= => [y ys] => H2.
   exact/H2/mem_last.
-Qed.
+Defined.
 
 Lemma NE_Forall_append : forall (P : A -> bool) xs ys,
    NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys).
@@ -131,10 +127,10 @@ Proof.
   - rewrite all_cat -cat1s all_cat -[z1 :: _]cat1s all_cat /=.
     move/and5P=> [H1 H2 H3 /andP [H4 H5] /andP [/andP [H6 H7] H8]].
     by split; apply/and3P.
-Qed.
+Defined.
 
 Definition NE_StronglySorted (ne : NonEmpty A) : Prop :=
-  let: NE x xs := ne in all id (pairmap R x xs).
+  let: (x, xs) := ne in all id (pairmap R x xs).
 Arguments NE_StronglySorted ne /.
 
 Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
@@ -146,7 +142,7 @@ Proof.
   case=> [y ys] /=.
   rewrite pairmap_cat all_cat /=.
   by move/and3P=> [H1 H2 H3].
-Qed.
+Defined.
 
 Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2) -> R (NE_last l1) (NE_head l2).
@@ -157,14 +153,14 @@ Proof.
   elim/ne_ind=> [y|y ys IHys] //=;
   rewrite pairmap_cat all_cat /=;
   by move/and3P => [? ? ?].
-Qed.
+Defined.
 
 End Sorted.
 
 Section Membership.
 
 Definition NE_member {a : eqType} (z : a) (ne : NonEmpty a) : Prop :=
-  let: NE x xs := ne in (x == z) || (z \in xs).
+  let: (x, xs) := ne in (x == z) || (z \in xs).
 Arguments NE_member [a] z ne /.
 
 Lemma NE_Forall_member_spec {a : eqType} (z : a) (ne : NonEmpty a) :
@@ -174,6 +170,6 @@ Proof.
     by subst.
   move/allP in H2.
   exact: H2.
-Qed.
+Defined.
 
 End Membership.
