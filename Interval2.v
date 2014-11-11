@@ -1,5 +1,5 @@
 Require Import Lib.
-Require Import NonEmpty2.
+Require Import NonEmpty3.
 
 Require Export Range2.
 
@@ -125,8 +125,8 @@ Admitted.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
   let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
-  has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
-      (NE_to_list (rds i)).
+  has (fun (x : RangeSig) => has (f x) (list_of_ne (rds j)))
+      (list_of_ne (rds i)).
 
 Definition intervalIntersectionPoint `(Interval i) `(Interval j) : option nat :=
   NE_fold_left

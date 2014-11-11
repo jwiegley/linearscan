@@ -31,7 +31,7 @@ Proof. move=> H; constructor; case: l => // [|x xs] in H *. Defined.
 
 Arguments NE_from_list [a] l _.
 
-Definition ne_ind : forall a (P : NonEmpty a -> Type),
+Definition ne_rect : forall a (P : NonEmpty a -> Type),
   (forall x : a, P [::: x])
     -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & NE_to_list l])
     -> forall l : NonEmpty a, P l.
@@ -41,6 +41,16 @@ Proof.
     exact: H1.
   exact/(H2 x (y, ys))/IHys.
 Defined.
+
+Definition ne_rec : forall a (P : NonEmpty a -> Set),
+  (forall x : a, P [::: x])
+    -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & NE_to_list l])
+    -> forall l : NonEmpty a, P l := [eta ne_rect].
+
+Definition ne_ind : forall a (P : NonEmpty a -> Prop),
+  (forall x : a, P [::: x])
+    -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & NE_to_list l])
+    -> forall l : NonEmpty a, P l := [eta ne_rect].
 
 Definition NE_length {a} (ne : NonEmpty a) : nat := (size ne).+1.
 Arguments NE_length [a] ne /.

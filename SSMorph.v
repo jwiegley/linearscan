@@ -434,6 +434,9 @@ Proof.
   apply: (tt, _).
 
   case: ssi => desc holds st.
+  (* There is an opportunity here for optimization: finding the best inactive
+     interval to split, for example one with a large lifetime hole, or one
+     that does not cover loops. *)
   have intids := intervals_for_reg (if trueForActives
                                     then active desc
                                     else inactive desc) reg.
