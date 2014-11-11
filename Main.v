@@ -58,31 +58,31 @@ Extract Inlined Constant cat       => "(Prelude.++)".
 (* Extract Inlined Constant eq_op     => "(Prelude.==)". *)
 Extract Inlined Constant eqb       => "(Prelude.==)".
 Extract Inlined Constant eqn       => "(Prelude.==)".
-Extract Inlined Constant filter    => "(Prelude.filter)".
+Extract Inlined Constant filter    => "Prelude.filter".
 Extract Inlined Constant foldl     => "Data.List.foldl'".
 Extract Inlined Constant foldr     => "Prelude.foldr".
-Extract Inlined Constant fst       => "(Prelude.fst)".
+Extract Inlined Constant fst       => "Prelude.fst".
 (* Extract Inlined Constant funcomp   => "(Prelude..)". *)
-(* Extract Inlined Constant id        => "(Prelude.id)". *)
-Extract Inlined Constant has       => "(Data.List.any)".
+(* Extract Inlined Constant id        => "Prelude.id". *)
+Extract Inlined Constant has       => "Data.List.any".
 Extract Inlined Constant rem       => "(Prelude.const Data.List.delete)".
-Extract Inlined Constant length    => "(Data.List.length)".
+Extract Inlined Constant length    => "Data.List.length".
 Extract Inlined Constant leq       => "(Prelude.<=)".
-Extract Inlined Constant map       => "(Prelude.map)".
-Extract Inlined Constant maxn      => "(Prelude.max)".
-Extract Inlined Constant minn      => "(Prelude.min)".
+Extract Inlined Constant map       => "Prelude.map".
+Extract Inlined Constant maxn      => "Prelude.max".
+Extract Inlined Constant minn      => "Prelude.min".
 Extract Inlined Constant minus     => "(Prelude.-)".
 Extract Inlined Constant mult      => "(Prelude.*)".
-Extract Inlined Constant negb      => "(Prelude.not)".
+Extract Inlined Constant negb      => "Prelude.not".
 Extract Inlined Constant orb       => "(Prelude.||)".
 Extract Inlined Constant plus      => "(Prelude.+)".
 Extract Inlined Constant tail_plus => "(Prelude.+)".
-Extract Inlined Constant predn     => "(Prelude.pred)".
+Extract Inlined Constant predn     => "Prelude.pred".
 Extract Inlined Constant proj1_sig => "".
-Extract Inlined Constant projT1    => "(Prelude.fst)".
-Extract Inlined Constant safe_hd   => "(Prelude.head)".
-Extract Inlined Constant size      => "(Data.List.length)".
-Extract Inlined Constant snd       => "(Prelude.snd)".
+Extract Inlined Constant projT1    => "Prelude.fst".
+Extract Inlined Constant safe_hd   => "Prelude.head".
+Extract Inlined Constant size      => "Data.List.length".
+Extract Inlined Constant snd       => "Prelude.snd".
 Extract Inlined Constant subn      => "(Prelude.-)".
 
 (* Avoid extracting this function, which has no computational value, but Coq

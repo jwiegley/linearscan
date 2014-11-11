@@ -25,7 +25,7 @@ unsafeCoerce = IOExts.unsafeCoerce
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
-nat_of_ord :: Prelude.Int -> (Prelude.Int) -> Prelude.Int
+nat_of_ord :: Prelude.Int -> Prelude.Int -> Prelude.Int
 nat_of_ord n i =
   case i of {
     m -> m}
@@ -37,7 +37,7 @@ ordinal_subType n =
     case unsafeCoerce u of {
       x -> k_S x __})
 
-ordinal_eqMixin :: Prelude.Int -> Eqtype.Equality__Coq_mixin_of (Prelude.Int)
+ordinal_eqMixin :: Prelude.Int -> Eqtype.Equality__Coq_mixin_of Prelude.Int
 ordinal_eqMixin n =
   Eqtype.Equality__Mixin (\x y ->
     Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (nat_of_ord n x))
@@ -51,11 +51,11 @@ ordinal_eqType :: Prelude.Int -> Eqtype.Equality__Coq_type
 ordinal_eqType n =
   unsafeCoerce (ordinal_eqMixin n)
 
-widen_ord :: Prelude.Int -> Prelude.Int -> (Prelude.Int) -> (Prelude.Int)
+widen_ord :: Prelude.Int -> Prelude.Int -> Prelude.Int -> Prelude.Int
 widen_ord n m i =
    (nat_of_ord n i)
 
-ord_max :: Prelude.Int -> (Prelude.Int)
+ord_max :: Prelude.Int -> Prelude.Int
 ord_max n' =
    n'
 

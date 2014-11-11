@@ -97,7 +97,7 @@ rangesIntersect x y =
 rangeIntersectionPoint :: RangeDesc -> RangeDesc -> Prelude.Maybe Prelude.Int
 rangeIntersectionPoint x y =
   case rangesIntersect x y of {
-   Prelude.True -> Prelude.Just ((Prelude.min) (rbeg x) (rbeg y));
+   Prelude.True -> Prelude.Just (Prelude.min (rbeg x) (rbeg y));
    Prelude.False -> Prelude.Nothing}
 
 findRangeUsePos :: RangeDesc -> (UsePos -> Prelude.Bool) -> Prelude.Maybe

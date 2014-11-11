@@ -58,8 +58,8 @@ intervalExtent d =
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
   let {f = \x y -> Range.rangesIntersect ( x) ( y)} in
-  (Data.List.any) (\x ->
-    (Data.List.any) (f x) (NonEmpty0.coq_NE_to_list (rds j)))
+  Data.List.any (\x ->
+    Data.List.any (f x) (NonEmpty0.coq_NE_to_list (rds j)))
     (NonEmpty0.coq_NE_to_list (rds i))
 
 intervalIntersectionPoint :: IntervalDesc -> IntervalDesc -> Prelude.Maybe
@@ -93,7 +93,7 @@ findIntervalUsePos i f =
 
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
-  Lib.option_map (Ssrfun.funcomp () Range.uloc (Prelude.snd))
+  Lib.option_map (Ssrfun.funcomp () Range.uloc Prelude.snd)
     (findIntervalUsePos d (\u ->
       (Prelude.<=) (Prelude.succ pos) (Range.uloc u)))
 
@@ -104,7 +104,7 @@ firstUsePos d =
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
-  Lib.option_map (Ssrfun.funcomp () Range.uloc (Prelude.snd))
+  Lib.option_map (Ssrfun.funcomp () Range.uloc Prelude.snd)
     (findIntervalUsePos d Range.regReq)
 
 lastUsePos :: IntervalDesc -> Prelude.Int
@@ -116,8 +116,8 @@ splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Int
 splitPosition d before =
   let {initial = firstUsePos d} in
   let {final = lastUsePos d} in
-  (Prelude.max) (Prelude.succ initial)
-    ((Prelude.min) final
+  Prelude.max (Prelude.succ initial)
+    (Prelude.min final
       (Lib.fromMaybe final (Lib.option_choose before (firstUseReqReg d))))
 
 intervalSpan :: (NonEmpty0.NonEmpty Range.RangeDesc) -> Prelude.Int ->

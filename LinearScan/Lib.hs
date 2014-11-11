@@ -50,7 +50,7 @@ list_membership a l =
   case l of {
    [] -> [];
    (:) x xs -> (:) x
-    ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
+    (Prelude.map (exist_in_cons a x xs) (list_membership a xs))}
 
 lebf :: (a1 -> Prelude.Int) -> a1 -> a1 -> Prelude.Bool
 lebf f n m =
@@ -60,13 +60,13 @@ sumlist :: ([] Prelude.Int) -> Prelude.Int
 sumlist =
   Data.List.foldl' (Prelude.+) 0
 
-widen_id :: Prelude.Int -> (Prelude.Int) -> (Prelude.Int)
+widen_id :: Prelude.Int -> Prelude.Int -> Prelude.Int
 widen_id n =
   Fintype.widen_ord n (Prelude.succ n)
 
-widen_fst :: Prelude.Int -> ((,) (Prelude.Int) a1) -> (,) (Prelude.Int) a1
+widen_fst :: Prelude.Int -> ((,) Prelude.Int a1) -> (,) Prelude.Int a1
 widen_fst n p =
-  (,) (widen_id n ((Prelude.fst) p)) ((Prelude.snd) p)
+  (,) (widen_id n (Prelude.fst p)) (Prelude.snd p)
 
 insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
 insert p z l =
