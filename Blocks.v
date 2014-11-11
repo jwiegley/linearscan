@@ -51,7 +51,7 @@ Record boundedRangeVec (pos : nat) := {
   regs : Vec (boundedTriple pos) maxReg
 }.
 
-Lemma transportVecBounds (pos m : nat) `(Hlt : pos < n) :
+Definition transportVecBounds (pos m : nat) `(Hlt : pos < n) :
   Vec (boundedTriple n) m -> Vec (boundedTriple pos) m.
 Proof.
   elim/vec_rect=> [|sz [p [[rd r Hr]| ]] xs IHxs].
@@ -65,14 +65,14 @@ Proof.
   - constructor; last exact: IHxs.
     split. apply p.
     exact: None.
-Qed.
+Defined.
 
-Lemma boundedTransport (pos : nat) `(Hlt : pos < n) :
+Definition boundedTransport (pos : nat) `(Hlt : pos < n) :
   boundedRangeVec n -> boundedRangeVec pos.
 Proof.
   case=> Hvars Hregs.
   split; exact: (transportVecBounds Hlt).
-Qed.
+Defined.
 
 Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos.
 Proof. eexists; [ by exact: R_Sing | by [] ]. Defined.

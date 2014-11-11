@@ -182,12 +182,9 @@ Proof.
       by constructor.
     constructor. by [].
     apply NE_Forall_impl
-      with (P := (fun y : UsePos => a < y))
-           (R := upos_lt).
-    + exact: upos_lt_trans.
-    + move=> *.
-      exact: (ltn_trans H0).
-    + by [].
+      with (P := (fun y : UsePos => a < y)); last by [].
+    move=> *.
+    exact: (ltn_trans H0).
   - Case "R_Extend". by [].
 Qed.
 

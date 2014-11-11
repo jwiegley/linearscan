@@ -1,11 +1,11 @@
-Require Import Coq.Classes.RelationClasses.
-
 Require Import Lib.
 Require Import NonEmpty.
-Require Import Hask.IEndo.
-Require Import Hask.IApplicative.
-Require Import Hask.IMonad.
-Require Import Hask.IState.
+Require Import IEndo.
+Require Import IApplicative.
+Require Import IMonad.
+Require Import IState.
+
+Require Import Coq.Classes.RelationClasses.
 
 Require Export ScanState.
 

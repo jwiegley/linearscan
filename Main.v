@@ -97,3 +97,5 @@ Separate Extraction LinearScan.allocateRegisters
 
 (* Show which axioms we depend on for this development. *)
 Print Assumptions LinearScan.allocateRegisters.
+
+(* Print Libraries. *)

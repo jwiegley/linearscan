@@ -1,8 +1,3 @@
-Require Import Coq.Classes.RelationClasses.
-Require Import Coq.Lists.List.
-Require Import Coq.Sorting.Sorted.
-Require Import Coq.Relations.Relations.
-
 Require Import Ssreflect.ssreflect.
 Require Import Ssreflect.ssrfun.
 Require Import Ssreflect.ssrbool.
@@ -87,6 +82,8 @@ Lemma NE_last_append_spec : forall {a} {xs ys : NonEmpty a},
 Proof. induction xs; auto. Qed.
 
 Section Sorted.
+
+Require Import Coq.Relations.Relations.
 
 Variable A : Set.
 Variable R : relation A.

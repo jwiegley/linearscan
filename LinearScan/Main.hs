@@ -13,7 +13,6 @@ import qualified LinearScan.IMonad as IMonad
 import qualified LinearScan.IState as IState
 import qualified LinearScan.Interval as Interval
 import qualified LinearScan.Lib as Lib
-import qualified LinearScan.List0 as List0
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
@@ -1007,15 +1006,13 @@ _LinearScan__linearScan_func x =
    linearScan0 = \sd0 ->
     let {y = (,) sd0 __} in _LinearScan__linearScan_func ( y)}
   in
-  let {
-   filtered_var = List0.destruct_list (_LinearScan__MLS__MS__unhandled sd)}
-  in
+  let {filtered_var = _LinearScan__MLS__MS__unhandled sd} in
   case filtered_var of {
-   Prelude.Just s ->
+   [] -> sd;
+   (:) x0 xs ->
     let {ssinfo = LinearScan__Build_SSInfo sd __} in
     case IState.runIState (_LinearScan__handleInterval sd) ssinfo of {
-     (,) x0 ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo')};
-   Prelude.Nothing -> sd}
+     (,) x1 ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo')}}
 
 _LinearScan__linearScan :: LinearScan__MLS__MS__ScanStateDesc ->
                            LinearScan__MLS__MS__ScanStateDesc

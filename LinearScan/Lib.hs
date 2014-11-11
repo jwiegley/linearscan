@@ -52,6 +52,10 @@ list_membership a l =
    (:) x xs -> (:) x
     ((Prelude.map) (exist_in_cons a x xs) (list_membership a xs))}
 
+lebf :: (a1 -> Prelude.Int) -> a1 -> a1 -> Prelude.Bool
+lebf f n m =
+  (Prelude.<=) (f n) (f m)
+
 sumlist :: ([] Prelude.Int) -> Prelude.Int
 sumlist =
   Data.List.foldl' (Prelude.+) 0
@@ -72,8 +76,4 @@ insert p z l =
     case p x of {
      Prelude.True -> (:) x (insert p z xs);
      Prelude.False -> (:) z ((:) x xs)}}
-
-lebf :: (a1 -> Prelude.Int) -> a1 -> a1 -> Prelude.Bool
-lebf f n m =
-  (Prelude.<=) (f n) (f m)
 

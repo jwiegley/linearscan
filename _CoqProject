@@ -1,4 +1,4 @@
--I . -R Hask Hask -dont-load-proofs
+-I . -dont-load-proofs
 Allocate.v
 Blocks.v
 Interval.v
@@ -11,3 +11,7 @@ SSMorph.v
 ScanState.v
 Spec.v
 Vector.v
+IEndo.v
+IApplicative.v
+IMonad.v
+IState.v

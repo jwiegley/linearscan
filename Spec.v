@@ -17,6 +17,13 @@ Module Import MS := MScanState Mach.
     specification the linear register allocation algorithm, but which are not
     directly used in implementing the algorithm. *)
 
+Module SortednessProof.
+
+(* SSReflect doesn't provide a scheme for determining sortedness, so we
+   confine the import of the Sorted library to this section. *)
+
+Require Import Coq.Sorting.Sorted.
+
 Lemma Forall_widen : forall n x (xs : list (fin n * nat)),
   List.Forall (lebf snd x) xs
     -> List.Forall (lebf snd (widen_id (fst x), snd x))
@@ -29,8 +36,8 @@ Proof.
 Qed.
 
 Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
-  StronglySorted (lebf snd) xs
-    -> StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
+  Sorted.StronglySorted (lebf snd) xs
+    -> Sorted.StronglySorted (lebf snd) [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
@@ -38,24 +45,70 @@ Proof.
   by apply Forall_widen; inv H.
 Qed.
 
+Lemma Forall_insert_spec : forall a x (xs : seq (a * nat)) z,
+  List.Forall (lebf snd x) xs -> lebf snd x z
+    -> List.Forall (lebf snd x) (insert (lebf snd ^~ z) z xs).
+Proof.
+  move=> a x.
+  elim=> /= [|y ys IHys] z H Hlt.
+    by constructor.
+  rewrite /insert.
+  case L: (lebf snd y z).
+    constructor. by inv H.
+    by apply: IHys; inv H.
+  by constructor.
+Qed.
+
+Lemma StronglySorted_insert_spec a (l : list (a * nat)) : forall z,
+  Sorted.StronglySorted (lebf snd) l
+    -> Sorted.StronglySorted (lebf snd) (insert (lebf snd ^~ z) z l).
+Proof.
+  move=> z.
+  elim: l => /= [|x xs IHxs] Hsort.
+    by constructor.
+  inv Hsort. clear Hsort.
+  specialize (IHxs H1).
+  rewrite /insert.
+  case L: (lebf snd x z).
+    constructor. exact: IHxs.
+    exact: Forall_insert_spec.
+  constructor.
+    by constructor.
+  constructor.
+    unfold lebf in *.
+    apply ltnW. rewrite ltnNge.
+    apply/negP/eqP. by rewrite L.
+  apply List.Forall_impl with (P := (fun m : a * nat => lebf snd x m)).
+    rewrite /lebf.
+    move=> a0 Hlt.
+    move: L => /negP.
+    rewrite /lebf.
+    move=> /negP.
+    rewrite -ltnNge.
+    move=> /ltnW L.
+    exact: (leq_trans L).
+  by [].
+Qed.
+
 Theorem unhandled_sorted `(st : ScanState sd) :
-  StronglySorted (lebf snd) (unhandled sd).
+  Sorted.StronglySorted (lebf snd) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case.
-  - Case "ScanState_nil". constructor.
+  - Case "ScanState_nil". by constructor.
 
   - Case "ScanState_newUnhandled".
-    rewrite /unh.
-    by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
+    exact/StronglySorted_insert_spec/StronglySorted_widen/IHst.
 
-  - Case "ScanState_setInterval". apply IHst.
-  - Case "ScanState_setFixedIntervals". apply IHst.
+  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". inv IHst.
-  - Case "ScanState_moveActiveToInactive". apply IHst.
-  - Case "ScanState_moveActiveToHandled". apply IHst.
-  - Case "ScanState_moveInactiveToActive". apply IHst.
-  - Case "ScanState_moveInactiveToHandled".  apply IHst.
+  - Case "ScanState_moveActiveToInactive". exact: IHst.
+  - Case "ScanState_moveActiveToHandled". exact: IHst.
+  - Case "ScanState_moveInactiveToActive". exact: IHst.
+  - Case "ScanState_moveInactiveToHandled".  exact: IHst.
 Qed.
+
+End SortednessProof.
 
 Theorem allocated_regs_are_unique `(st : ScanState sd) :
   uniq ([ seq snd i | i <- active sd ++ inactive sd ]).
@@ -65,8 +118,8 @@ Proof.
   - Case "ScanState_newUnhandled".
     by rewrite /widen_fst -!map_cat -!map_comp /funcomp //.
 
-  - Case "ScanState_setInterval". apply IHst.
-  - Case "ScanState_setFixedIntervals". apply IHst.
+  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive".
     move=> /= in IHst *; apply/andP; split=> //.
 
@@ -193,8 +246,8 @@ Proof.
     apply/perm_map.
     by rewrite insert_perm.
 
-  - Case "ScanState_setInterval". apply IHst.
-  - Case "ScanState_setFixedIntervals". apply IHst.
+  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive".
     move: IHst; rewrite /= -cons_uniq -!map_cat => IHst.
     set s2 := fst x :: [seq fst i | i <- unh] ++
@@ -224,8 +277,8 @@ Proof.
   - Case "ScanState_newUnhandled".
     by rewrite /unh insert_size !size_map addSn.
 
-  - Case "ScanState_setInterval". apply IHst.
-  - Case "ScanState_setFixedIntervals". apply IHst.
+  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
 
   - Case "ScanState_moveUnhandledToActive".
     by rewrite addnA addnS -addSn -addnA.
@@ -306,7 +359,7 @@ Proof.
       move: Hlau => /and3P [H1 _ ?];
       move: in_cons H1 => -> /norP [? ?];
         first rewrite vnth_vreplace_neq //=;
-      by apply/andP.
+      exact/andP.
     rewrite vnth_vreplace addsubsubeq; first by [].
     exact: ltnW.
   move: cons_uniq Huniq => -> /andP [Huniq1 Huniq2].
