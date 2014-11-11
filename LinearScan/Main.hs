@@ -206,6 +206,22 @@ _LinearScan__MLS__MS__unhandledExtent sd =
   _LinearScan__MLS__MS__totalExtent sd
     (Prelude.map (\i -> Prelude.fst i) (_LinearScan__MLS__MS__unhandled sd))
 
+_LinearScan__MLS__MS__intervals_for_reg :: LinearScan__MLS__MS__ScanStateDesc
+                                           -> ([]
+                                           ((,)
+                                           LinearScan__MLS__MS__IntervalId
+                                           LinearScan__MLS__MS__PhysReg)) ->
+                                           LinearScan__MLS__MS__PhysReg -> []
+                                           LinearScan__MLS__MS__IntervalId
+_LinearScan__MLS__MS__intervals_for_reg sd xs reg =
+  Data.List.foldl' (\acc x ->
+    case x of {
+     (,) xid r ->
+      case Eqtype.eq_op (Fintype.ordinal_eqType _MyMachine__maxReg)
+             (unsafeCoerce r) (unsafeCoerce reg) of {
+       Prelude.True -> (:) xid acc;
+       Prelude.False -> acc}}) [] xs
+
 _LinearScan__MLS__MS__registerWithHighestPos :: (Vector0.Vec
                                                 (Prelude.Maybe Prelude.Int))
                                                 -> (,) Prelude.Int
@@ -307,27 +323,38 @@ _LinearScan__transportation sd1 sd2 x =
   Fintype.widen_ord (_LinearScan__MLS__MS__nextInterval sd1)
     (_LinearScan__MLS__MS__nextInterval sd2) x
 
+data LinearScan__HasBase p =
+   LinearScan__Build_HasBase
+
+_LinearScan__coq_HasBase_rect :: (() -> a2) -> a2
+_LinearScan__coq_HasBase_rect f =
+  f __
+
+_LinearScan__coq_HasBase_rec :: (() -> a2) -> a2
+_LinearScan__coq_HasBase_rec f =
+  _LinearScan__coq_HasBase_rect f
+
 _LinearScan__coq_SSMorphStLen_rect :: LinearScan__MLS__MS__ScanStateDesc ->
                                       LinearScan__MLS__MS__ScanStateDesc ->
-                                      (() -> () -> () -> a1) -> a1
+                                      (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStLen_rect sd1 sd2 f =
-  f __ __ __
+  f __ __
 
 _LinearScan__coq_SSMorphStLen_rec :: LinearScan__MLS__MS__ScanStateDesc ->
                                      LinearScan__MLS__MS__ScanStateDesc ->
-                                     (() -> () -> () -> a1) -> a1
+                                     (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStLen_rect sd1 sd2 f
 
 _LinearScan__coq_SSMorphHasLen_rect :: LinearScan__MLS__MS__ScanStateDesc ->
                                        LinearScan__MLS__MS__ScanStateDesc ->
-                                       (() -> () -> () -> a1) -> a1
+                                       (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphHasLen_rect sd1 sd2 f =
-  f __ __ __
+  f __ __
 
 _LinearScan__coq_SSMorphHasLen_rec :: LinearScan__MLS__MS__ScanStateDesc ->
                                       LinearScan__MLS__MS__ScanStateDesc ->
-                                      (() -> () -> () -> a1) -> a1
+                                      (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphHasLen_rect sd1 sd2 f
 
@@ -345,26 +372,25 @@ _LinearScan__coq_HasWork_rec f =
 _LinearScan__coq_SSMorphStHasLen_rect :: LinearScan__MLS__MS__ScanStateDesc
                                          ->
                                          LinearScan__MLS__MS__ScanStateDesc
-                                         -> (() -> () -> () -> () -> a1) ->
-                                         a1
+                                         -> (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStHasLen_rect sd1 sd2 f =
-  f __ __ __ __
+  f __ __
 
 _LinearScan__coq_SSMorphStHasLen_rec :: LinearScan__MLS__MS__ScanStateDesc ->
                                         LinearScan__MLS__MS__ScanStateDesc ->
-                                        (() -> () -> () -> () -> a1) -> a1
+                                        (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStHasLen_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStHasLen_rect sd1 sd2 f
 
 _LinearScan__coq_SSMorphSplit_rect :: LinearScan__MLS__MS__ScanStateDesc ->
                                       LinearScan__MLS__MS__ScanStateDesc ->
-                                      (() -> () -> () -> () -> a1) -> a1
+                                      (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphSplit_rect sd1 sd2 f =
-  f __ __ __ __
+  f __ __
 
 _LinearScan__coq_SSMorphSplit_rec :: LinearScan__MLS__MS__ScanStateDesc ->
                                      LinearScan__MLS__MS__ScanStateDesc ->
-                                     (() -> () -> () -> () -> a1) -> a1
+                                     (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphSplit_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphSplit_rect sd1 sd2 f
 
@@ -381,15 +407,13 @@ _LinearScan__coq_IsSplittable_rec f =
 
 _LinearScan__coq_SSMorphStSplit_rect :: LinearScan__MLS__MS__ScanStateDesc ->
                                         LinearScan__MLS__MS__ScanStateDesc ->
-                                        (() -> () -> () -> () -> () -> () ->
-                                        a1) -> a1
+                                        (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStSplit_rect sd1 sd2 f =
-  f __ __ __ __ __ __
+  f __ __
 
 _LinearScan__coq_SSMorphStSplit_rec :: LinearScan__MLS__MS__ScanStateDesc ->
                                        LinearScan__MLS__MS__ScanStateDesc ->
-                                       (() -> () -> () -> () -> () -> () ->
-                                       a1) -> a1
+                                       (() -> () -> a1) -> a1
 _LinearScan__coq_SSMorphStSplit_rec sd1 sd2 f =
   _LinearScan__coq_SSMorphStSplit_rect sd1 sd2 f
 
@@ -481,8 +505,8 @@ _LinearScan__withCursor :: LinearScan__MLS__MS__ScanStateDesc ->
                            (LinearScan__MLS__MS__ScanStateDesc -> () ->
                            LinearScan__SState a1 a2 a3) -> LinearScan__SState
                            a1 a2 a3
-_LinearScan__withCursor pre f i =
-  case i of {
+_LinearScan__withCursor pre f x =
+  case x of {
    LinearScan__Build_SSInfo thisDesc0 thisHolds0 ->
     f thisDesc0 __ (LinearScan__Build_SSInfo thisDesc0 thisHolds0)}
 
@@ -584,29 +608,6 @@ _LinearScan__distance n m =
    Prelude.True -> (Prelude.-) m n;
    Prelude.False -> (Prelude.-) n m}
 
-_LinearScan__splitCurrentInterval_subproof :: LinearScan__MLS__MS__ScanStateDesc
-                                              -> (Prelude.Maybe Prelude.Int)
-                                              -> Prelude.Int -> (Vector0.Vec
-                                              Interval.IntervalDesc) ->
-                                              LinearScan__MLS__MS__Coq_fixedIntervalsType
-                                              -> ([]
-                                              ((,) Prelude.Int Prelude.Int))
-                                              -> ([]
-                                              ((,) Prelude.Int
-                                              LinearScan__MLS__MS__PhysReg))
-                                              -> ([]
-                                              ((,) Prelude.Int
-                                              LinearScan__MLS__MS__PhysReg))
-                                              -> ([]
-                                              ((,) Prelude.Int
-                                              LinearScan__MLS__MS__PhysReg))
-                                              -> a1 -> LinearScan__SSInfo 
-                                              ()
-_LinearScan__splitCurrentInterval_subproof pre before _nextInterval_ intervals0 _fixedIntervals_ unhandled0 _active_ _inactive_ _handled_ holds =
-  _LinearScan__coq_SSMorph_rect pre (LinearScan__MLS__MS__Build_ScanStateDesc
-    _nextInterval_ intervals0 _fixedIntervals_ [] _active_ _inactive_
-    _handled_) (\_ _ _ -> Logic.coq_False_rect)
-
 _LinearScan__splitCurrentInterval :: LinearScan__MLS__MS__ScanStateDesc ->
                                      (Prelude.Maybe Prelude.Int) ->
                                      LinearScan__SState a1 () ()
@@ -616,12 +617,7 @@ _LinearScan__splitCurrentInterval pre before ssi =
       _evar_0_ = \desc holds ->
        let {
         _evar_0_ = \_nextInterval_ intervals0 _fixedIntervals_ unhandled0 _active_ _inactive_ _handled_ ->
-         let {
-          _evar_0_ = \x ->
-           _LinearScan__splitCurrentInterval_subproof pre before
-             _nextInterval_ intervals0 _fixedIntervals_ unhandled0 _active_
-             _inactive_ _handled_ x}
-         in
+         let {_evar_0_ = \holds0 -> Logic.coq_False_rect} in
          let {
           _evar_0_0 = \_top_assumption_ ->
            let {
@@ -689,25 +685,50 @@ _LinearScan__splitCurrentInterval pre before ssi =
                  case _top_assumption_1 of {
                   (,) x x0 -> _evar_0_0 x x0}))}
            in
-           (\us _ _ _ _ holds0 _ _ _ _ ->
+           (\us _ _ _ _ _ holds0 _ _ ->
            case _top_assumption_ of {
             (,) x x0 -> _evar_0_0 x x0 us holds0})}
          in
          case unhandled0 of {
-          [] -> (\_ _ _ x _ _ _ _ -> _evar_0_ x);
+          [] -> (\_ _ _ _ holds0 _ _ -> _evar_0_ holds0);
           (:) x x0 -> _evar_0_0 x x0 __}}
        in
        case desc of {
         LinearScan__MLS__MS__Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 ->
-         _evar_0_ x x0 x1 x2 x3 x4 x5 __ __ __ holds __ __ __}}
+         _evar_0_ x x0 x1 x2 x3 x4 x5 __ __ __ __ holds __}}
      in
      case ssi of {
       LinearScan__Build_SSInfo x x0 -> _evar_0_ x x0 __})
 
+_LinearScan__splitActiveIntervalForReg_admitted :: LinearScan__MLS__MS__ScanStateDesc
+                                                   ->
+                                                   LinearScan__MLS__MS__PhysReg
+                                                   -> Prelude.Int ->
+                                                   Prelude.Int ->
+                                                   (Vector0.Vec
+                                                   Interval.IntervalDesc) ->
+                                                   LinearScan__MLS__MS__Coq_fixedIntervalsType
+                                                   -> ([]
+                                                   ((,) Prelude.Int
+                                                   Prelude.Int)) -> ([]
+                                                   ((,) Prelude.Int
+                                                   LinearScan__MLS__MS__PhysReg))
+                                                   -> ([]
+                                                   ((,) Prelude.Int
+                                                   LinearScan__MLS__MS__PhysReg))
+                                                   -> ([]
+                                                   ((,) Prelude.Int
+                                                   LinearScan__MLS__MS__PhysReg))
+                                                   -> a1 ->
+                                                   LinearScan__SSInfo 
+                                                   ()
+_LinearScan__splitActiveIntervalForReg_admitted =
+  Prelude.error "AXIOM TO BE REALIZED"
+
 _LinearScan__splitActiveIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
                                           -> LinearScan__MLS__MS__PhysReg ->
                                           Prelude.Int -> LinearScan__SState
-                                          a1 a1 ()
+                                          a1 () ()
 _LinearScan__splitActiveIntervalForReg =
   Prelude.error "AXIOM TO BE REALIZED"
 

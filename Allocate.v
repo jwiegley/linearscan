@@ -14,10 +14,6 @@ Import M.
 
 Open Scope program_scope.
 
-Definition splitActiveIntervalForReg {pre P} (reg : PhysReg) (pos : nat) :
-  SState pre P P unit.
-Admitted.
-
 Definition splitAnyInactiveIntervalForReg {pre P} (reg : PhysReg) :
   SState pre P P unit.
 Admitted.

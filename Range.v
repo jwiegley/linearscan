@@ -248,8 +248,7 @@ Definition Range_weaken_beg : forall b x y xs,
 Proof.
   move=> b x y xs H Hlt.
   move: (R_Extend b y H) => /=.
-  rewrite (maxnn y).
-  case: (minn_idPl Hlt) => -> //.
+  by rewrite (maxnn y) (minn_idPl Hlt).
 Defined.
 
 Definition Range_append_fst
@@ -275,8 +274,7 @@ Definition Range_weaken_end : forall e x y xs,
 Proof.
   move=> e x y xs H Hgt.
   move: (R_Extend x e H) => /=.
-  rewrite (minnn x).
-  case: (maxn_idPl Hgt) => -> //.
+  by rewrite (minnn x) (maxn_idPl Hgt).
 Defined.
 
 Definition Range_append_snd

@@ -167,7 +167,7 @@ Qed.
     registers available (or, if there are more register than intervals to be
     allocated, the number of intervals). *)
 Theorem limit_active_registers `(st : ScanState sd) :
-  size (active sd ++ inactive sd) <= minn maxReg (nextInterval sd).
+  size (active sd) <= minn maxReg (nextInterval sd).
 (* jww (2014-10-31): Implementing this will need supporting evidence from the
    algorithm; I don't think the constructors give us enough detail to
    determine it here by induction. *)

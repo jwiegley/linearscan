@@ -58,6 +58,14 @@ Arguments totalExtent [sd] _ /.
 Definition unhandledExtent (sd : ScanStateDesc) : nat :=
   totalExtent [seq fst i | i <- unhandled sd].
 
+Definition intervals_for_reg {sd : ScanStateDesc}
+  (xs : seq (IntervalId sd * PhysReg)) (reg : PhysReg) : seq (IntervalId sd) :=
+  foldl (fun acc x =>
+           let: (xid, r) := x in
+           if r == reg
+           then xid :: acc
+           else acc) nil xs.
+
 (** Given a vector of optional positions associated with register, return the
     first register (counting downwards) which is either [None], or the highest
     of [Some] value.
