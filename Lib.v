@@ -119,7 +119,7 @@ Proof.
 Qed.
 
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
-Proof. by rewrite /=; apply/negPn; case: (odd n). Qed.
+Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
 
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.

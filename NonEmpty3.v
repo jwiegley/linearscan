@@ -244,14 +244,11 @@ Defined.
 
 End Membership.
 
-Lemma NE_inj : forall T (xs ys : seq T) Hxs Hys,
+Definition NE_inj : forall T (xs ys : seq T) Hxs Hys,
   xs = ys <-> NE xs Hxs = NE ys Hys.
 Proof.
   move=> T xs ys Hxs Hys.
-  split.
-    move=> H.
-    move: Hxs Hys.
-    rewrite H => Hxs Hys.
-    by have ->: Hxs = Hys by exact: eq_irrelevance.
-  congruence.
+  split; last congruence.
+  move=> H; move: H => -> in Hxs Hys *.
+  by have ->: Hxs = Hys by exact: eq_irrelevance.
 Defined.

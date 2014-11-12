@@ -52,6 +52,9 @@ Definition ne_ind : forall a (P : NonEmpty a -> Prop),
     -> (forall (x : a) (l : NonEmpty a), P l -> P [::: x & NE_to_list l])
     -> forall l : NonEmpty a, P l := [eta ne_rect].
 
+Definition NE_cons {a} (x : a) (xs : NonEmpty a) : NonEmpty a :=
+  [::: x & NE_to_list xs].
+
 Definition NE_length {a} (ne : NonEmpty a) : nat := (size ne).+1.
 Arguments NE_length [a] ne /.
 
