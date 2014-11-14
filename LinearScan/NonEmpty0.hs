@@ -21,6 +21,12 @@ coq_NonEmpty_rec :: (a1 -> a2) -> (a1 -> (NonEmpty a1) -> a2 -> a2) ->
 coq_NonEmpty_rec =
   coq_NonEmpty_rect
 
+coq_NE_length :: (NonEmpty a1) -> Prelude.Int
+coq_NE_length ne =
+  case ne of {
+   NE_Sing x -> Prelude.succ 0;
+   NE_Cons x xs -> (Prelude.+) (Prelude.succ 0) (coq_NE_length xs)}
+
 coq_NE_to_list :: (NonEmpty a1) -> [] a1
 coq_NE_to_list ne =
   case ne of {

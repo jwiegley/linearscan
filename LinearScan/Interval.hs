@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
+{- For Hugs, use the option -F"cpp -P -traditional" -}
+
 module LinearScan.Interval where
 
 import qualified Prelude
@@ -8,9 +11,22 @@ import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
+import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Ssreflect as Ssreflect
 import qualified LinearScan.Ssrfun as Ssrfun
+import qualified LinearScan.Ssrnat as Ssrnat
 
+
+
+--unsafeCoerce :: a -> b
+#ifdef __GLASGOW_HASKELL__
+import qualified GHC.Base as GHC.Base
+unsafeCoerce = GHC.Base.unsafeCoerce#
+#else
+-- HUGS
+import qualified LinearScan.IOExts as IOExts
+unsafeCoerce = IOExts.unsafeCoerce
+#endif
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -54,6 +70,18 @@ intervalCoversPos d pos =
 intervalExtent :: IntervalDesc -> Prelude.Int
 intervalExtent d =
   (Prelude.-) (intervalEnd d) (intervalStart d)
+
+coq_Interval_is_singleton :: IntervalDesc -> Prelude.Bool
+coq_Interval_is_singleton d =
+  (Prelude.&&)
+    (Eqtype.eq_op Ssrnat.nat_eqType
+      (unsafeCoerce (NonEmpty0.coq_NE_length (rds d)))
+      (unsafeCoerce (Prelude.succ 0)))
+    (Eqtype.eq_op Ssrnat.nat_eqType
+      (unsafeCoerce
+        (NonEmpty0.coq_NE_length
+          (Range.ups ( (NonEmpty0.coq_NE_head (rds d))))))
+      (unsafeCoerce (Prelude.succ 0)))
 
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
