@@ -455,9 +455,10 @@ Proof.
                                     else inactive desc) reg.
   case: W => /(_ pre desc holds).
   case=> /=; case.
-  case: desc => /= ? intervals0 ? ? active0 ? ? in holds intids st *.
+  case: desc => /= ni intervals0 ? unh active0 ? ? in holds intids st *.
 
-  case: intids => //= [|aid _] len_is_SSMorph0 *.
+  case: intids
+    => //= [|aid _] len_is_SSMorph0 unhandled_nonempty first_nonempty.
     apply (inl ENoIntervalsToSplit). (* ERROR *)
 
   set int := vnth intervals0 aid.
@@ -492,20 +493,35 @@ Proof.
 
   apply: (Build_SSInfo _ state).
 
-  (* jww (2014-11-11): Need to prove:
+  case: len_is_SSMorph0
+    => /= next_interval_increases
+          total_extent_decreases
+          handled_count_increases.
+  have Huelt: unhandledExtent new_unhandled_added <= unhandledExtent pre.
+    move: (lists_are_unique st).
+    move: (lists_are_unique state).
+    rewrite /all_state_lists /new_unhandled_added.
+    rewrite /unhandledIds cat_uniq => /and3P [/= Huniq_state _ _].
+    rewrite /unhandledIds cat_uniq /= => /and3P [Huniq_st _ _].
+    apply: (leq_trans _ total_extent_decreases).
+    rewrite /unhandledExtent /=
+            {holds state st new_unhandled_added set_int_desc
+             unhandled_nonempty total_extent_decreases}.
+    (* elim: unh => // [u us IHus] in first_nonempty Huniq_state Huniq_st *. *)
+    (* case: us => /= [|y ys] in IHus first_nonempty Huniq_state Huniq_st *. *)
+    (* simpl. *)
+    (* case H: (aid == fst u). *)
+    (*   move/eqP in H. *)
+    (*   rewrite H -!map_comp /funcomp insert_f_sumlist !map_cons *)
+    (*           !sumlist_cons -map_comp /funcomp *)
+    (*           !vnth_vshiftin vnth_last vnth_vreplace /=. *)
+    admit.
 
-         unhandledExtent new_unhandled_added <= unhandledExtent pre
-
-     This function (as written now) *increases* the unhandledExtent, because
-     it appends the remainder of the split block back onto the unhandled
-     list. *)
-
-  case: len_is_SSMorph0 => /= *.
   apply: Build_SSMorphHasLen;
   try apply: Build_SSMorphLen;
   try apply: Build_SSMorph;
   rewrite ?insert_size ?size_map; auto.
-Admitted.
+Defined.
 
 Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
   (reg : PhysReg) (pos : nat) : SState pre P SSMorphHasLen unit :=

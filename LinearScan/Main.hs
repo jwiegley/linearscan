@@ -733,8 +733,87 @@ _LinearScan__splitAssignedIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
                                             Prelude.Bool ->
                                             LinearScan__SState a1 () 
                                             ()
-_LinearScan__splitAssignedIntervalForReg =
-  Prelude.error "AXIOM TO BE REALIZED"
+_LinearScan__splitAssignedIntervalForReg pre reg pos trueForActives ssi =
+  let {
+   _evar_0_ = \desc holds ->
+    Ssreflect.ssr_have
+      (_LinearScan__MLS__MS__intervals_for_reg desc
+        (case trueForActives of {
+          Prelude.True -> _LinearScan__MLS__MS__active desc;
+          Prelude.False -> _LinearScan__MLS__MS__inactive desc}) reg)
+      (\intids ->
+      let {
+       _evar_0_ = \ni intervals0 _fixedIntervals_ unh active0 _inactive_ _handled_ holds0 intids0 ->
+        let {
+         _evar_0_ = \_ _ _ -> Prelude.Left LinearScan__ENoIntervalsToSplit}
+        in
+        let {
+         _evar_0_0 = \aid _the_1st_wildcard_ ->
+          let {int = LinearScan.Utils.nth ni intervals0 aid} in
+          let {
+           _evar_0_0 = \_ -> Prelude.Left LinearScan__ECurrentIsSingleton}
+          in
+          let {
+           _evar_0_1 = \_ -> Prelude.Right ((,) ()
+            (Ssreflect.ssr_have __ (\_ ->
+              let {
+               _top_assumption_ = Interval.splitPosition ( int) pos
+                                    Prelude.False}
+              in
+              let {
+               _top_assumption_0 = Interval.splitInterval _top_assumption_
+                                     ( int)}
+              in
+              let {
+               _evar_0_1 = \_top_assumption_1 _top_assumption_2 ->
+                let {
+                 _evar_0_1 = \_ ->
+                  Ssreflect.ssr_have __ (\_ ->
+                    Ssreflect.ssr_have __
+                      (let {
+                        new_unhandled_added = LinearScan__MLS__MS__Build_ScanStateDesc
+                         (Prelude.succ ni)
+                         (LinearScan.Utils.snoc ni
+                           (LinearScan.Utils.set_nth ni intervals0 aid
+                             _top_assumption_1) _top_assumption_2)
+                         _fixedIntervals_
+                         (Lib.insert (\x ->
+                           Lib.lebf Prelude.snd x ((,) (Fintype.ord_max ni)
+                             (Interval.ibeg _top_assumption_2))) ((,)
+                           (Fintype.ord_max ni)
+                           (Interval.ibeg _top_assumption_2))
+                           (Prelude.map (Lib.widen_fst ni) unh))
+                         (Prelude.map (Lib.widen_fst ni) active0)
+                         (Prelude.map (Lib.widen_fst ni) _inactive_)
+                         (Prelude.map (Lib.widen_fst ni) _handled_)}
+                       in
+                       \_ -> LinearScan__Build_SSInfo new_unhandled_added __))}
+                in
+                Logic.eq_rect_r
+                  (Eqtype.eq_op Ssrnat.nat_eqType
+                    (unsafeCoerce (Interval.ibeg _top_assumption_1))
+                    (unsafeCoerce (Interval.ibeg ( int)))) _evar_0_1
+                  (Eqtype.eq_op Ssrnat.nat_eqType
+                    (unsafeCoerce (Interval.ibeg ( int)))
+                    (unsafeCoerce (Interval.ibeg _top_assumption_1))) __}
+              in
+              case _top_assumption_0 of {
+               (,) x x0 -> _evar_0_1 x x0})))}
+          in
+          case Interval.coq_Interval_is_singleton ( int) of {
+           Prelude.True -> _evar_0_0 __;
+           Prelude.False -> _evar_0_1 __}}
+        in
+        case intids0 of {
+         [] -> _evar_0_;
+         (:) x x0 -> (\_ _ _ -> _evar_0_0 x x0)}}
+      in
+      case desc of {
+       LinearScan__MLS__MS__Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 ->
+        _evar_0_ x x0 x1 x2 x3 x4 x5 holds intids __ __ __})}
+  in
+  case ssi of {
+   LinearScan__Build_SSInfo x x0 -> _evar_0_ x x0}
 
 _LinearScan__splitActiveIntervalForReg :: LinearScan__MLS__MS__ScanStateDesc
                                           -> LinearScan__MLS__MS__PhysReg ->
