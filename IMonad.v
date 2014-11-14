@@ -1,4 +1,6 @@
-Require Import IApplicative.
+Require Export IApplicative.
+
+Require Import Ssreflect.ssrfun.
 
 Class IMonad (M : Type -> Type -> Type -> Type) :=
 { is_iapplicative :> IApplicative M

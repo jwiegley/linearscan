@@ -1,5 +1,7 @@
 Require Export IEndo.
 
+Require Import Ssreflect.ssrfun.
+
 Generalizable All Variables.
 
 Reserved Notation "f <**> g" (at level 28, left associativity).

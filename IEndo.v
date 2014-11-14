@@ -1,4 +1,4 @@
-Require Export Ssreflect.ssrfun.
+Require Import Ssreflect.ssrfun.
 
 Generalizable All Variables.
 
