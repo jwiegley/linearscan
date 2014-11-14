@@ -32,13 +32,6 @@ Section IFunctors.
   Variable F : Type -> Type -> Type -> Type.
   Context `{IFunctor F}.
 
-  Theorem ifun_identity_x : forall {I O X} (x : F I O X), imap id x = id x.
-  Proof.
-    intros.
-    rewrite ifun_identity.
-    reflexivity.
-  Qed.
-
   Theorem ifun_composition_x
     : forall {I O X Y Z} (f : Y -> Z) (g : X -> Y) (x : F I O X),
     f <$$> (g <$$> x) = (f \o g) <$$> x.

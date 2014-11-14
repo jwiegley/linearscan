@@ -19,16 +19,14 @@ Arguments mkIState [i o a] _.
 Definition runIState {i o a} (x : IState i o a) :=
   match x with mkIState f => f end.
 
+Axiom funext : forall a b (f g : a -> b), f =1 g -> f = g.
+
 Lemma eq_mkIState : forall (i o a : Type) (f1 f2 : i -> (a * o)),
   f1 =1 f2 -> mkIState f1 = mkIState f2.
 Proof.
   move=> i o a f1 f2 Ef.
   congr (mkIState _).
-  (* jww (2014-11-10): This is the only axiom being brought into this
-     development.  Is there any way around it? *)
-  Require FunctionalExtensionality.
-  apply FunctionalExtensionality.functional_extensionality.
-  apply Ef.
+  apply/funext/Ef.
 Qed.
 
 Program Instance IState_IFunctor : IFunctor IState := {
