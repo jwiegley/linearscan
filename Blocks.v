@@ -24,7 +24,6 @@ Section Block.
 
 Variable baseType : Set.
 Variable maxVirtReg : nat.
-Hypothesis variables_exist : maxVirtReg > 0.
 
 Definition SomeVar := (fin maxVirtReg + fin maxReg)%type.
 
@@ -221,8 +220,12 @@ Definition determineIntervals (blocks : NonEmpty Block) : ScanStateSig :=
 
   vfoldl handleVar s2 varRanges.
 
-Definition allocateRegisters (blocks : NonEmpty Block) : ScanStateDesc :=
-  proj1_sig (uncurry_sig linearScan (determineIntervals blocks)).
+Definition allocateRegisters (blocks : NonEmpty Block) :
+  SSError + ScanStateDesc :=
+  match uncurry_sig linearScan (determineIntervals blocks) with
+  | inl err => inl err
+  | inr x   => inr x.1
+  end.
 
 End Block.
 

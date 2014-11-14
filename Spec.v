@@ -114,12 +114,14 @@ Qed.
 End SortednessProof.
 
 Theorem allocated_regs_are_unique `(st : ScanState sd) :
-  uniq ([ seq snd i | i <- active sd ++ inactive sd ]).
+  uniq ([ seq snd i | i <- active sd ]).
+Abort.
+(*
 Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil". constructor.
   - Case "ScanState_newUnhandled".
-    by rewrite /widen_fst -!map_cat -!map_comp /funcomp //.
+    by rewrite /widen_fst -!map_comp /funcomp //.
 
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
@@ -127,42 +129,25 @@ Proof.
     move=> /= in IHst *; apply/andP; split=> //.
 
     (* jww (2014-10-31): Need the following evidence here:
-         reg \notin [seq snd i | i <- act ++ inact]
+         reg \notin [seq snd i | i <- act]
 
        This will need to come from the [ScanState_moveUnhandledToActive]
        constructor, but doing so will require obtaining it from the algorithm,
        which may be a substantial change. *)
-    admit.
 
   - Case "ScanState_moveActiveToInactive".
-    move: IHst; set s2 := (X in uniq X) => IHst.
-    rewrite (@perm_eq_uniq _ _ s2) => //.
-    apply/perm_map.
-    rewrite perm_rem_cons; last by [].
-    exact: perm_eq_refl.
+    move: IHst; set s2 := (X in uniq X) => IHst /=.
 
   - Case "ScanState_moveActiveToHandled".
-    move: IHst; set s2 := (X in uniq X) => IHst.
-    apply/(@subseq_uniq _ _ s2); last exact: IHst.
-    apply/map_subseq/cat_subseq;
-      first exact: rem_subseq.
-    exact: subseq_refl.
+    move: IHst; set s2 := (X in uniq X) => IHst /=.
 
   - Case "ScanState_moveInactiveToActive".
     rewrite /= -cons_uniq -map_cons.
-    move: IHst; set s2 := (X in uniq X) => IHst.
-    rewrite (@perm_eq_uniq _ _ s2); first exact: IHst.
-    apply/perm_map.
-    rewrite -cat_cons perm_catC perm_rem_cons // perm_catC.
-    exact: perm_eq_refl.
 
   - Case "ScanState_moveInactiveToHandled".
-    move: IHst; set s2 := (X in uniq X) => IHst.
-    apply/(@subseq_uniq _ _ s2); last exact: IHst.
-    apply/map_subseq/cat_subseq;
-      first exact: subseq_refl.
-    exact: rem_subseq.
+    by move: IHst; set s2 := (X in uniq X) => IHst.
 Qed.
+*)
 
 (** The number of active or inactive registers cannot exceed the number of
     registers available (or, if there are more register than intervals to be
@@ -172,7 +157,7 @@ Theorem limit_active_registers `(st : ScanState sd) :
 (* jww (2014-10-31): Implementing this will need supporting evidence from the
    algorithm; I don't think the constructors give us enough detail to
    determine it here by induction. *)
-Admitted.
+Abort.
 
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd;

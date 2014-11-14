@@ -26,6 +26,7 @@ LinearScan/Main.hs: Main.vo
 		LinearScan/*.hs
 	@perl -i -pe 's/module LinearScan..+?.Utils where/module LinearScan.Utils where/' \
 		LinearScan/Utils.hs
+	@perl -i -pe 's/o -> Prelude.Either a \(\(,\) errType i\)/i -> Prelude.Either errType ((,) a o)/' LinearScan/IState.hs
 	@perl -i -pe 's/a -> \(,\) i o/i -> (,) a o/' LinearScan/IState.hs
 	@perl -i -pe 's/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/' \
 		LinearScan/Main.hs

@@ -25,10 +25,16 @@ type    IntervalId = Int
 allocateRegisters
     :: Int
     -> (block -> (StartsLoop, EndsLoop, [Either VirtReg PhysReg]))
-    -> NonEmpty block -> ScanState
+    -> NonEmpty block
+    -> Either String ScanState
 allocateRegisters maxVirtReg blockInfo blocks =
-    ScanState $ _LinearScan__allocateRegisters
-        maxVirtReg (coq_NE_map gather blocks)
+    case _LinearScan__allocateRegisters maxVirtReg (coq_NE_map gather blocks) of
+        Left x -> Left $ case x of
+            LinearScan__ECurrentIsSingleton ->
+                "Current interval is a singleton"
+            LinearScan__ENoIntervalsToSplit ->
+                "There are no intervals to split"
+        Right x -> Right $ ScanState x
   where
     gather b =
         let (starts, ends, refs) = blockInfo b in

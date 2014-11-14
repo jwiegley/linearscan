@@ -6,7 +6,12 @@ Require Import Ssreflect.seq.
 
 Generalizable All Variables.
 
-Inductive IState (i o a : Type) := mkIState : (i -> (a * o)) -> IState i o a.
+Section IState.
+
+Variable errType : Set.
+
+Inductive IState (i o a : Type) :=
+  mkIState : (i -> errType + (a * o)) -> IState i o a.
 
 Arguments mkIState [i o a] _.
 
@@ -15,7 +20,8 @@ Definition runIState {i o a} (x : IState i o a) :=
 
 Axiom funext : forall a b (f g : a -> b), f =1 g -> f = g.
 
-Lemma eq_mkIState : forall (i o a : Type) (f1 f2 : i -> (a * o)),
+Lemma eq_mkIState : forall (i o a : Type)
+  (f1 f2 : i -> errType + (a * o)),
   f1 =1 f2 -> mkIState f1 = mkIState f2.
 Proof.
   move=> i o a f1 f2 Ef.
@@ -23,9 +29,13 @@ Proof.
   apply/funext/Ef.
 Qed.
 
-Program Instance IState_IFunctor : IFunctor IState := {
+Global Program Instance IState_IFunctor : IFunctor IState := {
     imap := fun _ _ _ _ f x =>
-      mkIState (fun st => let (a,st') := runIState x st in (f a, st'))
+      mkIState (fun st =>
+                  match runIState x st with
+                  | inl err => inl err
+                  | inr (a,st') => inr (f a, st')
+                  end)
 }.
 Obligation 1.
   destruct x.
@@ -33,38 +43,49 @@ Obligation 1.
   apply eq_mkIState.
   move=> st.
   compute.
-  by case: (p st).
+  case: (s st); auto.
+  by case.
 Qed.
 Obligation 2.
   destruct x. simpl.
   apply eq_mkIState.
   move=> st.
   compute.
-  by case: (p st).
+  case: (s st); auto.
+  by case.
 Qed.
 
-Definition iget  {i}     : IState i i i := mkIState (fun i => (i, i)).
-Definition igets {i a} f : IState i i a := mkIState (fun s => (f s, s)).
+Definition ierr {i} (err : errType) : IState i i i :=
+  mkIState (fun i => inl err).
 
-Definition iput {i o} (x : o) : IState i o unit := mkIState (fun s => (tt, x)).
+Definition iget  {i}     : IState i i i := mkIState (fun i => inr (i, i)).
+Definition igets {i a} f : IState i i a := mkIState (fun s => inr (f s, s)).
+
+Definition iput {i o} (x : o) : IState i o unit :=
+  mkIState (fun s => inr (tt, x)).
 
 Definition imodify {i o} (f : i -> o) : IState i o unit :=
-  mkIState (fun i => (tt, f i)).
+  mkIState (fun i => inr (tt, f i)).
 
-Program Instance IState_IApplicative : IApplicative IState := {
-    ipure := fun _ _ x => mkIState (fun st => (x, st));
+Global Program Instance IState_IApplicative : IApplicative IState := {
+    ipure := fun _ _ x => mkIState (fun st => inr (x, st));
     iap := fun _ _ _ _ _ f x =>
       mkIState (fun st =>
-        let (f', st') := runIState f st in
-        let (x', st'') := runIState x st' in
-        (f' x', st''))
+        match runIState f st with
+        | inl err => inl err
+        | inr (f', st') =>
+            match runIState x st' with
+            | inl err => inl err
+            | inr (x', st'') => inr (f' x', st'')
+            end
+        end)
 }.
 Obligation 1.
   destruct x. compute.
   apply eq_mkIState.
   move=> st; compute.
-  destruct (p st).
-  reflexivity.
+  case: (s st); auto.
+  by case.
 Qed.
 Obligation 2.
   destruct u.
@@ -72,53 +93,62 @@ Obligation 2.
   destruct w. simpl.
   apply eq_mkIState.
   move=> st; compute.
-  destruct (p st).
-  destruct (p0 j).
-  destruct (p1 k).
-  reflexivity.
+  case: (s st); auto.
+  case; move=> a b.
+  case: (s0 b); auto.
+  case; move=> a0 b0.
+  case: (s1 b0); auto.
+  by case.
 Qed.
 
-Program Instance IState_IMonad : IMonad IState := {
+Global Program Instance IState_IMonad : IMonad IState := {
     ijoin := fun _ _ _ _ x => mkIState (fun st =>
-      let (y, st') := runIState x st in
-      let (a, st'') := runIState y st' in
-      (a, st''))
+      match runIState x st with
+      | inl err => inl err
+      | inr (y, st') =>
+          match runIState y st' with
+          | inl err => inl err
+          | inr (a, st'') => inr (a, st'')
+          end
+      end)
 }.
 Obligation 1.
   destruct x.
   unfold funcomp.
   apply eq_mkIState.
   move=> y; compute.
-  destruct (p y).
-  destruct i. simpl.
-  destruct (p0 j).
-  destruct i. simpl.
-  destruct (p1 k).
-  reflexivity.
+  case: (s y); auto.
+  case; case=> s0 b.
+  case: (s0 b); auto.
+  case; case=> s1 b1.
+  case: (s1 b1); auto.
+  by case.
 Qed.
 Obligation 2.
   destruct x.
   unfold funcomp.
   apply eq_mkIState.
   move=> y; compute.
-  destruct (p y).
-  reflexivity.
+  case: (s y); auto.
+  by case.
 Qed.
 Obligation 3.
   destruct x.
   unfold funcomp.
   apply eq_mkIState.
   move=> y; compute.
-  destruct (p y).
-  reflexivity.
+  case: (s y) => //.
+  by case.
 Qed.
 Obligation 4.
   destruct x.
   unfold funcomp.
   apply eq_mkIState.
   move=> y; compute.
-  destruct (p y). simpl.
-  destruct i. simpl.
-  destruct (p0 a).
-  reflexivity.
+  case: (s y) => //=.
+  case; case=> s0 b.
+  case: (s0 b) => //.
+  by case.
 Qed.
+
+End IState.

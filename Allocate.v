@@ -178,9 +178,10 @@ Definition checkActiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let (sd',st',H) := go sd st unchanged (list_membership (active sd)) in
-   IState.iput {| thisDesc  := sd'
-                ; thisHolds := H
-                ; thisState := st' |}.
+    IState.iput SSError
+      {| thisDesc  := sd'
+       ; thisHolds := H
+       ; thisState := st' |}.
 
 Definition checkInactiveIntervals {pre} (pos : nat) :
   SState pre SSMorphLen SSMorphLen unit :=
@@ -205,9 +206,10 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let (sd',st',H) := go sd st unchanged (list_membership (inactive sd)) in
-   IState.iput {| thisDesc  := sd'
-                ; thisHolds := H
-                ; thisState := st' |}.
+    IState.iput SSError
+      {| thisDesc  := sd'
+       ; thisHolds := H
+       ; thisState := st' |}.
 
 Definition handleInterval {pre} :
   SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
@@ -231,26 +233,31 @@ Definition handleInterval {pre} :
     | None   => allocateBlockedReg
     end.
 
-Require Import Coq.Program.Wf.
+Require Import Recdef.
 
-Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure (unhandledExtent sd)} : { sd' : ScanStateDesc | ScanState sd' } :=
+Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
+  {measure unhandledExtent sd} :
+  SSError + { sd' : ScanStateDesc | ScanState sd' } :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  match unhandled sd with
-  | x :: xs =>
-    let H := list_cons_nonzero (erefl (x :: xs)) in
+  match List.destruct_list (unhandled sd) with
+  | inleft (existT x (exist xs H)) =>
     let ssinfo := {| thisDesc  := sd
-                   ; thisHolds := newSSMorphHasLen H
+                   ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
-    let (_, ssinfo') := IState.runIState handleInterval ssinfo in
-    linearScan (thisDesc ssinfo') (thisState ssinfo')
-  | nil => (sd; st)
+    match IState.runIState SSError handleInterval ssinfo with
+    | inl err => inl err
+    | inr (_, ssinfo') => linearScan (thisDesc ssinfo') (thisState ssinfo')
+    end
+  | inright _ => inr (sd; st)
   end.
 (* We must prove that after every call to [handleInterval], the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Obligation 2. by case: ssinfo' => ? /= [? /ltP]. Qed.
+Proof.
+  intros. clear.
+  by case: ssinfo' => ? /= [? /ltP].
+Qed.
 
 End MAllocate.

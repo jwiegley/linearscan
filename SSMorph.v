@@ -151,12 +151,16 @@ Arguments thisDesc  {_ P} _.
 Arguments thisHolds {_ P} _.
 Arguments thisState {_ P} _.
 
+Inductive SSError :=
+  | ECurrentIsSingleton
+  | ENoIntervalsToSplit.
+
 Definition SState (sd : ScanStateDesc) P Q :=
-  IState (SSInfo sd P) (SSInfo sd Q).
+  IState SSError (SSInfo sd P) (SSInfo sd Q).
 
 Definition withScanState {a pre} {P Q}
   (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a) :
-  SState pre P Q a := iget >>>= fun i => f (thisDesc i) (thisState i).
+  SState pre P Q a := iget SSError >>>= fun i => f (thisDesc i) (thisState i).
 
 Arguments withScanState {a pre P Q} f.
 
@@ -171,10 +175,13 @@ Proof.
   assert (SSInfo thisDesc0 P).
     eapply {| thisDesc  := _
             ; thisHolds := _ |}.
-  apply p in X.
+  apply s in X.
   destruct X.
+    apply (inl s0).
+  apply inr.
+  destruct p.
   split. apply a0.
-  destruct s.
+  destruct s0.
   eexists.
   apply (transitivity thisHolds0 thisHolds1).
   assumption.
@@ -194,11 +201,14 @@ Proof.
   exists. intros.
   destruct X.
   destruct thisHolds0.
-  specialize (p
+  specialize (s
     {| thisDesc  := thisDesc0
      ; thisHolds := haslen_is_SSMorphLen0
      ; thisState := thisState0
      |}).
+  destruct s.
+    apply (inl s).
+  apply inr.
   destruct p.
   split. apply a0.
   eexists.
@@ -209,8 +219,9 @@ Proof.
 Defined.
 
 Definition stbind {P Q R a b}
-  (f : (a -> IState Q R b)) (x : IState P Q a) : IState P R b :=
-  @ijoin IState _ P Q R b (@imap _ _ P Q _ _ f x).
+  (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
+  IState SSError P R b :=
+  @ijoin (IState SSError) _ P Q R b (@imap _ _ P Q _ _ f x).
 
 Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
 
@@ -220,12 +231,13 @@ Notation "X <<- A ;; B" := (A >>>= (fun X => B))
 Notation "A ;;; B" := (_ <<- A ;; B)
   (right associativity, at level 84, A1 at next level).
 
-Definition return_ {I X} := @ipure IState _ I X.
+Definition return_ {I X} := @ipure (IState SSError) _ I X.
 
 Definition weakenStHasLenToSt {pre} :
   SState pre SSMorphStHasLen SSMorphSt unit.
 Proof.
   constructor. intros HS.
+  apply inr.
   split. apply tt.
   destruct HS.
   apply: Build_SSInfo.
@@ -289,6 +301,7 @@ Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P SSMorphSt unit.
 Proof.
   constructor. intros.
+  apply inr.
   split. apply tt.
   destruct H.
   destruct X.
@@ -355,7 +368,6 @@ Definition splitCurrentInterval {pre P} `{W : HasWork P}
 Proof.
   rewrite /SState.
   apply: mkIState => ssi.
-  apply: (tt, _).
 
   case: ssi => desc holds.
   case: W => /(_ pre desc holds).
@@ -367,10 +379,12 @@ Proof.
   move=> ? extent_decreases ? ? holds unhandled_nonempty0 state.
 
   set int := vnth intervals0 uid.
-  have Hnotsing : ~~ Interval_is_singleton int.2.
-    (* jww (2014-11-06): This information must come from the input state,
-       which would be something along the lines of SSMorphSplit, above. *)
-    admit.
+  (* jww (2014-11-06): This could come from the input state, along the lines
+     of SSMorphSplit, above. *)
+  case Hnotsing: (Interval_is_singleton int.2).
+    apply (inl ECurrentIsSingleton). (* ERROR *)
+  apply: (inr (tt, _)).
+  move/negbT in Hnotsing.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
   move: (@splitPosition _ int.2 before true Hlt) => [pos Hmid].
@@ -431,7 +445,6 @@ Definition splitAssignedIntervalForReg {pre P} `{W : HasWork P}
 Proof.
   rewrite /SState.
   apply: mkIState => ssi.
-  apply: (tt, _).
 
   case: ssi => desc holds st.
   (* There is an opportunity here for optimization: finding the best inactive
@@ -444,17 +457,16 @@ Proof.
   case=> /=; case.
   case: desc => /= ? intervals0 ? ? active0 ? ? in holds intids st *.
 
-  case: intids => //= [|aid _].
-    (* jww (2014-11-11): What to do if there is no interval to split? *)
-    admit.
-
-  move=> *.
+  case: intids => //= [|aid _] len_is_SSMorph0 *.
+    apply (inl ENoIntervalsToSplit). (* ERROR *)
 
   set int := vnth intervals0 aid.
-  have Hnotsing : ~~ Interval_is_singleton int.2.
-    (* jww (2014-11-06): This information must come from the input state,
-       which would be something along the lines of SSMorphSplit, above. *)
-    admit.
+  (* jww (2014-11-06): This could come from the input state, along the lines
+     of SSMorphSplit, above. *)
+  case Hnotsing: (Interval_is_singleton int.2).
+    apply (inl ECurrentIsSingleton). (* ERROR *)
+  apply: (inr (tt, _)).
+  move/negbT in Hnotsing.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
   move: (@splitPosition _ int.2 pos false Hlt)
@@ -488,10 +500,11 @@ Proof.
      it appends the remainder of the split block back onto the unhandled
      list. *)
 
-  apply Build_SSMorphHasLen;
-  try apply Build_SSMorphLen;
-  try apply Build_SSMorph;
-  rewrite ?insert_size ?size_map //; auto.
+  case: len_is_SSMorph0 => /= *.
+  apply: Build_SSMorphHasLen;
+  try apply: Build_SSMorphLen;
+  try apply: Build_SSMorph;
+  rewrite ?insert_size ?size_map; auto.
 Admitted.
 
 Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
