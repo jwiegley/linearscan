@@ -1,9 +1,10 @@
 COQFLAGS = ""
 MISSING  = \
 	find . -name '*.v' ! -name Notes.v ! -name CpdtTactics.v	\
-                ! -name '*2.v'                                   |	\
-		xargs egrep -i -Hn '(admit|abort|undefined)'     |	\
-		      egrep -v 'Definition undefined'
+                ! -name '*2.v'                             |		\
+		xargs egrep -i -Hn '(admit|undefined)'     |		\
+		      egrep -v 'Definition undefined'      |		\
+		      egrep -v new/
 
 all: Makefile.coq
 	$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
