@@ -1,16 +1,22 @@
+%% \documentclass{article}
 \documentclass{llncs}
 
 \usepackage{makeidx}  % allows for indexgeneration
 \usepackage[usenames,dvipsnames]{color}
-\usepackage{fancyvrb} 
+% \usepackage{fancyhdr}  \pagestyle{fancy}
+% llncs wants us to user verbatim package (yuck): \usepackage{fancyvrb} 
+\usepackage{verbatim}
 \usepackage{environ}
 
 % \newif\ifdraft\draftfalse  % draft = comments and half-baked bits
 \newif\ifdraft\drafttrue  % draft = comments and half-baked bits
 
-\DefineVerbatimEnvironment{MyCoqExample}{Verbatim}{frame=lines,framerule=1pt}
-\DefineVerbatimEnvironment{MyCoqExampleStar}{Verbatim}{frame=lines,framerule=1pt}
-% \DefineVerbatimEnvironment{MyCoqEval}{Verbatim}{}
+% \DefineVerbatimEnvironment{MyCoqExample}{Verbatim}{frame=lines,framerule=1pt,fontsize=\small,samepage=true}
+% \DefineVerbatimEnvironment{MyCoqExampleStar}{Verbatim}{frame=lines,framerule=1pt,fontsize=\small,samepage=true}
+% \DefineVerbatimEnvironment{MyCoqUneval}{Verbatim}{frame=lines,framerule=1pt,fontsize=\small,samepage=true}
+\newenvironment{MyCoqExample}{\small \verbatim}{\endverbatim \normalsize}
+\newenvironment{MyCoqExampleStar}{\small \verbatim}{\endverbatim \normalsize}
+\newenvironment{MyCoqUneval}{\small \verbatim}{\endverbatim \normalsize}
 \NewEnviron{MyCoqEval}{}
 
 % Comments
@@ -19,23 +25,34 @@
 \newcommand{\todo}[1]{\xcomment{red}{TO DO}{#1}}
 \newcommand{\gts}[1]{\xcomment{OliveGreen}{GTS}{#1}}
 
+% LLNCS style does not allow for generating PDF bookmarks.
 % should be the last one
 \usepackage[%
-    %pdftex,%
+    pdftex,%
     %pdfpagelabels,%
-    %bookmarks=true,%
+    bookmarks=true,
+    bookmarksopen=true,
     % pdfdisplaydoctitle=true,%
     % pdflang=en-us,%
     % pdfencoding=auto,%
     % bookmarksnumbered=true,%
 ]{hyperref}
 
+% Instructions from Laurie Walsh, 11/12/2014: Footer should contain:
+% Title page: "Approved for Public Release; Distribution Unlimited. Cleared for Open Publication on 11/12/14."
+% Subsequent pages, in the footer: "Non-Technical Data - Releasable to Foreign Persons."
+% \fancyhf{}    % clear out all head and foot
+% \lfoot{Approved for Public Release; Distribution Unlimited. Cleared for Open Publication on 11/12/14.}
+% \renewcommand{\headrulewidth}{0.0pt}
+
 \begin{document}
 
+% LLNCS:
 \frontmatter          % for the preliminaries
 
 \pagestyle{headings}  % switches on printing of running heads
 
+% LLNCS:
 \mainmatter
 
 \title{Experience Report: Implementing a register allocator for Haskell
@@ -43,9 +60,11 @@
 
 \author{John Wiegley \and Gregory Sullivan}
 
+% LLNCS
 \institute{BAE Systems, Burlington MA 01803, USA}
 
 \maketitle
+% \thispagestyle{fancy}
 
 \begin{abstract}
   We describe the process of formalizing a register allocation algorithm, and
@@ -59,7 +78,8 @@
   algorithm verification efforts, in the hope that those teams can learn from
   our mistakes.
   
- \keywords{formal verification, register allocation, Coq, Haskell}
+% LLNCS:
+\keywords{formal verification, register allocation, Coq, Haskell}
 \end{abstract}
 
 \section{Introduction}
@@ -83,18 +103,21 @@ so that \emph{only correct implementations typecheck}.  After that, the
 only parameters of choice are choosing which efficiency dimensions to
 optimize for.
 
-\fixme{Rewrite section overview}In Section~\ref{sec:alg}, we give a
-brief overview of the linear scan register allocation algorithm and
-its datatypes, focusing on correctness properties. In
-Section~\ref{sec:evolve}, we describe the design iterations as we
-discovered strategies for applying Coq to this sort of combined
-verification and implementation task.  We conclude with lessons
-learned, in the hope that our experience will help others embrace the
-methodology of formal development, proof, and code extraction (while
-avoiding some of the pitfalls).
+All of the Coq definitions and proofs, and the generated Haskell code
+can be found at \url{https://github.com/jwiegley/linearscan}.
 
-\todo{Add pointer to github repo containing all proofs and extracted
-  Haskell (and maybe extended version of this paper).}
+% \clearpage
+% \lfoot{Non-Technical Data - Releasable to Foreign Persons.}
+
+% \fixme{Rewrite section overview}In Section~XXX, we give a
+% brief overview of the linear scan register allocation algorithm and
+% its datatypes, focusing on correctness properties. In
+% Section~\ref{sec:evolve}, we describe the design iterations as we
+% discovered strategies for applying Coq to this sort of combined
+% verification and implementation task.  We conclude with lessons
+% learned, in the hope that our experience will help others embrace the
+% methodology of formal development, proof, and code extraction (while
+% avoiding some of the pitfalls).
 
 \begin{MyCoqEval}
 Require Import ScanState.
@@ -166,7 +189,7 @@ approach:
 \begin{enumerate}
 \item Proving termination of complex recursive functions is difficult.
 \item Proving data structure invariants requires proving that mutating
-  function maintains invariants. If we modify that structure, we must revisit
+  functions maintains invariants. If we modify that structure, we must revisit
   many proofs.
 \end{enumerate}
 The following function definition illustrates the above
@@ -177,8 +200,7 @@ intervals into either the ``handled'' or ``inactive'' sets.
 
 \begin{MyCoqExampleStar}
 Definition checkActiveIntervals st pos : ScanStateDesc :=
-  let fix go st st0 (ints : list (IntervalId st))
-             (pos : nat) :=
+  let fix go st st0 (ints : list (IntervalId st)) (pos : nat) :=
     match ints with
     | nil => st0
     | x :: xs =>
@@ -293,7 +315,7 @@ Definition gtb x y :=match nat_compare x y with Gt => true | _ => false end.
 Definition definition_goes_here {a : Type} : a. Admitted.
 \end{MyCoqEval}
 
-\subsubsection*{Lesson learned}
+\subsubsection*{Lesson learned.}
 
 Proving purely computational algorithms of this complexity meant using proof
 scripts to explore every possibility at each step of the algorithm: in effect,
@@ -329,7 +351,7 @@ the lists. Property \texttt{unhandled\_sorted} requires that the
 \texttt{lists\_are\_unique} states that no interval index recurs
 across the four lists.
 
-\subsubsection*{Lessons learned}
+\subsubsection*{Lessons learned.}
 
 While the idea of simultaneously maintaining data structures and
 invariants of those data structures is good, mixing data and
@@ -344,10 +366,10 @@ reasons:
   \texttt{Set}, and so its inhabitants cannot be used by functions or data
   structures restricted to \texttt{Set}.
 
-\item Any time such values must be mutated, the correctness of the mutation
-  must be separately proven \emph{at each instance where it occurs}.  That is,
-  the properties cannot be proven generally, but must be constantly re-proven
-  in each new context.
+% \item Any time such values must be mutated, the correctness of the mutation
+%   must be separately proven \emph{at each instance where it occurs}.  That is,
+%   the properties cannot be proven generally, but must be constantly re-proven
+%   in each new context.\gts{is this subsumed by the following item?}
 
 \item It forces the propositions to be considered whenever a value is mutated
   or created, even though it may be preferable to transform such values
@@ -394,19 +416,23 @@ verified programming tasks:
 \item (minor point) If the only role of a proposition is to indicate
   that a property is held or not (for instance, that a list has a
   certain length), it is better to do so using a boolean-returning
-  function called from an existential data type that pairs the
+  function called from an dependent data type 
+% \gts{is ``existential data type'' the same as ``dependent data type''? If so,
+%      let's just use ``dependent'' throughout.}
+that pairs the
   qualified value with the function's result: an example would be
-  \verb@{ l : list a | size l == 4 }@, or specialized by a data
-  constructor as:
+  \verb@{ l : list a | size l == 4 }@.
 
-\begin{MyCoqExampleStar}
-Inductive listn {a} := mklistn l n of (@size a l == n).
-\end{MyCoqExampleStar}
+% , or specialized by a data  constructor as:
+
+% \begin{MyCoqExampleStar}
+% Inductive listn {a} := mklistn l n of (@size a l == n).
+% \end{MyCoqExampleStar}
   
-  This enables use of small-scale reflection (see the \textsf{ssreflect}
-  library), which has benefits beyond the scope of this paper.  We mention it
-  here only to underscore that we do not recommend all propositions be made
-  inductive, but only those more information rich than simple yes/no properties.
+%   This enables use of small-scale reflection (see the \textsf{ssreflect}
+%   library), which has benefits beyond the scope of this paper.  We mention it
+%   here only to underscore that we do not recommend all propositions be made
+%   inductive, but only those more information rich than simple yes/no properties.
 
 \end{enumerate}
 
@@ -434,7 +460,7 @@ in the next section.
 
 As before, we define a datatype \emph{ScanStateDesc} that contains
 only data (no propositions). An excerpt is:
-\begin{verbatim}
+\begin{MyCoqUneval}[label=ScanStateDesc v3]
 Record ScanStateDesc : Type := {
     unhandled : list (IntervalId * nat);   (* starts after pos *)
     active    : list IntervalId;           (* ranges over pos *)
@@ -443,7 +469,7 @@ Record ScanStateDesc : Type := {
     all_state_lists := map fst unhandledIds ++
                        active ++ inactive ++ handled
 }.
-\end{verbatim}
+\end{MyCoqUneval}
 
 Next, we define an inductive proposition named \texttt{ScanState}(of type
 Proposition, indexed by \texttt{ScanStateDesc}) that enumerates exactly the
@@ -451,7 +477,7 @@ allowed methods for transitioning from one \emph{ScanStateDesc} record
 satisfying \texttt{ScanState} to another \emph{ScanStateDesc} record
 satisfying \texttt{ScanState}. Following are some excerpts:
 
-\begin{verbatim}
+\begin{MyCoqUneval}[label=ScanState Prop]
 Inductive ScanState : ScanStateDesc -> Prop :=
   | ScanState_nil :
     ScanState
@@ -463,8 +489,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
       {| active           := rem x (active sd)
        ; handled          := x :: handled sd
          ... other fields unchanged ... |}
-\end{verbatim}
-
+\end{MyCoqUneval}
+     
 Now, if we want to prove a theorem about a \texttt{ScanState}-qualified
 \texttt{ScanStateDesc} record, we consider each case in the definition of
 \texttt{ScanState}.
@@ -484,7 +510,7 @@ Now, if we want to prove a theorem about a \texttt{ScanState}-qualified
 % Qed.
 % \end{verbatim}
 
-% \subsubsection*{Lesson learned}
+% \subsubsection*{Lesson learned.}
 
 % One of the main lessons learned is that Coq is a fantastic environment
 % in which to reason about code and algorithms!  It required me to fully
@@ -507,7 +533,7 @@ Now, if we want to prove a theorem about a \texttt{ScanState}-qualified
 % with my types'', leading to a richer understanding and better
 % decisions.
 
-\section{Proof morphisms}
+\section{Chains of Evidence Using Monads}
 \label{sec:pfmorph}
 
 During the course of development, it became clear that not only was evidence
@@ -543,10 +569,31 @@ Definition handleInterval {pre}
   : SState pre SSMorphHasLen SSMorphSt (option PhysReg).
 \end{MyCoqExampleStar}
 
+% Notes from talking with John
+% ----------------------------
+% SState is indexed monad for proving things about a state w.r.t. pre
+% (synonym for indexed monad).  Pre is a ScanStateDesc.
+
+% SState relates pre to ingoing and outgoing states.
+
+% SSMorphHasLen (a predicate from ScanStateDesc to Prop) incoming
+% state is related to pre in that has work to do
+% (specif. SState.len(unhandled) > 0).  if pre had work to do, then
+% SState still has work to do.
+
+% SSMorphSt (a predicate from ScanStateDesc to Prop) (should be
+% SSMorphProductive) says have reduced work to be done.
+
+% (option PhysReg) says result of the function may be an allocation of
+% a physical register (or we failed to allocate a physical register).
+
 This function signature tells us that with regard to some original state
 \texttt{pre}, we require that the state upon entering this function is related
 to this original state such that there is work yet to be done (i.e., we have
 proven productivity), and that the output state demonstrates productivity.
+% \gts{English makes sense, but can't map it to code. Need to nknow
+%   which of SState, SSMorphHasLen, SSMorphSt correspond to the
+%   properties you mention. Also, what's ``option PhysReg'' doing?}
 Use of this function alone gives sufficient evidence to prove termination, as
 will any composition that includes this function.
 

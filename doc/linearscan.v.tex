@@ -123,10 +123,10 @@ Most of the types used are records.
 We quickly encountered two issues with this ``purely computational''
 approach:
 \begin{enumerate}
-\item Proving termination of loops is difficult.
-\item Proving invariants over data structures requires proving that
-  every function maintains all invariants. When we want to modify a
-  function's logic, we need to revisit many proofs.
+\item Proving termination of complex recursive functions is difficult.
+\item Proving data structure invariants requires proving that mutating
+  function maintains invariants. If we modify that structure, we must revisit
+  many proofs.
 \end{enumerate}
 The following function definition illustrates the above
 issues. \texttt{checkActiveIntervals} loops over the current set of
@@ -166,14 +166,9 @@ intervals into either the ``handled'' or ``inactive'' sets.
 % Case in point driving this need was a function used to move active intervals
 % to either the inactive or unhandled lists:
 
-First, proving termination of any function defined as a fixpoint is
-difficult in Coq; in particular, it is difficult to use induction,
-which is a pervasive proof technique in Coq.
-
-Next, consider the following two Lemmas, which claim that (1)
-\texttt{checkActiveIntervals} does not disrupt the next interval to
-handle; and (2) \texttt{checkActiveIntervals} does not introduce any
-new intervals.
+Now consider the following two Lemmas, which claim that (1)
+\texttt{checkActiveIntervals} does not disrupt the next interval to handle;
+and (2) \texttt{checkActiveIntervals} does not introduce any new intervals.
 
 % This required some supporting lemmas, to show that certain properties of the
 % scan state were preserved by the function:
@@ -192,22 +187,21 @@ new intervals.
 \texttt{Coq~{<}~~~~~~~~~~~~~(all\_state\_lists~st').}\\
 \end{flushleft}
 
-Because the \texttt{checkActiveIntervals} function operates by
-generating a new scan state on \emph{each} iteration of the loop, we
-need to prove that all properties are maintained by each helper
-function. 
-%
+Because \texttt{checkActiveIntervals} operates by generating a new scan state
+on \emph{each} iteration of the loop, we need to prove that all properties are
+maintained by each helper function.
+
 % However, both of these became inordinately difficult to prove, since we are
 % folding over a list of items taken from the original scan state, and using
 % each item to generate new, intermediate scan states.  This is further done by
 % a fixpoint within the function, making it difficult for Coq to simplify.
-%
+
 As a result, we found ourselves having to break up functions further, and
-prove more and more auxiliary lemmas about each piece.  After losing much time
-to this approach, we decided that evidence should be carried through each
-modification step to prove the desired property.  That is, rather proving
-correctness ``from the outside'', the function itself was changed to manage
-the evidence, which removed the need for helper lemmas.
+prove more auxiliary lemmas about each piece.  After losing much time to this
+approach, we decided that evidence should be carried through each modification
+to prove the desired property.  That is, rather than proving correctness
+``from the outside'', the function was changed to manage evidence, which
+removed the need for helper lemmas.
 
 % The next version shows this change, but became less clear to read as a result:
 % 
@@ -241,36 +235,13 @@ the evidence, which removed the need for helper lemmas.
 % computational approach:
 
 
-% \begin{coq_example*}
-% Program Fixpoint quicksort (l : list nat)
-%   {measure (length l)} : list nat :=
-%   definition_goes_here.
-% \end{coq_example*}
-% 
-% \begin{coq_eval}
-% Obligation 1. admit. Defined.
-% \end{coq_eval}
-% 
-% \begin{coq_example*}
-% Lemma quicksort_spec (l : list nat) : forall l',
-%   quicksort l = l' -> (Permutation l l' /\
-%                        StronglySorted le l').
-% \end{coq_example*}
-% \begin{coq_eval}
-% Proof. admit. Defined.
-% \end{coq_eval}
-% 
-% \fixme{Explain why the difficulty here is one of ``reversing the algorithm''
-%   of quicksort within the proof using tactics.}
-
 \subsubsection*{Lesson learned}
 
 Proving purely computational algorithms of this complexity meant using proof
 scripts to explore every possibility at each step of the algorithm: in effect,
 re-implementing the same algorithm in reverse, only now using tactics.
 
-% \subsection{Second design: More dependent}
-\subsection{Second design: Proof-Carrying Data}
+\subsection{Second design: Proof-carrying data}
 \label{sec:depinduct}
 
 In the second design of our algorithm, an attempt was made to reduce the
@@ -334,8 +305,8 @@ reasons:
 A guiding principle is to separate concerns as much as practical, which led
 directly to the third redesign, discussed in the next section.  
 
-\subsection{Third design: Proof-Qualified Data (Regular Datatypes Qualified by Inductive
-  Propositions)}
+\subsection{Third design: Proof-Qualified Data (Regular Datatypes Qualified by
+  Inductive Propositions)}
 \label{sec:splitdesign}
 
 After several iterations, where proving was found to be difficult and
@@ -407,79 +378,53 @@ As before, we define a datatype \emph{ScanStateDesc} that contains
 only data (no propositions). An excerpt is:
 \begin{verbatim}
 Record ScanStateDesc : Type := {
-    nextInterval : nat;
-    IntervalId   := fin nextInterval;
-
     unhandled : list (IntervalId * nat);   (* starts after pos *)
     active    : list IntervalId;           (* ranges over pos *)
     inactive  : list IntervalId;           (* falls in lifetime hole *)
 
-    unhandledIds    := map fst unhandled;
-    unhandledStarts := map snd unhandled;
-...
-    all_state_lists := unhandledIds ++ active ++ inactive ++ handled
+    all_state_lists := map fst unhandledIds ++
+                       active ++ inactive ++ handled
 }.
 \end{verbatim}
 
-Next, we define an inductive proposition named \texttt{ScanState}(of
-type Proposition, indexed by \texttt{ScanStateDesc}) that enumerates
-exactly the allowed methods for transitioning from one
-\emph{ScanStateDesc} record satisfying \texttt{ScanState} to another
-\emph{ScanStateDesc} record satisfying \texttt{ScanState}. Following
-are some excerpts:
+Next, we define an inductive proposition named \texttt{ScanState}(of type
+Proposition, indexed by \texttt{ScanStateDesc}) that enumerates exactly the
+allowed methods for transitioning from one \emph{ScanStateDesc} record
+satisfying \texttt{ScanState} to another \emph{ScanStateDesc} record
+satisfying \texttt{ScanState}. Following are some excerpts:
 
 \begin{verbatim}
 Inductive ScanState : ScanStateDesc -> Prop :=
   | ScanState_nil :
     ScanState
-      {| nextInterval     := 0
-       ; unhandled        := nil
-       ; active           := nil
-       ; inactive         := nil
-       ; handled          := nil
-       ; intervals        := V.nil _
-       ; assignments      := V.nil _
-       ; fixedIntervals   := V.const None _
-       |}
+      {| ... to fields to 0 or nil... |}
 ...
   | ScanState_moveActiveToHandled sd :
     ScanState sd -> forall `(H : x \in active sd),
     ScanState
-      {| nextInterval     := nextInterval sd
-       ; unhandled        := unhandled sd
-       ; active           := rem x (active sd)
-       ; inactive         := inactive sd
+      {| active           := rem x (active sd)
        ; handled          := x :: handled sd
-       ; intervals        := intervals sd
-       ; assignments      := assignments sd
-       ; fixedIntervals   := fixedIntervals sd
-       |}
-
-...
+         ... other fields unchanged ... |}
 \end{verbatim}
 
-Now, if we want to prove a theorem about a
-\texttt{ScanState}-qualified \texttt{ScanStateDesc} record, we
-consider each case in the definition of \texttt{ScanState}.
-For example, to prove that the unhandled interval list is sorted, the
-proof is:
+Now, if we want to prove a theorem about a \texttt{ScanState}-qualified
+\texttt{ScanStateDesc} record, we consider each case in the definition of
+\texttt{ScanState}.
 
-\begin{verbatim}
-Theorem unhandled_sorted `(st : ScanState sd) :
-  StronglySorted (lebf snd) (unhandled sd).
-Proof.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". constructor.
-  - Case "ScanState_newUnhandled".
-    rewrite /unh.
-    by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
-  - Case "ScanState_moveUnhandledToActive". inv IHst.
-  - Case "ScanState_moveActiveToInactive". apply IHst.
-  - Case "ScanState_moveActiveToHandled". apply IHst.
-  - Case "ScanState_moveInactiveToActive". apply IHst.
-  - Case "ScanState_moveInactiveToHandled".  apply IHst.
-Qed.
-\end{verbatim}
+% For example, to prove that the unhandled interval list is sorted, the proof
+% is:
+% 
+% \begin{verbatim}
+% Theorem unhandled_sorted `(st : ScanState sd) :
+%   StronglySorted (lebf snd) (unhandled sd).
+% Proof.
+%   ScanState_cases (induction st) Case; simpl in *; try apply IHst.
+%   - constructor.
+%   - rewrite /unh.
+%     by apply/StronglySorted_insert_spec/StronglySorted_widen/IHst.
+%   - inv IHst.
+% Qed.
+% \end{verbatim}
 
 % \subsubsection*{Lesson learned}
 
@@ -557,11 +502,11 @@ By this means, the final well-foundedness proof of the main algorithm became a
 one-liner, while at the same time each component function of the algorithm was
 greatly simplified, reading similarly to an equivalent Haskell implementation.
 
-\begin{verbatim}
-Proof.
-  intros; clear; by case: ssinfo' => ?; case=> /= _ /ltP.
-Qed.
-\end{verbatim}
+% \begin{verbatim}
+% Proof.
+%   intros; clear; by case: ssinfo' => ?; case=> /= _ /ltP.
+% Qed.
+% \end{verbatim}
 
 \section{Code extraction}
 \label{sec:extract}
@@ -593,98 +538,6 @@ Even still, the ability to write code in Coq and have it so easily converted
 to naive Haskell was incredibly useful, and an area that we hope sees further
 development.  The result Haskell code was quite simple and straightforward,
 which should lend fairly well to optimization by the GHC compiler.
-
-\section{Register Allocation Algorithm and Correctness Properties}
-\label{sec:alg}
-
-The algorithm we implemented is fully documented in the original
-paper\cite{Wimmer:2005}.  We extend that documentation by presenting several
-requirements that were implicit in their presentation, but became necessarily
-explicit in the Coq formalization.  Each requirement stated below was encoded
-in either a type or a lemma, and proven during the course of development.
-
-\subsection{Use positions}
-\label{sec:usepos}
-
-When code is linearized for the purpose of register allocation, each position
-where a variable is used is termed a \emph{use position}.  There is also a
-boolean flag to indicate whether a register is required at this use position
-or not.
-
-\paragraph{Requirements}
-
-\begin{itemize}
-\item All use positions must be given odd addresses, so that ranges do not
-  extend to the next use position.
-\end{itemize}
-
-\subsection{Ranges}
-\label{sec:ranges}
-
-A list of use positions constitutes a range, from the beginning use position,
-to one beyond the last.  A range may also be extended so that its beginning
-and end fall outside its list of use positions.  This is done in order to
-provide explicit coverage of loop bodies, to avoid reloading registers each
-time the loop body is executed.
-
-\paragraph{Requirements}
-
-\begin{itemize}
-\item The list of use positions is ordered with respect to location.
-\item The list of use positions is unique with respect to location (no
-  recurring use positions).
-\item The beginning of a range is $\le$ its first use position location.
-\item The end of a range is $>$ its last use position location.
-\end{itemize}
-
-\subsection{Intervals}
-\label{sec:intervals}
-
-An ordered list of ranges constitutes an \emph{interval}.  In the majority of
-scenarios, intervals are equivalent to ranges, since only a single range is
-used.  However, adding the concept of intervals allows for \emph{lifetime
-  holes} between component ranges, that are otherwise allocated to the same
-register.
-
-\paragraph{Requirements}
-
-\begin{itemize}
-\item The list of ranges is ordered by the first use position in each range.
-\item The list of ranges is non-overlapping.
-\item The beginning of the interval corresponds to the beginning of its first
-  range.
-\item The end of the interval corresponds to the end of its last range.
-\end{itemize}
-
-\subsection{Scan state}
-\label{sec:scanstate}
-
-During the course of the algorithm, a position counter is iterated from the
-first code position to the last.  Six separate details are managed using a
-collection of lists:
-
-\begin{enumerate}
-\item A list of yet to be allocated intervals (unhandled intervals).
-\item A list of active intervals (those covering the current position, and
-  presently allocated).
-\item A list of inactive intervals (those having a lifetime hole covering the
-  current position).
-\item A list of handled intervals.
-\item A mapping from registers to active/inactive/handled intervals.
-\item A mapping from intervals (those not unhandled) to registers.
-\end{enumerate}
-
-\paragraph{Requirements}
-
-\begin{itemize}
-\item The list of unhandled intervals is ordered by start positions.
-\item The first 4 lists, taken as a set, must contain no recurring
-  intervals, and have no overlapping intervals.
-\item All register indices must be $<$ the maximum register index.
-\item The number of intervals in the active list be $<$ the maximum register
-  index.
-\end{itemize}
-
 
 % ---- Bibliography ----
 \bibliographystyle{splncs03}

@@ -1,2 +1,5 @@
 #!/bin/bash
-exec coqtop -I . -I $HOME/bae/linearscan -dont-load-proofs -quality "$@"
+# If the checkout of linearscan is somewhere other than ~/bae/linearscan
+# then set LINSCANDIR
+linearscandir=${LINSCANDIR:-$HOME/bae/linearscan}
+exec coqtop -I . -I $linearscandir -dont-load-proofs -quality "$@"

@@ -1,0 +1,17 @@
+Environment variables:
+
+* LINSCANDIR: If linearscan library is somewhere other than $HOME/bae/linearscan, do:
+     export LINSCANDIR=/path/to/linearscan
+
+* NOCOQ: if coq has trouble with the coq code embedded in coq_ environments
+  and sent to coq via coq-tex, use "MyCoq" names in .tex file instead and do:
+     export NOCOQ=1
+  See wrap-coq-tex for a longer explanation.
+
+The primary paper source is linearscan.tex
+
+To compile the paper and evaluate the embedded coq code,
+run 'make', with LINSCANDIR set appropriately and NOCOQ unset.
+
+To compile the paper without running coq, just pdflatex the file as-is, 
+or run 'make' with NOCOQ set.

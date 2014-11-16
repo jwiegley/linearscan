@@ -1,0 +1,43 @@
+#!/bin/sh
+# Summary: set env var NOCOQ to turn off coq-tex's processing.
+#   In your .tex file, do
+#     \usepackage{fancyvrb} 
+#     \DefineVerbatimEnvironment{MyCoqExample}{Verbatim}{}
+#     \DefineVerbatimEnvironment{MyCoqExampleStar}{Verbatim}{}
+#     \DefineVerbatimEnvironment{MyCoqEval}{Verbatim}{}
+# and use the "MyCoq" names instead of the "coq_" names.
+#
+# Usage: wrap-coq-tex foo.tex   # will produce foo.v.tex
+#
+# Rant:
+#   coq-tex has two big annoyances:
+#   1. when coq fails hard, the generation of the *.v.tex file is killed.
+#      Thus we can't run coq-tex if the coq code fails.
+#   2. coq-tex made the unfortunate decision to use underscores in its 
+#   "environments" (e.g. coq_example). That choice of names is very 
+#   TeX-unfriendly, as it is difficult to, for example, redefine those
+#   environments as, e.g. verbatim environments. What you would like to
+#   do, if you want to turn off Coq processing temporarily, is 
+#   \usepackage{fancyvrb} \DefineVerbatimEnvironment{coq_example}{Verbatim}{}.
+#   but because underscores are not generally allowed in TeX command names, this
+#   is difficult.
+#   As a result, I've (Greg S. 11/2014) used "MyCoq" instead of "coq_" in the TeX
+#   source. If we want coq-tex to do it's thing, make sure NOCOQ is not set, and this
+#   script will replace all the "MyCoq" names with corresponding "coq_" names.
+#
+infile=$1
+shift 1
+tmpfile=`echo $infile | sed 's/\.tex/.tmp.tex/'`
+ if [ -z ${NOCOQ+x} ]; then              # if NOCOQ is not set (so enable coq-tex)
+    # use coq-tex's environment names:
+    sed -E 's/((begin|end).)MyCoqExampleStar.*/\1coq_example*}/' $infile | sed -E 's/((begin|end).)MyCoqExample.*/\1coq_example}/' | sed -E 's/((begin|end).)MyCoqEval/\1coq_eval/' > $tmpfile
+    infile=$tmpfile
+fi
+coqtexoutfile=`echo $infile | sed 's/\.tex/.v.tex/'`
+# if didn't s/MyCoq/coq_/, then coq-tex will have no effect (MyCoq envs are verbatim envs)
+# either way, coq-tex produces foo.v.tex from foo.tex
+coq-tex $* $infile
+if [ -z ${NOCOQ+x} ]; then
+    # mv filename.tmp.v.tex filename.v.tex
+    mv $coqtexoutfile `echo $coqtexoutfile | sed 's/\.tmp//'`
+fi
