@@ -485,10 +485,10 @@ Proof.
   simpl in set_int_desc.
   move=> state.
 
-  have := ScanState_newUnhandled state i1.
+  have := ScanState_newInactive reg state i1.
   rewrite /= => {state}.
-  set new_unhandled_added := Build_ScanStateDesc _ _ _ _ _ _.
-  simpl in new_unhandled_added.
+  set new_inactive_added := Build_ScanStateDesc _ _ _ _ _ _.
+  simpl in new_inactive_added.
   move=> state.
 
   apply: (Build_SSInfo _ state).
@@ -497,25 +497,43 @@ Proof.
     => /= next_interval_increases
           total_extent_decreases
           handled_count_increases.
-  have ?: unhandledExtent new_unhandled_added <= unhandledExtent pre.
+  have ?: unhandledExtent new_inactive_added <= unhandledExtent pre.
     move: (lists_are_unique st).
     move: (lists_are_unique state).
-    rewrite /all_state_lists /new_unhandled_added.
+    rewrite /all_state_lists /new_inactive_added.
     rewrite /unhandledIds cat_uniq => /and3P [/= Huniq_state _ _].
     rewrite /unhandledIds cat_uniq /= => /and3P [Huniq_st _ _].
     apply: (leq_trans _ total_extent_decreases).
     rewrite /unhandledExtent /=
-            {holds state st new_unhandled_added set_int_desc
+            {holds state st new_inactive_added set_int_desc
              unhandled_nonempty total_extent_decreases}.
-    (* elim: unh => // [u us IHus] in first_nonempty Huniq_state Huniq_st *. *)
-    (* case: us => /= [|y ys] in IHus first_nonempty Huniq_state Huniq_st *. *)
-    (* simpl. *)
-    (* case H: (aid == fst u). *)
-    (*   move/eqP in H. *)
-    (*   rewrite H -!map_comp /funcomp insert_f_sumlist !map_cons *)
-    (*           !sumlist_cons -map_comp /funcomp *)
-    (*           !vnth_vshiftin vnth_last vnth_vreplace /=. *)
-    admit.
+    elim: unh => // [u us IHus] in first_nonempty Huniq_state Huniq_st *.
+    case: us => /= [|y ys] in IHus first_nonempty Huniq_state Huniq_st *.
+      simpl.
+      rewrite !sumlist_cons /sumlist !addn0 /=.
+      case H: (aid == fst u).
+        move/eqP in H.
+        move: H6.
+        rewrite H !vnth_vshiftin vnth_vreplace /int H.
+        by move/ltnW.
+      rewrite vnth_vshiftin vnth_vreplace_neq; first by [].
+      by move/negbT in H.
+    rewrite sumlist_cons [sumlist [:: _, _ & _]]sumlist_cons.
+    apply/leq_add.
+      case H: (aid == fst u).
+        move/eqP in H.
+        move: H6.
+        rewrite H !vnth_vshiftin vnth_vreplace /int H /=.
+        by move/ltnW.
+      rewrite vnth_vshiftin vnth_vreplace_neq; first by [].
+      by move/negbT in H.
+    apply IHus; first by [].
+      rewrite !map_widen_fst -cons_uniq -map_cons.
+      rewrite map_inj_uniq; last by exact: widen_ord_inj.
+      move: Huniq_st.
+      by rewrite -cons_uniq -map_cons cons_uniq => /andP [_ ?].
+    move/and3P: Huniq_st => [? ? ?].
+    by apply/andP.
 
   apply: Build_SSMorphHasLen;
   try apply: Build_SSMorphLen;

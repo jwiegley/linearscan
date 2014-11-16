@@ -771,23 +771,19 @@ _LinearScan__splitAssignedIntervalForReg pre reg pos trueForActives ssi =
                   Ssreflect.ssr_have __ (\_ ->
                     Ssreflect.ssr_have __
                       (let {
-                        new_unhandled_added = LinearScan__MLS__MS__Build_ScanStateDesc
+                        new_inactive_added = LinearScan__MLS__MS__Build_ScanStateDesc
                          (Prelude.succ ni)
                          (LinearScan.Utils.snoc ni
                            (LinearScan.Utils.set_nth ni intervals0 aid
                              _top_assumption_1) _top_assumption_2)
                          _fixedIntervals_
-                         (Lib.insert (\x ->
-                           Lib.lebf Prelude.snd x ((,) (Fintype.ord_max ni)
-                             (Interval.ibeg _top_assumption_2))) ((,)
-                           (Fintype.ord_max ni)
-                           (Interval.ibeg _top_assumption_2))
-                           (Prelude.map (Lib.widen_fst ni) unh))
-                         (Prelude.map (Lib.widen_fst ni) active0)
-                         (Prelude.map (Lib.widen_fst ni) _inactive_)
+                         (Prelude.map (Lib.widen_fst ni) unh)
+                         (Prelude.map (Lib.widen_fst ni) active0) ((:) ((,)
+                         (Fintype.ord_max ni) reg)
+                         (Prelude.map (Lib.widen_fst ni) _inactive_))
                          (Prelude.map (Lib.widen_fst ni) _handled_)}
                        in
-                       \_ -> LinearScan__Build_SSInfo new_unhandled_added __))}
+                       \_ -> LinearScan__Build_SSInfo new_inactive_added __))}
                 in
                 Logic.eq_rect_r
                   (Eqtype.eq_op Ssrnat.nat_eqType
