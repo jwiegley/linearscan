@@ -6,8 +6,6 @@ Require Import Ssreflect.seq.
 Require Import Ssreflect.ssrnat.
 Require Import Ssreflect.fintype.
 
-Notation fin := ordinal.
-
 Section Vector.
 
 Variable A : Type.
@@ -24,30 +22,30 @@ Definition vsing (x : A) : Vec 1 := (x, tt).
 
 Definition vcons {n} (x : A) (v : Vec n) : Vec n.+1 := (x, v).
 
-Definition fin_contra : forall {x}, fin 0 -> x.
+Definition fin_contra : forall {x}, 'I_0 -> x.
 Proof. by move=> x; case=> m; move/eqP: (ltn0 m) => Hcontra //. Defined.
 
-Definition fin_rect {n} : forall (P : fin n.+1 -> Type),
+Definition fin_rect {n} : forall (P : 'I_n.+1 -> Type),
   (forall {H}, P (@Ordinal n.+1 0 H))
     -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
           -> P (@Ordinal n.+1 m.+1 H))
-    -> forall (x : fin n.+1), P x.
+    -> forall (x : 'I_n.+1), P x.
 Proof.
   move=> P Hz HSn; case=> m H.
   elim: m => [|m IHm] in H *; [ exact: Hz | exact/HSn/IHm ].
 Defined.
 
-Definition fin_rec {n} : forall (P : fin n.+1 -> Set),
+Definition fin_rec {n} : forall (P : 'I_n.+1 -> Set),
   (forall {H}, P (@Ordinal n.+1 0 H))
     -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
           -> P (@Ordinal n.+1 m.+1 H))
-    -> forall (x : fin n.+1), P x := [eta fin_rect].
+    -> forall (x : 'I_n.+1), P x := [eta fin_rect].
 
-Definition fin_ind {n} : forall (P : fin n.+1 -> Prop),
+Definition fin_ind {n} : forall (P : 'I_n.+1 -> Prop),
   (forall {H}, P (@Ordinal n.+1 0 H))
     -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
           -> P (@Ordinal n.+1 m.+1 H))
-    -> forall (x : fin n.+1), P x := [eta fin_rect].
+    -> forall (x : 'I_n.+1), P x := [eta fin_rect].
 
 Definition vec_rect : forall (P : forall {n}, Vec n -> Type),
   P vnil
@@ -98,7 +96,7 @@ Proof.
 Defined.
 
 Definition vfoldl_with_index
-  {B : Type} {n} (f : fin n -> B -> A -> B) (b : B) (v : Vec n) : B.
+  {B : Type} {n} (f : 'I_n -> B -> A -> B) (b : B) (v : Vec n) : B.
 Proof.
   case: n => [//|n] in f v *.
   elim/vecn_rect: v => [x|sz x xs IHxs].
@@ -115,7 +113,7 @@ Proof.
   elim: n => [|n IHn]; [ exact: vnil | exact: (vcons i IHn) ].
 Defined.
 
-Definition vreplace {n} (v : Vec n) (p : fin n) (i : A) : Vec n.
+Definition vreplace {n} (v : Vec n) (p : 'I_n) (i : A) : Vec n.
 Proof.
   case: n => [|n] in v p *;
     first exact: fin_contra.
@@ -126,7 +124,7 @@ Proof.
   exact: (vcons x (IHxs (@Ordinal _ p _))).
 Defined.
 
-Definition vnth {n} (v : Vec n) (p : fin n) : A.
+Definition vnth {n} (v : Vec n) (p : 'I_n) : A.
 Proof.
   case: n => [|n] in v p *;
     first exact: fin_contra.
@@ -175,7 +173,7 @@ Proof.
   exact: IHxs.
 Qed.
 
-Lemma vreplace_cons0 n (k : fin n.+1) : forall i (v : Vec n) z,
+Lemma vreplace_cons0 n (k : 'I_n.+1) : forall i (v : Vec n) z,
   k == ord0 -> vreplace (vcons i v) k z = vcons z v.
 Proof.
   move=> i v z H.
@@ -201,14 +199,14 @@ Proof.
   by rewrite vreplace_consn vnth_consn IHxs.
 Qed.
 
-Lemma fin1_eq : forall (j k : fin 1), j == k.
+Lemma fin1_eq : forall (j k : 'I_1), j == k.
 Proof.
   elim/@fin_ind=> [?|? ? _];
   elim/@fin_ind=> [?|? ? _]; first by [];
   discriminate.
 Qed.
 
-Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
+Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : 'I_n) (z : A),
   k != j -> vnth (vreplace v k z) j = vnth v j.
 Proof.
   move=> n v k j z.
@@ -303,7 +301,7 @@ Proof. reflexivity. Qed.
 
 End VectorSpec.
 
-Extract Inductive fin => "Prelude.Int" [""].
+Extract Inductive ordinal => "Prelude.Int" [""].
 
 Extract Constant Vec "a" => "[a]".
 

@@ -257,7 +257,7 @@ Proof.
   exact: perm_to_rem.
 Qed.
 
-Lemma lift_bounded : forall n (x : fin n), ord_max != widen_ord (leqnSn n) x.
+Lemma lift_bounded : forall n (x : 'I_n), ord_max != widen_ord (leqnSn n) x.
 Proof.
   move=> n.
   case=> /= m Hlt.
@@ -281,7 +281,7 @@ Definition widen_id {n} := widen_ord (leqnSn n).
 Arguments widen_id [n] i /.
 Definition widen_fst {n a} p := (@widen_id n (@fst _ a p), snd p).
 
-Lemma map_widen_fst : forall (a : eqType) n (xs : seq (fin n * a)),
+Lemma map_widen_fst : forall (a : eqType) n (xs : seq ('I_n * a)),
   [seq fst i | i <- [seq (@widen_fst n a) i | i <- xs]] =
   [seq (@widen_id n) i | i <- [seq fst i | i <- xs]].
 Proof. move=> a n xs. by rewrite -!map_comp. Qed.
@@ -293,7 +293,7 @@ Proof.
   by invert; apply ord_inj.
 Qed.
 
-Lemma no_ord_max : forall n (xs : seq (fin n)),
+Lemma no_ord_max : forall n (xs : seq ('I_n)),
   ord_max \notin [ seq widen_id i | i <- xs ].
 Proof.
   move=> n; elim=> // [x xs IHxs] /=.

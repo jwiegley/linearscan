@@ -26,7 +26,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Sorted.
 Require Import Ssreflect.seq.
 
-Lemma Forall_widen : forall n x (xs : list (fin n * nat)),
+Lemma Forall_widen : forall n x (xs : list ('I_n * nat)),
   Forall (lebf (@snd _ _) x) xs
     -> Forall (lebf (@snd _ _) (widen_id (fst x), snd x))
                    [seq (widen_id (fst p), snd p) | p <- xs].
@@ -37,7 +37,7 @@ Proof.
   by apply IHys; inv H.
 Qed.
 
-Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
+Lemma StronglySorted_widen : forall n (xs : list ('I_n * nat)),
   StronglySorted (lebf (@snd _ _)) xs
     -> StronglySorted (lebf (@snd _ _))
                       [seq widen_fst p | p <- xs].

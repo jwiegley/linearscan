@@ -11,7 +11,7 @@ Generalizable All Variables.
 Module MScanState (Mach : Machine).
 Import Mach.
 
-Definition PhysReg := fin maxReg.
+Definition PhysReg := 'I_maxReg.
 
 (** ** ScanStateDesc *)
 
@@ -24,7 +24,7 @@ Definition fixedIntervalsType :=
 
 Record ScanStateDesc : Type := {
     nextInterval : nat;
-    IntervalId := fin nextInterval;
+    IntervalId := 'I_nextInterval;
 
     intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
     fixedIntervals : fixedIntervalsType;
@@ -74,9 +74,9 @@ Definition intervals_for_reg {sd : ScanStateDesc}
     n, in which case register 0 is selected. *)
 
 Definition registerWithHighestPos :
-  Vec (option nat) maxReg -> fin maxReg * option nat :=
+  Vec (option nat) maxReg -> 'I_maxReg * option nat :=
   vfoldl_with_index
-    (fun reg (res : fin maxReg * option nat) x =>
+    (fun reg (res : 'I_maxReg * option nat) x =>
        match (res, x) with
        | ((r, None), _) => (r, None)
        | (_, None) => (reg, None)

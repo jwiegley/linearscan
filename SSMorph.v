@@ -267,7 +267,7 @@ Proof.
 Defined.
 
 Lemma unhandledExtent_cons :
-  forall ni i (unh : list (fin ni * nat)) ints fixints
+  forall ni i (unh : list ('I_ni * nat)) ints fixints
     act act' inact inact' hnd hnd',
   unhandledExtent
     {| nextInterval     := ni

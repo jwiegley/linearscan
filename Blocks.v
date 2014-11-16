@@ -25,7 +25,7 @@ Section Block.
 Variable baseType : Set.
 Variable maxVirtReg : nat.
 
-Definition SomeVar := (fin maxVirtReg + fin maxReg)%type.
+Definition SomeVar := ('I_maxVirtReg + 'I_maxReg)%type.
 
 Record Block : Type := {
     original    : baseType;
