@@ -450,14 +450,16 @@ _LinearScan__thisHolds startDesc s =
 data LinearScan__SSError =
    LinearScan__ECurrentIsSingleton
  | LinearScan__ENoIntervalsToSplit
+ | LinearScan__EFailedToAllocateRegister
 
-_LinearScan__coq_SSError_rect :: a1 -> a1 -> LinearScan__SSError -> a1
-_LinearScan__coq_SSError_rect f f0 s =
+_LinearScan__coq_SSError_rect :: a1 -> a1 -> a1 -> LinearScan__SSError -> a1
+_LinearScan__coq_SSError_rect f f0 f1 s =
   case s of {
    LinearScan__ECurrentIsSingleton -> f;
-   LinearScan__ENoIntervalsToSplit -> f0}
+   LinearScan__ENoIntervalsToSplit -> f0;
+   LinearScan__EFailedToAllocateRegister -> f1}
 
-_LinearScan__coq_SSError_rec :: a1 -> a1 -> LinearScan__SSError -> a1
+_LinearScan__coq_SSError_rec :: a1 -> a1 -> a1 -> LinearScan__SSError -> a1
 _LinearScan__coq_SSError_rec =
   _LinearScan__coq_SSError_rect
 
@@ -1120,7 +1122,11 @@ _LinearScan__linearScan_F linearScan0 sd =
      Prelude.Left err -> Prelude.Left err;
      Prelude.Right p ->
       case p of {
-       (,) o ssinfo' -> linearScan0 (_LinearScan__thisDesc sd ssinfo') __}};
+       (,) mreg ssinfo' ->
+        case mreg of {
+         Prelude.Just p0 -> linearScan0 (_LinearScan__thisDesc sd ssinfo') __;
+         Prelude.Nothing -> Prelude.Left
+          LinearScan__EFailedToAllocateRegister}}};
    Prelude.Nothing -> Prelude.Right sd}
 
 _LinearScan__linearScan_terminate :: LinearScan__MLS__MS__ScanStateDesc ->
@@ -1134,10 +1140,14 @@ _LinearScan__linearScan_terminate sd =
      Prelude.Left err -> Prelude.Left err;
      Prelude.Right p ->
       case p of {
-       (,) o ssinfo' ->
-        Specif.sig_rect (\rec_res _ -> rec_res)
-          (_LinearScan__linearScan_terminate
-            (_LinearScan__thisDesc sd ssinfo'))}};
+       (,) mreg ssinfo' ->
+        case mreg of {
+         Prelude.Just p0 ->
+          Specif.sig_rect (\rec_res _ -> rec_res)
+            (_LinearScan__linearScan_terminate
+              (_LinearScan__thisDesc sd ssinfo'));
+         Prelude.Nothing -> Prelude.Left
+          LinearScan__EFailedToAllocateRegister}}};
    Prelude.Nothing -> Prelude.Right sd}
 
 _LinearScan__linearScan :: LinearScan__MLS__MS__ScanStateDesc ->
@@ -1151,9 +1161,13 @@ _LinearScan__linearScan sd =
      Prelude.Left err -> Prelude.Left err;
      Prelude.Right p ->
       case p of {
-       (,) o ssinfo' ->
-        Specif.sig_rect (\rec_res _ -> rec_res)
-          (_LinearScan__linearScan (_LinearScan__thisDesc sd ssinfo'))}};
+       (,) mreg ssinfo' ->
+        case mreg of {
+         Prelude.Just p0 ->
+          Specif.sig_rect (\rec_res _ -> rec_res)
+            (_LinearScan__linearScan (_LinearScan__thisDesc sd ssinfo'));
+         Prelude.Nothing -> Prelude.Left
+          LinearScan__EFailedToAllocateRegister}}};
    Prelude.Nothing -> Prelude.Right sd}
 
 data LinearScan__R_linearScan =
@@ -1166,9 +1180,17 @@ data LinearScan__R_linearScan =
                                                                  Prelude.Int) 
  ([] ((,) LinearScan__MLS__MS__IntervalId Prelude.Int)) (Prelude.Maybe
                                                         LinearScan__MLS__MS__PhysReg) 
- (LinearScan__SSInfo ()) (Prelude.Either LinearScan__SSError
-                         LinearScan__MLS__MS__ScanStateDesc) LinearScan__R_linearScan
- | LinearScan__R_linearScan_2 LinearScan__MLS__MS__ScanStateDesc
+ (LinearScan__SSInfo ())
+ | LinearScan__R_linearScan_2 LinearScan__MLS__MS__ScanStateDesc ((,)
+                                                                 LinearScan__MLS__MS__IntervalId
+                                                                 Prelude.Int) 
+ ([] ((,) LinearScan__MLS__MS__IntervalId Prelude.Int)) (Prelude.Maybe
+                                                        LinearScan__MLS__MS__PhysReg) 
+ (LinearScan__SSInfo ()) LinearScan__MLS__MS__PhysReg (Prelude.Either
+                                                      LinearScan__SSError
+                                                      LinearScan__MLS__MS__ScanStateDesc) 
+ LinearScan__R_linearScan
+ | LinearScan__R_linearScan_3 LinearScan__MLS__MS__ScanStateDesc
 
 _LinearScan__coq_R_linearScan_rect :: (LinearScan__MLS__MS__ScanStateDesc ->
                                       () -> ((,)
@@ -1185,7 +1207,18 @@ _LinearScan__coq_R_linearScan_rect :: (LinearScan__MLS__MS__ScanStateDesc ->
                                       Prelude.Int)) -> () -> () ->
                                       (Prelude.Maybe
                                       LinearScan__MLS__MS__PhysReg) ->
+                                      (LinearScan__SSInfo ()) -> () -> () ->
+                                      a1) ->
+                                      (LinearScan__MLS__MS__ScanStateDesc ->
+                                      () -> ((,)
+                                      LinearScan__MLS__MS__IntervalId
+                                      Prelude.Int) -> ([]
+                                      ((,) LinearScan__MLS__MS__IntervalId
+                                      Prelude.Int)) -> () -> () ->
+                                      (Prelude.Maybe
+                                      LinearScan__MLS__MS__PhysReg) ->
                                       (LinearScan__SSInfo ()) -> () ->
+                                      LinearScan__MLS__MS__PhysReg -> () ->
                                       (Prelude.Either LinearScan__SSError
                                       LinearScan__MLS__MS__ScanStateDesc) ->
                                       LinearScan__R_linearScan -> a1 -> a1)
@@ -1195,14 +1228,16 @@ _LinearScan__coq_R_linearScan_rect :: (LinearScan__MLS__MS__ScanStateDesc ->
                                       (Prelude.Either LinearScan__SSError
                                       LinearScan__MLS__MS__ScanStateDesc) ->
                                       LinearScan__R_linearScan -> a1
-_LinearScan__coq_R_linearScan_rect f f0 f1 sd s r =
+_LinearScan__coq_R_linearScan_rect f f0 f1 f2 sd s r =
   case r of {
    LinearScan__R_linearScan_0 sd0 x xs x0 -> f sd0 __ x xs __ __ x0 __;
-   LinearScan__R_linearScan_1 sd0 x xs x0 x1 x2 x3 ->
-    f0 sd0 __ x xs __ __ x0 x1 __ x2 x3
-      (_LinearScan__coq_R_linearScan_rect f f0 f1
-        (_LinearScan__thisDesc sd0 x1) x2 x3);
-   LinearScan__R_linearScan_2 sd0 -> f1 sd0 __ __ __}
+   LinearScan__R_linearScan_1 sd0 x xs x0 x1 ->
+    f0 sd0 __ x xs __ __ x0 x1 __ __;
+   LinearScan__R_linearScan_2 sd0 x xs x0 x1 x2 x3 x4 ->
+    f1 sd0 __ x xs __ __ x0 x1 __ x2 __ x3 x4
+      (_LinearScan__coq_R_linearScan_rect f f0 f1 f2
+        (_LinearScan__thisDesc sd0 x1) x3 x4);
+   LinearScan__R_linearScan_3 sd0 -> f2 sd0 __ __ __}
 
 _LinearScan__coq_R_linearScan_rec :: (LinearScan__MLS__MS__ScanStateDesc ->
                                      () -> ((,)
@@ -1219,7 +1254,18 @@ _LinearScan__coq_R_linearScan_rec :: (LinearScan__MLS__MS__ScanStateDesc ->
                                      Prelude.Int)) -> () -> () ->
                                      (Prelude.Maybe
                                      LinearScan__MLS__MS__PhysReg) ->
+                                     (LinearScan__SSInfo ()) -> () -> () ->
+                                     a1) ->
+                                     (LinearScan__MLS__MS__ScanStateDesc ->
+                                     () -> ((,)
+                                     LinearScan__MLS__MS__IntervalId
+                                     Prelude.Int) -> ([]
+                                     ((,) LinearScan__MLS__MS__IntervalId
+                                     Prelude.Int)) -> () -> () ->
+                                     (Prelude.Maybe
+                                     LinearScan__MLS__MS__PhysReg) ->
                                      (LinearScan__SSInfo ()) -> () ->
+                                     LinearScan__MLS__MS__PhysReg -> () ->
                                      (Prelude.Either LinearScan__SSError
                                      LinearScan__MLS__MS__ScanStateDesc) ->
                                      LinearScan__R_linearScan -> a1 -> a1) ->
@@ -1229,8 +1275,8 @@ _LinearScan__coq_R_linearScan_rec :: (LinearScan__MLS__MS__ScanStateDesc ->
                                      (Prelude.Either LinearScan__SSError
                                      LinearScan__MLS__MS__ScanStateDesc) ->
                                      LinearScan__R_linearScan -> a1
-_LinearScan__coq_R_linearScan_rec f f0 f1 sd s r =
-  _LinearScan__coq_R_linearScan_rect f f0 f1 sd s r
+_LinearScan__coq_R_linearScan_rec f f0 f1 f2 sd s r =
+  _LinearScan__coq_R_linearScan_rect f f0 f1 f2 sd s r
 
 type LinearScan__SomeVar = Prelude.Either Prelude.Int Prelude.Int
 

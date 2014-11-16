@@ -249,15 +249,16 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
                    |} in
     match IState.runIState SSError handleInterval ssinfo with
     | inl err => inl err
-    | inr (_, ssinfo') => linearScan (thisDesc ssinfo') (thisState ssinfo')
+    | inr (mreg, ssinfo') =>
+        match mreg with
+        | None => inl EFailedToAllocateRegister
+        | Some _ => linearScan (thisDesc ssinfo') (thisState ssinfo')
+        end
     end
   | inright _ => inr (sd; st)
   end.
 (* We must prove that after every call to [handleInterval], the total extent
    of the remaining unhandled intervals is less than it was before. *)
-Proof.
-  intros. clear.
-  by case: ssinfo' => ? /= [? /ltP].
-Qed.
+Proof. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
 
-End MAllocate. 
+End MAllocate.
