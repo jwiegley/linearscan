@@ -133,6 +133,19 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        |}
 
+  | ScanState_newInactive sd reg :
+    ScanState sd -> forall `(i : Interval d),
+    let inact := map widen_fst (inactive sd) in
+    ScanState
+      {| nextInterval     := (nextInterval sd).+1
+       ; unhandled        := map widen_fst (unhandled sd)
+       ; active           := map widen_fst (active sd)
+       ; inactive         := (ord_max, reg) :: inact
+       ; handled          := map widen_fst (handled sd)
+       ; intervals        := vshiftin (intervals sd) (d; i)
+       ; fixedIntervals   := fixedIntervals sd
+       |}
+
   | ScanState_setInterval sd :
     ScanState sd -> forall xid `(i : Interval d),
     let xi := (vnth (intervals sd) xid).2 in
@@ -235,6 +248,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
   | Case_aux c "ScanState_newUnhandled"
+  | Case_aux c "ScanState_newInactive"
   | Case_aux c "ScanState_setInterval"
   | Case_aux c "ScanState_setFixedIntervals"
   | Case_aux c "ScanState_moveUnhandledToActive"

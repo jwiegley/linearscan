@@ -40,7 +40,7 @@ Qed.
 Lemma StronglySorted_widen : forall n (xs : list (fin n * nat)),
   StronglySorted (lebf (@snd _ _)) xs
     -> StronglySorted (lebf (@snd _ _))
-                      [seq (widen_id (fst p), snd p) | p <- xs].
+                      [seq widen_fst p | p <- xs].
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
@@ -102,6 +102,8 @@ Proof.
   - Case "ScanState_newUnhandled".
     exact/StronglySorted_insert_spec/StronglySorted_widen/IHst.
 
+  - Case "ScanState_newInactive".
+    apply: StronglySorted_widen. exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". inv IHst.
@@ -210,6 +212,20 @@ Proof.
   uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
 Qed.
 
+Lemma uniq_catA : forall (T : eqType) (s1 s2 s3 : seq T),
+  uniq ((s1 ++ s2) ++ s3) = uniq (s1 ++ s2 ++ s3).
+Proof.
+  move=> T.
+  elim=> //= [x xs IHxs] s2 s3.
+  rewrite IHxs.
+  congr (_ && _).
+  rewrite !mem_cat.
+  have ->: forall a b c, (a || b || c) = [|| a, b | c].
+    move=> a b c.
+    by rewrite Bool.orb_assoc.
+  by [].
+Qed.
+
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists
@@ -233,6 +249,27 @@ Proof.
     rewrite perm_cat2r.
     apply/perm_map.
     by rewrite insert_perm.
+
+  - Case "ScanState_newInactive".
+    rewrite /= /inact.
+    rewrite uniq_catC uniq_catA uniq_catC uniq_catA cat_cons cons_uniq.
+    apply/andP; split.
+      rewrite -!map_comp /funcomp -!map_cat !mem_cat.
+      apply/norP; split.
+        rewrite /= /widen_id.
+        move: (no_ord_max [seq fst i | i <- inactive sd ++ handled sd]).
+        rewrite -!map_comp /funcomp.
+        exact.
+      apply/norP; split.
+        move: (no_ord_max [seq fst i | i <- unhandled sd]).
+        rewrite -!map_comp /funcomp.
+        exact.
+      move: (no_ord_max [seq fst i | i <- active sd]).
+      rewrite -!map_comp /funcomp.
+      exact.
+    rewrite uniq_catC uniq_catA !map_widen_fst -!map_cat map_inj_uniq.
+      by rewrite !map_cat.
+    exact: widen_ord_inj.
 
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
@@ -264,6 +301,9 @@ Proof.
 
   - Case "ScanState_newUnhandled".
     by rewrite /unh insert_size !size_map addSn.
+
+  - Case "ScanState_newInactive".
+    by rewrite !size_map addSn !addnS.
 
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.

@@ -497,7 +497,7 @@ Proof.
     => /= next_interval_increases
           total_extent_decreases
           handled_count_increases.
-  have Huelt: unhandledExtent new_unhandled_added <= unhandledExtent pre.
+  have ?: unhandledExtent new_unhandled_added <= unhandledExtent pre.
     move: (lists_are_unique st).
     move: (lists_are_unique state).
     rewrite /all_state_lists /new_unhandled_added.

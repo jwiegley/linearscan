@@ -260,4 +260,4 @@ Proof.
   by case: ssinfo' => ? /= [? /ltP].
 Qed.
 
-End MAllocate.
+End MAllocate. 
