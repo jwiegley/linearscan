@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wall -Werror #-}
+
 module LinearScan
     ( VirtReg
     , StartsLoop(..)
@@ -10,10 +12,8 @@ module LinearScan
     ) where
 
 import Control.Arrow (second)
-import LinearScan.Lib
 import LinearScan.Main
 import LinearScan.NonEmpty0
-import LinearScan.Vector0
 
 type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__MLS__MS__ScanStateDesc
@@ -34,6 +34,8 @@ allocateRegisters maxVirtReg blockInfo blocks =
                 "Current interval is a singleton"
             LinearScan__ENoIntervalsToSplit ->
                 "There are no intervals to split"
+            LinearScan__EFailedToAllocateRegister ->
+                "Failed to allocate register for current interval"
         Right x -> Right $ ScanState x
   where
     gather b =
