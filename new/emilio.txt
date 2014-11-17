@@ -1,0 +1,433 @@
+John Wiegley <johnw@newartisans.com> writes:
+
+> I was able to complete the proof today, after sleeping on it:
+>
+>     Lemma vnth_replace_neq : forall n (v : Vec n) (k j : fin n) (z : A),
+>       k != j -> vnth (replace v k z) j = vnth v j.
+
+I'm sure you already know about it, but given that you are using
+ordinals, moving to ssreflect tuples could also work well for this case.
+
+I have tried different Vector approaches, so far the n.-tuple one works best
+for me.
+
+A definition of replace (set_tnth) and the lemma using tuples could be:
+
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype tuple.
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section SetNthTuple.
+
+  Variables (n : nat) (T : Type).
+
+  Implicit Types (i : 'I_n) (t : n.-tuple T) (x : T).
+
+  Lemma set_nth_tupleP t i x :
+    size (set_nth (tnth_default t i) t i x) == n.
+  Proof. by rewrite size_set_nth size_tuple maxnE addnC subnK. Qed.
+
+  Canonical set_nth_tuple t i x := Tuple (set_nth_tupleP t i x).
+
+  Definition set_tnth t i x :=
+    [tuple of set_nth (tnth_default t i) t i x].
+
+  Lemma set_tnth_nth t i x :
+    set_tnth t i x = set_nth (tnth_default t i) t i x :> seq T.
+  Proof. by []. Qed.
+
+End SetNthTuple.
+
+Lemma vnth_replace_neq
+      (T : eqType) n
+      (t : n.-tuple T)
+      (k j : 'I_n)
+      (z : T) :
+  j != k ->
+  tnth (set_tnth t k z) j = tnth t j.
+Proof.
+  rewrite -val_eqE /= => /negbTE Hidx.
+  rewrite (tnth_nth (tnth_default t k))
+          (tnth_nth (tnth_default t j)).
+  by rewrite set_tnth_nth nth_set_nth /= Hidx -!tnth_nth.
+Qed.
+
+------------------------------------------------------------------------
+
+John Wiegley <johnw@newartisans.com> writes:
+
+>> Umm, would that be a problem? After a quick look, I'd guess that quantifying
+>> over n in that places should work quite well.
+>
+> I gave it a quick try, and backed away fairly soon after.  There are lots of
+> places where I simply want to append two non-empty lists, knowing only that
+> the result in nonempty, rather than having to fix the types so that the math
+> on the 'n' component of n.+1-tuple lines up.
+
+This is strange, it shouldn't be so messy.
+
+> If you wanted to give it a try, you should run into these sorts of problems
+> pretty immediately.
+
+Do you have a concrete example?
+
+As far as I can see, appending a m.+1 and n.+1 tuple will produce a m.+1
++ n.+1 tuple which is reducible to a (m + n.+1).+1 one, so no adjusting
+should be necessary:
+
+Lemma nplus1_try m n T U (t : m.+1.-tuple T) (u : n.+1.-tuple T)
+      (f : forall k, k.+1.-tuple T -> U) : U.
+Proof. by move/f: [tuple of cat u t]. Qed.
+
+>> You could also create your own subtype:
+>
+>> Structure nempty_of : Type := NEmpty {nval :> seq T; _ : size nval > 0}.
+>
+> I've done this now in NonEmpty3.v, but am having difficulties with
+> computations not reducing that I still have to track down (see the examples at
+> the end of Range2.v).  It would be nice if Coq could tell me "this
+> couldn't simplify any further because I was unable to reduce X".
+
+I had a quick look to NonEmpty3.v, I think this approach won't work
+well.
+
+Do you understand how tuples work? IMVHO, this is a strong prerrequisite
+in order to implement the nempty_of type successfully. Have a look to
+tuple.v and try to understand what is going on.
+
+Unfortunately the subType machinery is not very accessible, but on the
+other hand it is really powerful and convenient once mastered.
+
+The key idea of subtypes is that operations, (and the elimination
+principles) are defined over the base type (sequences in this
+case). Proofs are irrelevant and you never deal with them but in an
+accessory way.
+
+Thus, when you want to do any operation over nonempty sequences you use
+the *standard* version for seqs. When a proof of non-emptyness is
+needed, Coq will infer it using the Canonical instance mechanism.
+
+However, both nonempty implementations don't carry a index for the
+canonical inference, so you'll have trouble.
+
+Regarding elimination, you don't want to do a custom principle at all,
+you just want to use the regular one over lists.
+
+The key point here is that proofs are non-important.
+
+So instead of:
+
+Definition NE_last (ne : NonEmpty) : T.
+
+You may want something like:
+
+Lemma ne_default (s : NonEmpty) : T.
+Proof. by case: s; case. Qed.
+
+Definition nlast s := last (ne_default s) s.
+
+Lemma nlastE x s : nlast s = last x s.
+Proof. by case: s; elim. Qed.
+
+Note the last lemma allows you to forget about the proof and replace by
+a normal well-behaved reducing term.
+
+I hope that helps!
+
+------------------------------------------------------------------------
+
+gallego@cri.ensmp.fr (Emilio Jesús Gallego Arias) writes:
+
+> You may want something like:
+>
+> Lemma ne_default (s : NonEmpty) : T.
+> Proof. by case: s; case. Qed.
+>
+> Definition nlast s := last (ne_default s) s.
+>
+> Lemma nlastE x s : nlast s = last x s.
+> Proof. by case: s; elim. Qed.
+
+One missing detail, is that you need the proof of size for nlast,
+separate from nlast (which is just a wrapper for last):
+
+Lemma nlastP s : size (nlast s) > 0.
+Proof. ... Qed.
+
+Why?
+
+Because nlast will return a standard seq, so in order to build a
+NonEmpty again you need the proof. If you had an index you could
+automate it. Otherwise you can do it manually:
+
+Definition nlast s := nlastP s.
+
+Then, the key point to achieve a good reduction behavior is that in
+lemmas/functions using nlast you use val, valE, val_inj or the
+"a = b :> seq T" form.
+
+Emilio
+
+p.d: I think using tuples will work the same.
+
+------------------------------------------------------------------------
+
+Ouch, the previous mail didn't make sense, it is getting late here...
+
+gallego@cri.ensmp.fr (Emilio Jesús Gallego Arias) writes:
+
+> Definition nlast s := nlastP s.
+>
+> Then, the key point to achieve a good reduction behavior is that in
+> lemmas/functions using nlast you use val, valE, val_inj or the
+> "a = b :> seq T" form.
+
+nlast doesn't work as it doesn't return a NonEmpty. Let's try with cat
+and actually check the code:
+
+Lemma ncatP (s u : NonEmpty) : size (cat s u) > 0.
+Proof. by case: s=> s Hs; rewrite size_cat addn_gt0 Hs. Qed.
+
+Definition ncat s u := NE (ncatP s u).
+
+Lemma ncatE s u : ncat s u = cat s u :> seq T.
+Proof. by []. Qed.
+
+Best,
+Emilio
+
+------------------------------------------------------------------------
+
+John Wiegley <johnw@newartisans.com> writes:
+
+>>>>>> Emilio Jesús Gallego Arias <gallego@cri.ensmp.fr> writes:
+>
+>> Do you have a concrete example?
+>
+> For example:
+>
+>   Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
+>     { p : option (NonEmpty UsePos) * option (NonEmpty UsePos)
+>     | match p with
+>       | (Some l1, Some l2) =>
+>           [ /\ l = NE_append l1 l2
+>           ,    all f l1
+>           &    ~~ f (NE_head l2)
+>           ]
+>   
+>       | (Some l1, None) => l = l1 /\ all f l1
+>       | (None, Some l2) => l = l2 /\ ~~ f (NE_head l2)
+>       | (None, None)    => False
+>       end
+>     }.
+>
+> What would this look like with n.+1-tuple types?  I'm splitting a list, and
+> then preserving
+
+Umm, maybe I would try something like this, separating the specification
+from the code:
+
+Section ExampleSpec.
+
+  Variable T : eqType.
+
+  Definition admit {U} : U.
+  Proof. admit. Qed.
+
+  Definition pos_sublists n (l : n.+1.-tuple T) : seq T * seq T := admit.
+
+  Definition chk_head (f : pred T) (s : seq T) : bool :=
+    oapp f true (ohead s).
+
+  Lemma pos_sublistsP n (l : n.+1.-tuple T) (f : pred T) :
+    let: (l1, l2) := pos_sublists l in
+    [&& l == l1 ++ l2 :> seq T,
+        all f l1 & ~~ (chk_head f l2)
+    ].
+  Proof. admit. Qed.
+
+End ExampleSpec.
+
+Note that option on non empty lists is isomorphic to regular lists.
+
+>> Lemma nplus1_try m n T U (t : m.+1.-tuple T) (u : n.+1.-tuple T) (f : forall
+>> k, k.+1.-tuple T -> U) : U.  Proof. by move/f: [tuple of u ++ t]. Qed.
+>
+> Interesting, I didn't think of using CPS transformation as a way to engage the
+> Coq simplifier.  Do you find yourself having to adopt this approach often?
+
+I'm sorry, I don't follow, where's CPS here?
+
+Now that you mention it, CPS works quite well in Coq.
+
+> Not how SSReflect tuples work, no, not really at all.  I've read the SSReflect
+> manual a few times now, but what I'm really missing right now is an idiomatic
+> guide to the "SSReflect way of thinking".  Your e-mails so far have actually
+> been the most detailed resource I've found so far.  I would really encourage
+> to write up a sort of guide to using subTypes, it would be a great benefit to
+> the community!
+
+I'm planning to do it. Indeed, I can relate to your experience, it was
+really painful to learn, with no other resource than source code.
+
+I hope to have time for it soon.
+
+>> Thus, when you want to do any operation over nonempty sequences you use the
+>> *standard* version for seqs. When a proof of non-emptyness is needed, Coq
+>> will infer it using the Canonical instance mechanism.
+>
+> This sounds like everything I want!  Now I just need to work through some of
+> your examples, to see how it might transfer to my development.
+
+IMHO, that should work well for you.
+
+I see you have a Haskell background. For better or worse, Haskell is
+extremely different from Coq, in the sense that Coq cannot erase the
+types at runtime, whereas Haskell does.
+
+This means that using types with proofs, works well in Haskell and
+terribly in Coq due to problems when reducing proofs.
+
+I'd dare to say that rhere are two styles of programming, I would call
+them "true dependently typed programming" and "programming with proofs".
+
+In the first style --- the one adopted by Haskell and most Agda users
+--- you write strong and informative types, such as NonEmpty. Your
+programs are "correct by construction". This works well in Haskell, its
+type system is not a logic and already inconsistent, and works
+reasonably well in Agda thanks to the use of axioms.
+
+Coq supports this approach too. You can write by hand the complex
+pattern matching annotations and custom induction principles needed to
+work with this kind of types. As your original example showed, you just
+needed to use a different destruction principle for Fin.t in order for
+the proof to go, the CoLoR approach is even more elegant.
+
+However, in real-world programs, I have found this style not to be
+practical, as too many of such principles may be required, and some of
+them are not exactly easy to write.
+
+However most of them are routine, indeed, the Program module supports
+two tactics "dependent induction" and "dependent destruction" that will
+greatly facilitate programming in this style. However, proofs generated
+with them won't reduce per-se, but you can use axioms to achieve that
+effect.
+
+I have some tactics for it:
+
+Ltac jm_dep_aux := rewrite /block /solution_left /simplification_heq
+/eq_rect_r /Logic.eq_sym /= ?JMeq_eq_refl /= ?inj_pairT2_refl.
+Ltac jm_dep := compute; do !jm_dep_aux.
+
+Quite a few people in the Coq community support this style, as they
+believe we should program using dependent types. I also think it is a
+more elegant style, but unfortunately the theory is not there yet, and
+I've mostly switched to the other side.
+
+The second style --- advocated by ssr and some other Coq frameworks,
+including compcert to some extent --- is to write programs "more or less
+without proofs" and prove properties about them separately.
+
+This way, you maintain a clear separation. On the other hand, is less
+elegant, types are less informative, and it requires a much greater
+discipline from the programmer to organize and structure proofs and
+code.
+
+A last comment, if you are studying how to build correct algorithms in
+Coq, there exists a lot of research on that topic. You may be interested
+in Adam's Chlipala papers, YNot, Hoare Type Theory...
+
+AFAICT, most of those frameworks separate proofs from programs, but
+unfortunately I'm not expert on this topic, I recommend you to ask in
+the Coq mailing list for more information.
+
+------------------------------------------------------------------------
+
+John Wiegley <johnw@newartisans.com> writes:
+
+>>>>>> Emilio Jesús Gallego Arias <gallego@cri.ensmp.fr> writes:
+>
+>>> [ /\ l = NE_append l1 l2
+>>> ,    all f l1
+>>> &    ~~ f (NE_head l2)
+>>> ]
+>
+>> Note that option on non empty lists is isomorphic to regular lists.
+>
+> True, but then it makes the above equality much harder to state.
+
+What do you mean, which equality? I think the specification using plain lists:
+
+  Definition pos_sublistsPd l l1 l2 (f : pred T) :=
+    [&& l == l1 ++ l2 :> seq T,
+        all f l1 &
+        ~~ (chk_head f l2)
+    ].
+
+is easier to understand and to work with than the one using nonEmpty:
+
+  Definition pos_P (l : NonEmpty) (f : pred T) (p : option NonEmpty * option NonEmpty) :=
+    match p with
+      | (Some l1, Some l2) =>
+        [ /\ l = NE_append l1 l2
+        ,    all f (ne_seq l1)
+        &    ~~ f (NE_head l2)
+        ]
+      | (Some l1, None) => l = l1 /\ all f (ne_seq l1)
+      | (None, Some l2) => l = l2 /\ ~~ f (NE_head l2)
+      | (None, None)    => False
+    end.
+
+Both are equivalent, find a proof attached.
+
+If you look at the proofs you will note the problems that returning a
+type of the form { x | P } gives, basically it is a mess everytime you
+have to compare them, unless you can make { x | P } a subtype, in this
+case equality on the tag suffices.
+
+I wouldn't recommend having functions of type {x | P} unless you make
+{x | P} a subtype.
+
+>>>> Lemma nplus1_try m n T U (t : m.+1.-tuple T) (u : n.+1.-tuple T) (f :
+>>>> forall k, k.+1.-tuple T -> U) : U.  Proof. by move/f: [tuple of u ++
+>>>> t]. Qed.
+>>> 
+>>> Interesting, I didn't think of using CPS transformation as a way to engage the
+>>> Coq simplifier.  Do you find yourself having to adopt this approach often?
+>
+>> I'm sorry, I don't follow, where's CPS here?
+>
+> The non-CPS version would be:
+>
+> Lemma nplus1_try m n T U (t : m.+1.-tuple T) (u : n.+1.-tuple T) :
+>   { k & k.+1.-tuple T }.
+
+Oh, I see. I didn't mean to use CPS or anything like that, make U
+concrete if you want. I just made f a parameter to represent an
+arbitrary function taking a non-empty list.
+
+I think the "non-CPS" version should have type:
+
+Lemma nplus1_try m n T U (t : m.+1.-tuple T) (u : n.+1.-tuple T) : seq T.
+
+>> This means that using types with proofs, works well in Haskell and terribly
+>> in Coq due to problems when reducing proofs.
+>
+> I'll have to give this more thought.  Yes, I primarily program in Haskell, and
+> I'm looking for ways to write better Haskell libraries using Coq (such as this
+> one that I'm working on now).
+
+Interesting, that made me think. One thought:
+
+Haskell and Coq type systems are very different, as you know it is not
+easy to map from one to the other, so in the end, the resulting Haskell
+code won't have very fancy types as you will have to keep proofs apart
+in Coq in order to preserve reduction.
+
+However, a different approach would be to use axioms to make Coq's type
+system more similar to the Haskell one (main proof-irrelevant). This is
+tricky in principle but on the other hand could work quite well.
+
+[code is in NonEmpty4.v]
