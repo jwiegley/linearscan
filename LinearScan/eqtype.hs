@@ -109,7 +109,7 @@ val_eqP t p sT =
 pair_eq :: Equality__Coq_type -> Equality__Coq_type -> Ssrbool.Coq_simpl_rel
            ((,) Equality__Coq_sort Equality__Coq_sort)
 pair_eq t1 t2 =
-  Ssrbool.coq_SimplRel (\u v ->
+   (\u v ->
     (Prelude.&&) (eq_op t1 (Prelude.fst u) (Prelude.fst v))
       (eq_op t2 (Prelude.snd u) (Prelude.snd v)))
 

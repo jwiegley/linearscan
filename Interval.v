@@ -308,7 +308,7 @@ Qed.
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
+Fixpoint intervalSpan' (rs : NonEmpty RangeSig) (before : nat)
   `(i : Interval {| ibeg := ib
                   ; iend := ie
                   ; rds  := rs |}) {struct rs} :
@@ -368,7 +368,7 @@ Proof.
 
     (* After splitting [i1], the result we finally return will effectively be
       (i0 :: i1_1, i1_2). *)
-    move: (intervalSpan rs before _ _ i1) => /= [] [[i1_1| ] [i1_2| ]].
+    move: (intervalSpan' rs before _ _ i1) => /= [] [[i1_1| ] [i1_2| ]].
     + SCase "(Some, Some)".
       move=> [? ? /eqP H2 /eqP H3 ? H4].
       destruct i1_1 as [i1_1d i1_1i] eqn:Heqe.
@@ -401,6 +401,18 @@ Proof.
 
   - Case "rs = R_Cons r rs'; (o, o0) = (None, None)".
     contradiction.
+Defined.
+
+Definition intervalSpan (rs : NonEmpty RangeSig) (before : nat)
+  `(i : Interval {| ibeg := ib
+                  ; iend := ie
+                  ; rds  := rs |}) :
+  { p : option IntervalSig * option IntervalSig | SubIntervalsOf before i p }.
+Proof.
+  pose (intervalSpan' before i).
+  unfold intervalSpan' in *.
+  simpl in s.
+  abstract apply s.
 Defined.
 
 Definition DefiniteSubIntervalsOf (before : nat) `(i : Interval d)

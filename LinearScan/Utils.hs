@@ -26,3 +26,7 @@ list_rect z f _ = go z
     go z (x:xs) = go (f err x xs z) xs
 
     err = error "list_rect: attempt to use size"
+
+uncons :: [a] -> Maybe (a, [a])
+uncons [] = Nothing
+uncons (x:xs) = Just (x, xs)

@@ -154,7 +154,8 @@ Arguments thisState {_ P} _.
 Inductive SSError :=
   | ECurrentIsSingleton
   | ENoIntervalsToSplit
-  | EFailedToAllocateRegister.
+  | EFailedToAllocateRegister
+  | ESpillingNotYetImplemented. (* jww (2014-11-17): undefined *)
 
 Definition SState (sd : ScanStateDesc) P Q :=
   IState SSError (SSInfo sd P) (SSInfo sd Q).

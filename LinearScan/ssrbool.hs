@@ -4,8 +4,6 @@ import qualified Prelude
 import qualified Data.List
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
-import qualified LinearScan.Ssrfun as Ssrfun
-
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -41,13 +39,9 @@ type Coq_pred t = t -> Prelude.Bool
 
 type Coq_rel t = t -> Coq_pred t
 
-type Coq_simpl_rel t = Ssrfun.Coq_simpl_fun t (Coq_pred t)
-
-coq_SimplRel :: (Coq_rel a1) -> Coq_simpl_rel a1
-coq_SimplRel r =
-  Ssrfun.SimplFun (\x -> r x)
+type Coq_simpl_rel t = (->) t (Coq_pred t)
 
 rel_of_simpl_rel :: (Coq_simpl_rel a1) -> Coq_rel a1
 rel_of_simpl_rel r x y =
-  Ssrfun.fun_of_simpl r x y
+  (Prelude.$) r x y
 

@@ -12,8 +12,6 @@ import qualified LinearScan.Logic as Logic
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
 import qualified LinearScan.Eqtype as Eqtype
-import qualified LinearScan.Ssreflect as Ssreflect
-import qualified LinearScan.Ssrfun as Ssrfun
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -65,7 +63,7 @@ intervalEnd i =
 intervalCoversPos :: IntervalDesc -> Prelude.Int -> Prelude.Bool
 intervalCoversPos d pos =
   (Prelude.&&) ((Prelude.<=) (intervalStart d) pos)
-    ((Prelude.<=) (Prelude.succ pos) (intervalEnd d))
+    ((Prelude.<=) ((Prelude.succ) pos) (intervalEnd d))
 
 intervalExtent :: IntervalDesc -> Prelude.Int
 intervalExtent d =
@@ -76,12 +74,12 @@ coq_Interval_is_singleton d =
   (Prelude.&&)
     (Eqtype.eq_op Ssrnat.nat_eqType
       (unsafeCoerce (NonEmpty0.coq_NE_length (rds d)))
-      (unsafeCoerce (Prelude.succ 0)))
+      (unsafeCoerce ((Prelude.succ) 0)))
     (Eqtype.eq_op Ssrnat.nat_eqType
       (unsafeCoerce
         (NonEmpty0.coq_NE_length
           (Range.ups ( (NonEmpty0.coq_NE_head (rds d))))))
-      (unsafeCoerce (Prelude.succ 0)))
+      (unsafeCoerce ((Prelude.succ) 0)))
 
 intervalsIntersect :: IntervalDesc -> IntervalDesc -> Prelude.Bool
 intervalsIntersect i j =
@@ -121,9 +119,9 @@ findIntervalUsePos i f =
 
 nextUseAfter :: IntervalDesc -> Prelude.Int -> Prelude.Maybe Prelude.Int
 nextUseAfter d pos =
-  Lib.option_map (Ssrfun.funcomp () Range.uloc Prelude.snd)
+  Lib.option_map ((Prelude..) Range.uloc Prelude.snd)
     (findIntervalUsePos d (\u ->
-      (Prelude.<=) (Prelude.succ pos) (Range.uloc u)))
+      (Prelude.<=) ((Prelude.succ) pos) (Range.uloc u)))
 
 firstUsePos :: IntervalDesc -> Prelude.Int
 firstUsePos d =
@@ -132,7 +130,7 @@ firstUsePos d =
 
 firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
-  Lib.option_map (Ssrfun.funcomp () Range.uloc Prelude.snd)
+  Lib.option_map ((Prelude..) Range.uloc Prelude.snd)
     (findIntervalUsePos d Range.regReq)
 
 lastUsePos :: IntervalDesc -> Prelude.Int
@@ -145,265 +143,106 @@ splitPosition :: IntervalDesc -> (Prelude.Maybe Prelude.Int) -> Prelude.Bool
 splitPosition d before splitBeforeLifetimeHole =
   let {initial = firstUsePos d} in
   let {final = lastUsePos d} in
-  Prelude.max (Prelude.succ initial)
+  Prelude.max ((Prelude.succ) initial)
     (Prelude.min final
       (Lib.fromMaybe final (Lib.option_choose before (firstUseReqReg d))))
+
+intervalSpan_subproof :: (NonEmpty0.NonEmpty Range.RangeDesc) -> Prelude.Int
+                         -> Prelude.Int -> Prelude.Int ->
+                         ((,) (Prelude.Maybe IntervalDesc)
+                         (Prelude.Maybe IntervalDesc))
+intervalSpan_subproof rs before ib ie =
+  case rs of {
+   NonEmpty0.NE_Sing r ->
+    case Range.rangeSpan (\u ->
+           (Prelude.<=) ((Prelude.succ) (Range.uloc u)) before) ( r) of {
+     (,) _top_assumption_ x ->
+      case _top_assumption_ of {
+       Prelude.Just r0 ->
+        case x of {
+         Prelude.Just r1 ->
+          
+            ( (\_ _ -> (,) (Prelude.Just (Build_IntervalDesc
+              (Range.rbeg ( r0)) (Range.rend ( r0)) (NonEmpty0.NE_Sing
+              ( r0)))) (Prelude.Just (Build_IntervalDesc (Range.rbeg ( r1))
+              (Range.rend ( r1)) (NonEmpty0.NE_Sing ( r1)))))) __ __;
+         Prelude.Nothing ->
+           (\_ -> (,) (Prelude.Just (Build_IntervalDesc ib ie
+            (NonEmpty0.NE_Sing r))) Prelude.Nothing) __};
+       Prelude.Nothing ->
+        case x of {
+         Prelude.Just r1 ->
+           (\_ -> (,) Prelude.Nothing (Prelude.Just (Build_IntervalDesc ib ie
+            (NonEmpty0.NE_Sing r)))) __;
+         Prelude.Nothing -> Logic.coq_False_rec}}};
+   NonEmpty0.NE_Cons r rs0 ->
+    case Range.rangeSpan (\u ->
+           (Prelude.<=) ((Prelude.succ) (Range.uloc u)) before) ( r) of {
+     (,) _top_assumption_ x ->
+      case _top_assumption_ of {
+       Prelude.Just r0 ->
+        case x of {
+         Prelude.Just r1 ->
+           (\_ ->
+             (\_ _ ->
+              (Prelude.flip (Prelude.$)) __ (\_ -> (,) (Prelude.Just
+                (Build_IntervalDesc (Range.rbeg ( r0)) (Range.rend ( r0))
+                (NonEmpty0.NE_Sing ( r0)))) (Prelude.Just (Build_IntervalDesc
+                (Range.rbeg ( r1))
+                (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
+                (NonEmpty0.NE_Cons r1 rs0))))) __ __) __;
+         Prelude.Nothing ->
+           (\_ ->
+             (\_ ->
+              case intervalSpan_subproof rs0 before
+                     (Range.rbeg ( (NonEmpty0.coq_NE_head rs0)))
+                     (Range.rend ( (NonEmpty0.coq_NE_last rs0))) of {
+               (,) _top_assumption_0 x0 ->
+                case _top_assumption_0 of {
+                 Prelude.Just i1_1 ->
+                  case x0 of {
+                   Prelude.Just i1_2 ->
+                    case i1_1 of {
+                     Build_IntervalDesc ibeg0 iend0 rds0 ->
+                      
+                        ( (\_ _ ->
+                           (\_ ->
+                             (\_ ->
+                              
+                                ((Prelude.flip (Prelude.$)) __ (\_ ->
+                                   (\_ _ -> (,) (Prelude.Just
+                                    (Build_IntervalDesc (Range.rbeg ( r))
+                                    iend0 (NonEmpty0.NE_Cons r rds0)))
+                                    (Prelude.Just i1_2)) __))) __) __)) __ __
+                        __};
+                   Prelude.Nothing ->
+                     (\_ _ _ -> (,) (Prelude.Just (Build_IntervalDesc
+                      (Range.rbeg ( r))
+                      (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
+                      (NonEmpty0.NE_Cons r rs0))) Prelude.Nothing) __ __ __};
+                 Prelude.Nothing ->
+                  case x0 of {
+                   Prelude.Just i1_2 ->
+                     (\_ _ _ -> (,) (Prelude.Just (Build_IntervalDesc ib
+                      (Range.rend ( r)) (NonEmpty0.NE_Sing r))) (Prelude.Just
+                      (Build_IntervalDesc
+                      (Range.rbeg ( (NonEmpty0.coq_NE_head rs0)))
+                      (Range.rend ( (NonEmpty0.coq_NE_last rs0))) rs0))) __
+                      __ __;
+                   Prelude.Nothing -> Logic.coq_False_rec}}}) __) __};
+       Prelude.Nothing ->
+        case x of {
+         Prelude.Just r1 ->
+           (\_ -> (,) Prelude.Nothing (Prelude.Just (Build_IntervalDesc ib ie
+            (NonEmpty0.NE_Cons r rs0)))) __;
+         Prelude.Nothing -> Logic.coq_False_rec}}}}
 
 intervalSpan :: (NonEmpty0.NonEmpty Range.RangeDesc) -> Prelude.Int ->
                 Prelude.Int -> Prelude.Int ->
                 ((,) (Prelude.Maybe IntervalDesc)
                 (Prelude.Maybe IntervalDesc))
 intervalSpan rs before ib ie =
-  let {f = \u -> (Prelude.<=) (Prelude.succ (Range.uloc u)) before} in
-  case rs of {
-   NonEmpty0.NE_Sing r ->
-    let {_top_assumption_ = Range.rangeSpan f ( r)} in
-    let {
-     _evar_0_ = \_top_assumption_0 ->
-      let {
-       _evar_0_ = \r0 _top_assumption_1 ->
-        let {
-         _evar_0_ = \r1 ->
-          let {
-           _evar_0_ = let {
-                       _evar_0_ = \_ _ -> (,) (Prelude.Just
-                        (Build_IntervalDesc (Range.rbeg ( r0))
-                        (Range.rend ( r0)) (NonEmpty0.NE_Sing ( r0))))
-                        (Prelude.Just (Build_IntervalDesc (Range.rbeg ( r1))
-                        (Range.rend ( r1)) (NonEmpty0.NE_Sing ( r1))))}
-                      in
-                      Logic.eq_rec_r (Range.rend ( r1)) _evar_0_
-                        (Range.rend
-                          (Range.getRangeDesc
-                            (
-                              (NonEmpty0.coq_NE_last
-                                (rds (Build_IntervalDesc ib ie
-                                  (NonEmpty0.NE_Sing r)))))))}
-          in
-          Logic.eq_rec_r (Range.rbeg ( r0)) _evar_0_
-            (Range.rbeg
-              (Range.getRangeDesc
-                (
-                  (NonEmpty0.coq_NE_head
-                    (rds (Build_IntervalDesc ib ie (NonEmpty0.NE_Sing r)))))))
-            __ __}
-        in
-        let {
-         _evar_0_0 = \_ ->
-          let {
-           _evar_0_0 = \_ -> (,) (Prelude.Just (Build_IntervalDesc ib ie
-            (NonEmpty0.NE_Sing r))) Prelude.Nothing}
-          in
-          Logic.eq_rec (Range.ups ( r)) _evar_0_0 (Range.ups ( r0)) __}
-        in
-        case _top_assumption_1 of {
-         Prelude.Just x -> (\_ -> _evar_0_ x);
-         Prelude.Nothing -> _evar_0_0}}
-      in
-      let {
-       _evar_0_0 = \_top_assumption_1 ->
-        let {
-         _evar_0_0 = \r1 ->
-          let {
-           _evar_0_0 = \_ -> (,) Prelude.Nothing (Prelude.Just
-            (Build_IntervalDesc ib ie (NonEmpty0.NE_Sing r)))}
-          in
-          Logic.eq_rec (Range.ups ( r)) _evar_0_0 (Range.ups ( r1)) __}
-        in
-        let {_evar_0_1 = \_ -> Logic.coq_False_rec} in
-        case _top_assumption_1 of {
-         Prelude.Just x -> (\_ -> _evar_0_0 x);
-         Prelude.Nothing -> _evar_0_1}}
-      in
-      case _top_assumption_0 of {
-       Prelude.Just x -> _evar_0_ x;
-       Prelude.Nothing -> _evar_0_0}}
-    in
-    case _top_assumption_ of {
-     (,) x x0 -> _evar_0_ x x0 __};
-   NonEmpty0.NE_Cons r rs0 ->
-    let {_top_assumption_ = Range.rangeSpan f ( r)} in
-    let {
-     _evar_0_ = \_top_assumption_0 ->
-      let {
-       _evar_0_ = \r0 _top_assumption_1 ->
-        let {
-         _evar_0_ = \r1 ->
-          let {
-           _evar_0_ = \_ ->
-            let {
-             _evar_0_ = \_ _ ->
-              Ssreflect.ssr_have __ (\_ -> (,) (Prelude.Just
-                (Build_IntervalDesc (Range.rbeg ( r0)) (Range.rend ( r0))
-                (NonEmpty0.NE_Sing ( r0)))) (Prelude.Just (Build_IntervalDesc
-                (Range.rbeg ( r1))
-                (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
-                (NonEmpty0.NE_Cons r1 rs0))))}
-            in
-            Logic.eq_rec_r (Range.rbeg ( r0)) _evar_0_
-              (Range.rbeg
-                (Range.getRangeDesc
-                  (
-                    (NonEmpty0.coq_NE_head
-                      (rds (Build_IntervalDesc ib ie (NonEmpty0.NE_Cons r
-                        rs0))))))) __ __}
-          in
-          Logic.eq_rec_r (Range.rend ( (NonEmpty0.coq_NE_last rs0))) _evar_0_
-            ie __}
-        in
-        let {
-         _evar_0_0 = \_ ->
-          let {
-           _evar_0_0 = \_ ->
-            let {
-             _evar_0_0 = \_ ->
-              let {
-               _top_assumption_2 = intervalSpan rs0 before
-                                     (Range.rbeg
-                                       ( (NonEmpty0.coq_NE_head rs0)))
-                                     (Range.rend
-                                       ( (NonEmpty0.coq_NE_last rs0)))}
-              in
-              let {
-               _evar_0_0 = \_top_assumption_3 ->
-                let {
-                 _evar_0_0 = \i1_1 _top_assumption_4 ->
-                  let {
-                   _evar_0_0 = \i1_2 ->
-                    case i1_1 of {
-                     Build_IntervalDesc ibeg0 iend0 rds0 ->
-                      let {
-                       _evar_0_0 = let {
-                                    _evar_0_0 = \_ _ ->
-                                     let {
-                                      _evar_0_0 = \_ ->
-                                       let {
-                                        _evar_0_0 = \_ ->
-                                         let {
-                                          _evar_0_0 = Ssreflect.ssr_have __
-                                                        (\_ ->
-                                                        let {
-                                                         _evar_0_0 = \_ _ ->
-                                                          (,) (Prelude.Just
-                                                          (Build_IntervalDesc
-                                                          (Range.rbeg ( r))
-                                                          iend0
-                                                          (NonEmpty0.NE_Cons
-                                                          r rds0)))
-                                                          (Prelude.Just
-                                                          i1_2)}
-                                                        in
-                                                        Logic.eq_rec iend0
-                                                          _evar_0_0
-                                                          (Range.rend
-                                                            (
-                                                              (NonEmpty0.coq_NE_last
-                                                                rds0))) __)}
-                                         in
-                                         Logic.eq_rec_r (iend ( i1_2))
-                                           _evar_0_0
-                                           (Range.rend
-                                             ( (NonEmpty0.coq_NE_last rs0)))}
-                                       in
-                                       Logic.eq_rec_r
-                                         (Range.rbeg
-                                           ( (NonEmpty0.coq_NE_head rds0)))
-                                         _evar_0_0
-                                         (Range.rbeg
-                                           ( (NonEmpty0.coq_NE_head rs0))) __}
-                                     in
-                                     Logic.eq_rec_r
-                                       (Range.rbeg
-                                         ( (NonEmpty0.coq_NE_head rds0)))
-                                       _evar_0_0 ibeg0 __}
-                                   in
-                                   Logic.eq_rec_r
-                                     (Range.rend
-                                       ( (NonEmpty0.coq_NE_last rds0)))
-                                     _evar_0_0 iend0}
-                      in
-                      Logic.eq_rec_r
-                        (Range.rbeg ( (NonEmpty0.coq_NE_head rds0)))
-                        _evar_0_0 ibeg0 __ __}}
-                  in
-                  let {
-                   _evar_0_1 = \_ ->
-                    let {
-                     _evar_0_1 = \_ _ _ -> (,) (Prelude.Just
-                      (Build_IntervalDesc (Range.rbeg ( r))
-                      (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
-                      (NonEmpty0.NE_Cons r rs0))) Prelude.Nothing}
-                    in
-                    Logic.eq_rec
-                      (rds (Build_IntervalDesc
-                        (Range.rbeg ( (NonEmpty0.coq_NE_head rs0)))
-                        (Range.rend ( (NonEmpty0.coq_NE_last rs0))) rs0))
-                      _evar_0_1 (rds ( i1_1)) __}
-                  in
-                  case _top_assumption_4 of {
-                   Prelude.Just x -> (\_ _ -> _evar_0_0 x);
-                   Prelude.Nothing -> _evar_0_1}}
-                in
-                let {
-                 _evar_0_1 = \_top_assumption_4 ->
-                  let {
-                   _evar_0_1 = \i1_2 ->
-                    let {
-                     _evar_0_1 = \_ _ _ -> (,) (Prelude.Just
-                      (Build_IntervalDesc ib (Range.rend ( r))
-                      (NonEmpty0.NE_Sing r))) (Prelude.Just
-                      (Build_IntervalDesc
-                      (Range.rbeg ( (NonEmpty0.coq_NE_head rs0)))
-                      (Range.rend ( (NonEmpty0.coq_NE_last rs0))) rs0))}
-                    in
-                    Logic.eq_rec
-                      (rds (Build_IntervalDesc
-                        (Range.rbeg ( (NonEmpty0.coq_NE_head rs0)))
-                        (Range.rend ( (NonEmpty0.coq_NE_last rs0))) rs0))
-                      _evar_0_1 (rds ( i1_2)) __}
-                  in
-                  let {_evar_0_2 = \_ _ _ -> Logic.coq_False_rec} in
-                  case _top_assumption_4 of {
-                   Prelude.Just x -> (\_ -> _evar_0_1 x);
-                   Prelude.Nothing -> _evar_0_2}}
-                in
-                case _top_assumption_3 of {
-                 Prelude.Just x -> _evar_0_0 x;
-                 Prelude.Nothing -> _evar_0_1}}
-              in
-              case _top_assumption_2 of {
-               (,) x x0 -> _evar_0_0 x x0 __ __ __}}
-            in
-            Logic.eq_rec_r (Range.rend ( (NonEmpty0.coq_NE_last rs0)))
-              _evar_0_0 ie __}
-          in
-          Logic.eq_rec (Range.ups ( r)) _evar_0_0 (Range.ups ( r0)) __}
-        in
-        case _top_assumption_1 of {
-         Prelude.Just x -> (\_ -> _evar_0_ x);
-         Prelude.Nothing -> _evar_0_0}}
-      in
-      let {
-       _evar_0_0 = \_top_assumption_1 ->
-        let {
-         _evar_0_0 = \r1 ->
-          let {
-           _evar_0_0 = \_ -> (,) Prelude.Nothing (Prelude.Just
-            (Build_IntervalDesc ib ie (NonEmpty0.NE_Cons r rs0)))}
-          in
-          Logic.eq_rec (Range.ups ( r)) _evar_0_0 (Range.ups ( r1)) __}
-        in
-        let {_evar_0_1 = \_ -> Logic.coq_False_rec} in
-        case _top_assumption_1 of {
-         Prelude.Just x -> (\_ -> _evar_0_0 x);
-         Prelude.Nothing -> _evar_0_1}}
-      in
-      case _top_assumption_0 of {
-       Prelude.Just x -> _evar_0_ x;
-       Prelude.Nothing -> _evar_0_0}}
-    in
-    case _top_assumption_ of {
-     (,) x x0 -> _evar_0_ x x0 __}}
+  intervalSpan_subproof rs before ib ie
 
 splitInterval :: Prelude.Int -> IntervalDesc ->
                  ((,) IntervalDesc IntervalDesc)
@@ -418,9 +257,7 @@ splitInterval before d =
         let {_evar_0_ = \i1 -> (,) i0 i1} in
         let {
          _evar_0_0 = \_ ->
-          let {_evar_0_0 = \_ -> Logic.coq_False_rec} in
-          Logic.eq_rec (rds (Build_IntervalDesc ib ie rds0)) _evar_0_0
-            (rds ( i0)) __}
+          let {_evar_0_0 = \_ -> Logic.coq_False_rec} in  _evar_0_0 __}
         in
         case _top_assumption_1 of {
          Prelude.Just x -> (\_ -> _evar_0_ x);
@@ -430,9 +267,7 @@ splitInterval before d =
        _evar_0_0 = \_top_assumption_1 ->
         let {
          _evar_0_0 = \i1 ->
-          let {_evar_0_0 = \_ -> Logic.coq_False_rec} in
-          Logic.eq_rec (rds (Build_IntervalDesc ib ie rds0)) _evar_0_0
-            (rds ( i1)) __}
+          let {_evar_0_0 = \_ -> Logic.coq_False_rec} in  _evar_0_0 __}
         in
         let {_evar_0_1 = \_ -> Logic.coq_False_rec} in
         case _top_assumption_1 of {

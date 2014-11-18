@@ -26,7 +26,11 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
 
 Definition assignSpillSlotToCurrent {pre P} `{HasWork P} :
   SState pre P P unit.
-Admitted.
+Proof.
+  constructor.
+  move=> H1.
+  apply (inl ESpillingNotYetImplemented).
+Defined.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -234,9 +238,10 @@ Definition handleInterval {pre} :
     end.
 
 Require Import Recdef.
+Require Import Coq.Program.Wf.
 
-Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure unhandledExtent sd} :
+Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
+  {measure (unhandledExtent sd)} :
   SSError + { sd' : ScanStateDesc | ScanState sd' } :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
@@ -257,8 +262,9 @@ Function linearScan (sd : ScanStateDesc) (st : ScanState sd)
     end
   | inright _ => inr (sd; st)
   end.
-(* We must prove that after every call to [handleInterval], the total extent
-   of the remaining unhandled intervals is less than it was before. *)
-Proof. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
+Obligation 1. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
+(* (* We must prove that after every call to [handleInterval], the total extent *)
+(*    of the remaining unhandled intervals is less than it was before. *) *)
+(* Proof. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed. *)
 
 End MAllocate.

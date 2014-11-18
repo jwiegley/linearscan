@@ -6,7 +6,6 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Logic as Logic
 import qualified LinearScan.Eqtype as Eqtype
-import qualified LinearScan.Fintype as Fintype
 
 
 __ :: any
@@ -59,14 +58,6 @@ lebf f n m =
 sumlist :: ([] Prelude.Int) -> Prelude.Int
 sumlist =
   Data.List.foldl' (Prelude.+) 0
-
-widen_id :: Prelude.Int -> Prelude.Int -> Prelude.Int
-widen_id n =
-  Fintype.widen_ord n (Prelude.succ n)
-
-widen_fst :: Prelude.Int -> ((,) Prelude.Int a1) -> (,) Prelude.Int a1
-widen_fst n p =
-  (,) (widen_id n (Prelude.fst p)) (Prelude.snd p)
 
 insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
 insert p z l =

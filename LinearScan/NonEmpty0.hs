@@ -24,8 +24,8 @@ coq_NonEmpty_rec =
 coq_NE_length :: (NonEmpty a1) -> Prelude.Int
 coq_NE_length ne =
   case ne of {
-   NE_Sing x -> Prelude.succ 0;
-   NE_Cons x xs -> (Prelude.+) (Prelude.succ 0) (coq_NE_length xs)}
+   NE_Sing x -> (Prelude.succ) 0;
+   NE_Cons x xs -> (Prelude.+) ((Prelude.succ) 0) (coq_NE_length xs)}
 
 coq_NE_to_list :: (NonEmpty a1) -> [] a1
 coq_NE_to_list ne =
@@ -54,10 +54,4 @@ coq_NE_map f ne =
 coq_NE_fold_left :: (a1 -> a2 -> a1) -> (NonEmpty a2) -> a1 -> a1
 coq_NE_fold_left f ne z =
   Data.List.foldl' f z (coq_NE_to_list ne)
-
-coq_NE_append :: (NonEmpty a1) -> (NonEmpty a1) -> NonEmpty a1
-coq_NE_append l1 l2 =
-  case l1 of {
-   NE_Sing x -> NE_Cons x l2;
-   NE_Cons x xs -> NE_Cons x (coq_NE_append xs l2)}
 

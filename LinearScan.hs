@@ -36,6 +36,8 @@ allocateRegisters maxVirtReg blockInfo blocks =
                 "There are no intervals to split"
             LinearScan__EFailedToAllocateRegister ->
                 "Failed to allocate register for current interval"
+            LinearScan__ESpillingNotYetImplemented ->
+                "Spilling is not yet implemented!"
         Right x -> Right $ ScanState x
   where
     gather b =
