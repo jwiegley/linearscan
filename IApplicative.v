@@ -1,4 +1,4 @@
-Require Export IEndo.
+Require Export LinearScan.IEndo.
 
 Require Import Ssreflect.ssrfun.
 

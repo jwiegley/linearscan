@@ -1,6 +1,6 @@
-Require Import Allocate.
-Require Import Lib.
-Require Import NonEmpty.
+Require Import LinearScan.Allocate.
+Require Import LinearScan.Lib.
+Require Import LinearScan.NonEmpty.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

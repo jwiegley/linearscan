@@ -5,6 +5,7 @@ module LinearScan.Main where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.IApplicative as IApplicative
@@ -14,7 +15,6 @@ import qualified LinearScan.IState as IState
 import qualified LinearScan.Interval as Interval
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.Logic as Logic
-import qualified LinearScan.NonEmpty0 as NonEmpty0
 import qualified LinearScan.Range as Range
 import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Vector0 as Vector0
@@ -38,16 +38,7 @@ __ :: any
 __ = Prelude.error "Logical or arity value used"
 
 _MyMachine__maxReg :: Prelude.Int
-_MyMachine__maxReg =
-  (Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    ((Prelude.succ) ((Prelude.succ) ((Prelude.succ) ((Prelude.succ)
-    0)))))))))))))))))))))))))))))))
+_MyMachine__maxReg = 32
 
 type LinearScan__MLS__MS__PhysReg = Prelude.Int
 
@@ -194,7 +185,7 @@ _LinearScan__MLS__MS__totalExtent :: LinearScan__MLS__MS__ScanStateDesc ->
                                      ([] LinearScan__MLS__MS__IntervalId) ->
                                      Prelude.Int
 _LinearScan__MLS__MS__totalExtent sd xs =
-  Lib.sumlist
+  Data.List.sum
     (Prelude.map (\i ->
       Interval.intervalExtent
         (
@@ -682,10 +673,8 @@ _LinearScan__splitCurrentInterval pre before ssi =
                                    (LinearScan.Utils.set_nth _nextInterval_
                                      intervals0 uid _top_assumption_2)
                                    _top_assumption_3) _fixedIntervals_
-                                 (Lib.insert (\x ->
-                                   Lib.lebf Prelude.snd x ((,)
-                                     ( _nextInterval_)
-                                     (Interval.ibeg _top_assumption_3))) ((,)
+                                 (Data.List.insertBy
+                                   (Data.Ord.comparing Prelude.snd) ((,)
                                    ( _nextInterval_)
                                    (Interval.ibeg _top_assumption_3)) ((:)
                                    (Prelude.id ((,) uid beg))
@@ -1020,7 +1009,7 @@ _LinearScan__checkActiveIntervals pre pos =
   (Prelude.$) (_LinearScan__withScanStatePO pre) (\sd _ ->
     IState.iput (LinearScan__Build_SSInfo
       (unsafeCoerce go sd sd
-        (Lib.list_membership
+        (Prelude.const
           (Eqtype.prod_eqType
             (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
             (Fintype.ordinal_eqType _MyMachine__maxReg))
@@ -1065,7 +1054,7 @@ _LinearScan__checkInactiveIntervals pre pos =
   (Prelude.$) (_LinearScan__withScanStatePO pre) (\sd _ ->
     IState.iput (LinearScan__Build_SSInfo
       (unsafeCoerce go sd sd
-        (Lib.list_membership
+        (Prelude.const
           (Eqtype.prod_eqType
             (Fintype.ordinal_eqType (_LinearScan__MLS__MS__nextInterval sd))
             (Fintype.ordinal_eqType _MyMachine__maxReg))
@@ -1253,14 +1242,14 @@ _LinearScan__transportVecBounds pos m n _top_assumption_ =
 _LinearScan__boundedSing :: Range.UsePos -> LinearScan__Coq_boundedRange
 _LinearScan__boundedSing upos =
   Range.Build_RangeDesc (Range.uloc upos) ((Prelude.succ) (Range.uloc upos))
-    (NonEmpty0.NE_Sing upos)
+    ((:[]) upos)
 
 _LinearScan__boundedCons :: Range.UsePos -> Prelude.Int ->
                             LinearScan__Coq_boundedRange ->
                             LinearScan__Coq_boundedRange
 _LinearScan__boundedCons upos n _top_assumption_ =
-  Range.Build_RangeDesc (Range.uloc upos) (Range.rend _top_assumption_)
-    (NonEmpty0.NE_Cons upos (Range.ups _top_assumption_))
+  Range.Build_RangeDesc (Range.uloc upos) (Range.rend _top_assumption_) ((:)
+    upos (Range.ups _top_assumption_))
 
 _LinearScan__withRanges :: Prelude.Int -> Prelude.Bool -> Range.UsePos ->
                            Prelude.Int -> LinearScan__Coq_boundedTriple ->
@@ -1285,9 +1274,8 @@ _LinearScan__withRanges pos req upos n _top_assumption_ =
   case _top_assumption_ of {
    (,) x x0 -> _evar_0_ x x0}
 
-_LinearScan__applyList :: Prelude.Int -> (NonEmpty0.NonEmpty
-                          (LinearScan__Block a1)) -> (Prelude.Int ->
-                          LinearScan__Coq_boundedRangeVec) ->
+_LinearScan__applyList :: Prelude.Int -> ([] (LinearScan__Block a1)) ->
+                          (Prelude.Int -> LinearScan__Coq_boundedRangeVec) ->
                           ((LinearScan__Block a1) -> Prelude.Int -> () ->
                           LinearScan__Coq_boundedRangeVec ->
                           LinearScan__Coq_boundedRangeVec) ->
@@ -1295,10 +1283,12 @@ _LinearScan__applyList :: Prelude.Int -> (NonEmpty0.NonEmpty
 _LinearScan__applyList maxVirtReg bs base f =
   let {
    go i bs0 =
-     case bs0 of {
-      NonEmpty0.NE_Sing x -> f x i __ (base i);
-      NonEmpty0.NE_Cons x xs ->
-       f x i __ (go ((Prelude.succ) ((Prelude.succ) i)) xs)}}
+     (\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)
+       (\x ->
+       f x i __ (base i))
+       (\x xs ->
+       f x i __ (go ((Prelude.succ) ((Prelude.succ) i)) xs))
+       bs0}
   in go ((Prelude.succ) 0) bs
 
 _LinearScan__emptyBoundedRangeVec :: Prelude.Int -> Prelude.Int ->
@@ -1414,8 +1404,8 @@ _LinearScan__extractRange x =
           Prelude.Nothing -> Range.packRange b});
        Prelude.Nothing -> Prelude.Nothing}}}
 
-_LinearScan__processBlocks :: Prelude.Int -> (NonEmpty0.NonEmpty
-                              (LinearScan__Block a1)) -> (,)
+_LinearScan__processBlocks :: Prelude.Int -> ([] (LinearScan__Block a1)) ->
+                              (,)
                               (Vector0.Vec (Prelude.Maybe Range.RangeDesc))
                               (Vector0.Vec (Prelude.Maybe Range.RangeDesc))
 _LinearScan__processBlocks maxVirtReg blocks =
@@ -1427,16 +1417,15 @@ _LinearScan__processBlocks maxVirtReg blocks =
     (LinearScan.Utils.vmap _MyMachine__maxReg _LinearScan__extractRange
       regs')}
 
-_LinearScan__determineIntervals :: Prelude.Int -> (NonEmpty0.NonEmpty
-                                   (LinearScan__Block a1)) ->
-                                   LinearScan__MLS__MS__ScanStateDesc
+_LinearScan__determineIntervals :: Prelude.Int -> ([] (LinearScan__Block a1))
+                                   -> LinearScan__MLS__MS__ScanStateDesc
 _LinearScan__determineIntervals maxVirtReg blocks =
   let {
    mkint = \ss mx f ->
     case mx of {
      Prelude.Just s ->
       f ss __ (Interval.Build_IntervalDesc (Range.rbeg s) (Range.rend s)
-        (NonEmpty0.NE_Sing s)) __;
+        ((:[]) s)) __;
      Prelude.Nothing -> ss}}
   in
   let {
@@ -1448,10 +1437,8 @@ _LinearScan__determineIntervals maxVirtReg blocks =
         (LinearScan.Utils.snoc (_LinearScan__MLS__MS__nextInterval sd)
           (_LinearScan__MLS__MS__intervals sd) d)
         (_LinearScan__MLS__MS__fixedIntervals sd)
-        (Lib.insert (\x ->
-          Lib.lebf Prelude.snd x ((,)
-            ( (_LinearScan__MLS__MS__nextInterval sd)) (Interval.ibeg d)))
-          ((,) ( (_LinearScan__MLS__MS__nextInterval sd)) (Interval.ibeg d))
+        (Data.List.insertBy (Data.Ord.comparing Prelude.snd) ((,)
+          ( (_LinearScan__MLS__MS__nextInterval sd)) (Interval.ibeg d))
           (Prelude.map Prelude.id (_LinearScan__MLS__MS__unhandled sd)))
         (Prelude.map Prelude.id (_LinearScan__MLS__MS__active sd))
         (Prelude.map Prelude.id (_LinearScan__MLS__MS__inactive sd))
@@ -1464,8 +1451,7 @@ _LinearScan__determineIntervals maxVirtReg blocks =
                case mr of {
                 Prelude.Just r -> Prelude.Just
                  (Interval.packInterval (Interval.Build_IntervalDesc
-                   (Range.rbeg ( r)) (Range.rend ( r)) (NonEmpty0.NE_Sing
-                   ( r))));
+                   (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
                 Prelude.Nothing -> Prelude.Nothing}) regRanges}
     in
     let {
@@ -1498,9 +1484,8 @@ _LinearScan__determineIntervals maxVirtReg blocks =
     in
     LinearScan.Utils.vfoldl' maxVirtReg handleVar s2 varRanges}
 
-_LinearScan__allocateRegisters :: Prelude.Int -> (NonEmpty0.NonEmpty
-                                  (LinearScan__Block a1)) -> Prelude.Either
-                                  LinearScan__SSError
+_LinearScan__allocateRegisters :: Prelude.Int -> ([] (LinearScan__Block a1))
+                                  -> Prelude.Either LinearScan__SSError
                                   LinearScan__MLS__MS__ScanStateDesc
 _LinearScan__allocateRegisters maxVirtReg blocks =
   case Lib.uncurry_sig (\x _ -> _LinearScan__linearScan x)

@@ -2,10 +2,10 @@ module LinearScan.Lib where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Logic as Logic
-import qualified LinearScan.Eqtype as Eqtype
 
 
 __ :: any
@@ -36,35 +36,4 @@ option_choose x y =
   case x of {
    Prelude.Just a -> x;
    Prelude.Nothing -> y}
-
-exist_in_cons :: Eqtype.Equality__Coq_type -> Eqtype.Equality__Coq_sort ->
-                 ([] Eqtype.Equality__Coq_sort) -> Eqtype.Equality__Coq_sort
-                 -> Eqtype.Equality__Coq_sort
-exist_in_cons a a0 l _top_assumption_ =
-  _top_assumption_
-
-list_membership :: Eqtype.Equality__Coq_type -> ([]
-                   Eqtype.Equality__Coq_sort) -> [] Eqtype.Equality__Coq_sort
-list_membership a l =
-  case l of {
-   [] -> [];
-   (:) x xs -> (:) x
-    (Prelude.map (exist_in_cons a x xs) (list_membership a xs))}
-
-lebf :: (a1 -> Prelude.Int) -> a1 -> a1 -> Prelude.Bool
-lebf f n m =
-  (Prelude.<=) (f n) (f m)
-
-sumlist :: ([] Prelude.Int) -> Prelude.Int
-sumlist =
-  Data.List.foldl' (Prelude.+) 0
-
-insert :: (a1 -> Prelude.Bool) -> a1 -> ([] a1) -> [] a1
-insert p z l =
-  case l of {
-   [] -> (:) z [];
-   (:) x xs ->
-    case p x of {
-     Prelude.True -> (:) x (insert p z xs);
-     Prelude.False -> (:) z ((:) x xs)}}
 

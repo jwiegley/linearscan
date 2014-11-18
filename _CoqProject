@@ -1,4 +1,4 @@
--I . -dont-load-proofs
+-R . LinearScan -dont-load-proofs
 Allocate.v
 Blocks.v
 Interval.v

@@ -1,12 +1,4 @@
-Require Export Vector.
-
-Require Export Ssreflect.ssreflect.
-Require Export Ssreflect.ssrfun.
-Require Export Ssreflect.ssrbool.
-Require Export Ssreflect.eqtype.
-Require Export Ssreflect.seq.
-Require Export Ssreflect.ssrnat.
-Require Export Ssreflect.fintype.
+Require Export LinearScan.Ssr.
 
 Generalizable All Variables.
 Set Implicit Arguments.
@@ -305,16 +297,16 @@ Qed.
 Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
 Proof. move=> a x; elim=> //. Qed.
 
-Fixpoint insert {a} (p : a -> bool) (z : a) (l : list a) : list a :=
+Fixpoint insert {a} (P : rel a) (z : a) (l : list a) : list a :=
   match l with
     | nil => [:: z]
     | cons x xs =>
-      if p x
-      then x :: insert p z xs
+      if P x z
+      then x :: insert P z xs
       else z :: x :: xs
   end.
 
-Arguments insert {a} p z l : simpl never.
+Arguments insert {a} P z l : simpl never.
 
 Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq_predType T),
   perm_eql (x :: y :: xs) (y :: x :: xs).
@@ -325,7 +317,7 @@ Proof.
 Qed.
 
 Lemma insert_perm (T : eqType) P (x : T) : forall (xs : seq_predType T),
-  perm_eql (insert (P ^~ x) x xs) (x :: xs).
+  perm_eql (insert P x xs) (x :: xs).
 Proof.
   elim=> //= [y ys IHys]; rewrite /insert.
   case: (P y x) => //=; apply/perm_eqlP.
@@ -334,7 +326,7 @@ Proof.
 Qed.
 
 Lemma insert_size : forall (a : eqType) P (x : a) xs,
-  size (insert (P ^~ x) x xs) = (size xs).+1.
+  size (insert P x xs) = (size xs).+1.
 Proof.
   move=> a P x xs.
   rewrite (@perm_eq_size _ _ (x :: xs)) => //.
@@ -344,7 +336,7 @@ Qed.
 Lemma insert_foldl :
   forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T),
   (forall x y z, f (f z x) y = f (f z y) x)
-    -> foldl f z (insert (P ^~ x) x xs) = foldl f z (x :: xs).
+    -> foldl f z (insert P x xs) = foldl f z (x :: xs).
 Proof.
   move=> T R f z P x xs.
   rewrite /insert.
@@ -356,7 +348,7 @@ Proof.
 Qed.
 
 Lemma insert_sumf : forall a f P (x : a) xs,
-  sumf f (insert (P ^~ x) x xs) = sumf f (x :: xs).
+  sumf f (insert P x xs) = sumf f (x :: xs).
 Proof.
   move=> a f P x xs.
   rewrite /sumf insert_foldl; first by [].
@@ -373,7 +365,7 @@ Proof.
 Qed.
 
 Lemma insert_f_sumlist : forall a (f : a -> nat) P (x : a) xs,
-  sumlist [seq f i | i <- insert (P ^~ x) x xs] =
+  sumlist [seq f i | i <- insert P x xs] =
   sumlist [seq f i | i <- x :: xs].
 Proof.
   move=> a f P y xs.

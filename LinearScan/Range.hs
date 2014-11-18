@@ -2,6 +2,7 @@ module LinearScan.Range where
 
 import qualified Prelude
 import qualified Data.List
+import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 import qualified LinearScan.Lib as Lib
@@ -25,20 +26,17 @@ regReq u =
    Build_UsePos uloc0 regReq0 -> regReq0}
 
 type UsePosSublistsOf =
-  ((,) (Prelude.Maybe (NonEmpty0.NonEmpty UsePos))
-  (Prelude.Maybe (NonEmpty0.NonEmpty UsePos)))
+  ((,) (Prelude.Maybe ([] UsePos)) (Prelude.Maybe ([] UsePos)))
 
-usePosSpan :: (UsePos -> Prelude.Bool) -> (NonEmpty0.NonEmpty UsePos) ->
-              UsePosSublistsOf
+usePosSpan :: (UsePos -> Prelude.Bool) -> ([] UsePos) -> UsePosSublistsOf
 usePosSpan f l =
-  case l of {
-   NonEmpty0.NE_Sing x ->
+  (\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)
+    (\x ->
     let {b = f x} in
     case b of {
-     Prelude.True -> (,) (Prelude.Just (NonEmpty0.NE_Sing x)) Prelude.Nothing;
-     Prelude.False -> (,) Prelude.Nothing (Prelude.Just (NonEmpty0.NE_Sing
-      x))};
-   NonEmpty0.NE_Cons x xs ->
+     Prelude.True -> (,) (Prelude.Just ((:[]) x)) Prelude.Nothing;
+     Prelude.False -> (,) Prelude.Nothing (Prelude.Just ((:[]) x))})
+    (\x xs ->
     let {b = f x} in
     case b of {
      Prelude.True ->
@@ -48,20 +46,17 @@ usePosSpan f l =
         case o of {
          Prelude.Just l1 ->
           case x0 of {
-           Prelude.Just l2 -> (,) (Prelude.Just (NonEmpty0.NE_Cons x l1))
-            (Prelude.Just l2);
-           Prelude.Nothing -> (,) (Prelude.Just (NonEmpty0.NE_Cons x l1))
-            Prelude.Nothing};
+           Prelude.Just l2 -> (,) (Prelude.Just ((:) x l1)) (Prelude.Just l2);
+           Prelude.Nothing -> (,) (Prelude.Just ((:) x l1)) Prelude.Nothing};
          Prelude.Nothing ->
           case x0 of {
-           Prelude.Just l2 -> (,) (Prelude.Just (NonEmpty0.NE_Sing x))
-            (Prelude.Just l2);
+           Prelude.Just l2 -> (,) (Prelude.Just ((:[]) x)) (Prelude.Just l2);
            Prelude.Nothing -> Prelude.error "absurd case"}}};
-     Prelude.False -> (,) Prelude.Nothing (Prelude.Just (NonEmpty0.NE_Cons x
-      xs))}}
+     Prelude.False -> (,) Prelude.Nothing (Prelude.Just ((:) x xs))})
+    l
 
 data RangeDesc =
-   Build_RangeDesc Prelude.Int Prelude.Int (NonEmpty0.NonEmpty UsePos)
+   Build_RangeDesc Prelude.Int Prelude.Int ([] UsePos)
 
 rbeg :: RangeDesc -> Prelude.Int
 rbeg r =
@@ -73,7 +68,7 @@ rend r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> rend0}
 
-ups :: RangeDesc -> NonEmpty0.NonEmpty UsePos
+ups :: RangeDesc -> [] UsePos
 ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
@@ -108,16 +103,15 @@ findRangeUsePos r f =
      Prelude.True -> Prelude.Just u;
      Prelude.False -> iHus}) n
 
-makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc ->
-                    (NonEmpty0.NonEmpty UsePos) -> (NonEmpty0.NonEmpty
-                    UsePos) ->
+makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> ([] UsePos) ->
+                    ([] UsePos) ->
                     ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))
 makeDividedRange f rd l1 l2 =
   case rd of {
    Build_RangeDesc rbeg0 rend0 ups0 ->
      (\_ -> (,) (Prelude.Just (Build_RangeDesc rbeg0 ((Prelude.succ)
-      (uloc (NonEmpty0.coq_NE_last l1))) l1)) (Prelude.Just (Build_RangeDesc
-      (uloc (NonEmpty0.coq_NE_head l2)) rend0 l2))) __}
+      (uloc (Prelude.last l1))) l1)) (Prelude.Just (Build_RangeDesc
+      (uloc (Prelude.head l2)) rend0 l2))) __}
 
 rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
              ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))

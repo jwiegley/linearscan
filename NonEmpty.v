@@ -1,10 +1,4 @@
-Require Import Ssreflect.ssreflect.
-Require Import Ssreflect.ssrfun.
-Require Import Ssreflect.ssrbool.
-Require Import Ssreflect.eqtype.
-Require Import Ssreflect.seq.
-Require Import Ssreflect.ssrnat.
-Require Import Ssreflect.fintype.
+Require Import LinearScan.Ssr.
 
 Generalizable All Variables.
 Set Implicit Arguments.
@@ -64,7 +58,7 @@ Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
     | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
   end.
 
-Definition NE_fold_left {a b : Type} (f : a -> b -> a) (ne : NonEmpty b) (z : a) : a :=
+Definition NE_foldl {a b : Type} (f : a -> b -> a) (z : a) (ne : NonEmpty b) : a :=
   foldl f z ne.
 
 Fixpoint NE_append {a : Type} (l1 l2 : NonEmpty a) : NonEmpty a :=

@@ -1,7 +1,8 @@
-Require Import Lib.
+Require Import LinearScan.Lib.
 
-Require Export Machine.
-Require Export Interval.
+Require Export LinearScan.Machine.
+Require Export LinearScan.Interval.
+Require Export LinearScan.Vector.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -125,7 +126,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
     let unh := map widen_fst (unhandled sd) in
     ScanState
       {| nextInterval     := (nextInterval sd).+1
-       ; unhandled        := insert (lebf (@snd _ _) ^~ n) n unh
+       ; unhandled        := insert (lebf (@snd _ _)) n unh
        ; active           := map widen_fst (active sd)
        ; inactive         := map widen_fst (inactive sd)
        ; handled          := map widen_fst (handled sd)

@@ -16,7 +16,7 @@ LinearScan/Main.hs: Main.vo
 	    while read file; do mv $$file LinearScan; done
 	@perl -i -pe 's/import qualified (.*)/import qualified LinearScan.\1 as \1/' \
 		LinearScan/*.hs
-	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified Data.Functor.Identity\nimport qualified LinearScan.Utils/' \
+	@perl -i -pe 's/import qualified LinearScan\.Prelude as Prelude/import qualified Prelude\nimport qualified Data.List\nimport qualified Data.Ord\nimport qualified Data.Functor.Identity\nimport qualified LinearScan.Utils/' \
 		LinearScan/*.hs
 	@perl -i -pe 's/import qualified LinearScan\.GHC/import qualified GHC/'	\
 		LinearScan/*.hs
@@ -37,6 +37,7 @@ Makefile.coq: _CoqProject
 	sed -i -e 's#./-dont-load-proofs#./.#g' $@
 	sed -i -e 's#cd ./. ; .(MAKE) all#cd ./. ; echo $$(MAKE) all#' $@
 	sed -i -e 's#cd \./\. ; .(MAKE) clean#cd ./. ; echo $$(MAKE) clean#' $@
+	sed -i -e 's#cd \./\. && .(MAKE) clean#cd ./. ; echo $$(MAKE) clean#' $@
 	sed -i -e 's#cd "./." && .(MAKE) all#cd ./. ; echo $$(MAKE) all#' $@
 
 clean: Makefile.coq

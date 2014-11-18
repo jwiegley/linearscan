@@ -1,5 +1,5 @@
-Require Import Lib.
-Require Import NonEmpty.
+Require Import LinearScan.Lib.
+Require Import LinearScan.NonEmpty.
 
 Require Import Coq.Classes.RelationClasses.
 

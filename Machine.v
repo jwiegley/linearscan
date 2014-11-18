@@ -1,4 +1,4 @@
-Require Import Lib.
+Require Import LinearScan.Lib.
 
 Module Type Machine.
 

@@ -1,10 +1,4 @@
-Require Import Ssreflect.ssreflect.
-Require Import Ssreflect.ssrfun.
-Require Import Ssreflect.ssrbool.
-Require Import Ssreflect.eqtype.
-Require Import Ssreflect.seq.
-Require Import Ssreflect.ssrnat.
-Require Import Ssreflect.fintype.
+Require Import Ssr.
 
 Section Vector.
 
@@ -300,8 +294,6 @@ Example vmap_check :
 Proof. reflexivity. Qed.
 
 End VectorSpec.
-
-Extract Inductive ordinal => "Prelude.Int" [""].
 
 Extract Constant Vec "a" => "[a]".
 

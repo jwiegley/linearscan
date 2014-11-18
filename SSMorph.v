@@ -1,13 +1,13 @@
-Require Import Lib.
-Require Import NonEmpty.
-Require Import IEndo.
-Require Import IApplicative.
-Require Import IMonad.
-Require Import IState.
+Require Import LinearScan.Lib.
+Require Import LinearScan.NonEmpty.
+Require Import LinearScan.IEndo.
+Require Import LinearScan.IApplicative.
+Require Import LinearScan.IMonad.
+Require Import LinearScan.IState.
 
 Require Import Coq.Classes.RelationClasses.
 
-Require Export ScanState.
+Require Export LinearScan.ScanState.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

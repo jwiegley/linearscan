@@ -1,4 +1,4 @@
-Require Export IApplicative.
+Require Export LinearScan.IApplicative.
 
 Require Import Ssreflect.ssrfun.
 

@@ -1,10 +1,10 @@
-Require Import Lib.
+Require Import LinearScan.Lib.
 
-Require Export SSMorph.
+Require Export LinearScan.SSMorph.
 
 Generalizable All Variables.
 
-Require Spec.
+Require LinearScan.Spec.
 
 Module MAllocate (M : Machine).
 
@@ -237,7 +237,7 @@ Definition handleInterval {pre} :
     | None   => allocateBlockedReg
     end.
 
-Require Import Recdef.
+(* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
 Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)

@@ -13,7 +13,6 @@ module LinearScan
 
 import Control.Arrow (second)
 import LinearScan.Main
-import LinearScan.NonEmpty0
 
 type    VirtReg    = Int
 newtype ScanState  = ScanState LinearScan__MLS__MS__ScanStateDesc
@@ -25,10 +24,11 @@ type    IntervalId = Int
 allocateRegisters
     :: Int
     -> (block -> (StartsLoop, EndsLoop, [Either VirtReg PhysReg]))
-    -> NonEmpty block
+    -> [block]
     -> Either String ScanState
+allocateRegisters _ _ [] = Left "No basic blocks were provided"
 allocateRegisters maxVirtReg blockInfo blocks =
-    case _LinearScan__allocateRegisters maxVirtReg (coq_NE_map gather blocks) of
+    case _LinearScan__allocateRegisters maxVirtReg (map gather blocks) of
         Left x -> Left $ case x of
             LinearScan__ECurrentIsSingleton ->
                 "Current interval is a singleton"

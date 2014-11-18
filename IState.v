@@ -1,4 +1,4 @@
-Require Export IMonad.
+Require Export LinearScan.IMonad.
 
 Require Import Ssreflect.ssreflect.
 Require Import Ssreflect.ssrfun.

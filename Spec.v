@@ -1,6 +1,6 @@
-Require Import Lib.
+Require Import LinearScan.Lib.
 
-Require Export ScanState.
+Require Export LinearScan.ScanState.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -39,8 +39,7 @@ Qed.
 
 Lemma StronglySorted_widen : forall n (xs : list ('I_n * nat)),
   StronglySorted (lebf (@snd _ _)) xs
-    -> StronglySorted (lebf (@snd _ _))
-                      [seq widen_fst p | p <- xs].
+    -> StronglySorted (lebf (@snd _ _)) [seq widen_fst p | p <- xs].
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
@@ -50,7 +49,7 @@ Qed.
 
 Lemma Forall_insert_spec : forall a x (xs : seq (a * nat)) z,
   Forall (lebf (@snd _ _) x) xs -> lebf (@snd _ _) x z
-    -> Forall (lebf (@snd _ _) x) (insert (lebf (@snd _ _) ^~ z) z xs).
+    -> Forall (lebf (@snd _ _) x) (insert (lebf (@snd _ _)) z xs).
 Proof.
   move=> a x.
   elim=> /= [|y ys IHys] z H Hlt.
@@ -64,7 +63,7 @@ Qed.
 
 Lemma StronglySorted_insert_spec a (l : list (a * nat)) : forall z,
   StronglySorted (lebf (@snd _ _)) l
-    -> StronglySorted (lebf (@snd _ _)) (insert (lebf (@snd _ _) ^~ z) z l).
+    -> StronglySorted (lebf (@snd _ _)) (insert (lebf (@snd _ _)) z l).
 Proof.
   move=> z.
   elim: l => /= [|x xs IHxs] Hsort.
