@@ -1,17 +1,18 @@
 -R . LinearScan -dont-load-proofs
 Allocate.v
-Blocks.v
+IApplicative.v
+IEndo.v
+IMonad.v
+IState.v
 Interval.v
 Lib.v
 Machine.v
 Main.v
 NonEmpty.v
+Ops.v
 Range.v
 SSMorph.v
 ScanState.v
 Spec.v
+Ssr.v
 Vector.v
-IEndo.v
-IApplicative.v
-IMonad.v
-IState.v

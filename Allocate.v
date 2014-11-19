@@ -6,11 +6,10 @@ Generalizable All Variables.
 
 Require LinearScan.Spec.
 
-Module MAllocate (M : Machine).
+Module MAllocate (Mach : Machine).
 
-Include MSSMorph M.
-Import MLS.MS.
-Import M.
+Include MSSMorph Mach.
+Import Mach.
 
 Open Scope program_scope.
 
@@ -240,9 +239,8 @@ Definition handleInterval {pre} :
 (* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
-Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
-  {measure (unhandledExtent sd)} :
-  SSError + { sd' : ScanStateDesc | ScanState sd' } :=
+Program Fixpoint linearScan {opType} (sd : ScanStateDesc) (st : ScanState sd)
+  {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
@@ -260,7 +258,7 @@ Program Fixpoint linearScan (sd : ScanStateDesc) (st : ScanState sd)
         | Some _ => linearScan (thisDesc ssinfo') (thisState ssinfo')
         end
     end
-  | inright _ => inr (sd; st)
+  | inright _ => inr nil
   end.
 Obligation 1. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
 (* (* We must prove that after every call to [handleInterval], the total extent *)

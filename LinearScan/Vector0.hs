@@ -3,11 +3,13 @@
 
 module LinearScan.Vector0 where
 
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
+
 
 
 --unsafeCoerce :: a -> b
@@ -19,6 +21,4 @@ unsafeCoerce = GHC.Base.unsafeCoerce#
 import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
-
-type Vec a = [a]
 

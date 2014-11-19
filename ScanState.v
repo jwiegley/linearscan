@@ -2,6 +2,7 @@ Require Import LinearScan.Lib.
 
 Require Export LinearScan.Machine.
 Require Export LinearScan.Interval.
+Require Export LinearScan.Ops.
 Require Export LinearScan.Vector.
 
 Set Implicit Arguments.
@@ -10,9 +11,9 @@ Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Module MScanState (Mach : Machine).
-Import Mach.
 
-Definition PhysReg := 'I_maxReg.
+Include MOps Mach.
+Import Mach.
 
 (** ** ScanStateDesc *)
 

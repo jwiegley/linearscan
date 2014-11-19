@@ -1,10 +1,12 @@
 module LinearScan.Range where
 
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
+
 import qualified LinearScan.Lib as Lib
 import qualified LinearScan.NonEmpty0 as NonEmpty0
 
@@ -72,6 +74,10 @@ ups :: RangeDesc -> [] UsePos
 ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
+
+getRangeDesc :: RangeDesc -> RangeDesc
+getRangeDesc d =
+  d
 
 packRange :: RangeDesc -> RangeDesc
 packRange d =

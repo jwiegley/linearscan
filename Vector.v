@@ -295,7 +295,8 @@ Proof. reflexivity. Qed.
 
 End VectorSpec.
 
-Extract Constant Vec "a" => "[a]".
+Extract Constant Vec "a" => "[]".
+Extraction Inline Vec.
 
 Extract Inlined Constant vnil     => "[]".
 Extract Inlined Constant vsing    => "[]".

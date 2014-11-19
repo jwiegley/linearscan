@@ -1,10 +1,12 @@
 module LinearScan.NonEmpty0 where
 
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
+
 
 coq_NonEmpty_rect :: (a1 -> a2) -> (a1 -> ([] a1) -> a2 -> a2) -> ([] 
                      a1) -> a2

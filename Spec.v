@@ -8,8 +8,9 @@ Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Module MLinearSpec (Mach : Machine).
+
+Include MScanState Mach.
 Import Mach.
-Module Import MS := MScanState Mach.
 
 (** * Linear scan specification *)
 

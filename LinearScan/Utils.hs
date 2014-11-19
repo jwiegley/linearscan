@@ -2,7 +2,7 @@ module LinearScan.Utils where
 
 import Data.List
 
-boundedTransport' maxVirtReg pos n _top_assumption_ = _top_assumption_
+boundedTransport' pos n _top_assumption_ = _top_assumption_
 
 snoc _ xs x = xs ++ [x]
 

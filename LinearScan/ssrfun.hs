@@ -1,10 +1,12 @@
 module LinearScan.Ssrfun where
 
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
+
 
 _Option__apply :: (a1 -> a2) -> a2 -> (Prelude.Maybe a1) -> a2
 _Option__apply f x u =

@@ -3,11 +3,13 @@
 
 module LinearScan.Ssrnat where
 
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
+
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Ssrbool as Ssrbool
 
@@ -34,4 +36,13 @@ nat_eqMixin =
 nat_eqType :: Eqtype.Equality__Coq_type
 nat_eqType =
   unsafeCoerce nat_eqMixin
+
+iter :: Prelude.Int -> (a1 -> a1) -> a1 -> a1
+iter n f x =
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    x)
+    (\i ->
+    f (iter i f x))
+    n
 

@@ -6,9 +6,9 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
+Require Import LinearScan.Allocate.
 Require Import LinearScan.Lib.
 Require Import LinearScan.NonEmpty.
-Require Import LinearScan.Blocks.
 Require Import LinearScan.Machine.
 
 Module MyMachine <: Machine.
@@ -21,7 +21,36 @@ Proof. unfold maxReg. exact: ltn0Sn. Qed.
 
 End MyMachine.
 
-Module Import LinearScan := MLinearScan MyMachine.
+Module Import LinearScan := MAllocate MyMachine.
+
+Definition determineIntervals {op : Set} (ops : OpList op) : ScanStateSig :=
+  let mkint (ss : ScanStateSig) (mx : option RangeSig)
+            (f : forall sd, ScanState sd -> forall d, Interval d
+                   -> ScanStateSig) :=
+      let: (exist sd st) := ss in
+      match mx with
+      | Some (exist _ r) => f _ st _ (I_Sing r)
+      | None => ss
+      end in
+
+  let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
+        packScanState (ScanState_newUnhandled st i) in
+
+  let: (varRanges, regRanges) := processOperations ops in
+  let regs := vmap (fun mr =>
+                if mr is Some r
+                then Some (packInterval (I_Sing r.2))
+                else None) regRanges in
+
+  let s0 := ScanState_nil in
+  let s1 := ScanState_setFixedIntervals s0 regs in
+  let s2 := packScanState s1 in
+
+  foldl handleVar s2 varRanges.
+
+Definition allocateRegisters {op : Set} (ops : OpList op) :
+  (SSError + seq (AllocationInfo op))%type :=
+  uncurry_sig linearScan (determineIntervals ops).
 
 Extraction Language Haskell.
 
@@ -49,22 +78,10 @@ Extract Inlined Constant Arith.Plus.tail_plus => "(Prelude.+)".
 Extraction Implicit widen_id [ n ].
 Extraction Implicit widen_fst [ n ].
 
-Extract Inlined Constant widen_id => "".
-Extract Inlined Constant widen_fst => "Prelude.id".
-
+Extract Inlined Constant widen_id           => "".
+Extract Inlined Constant widen_fst          => "Prelude.id".
 Extract Inlined Constant List.destruct_list => "LinearScan.Utils.uncons".
-
-Extract Inductive NonEmpty => "[]" ["(:[])" "(:)"]
-  "(\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)".
-
-Extract Inlined Constant NE_length  => "Prelude.length".
-Extract Inlined Constant NE_to_list => "".
-Extract Inlined Constant NE_head    => "Prelude.head".
-Extract Inlined Constant NE_last    => "Prelude.last".
-Extract Inlined Constant NE_map     => "Prelude.map".
-Extract Inlined Constant NE_foldl   => "Data.List.foldl'".
-
-Extract Inlined Constant list_membership => "Prelude.const".
+Extract Inlined Constant list_membership    => "Prelude.const".
 
 (* Avoid extracting this function, which has no computational value, but Coq
    insists on ignoring its opacity. *)
@@ -73,9 +90,9 @@ Extract Inlined Constant boundedTransport =>
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction LinearScan.allocateRegisters NE_map.
+Separate Extraction allocateRegisters NE_map.
 
 (* Show which axioms we depend on for this development. *)
-Print Assumptions LinearScan.allocateRegisters.
+Print Assumptions allocateRegisters.
 
 (* Print Libraries. *)

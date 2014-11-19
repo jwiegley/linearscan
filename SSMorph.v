@@ -4,6 +4,7 @@ Require Import LinearScan.IEndo.
 Require Import LinearScan.IApplicative.
 Require Import LinearScan.IMonad.
 Require Import LinearScan.IState.
+Require Import LinearScan.Spec.
 
 Require Import Coq.Classes.RelationClasses.
 
@@ -14,12 +15,10 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Require Spec.
+Module MSSMorph (Mach : Machine).
 
-Module MSSMorph (M : Machine).
-
-Module Import MLS := Spec.MLinearSpec M.
-Import MLS.MS.
+Include MLinearSpec Mach.
+Import Mach.
 
 Open Scope nat_scope.
 
