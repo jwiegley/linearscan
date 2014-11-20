@@ -64,7 +64,7 @@ Definition determineIntervals (ops : OpList opType) : ScanStateSig :=
 Definition allocateRegisters (blocks : seq blockType) :
   SSError + seq (AllocationInfo opType) :=
   let ops := flatten (map blockToOpList (computeBlockOrder blocks)) in
-  uncurry_sig linearScan (determineIntervals ops).
+  uncurry_sig (linearScan ops) (determineIntervals ops).
 
 End Main.
 

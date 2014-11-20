@@ -1360,14 +1360,18 @@ handleInterval pre =
       ((Prelude.$) (liftLen pre)
         (checkActiveIntervals pre position)))
 
-linearScan_func :: ((,) () ((,) ScanStateDesc ()))
-                                -> Prelude.Either SSError
+linearScan_func :: ((,) ()
+                                ((,) ([] ())
+                                ((,) ScanStateDesc ()))) ->
+                                Prelude.Either SSError
                                 ([] (AllocationInfo ()))
 linearScan_func x =
-  let {sd = Prelude.fst (Specif.projT2 x)} in
+  let {ops = Prelude.fst (Specif.projT2 x)} in
+  let {sd = Prelude.fst (Specif.projT2 (Specif.projT2 x))} in
   let {
-   linearScan0 = \sd0 ->
-    let {y = (,) __ ((,) sd0 __)} in linearScan_func ( y)}
+   linearScan0 = \ops0 sd0 ->
+    let {y = (,) __ ((,) ops0 ((,) sd0 __))} in
+    linearScan_func ( y)}
   in
   let {filtered_var = LinearScan.Utils.uncons (unhandled sd)} in
   case filtered_var of {
@@ -1384,7 +1388,7 @@ linearScan_func x =
         case mreg of {
          Prelude.Just wildcard' ->
           let {
-           filtered_var1 = linearScan0 (thisDesc sd ssinfo')}
+           filtered_var1 = linearScan0 ops (thisDesc sd ssinfo')}
           in
           case filtered_var1 of {
            Prelude.Left err -> Prelude.Left err;
@@ -1393,11 +1397,13 @@ linearScan_func x =
           EFailedToAllocateRegister}}};
    Prelude.Nothing -> Prelude.Right Lib.undefined}
 
-linearScan :: ScanStateDesc -> Prelude.Either
-                           SSError
+linearScan :: ([] a1) -> ScanStateDesc ->
+                           Prelude.Either SSError
                            ([] (AllocationInfo a1))
-linearScan sd =
-  unsafeCoerce (linearScan_func ((,) __ ((,) sd __)))
+linearScan ops sd =
+  unsafeCoerce
+    (linearScan_func ((,) __ ((,) (unsafeCoerce ops) ((,) sd
+      __))))
 
 _Blocks__computeBlockOrder :: ([] a1) -> [] a1
 _Blocks__computeBlockOrder blocks =
@@ -1469,6 +1475,6 @@ allocateRegisters blockToOpList opInfo blocks =
    ops = Seq.flatten
            (Prelude.map blockToOpList (_Blocks__computeBlockOrder blocks))}
   in
-  Lib.uncurry_sig (\x _ -> linearScan x)
+  Lib.uncurry_sig (\x _ -> linearScan ops x)
     (determineIntervals opInfo ops)
 

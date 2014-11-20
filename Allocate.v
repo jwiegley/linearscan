@@ -239,7 +239,8 @@ Definition handleInterval {pre} :
 (* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
-Program Fixpoint linearScan {opType} (sd : ScanStateDesc) (st : ScanState sd)
+Program Fixpoint linearScan {opType : Set} (ops : seq opType)
+  (sd : ScanStateDesc) (st : ScanState sd)
   {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
@@ -256,7 +257,7 @@ Program Fixpoint linearScan {opType} (sd : ScanStateDesc) (st : ScanState sd)
         match mreg with
         | None => inl EFailedToAllocateRegister
         | Some _ =>
-            match linearScan (thisDesc ssinfo') (thisState ssinfo') with
+            match linearScan ops (thisDesc ssinfo') (thisState ssinfo') with
             | inl err => inl err
             | inr xs => inr xs (* undefined *)
             end
@@ -264,9 +265,10 @@ Program Fixpoint linearScan {opType} (sd : ScanStateDesc) (st : ScanState sd)
     end
   | inright _ => inr undefined
   end.
-Obligation 1. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
-(* (* We must prove that after every call to [handleInterval], the total extent *)
-(*    of the remaining unhandled intervals is less than it was before. *) *)
-(* Proof. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed. *)
+Obligation 1.
+  (* We must prove that after every call to [handleInterval], the total extent
+     of the remaining unhandled intervals is less than it was before. *)
+  by intros; clear; case: ssinfo' => ? /= [? /ltP].
+Qed.
 
 End MAllocate.
