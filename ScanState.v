@@ -12,8 +12,7 @@ Generalizable All Variables.
 
 Module MScanState (Mach : Machine).
 
-Include MOps Mach.
-Import Mach.
+Include Mach.
 
 (** ** ScanStateDesc *)
 

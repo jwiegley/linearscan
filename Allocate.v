@@ -9,7 +9,7 @@ Require LinearScan.Spec.
 Module MAllocate (Mach : Machine).
 
 Include MSSMorph Mach.
-Import Mach.
+Include MOps Mach.
 
 Open Scope program_scope.
 
@@ -255,10 +255,14 @@ Program Fixpoint linearScan {opType} (sd : ScanStateDesc) (st : ScanState sd)
     | inr (mreg, ssinfo') =>
         match mreg with
         | None => inl EFailedToAllocateRegister
-        | Some _ => linearScan (thisDesc ssinfo') (thisState ssinfo')
+        | Some _ =>
+            match linearScan (thisDesc ssinfo') (thisState ssinfo') with
+            | inl err => inl err
+            | inr xs => inr xs (* undefined *)
+            end
         end
     end
-  | inright _ => inr nil
+  | inright _ => inr undefined
   end.
 Obligation 1. by intros; clear; case: ssinfo' => ? /= [? /ltP]. Qed.
 (* (* We must prove that after every call to [handleInterval], the total extent *)

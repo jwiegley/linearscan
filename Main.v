@@ -7,6 +7,7 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
 Require Import LinearScan.Allocate.
+Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
 Require Import LinearScan.NonEmpty.
 Require Import LinearScan.Machine.
@@ -19,28 +20,40 @@ Extract Constant maxReg => "32".
 Lemma registers_exist : (maxReg > 0).
 Proof. unfold maxReg. exact: ltn0Sn. Qed.
 
+Definition PhysReg := 'I_maxReg.
+
 End MyMachine.
 
 Module Import LinearScan := MAllocate MyMachine.
+Module Import Blocks := MBlocks MyMachine.
 
-Definition determineIntervals {op : Set} (ops : OpList op) : ScanStateSig :=
-  let mkint (ss : ScanStateSig) (mx : option RangeSig)
+Section Main.
+
+Close Scope nat_scope.
+
+Variable blockType : Set.
+Variable opType : Set.
+Variable blockToOpList : blockType -> seq opType.
+Variable opInfo : OpInfo opType.
+
+Definition determineIntervals (ops : OpList opType) : ScanStateSig :=
+  let mkint (ss : ScanStateSig)
+            (mx : option RangeSig)
             (f : forall sd, ScanState sd -> forall d, Interval d
                    -> ScanStateSig) :=
-      let: (exist sd st) := ss in
-      match mx with
-      | Some (exist _ r) => f _ st _ (I_Sing r)
-      | None => ss
-      end in
+      let: (exist sd st) := ss in match mx with
+           | Some (exist _ r) => f _ st _ (I_Sing r)
+           | None => ss
+           end in
 
   let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
 
-  let: (varRanges, regRanges) := processOperations ops in
+  let: (varRanges, regRanges) := processOperations opInfo ops in
   let regs := vmap (fun mr =>
-                if mr is Some r
-                then Some (packInterval (I_Sing r.2))
-                else None) regRanges in
+                      if mr is Some r
+                      then Some (packInterval (I_Sing r.2))
+                      else None) regRanges in
 
   let s0 := ScanState_nil in
   let s1 := ScanState_setFixedIntervals s0 regs in
@@ -48,9 +61,12 @@ Definition determineIntervals {op : Set} (ops : OpList op) : ScanStateSig :=
 
   foldl handleVar s2 varRanges.
 
-Definition allocateRegisters {op : Set} (ops : OpList op) :
-  (SSError + seq (AllocationInfo op))%type :=
+Definition allocateRegisters (blocks : seq blockType) :
+  SSError + seq (AllocationInfo opType) :=
+  let ops := flatten (map blockToOpList (computeBlockOrder blocks)) in
   uncurry_sig linearScan (determineIntervals ops).
+
+End Main.
 
 Extraction Language Haskell.
 

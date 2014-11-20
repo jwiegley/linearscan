@@ -18,7 +18,6 @@ Generalizable All Variables.
 Module MSSMorph (Mach : Machine).
 
 Include MLinearSpec Mach.
-Import Mach.
 
 Open Scope nat_scope.
 

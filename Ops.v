@@ -13,80 +13,37 @@ Module MOps (Mach : Machine).
 
 Import Mach.
 
-Definition PhysReg := 'I_maxReg.
-
-(** * Block *)
-
-(** An incoming [Block] is really a conceptual "set" of use-positions
-    ([UsePos]), involving several variables and/or registers -- or none (in
-    which case the allocator need not consider it, except to identify the
-    beginning and ending of loops). *)
-
 Section Ops.
 
 Variable opType : Set.
 
-(* SomeVar identifies a variable or register use.  If it is a variable use, an
-   index is given with a boolean to indicate if is required to be in a
-   register at that point.  If it is a register use, this reserves the
-   register for that use position. *)
-Definition SomeVar := ((nat * bool) + PhysReg)%type.
+Definition VarId := nat.
 
-Inductive OperationKind :=
-  | OILoopBegin
-  | OILoopEnd
-  | OICall of seq PhysReg.
+Inductive VarKind := Input | Temp | Output.
 
-Section Eqok.
+Record VarInfo := {
+  varId       : VarId;
+  varKind     : VarKind;
+  regRequired : bool
+}.
 
-Variables (T : eqType) (x0 : T).
-Implicit Type s : OperationKind.
+Record OpInfo := {
+  isLoopBegin : opType -> bool;
+  isLoopEnd   : opType -> bool;
+  isCall      : opType -> option (seq PhysReg);
+  varRefs     : opType -> seq VarInfo;
+  regRefs     : opType -> seq PhysReg
+}.
 
-Fixpoint eqok s1 s2 {struct s2} :=
-  match s1, s2 with
-  | OILoopBegin, OILoopBegin => true
-  | OILoopEnd,   OILoopEnd   => true
-  | OICall rs1,  OICall rs2  => rs1 == rs2
-  | _, _ => false
-  end.
+Definition OpList := seq opType.
 
-Lemma eqokP : Equality.axiom eqok.
-Proof.
-  move.
-  case=> [||l1]; case => [||l2];
-  try constructor; try by [].
-  case: (l1 =P l2) => /= [<-|neqx].
-    rewrite eq_refl.
-    by constructor.
-  move/eqP in neqx.
-  move/negbTE in neqx.
-  rewrite neqx.
-  constructor.
-  move/eqP in neqx.
-  move=> H.
-  contradiction neqx.
-  congruence.
-Qed.
+Inductive SpecialInstr :=
+  | SpillVictims of option (seq VarId).
 
-Canonical ok_eqMixin := EqMixin eqokP.
-Canonical ok_eqType := Eval hnf in EqType OperationKind ok_eqMixin.
-
-Lemma eqokE : eqok = eq_op. Proof. by []. Qed.
-
-Definition OperationKind_eqType (A : eqType) :=
-  Equality.Pack ok_eqMixin OperationKind.
-
-End Eqok.
-
-Definition OperationInfo :=
-  (seq OperationKind * { refCount : nat & Vec SomeVar refCount })%type.
-
-Definition OpPair := (opType * OperationInfo)%type.
-Definition OpList := NonEmpty OpPair.
-Definition OpListFromBlock block := block -> OpList.
-
-Inductive AllocationInfo :=
-  | AllocatedRegs of opType & (nat -> PhysReg).
+Record AllocationInfo := {
+  operation   : SpecialInstr + opType;
+  allocations : VarId -> PhysReg
+}.
 
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
@@ -150,18 +107,18 @@ Section applyList.
 
 Import EqNotations.
 
-Definition applyList (ops : OpList)
+Definition applyList (op : opType) (ops : OpList)
   (base : forall l, boundedRangeVec l.+2)
-  (f : OpPair -> forall (pos : nat) (Hodd : odd pos),
+  (f : opType -> forall (pos : nat) (Hodd : odd pos),
          boundedRangeVec pos.+2 -> boundedRangeVec pos)
    : boundedRangeVec 1 :=
-  let fix go i Hoddi bs :=
-      match bs with
-        | NE_Sing x => f x i Hoddi (base i)
-        | NE_Cons x xs =>
-          f x i Hoddi (go i.+2 (rew <- (odd_succ_succ _) in Hoddi) xs)
+  let fix go i Hoddi x xs :=
+      match xs with
+        | nil => f x i Hoddi (base i)
+        | y :: ys =>
+          f x i Hoddi (go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys)
       end in
-  go 1 (RangeTests.odd_1) ops.
+  go 1 (RangeTests.odd_1) op ops.
 
 End applyList.
 
@@ -178,17 +135,16 @@ Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
    site. Therefore, the allocation pass cannot assign a register to any
    interval there, and all intervals are spilled before the call. *)
 
-Definition handleBlock (o : OpPair) (pos : nat) (Hodd : odd pos)
-  (rest : boundedRangeVec pos.+2) : boundedRangeVec pos :=
-  let: (orig, (kinds, existT refCount references)) := o in
-
+Definition handleOp (opInfo : OpInfo) (o : opType)
+  (pos : nat) (Hodd : odd pos) (rest : boundedRangeVec pos.+2) :
+  boundedRangeVec pos :=
   let liftOr f mx y :=
       Some (match mx with Some x => f x y | None => y end) in
 
   (** If the instruction at this position begins or ends a loop, extend the
       current range so that it starts at, or end at, this boundary. *)
   let savingBound x :=
-      if (OILoopBegin \in kinds) || (OILoopEnd \in kinds)
+      if (isLoopBegin opInfo o) || (isLoopEnd opInfo o)
       then let: (mb, me, r) := x in
            (liftOr minn mb pos, liftOr maxn me pos, r)
       else x in
@@ -200,26 +156,38 @@ Definition handleBlock (o : OpPair) (pos : nat) (Hodd : odd pos)
 
   let restVars' := map savingBound (vars rest) in
   let restRegs' := vmap savingBound (regs rest) in
-  vec_rect SomeVar (fun _ _ => boundedRangeVec pos)
-    (boundedTransport (ltnSSn _) {| vars := restVars'; regs := restRegs' |})
-    (fun _ x _ _ =>
-       match x with
-       | inl (v, req) =>
-         let x := consr (nth (None, None, None) restVars' v) req in
-         let restVars'' :=
-             set_nth (None, None, None)
-                     (transportBounds (ltnSSn _) restVars') v x in
-         let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in
-         {| vars := restVars''; regs := restRegs'' |}
+  let unchanged :=
+      boundedTransport (ltnSSn _)
+                       {| vars := restVars'; regs := restRegs' |} in
 
-       | inr r =>
-         let x := consr (vnth restRegs' r) false in
-         let restVars'' := transportBounds (ltnSSn _) restVars' in
-         let restRegs'' :=
-             vreplace (transportVecBounds (ltnSSn _) restRegs') r x in
-         {| vars := restVars''; regs := restRegs'' |}
-      end)
-    references.
+  let rest2 := match varRefs opInfo o with
+      | nil => unchanged
+      | _ :: _ => undefined
+      end in
+
+  match regRefs opInfo o with
+  | nil => undefined
+  | _ :: _ => undefined
+  end.
+  (* vec_rect SomeVar (fun _ _ => boundedRangeVec pos) *)
+  (*   (fun _ x _ _ => *)
+  (*      match x with *)
+  (*      | inl (v, req) => *)
+  (*        let x := consr (nth (None, None, None) restVars' v) req in *)
+  (*        let restVars'' := *)
+  (*            set_nth (None, None, None) *)
+  (*                    (transportBounds (ltnSSn _) restVars') v x in *)
+  (*        let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in *)
+  (*        {| vars := restVars''; regs := restRegs'' |} *)
+
+  (*      | inr r => *)
+  (*        let x := consr (vnth restRegs' r) false in *)
+  (*        let restVars'' := transportBounds (ltnSSn _) restVars' in *)
+  (*        let restRegs'' := *)
+  (*            vreplace (transportVecBounds (ltnSSn _) restRegs') r x in *)
+  (*        {| vars := restVars''; regs := restRegs'' |} *)
+  (*     end) *)
+  (*   references. *)
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=
   let: (mb, me, mr) := x in
@@ -238,13 +206,17 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
             end)
   end.
 
-(** The list of blocks is processed in reverse, so that the resulting
+(** The list of operations is processed in reverse, so that the resulting
     sub-lists are also in order. *)
-Definition processOperations (ops : OpList) :
+Definition processOperations (opInfo : OpInfo) (ops : OpList) :
   seq (option RangeSig) * Vec (option RangeSig) maxReg :=
-  let: {| vars := vars'; regs := regs' |} :=
-       applyList ops emptyBoundedRangeVec handleBlock in
-  (map extractRange vars', vmap extractRange regs').
+  match ops with
+  | nil => (nil, vconst None)
+  | x :: xs =>
+      let: {| vars := vars'; regs := regs' |} :=
+           applyList x xs emptyBoundedRangeVec (handleOp opInfo) in
+      (map extractRange vars', vmap extractRange regs')
+  end.
 
 End Ops.
 

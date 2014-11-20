@@ -2,18 +2,17 @@
 
 module LinearScan
     ( allocate
-    , OpListFromBlock
-    , OperationInfo
+    , OpInfo(..)
     , AllocationInfo
     ) where
 
 import LinearScan.Main
 
-allocate :: [block] -> OpListFromBlock op block
+allocate :: [block] -> (block -> [op]) -> OpInfo op
          -> Either String [AllocationInfo op]
-allocate [] _ = Left "No basic blocks were provided"
-allocate blocks getInfo =
-    case allocateRegisters (concatMap getInfo blocks) of
+allocate [] _ _ = Left "No basic blocks were provided"
+allocate blocks blockToOpList opInfo =
+    case allocateRegisters blockToOpList opInfo blocks of
         Left x -> Left $ case x of
             ECurrentIsSingleton ->
                 "Current interval is a singleton"

@@ -1,5 +1,6 @@
 -R . LinearScan -dont-load-proofs
 Allocate.v
+Blocks.v
 IApplicative.v
 IEndo.v
 IMonad.v

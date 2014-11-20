@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
-{- For Hugs, use the option -F"cpp -P -traditional" -}
-
 module LinearScan.Ssrbool where
 
 
@@ -10,17 +7,6 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
-
-
---unsafeCoerce :: a -> b
-#ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base
-unsafeCoerce = GHC.Base.unsafeCoerce#
-#else
--- HUGS
-import qualified LinearScan.IOExts as IOExts
-unsafeCoerce = IOExts.unsafeCoerce
-#endif
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -61,30 +47,4 @@ type Coq_simpl_rel t = (->) t (Coq_pred t)
 rel_of_simpl_rel :: (Coq_simpl_rel a1) -> Coq_rel a1
 rel_of_simpl_rel r x y =
   (Prelude.$) r x y
-
-data Coq_mem_pred t =
-   Mem (Coq_pred t)
-
-data Coq_predType t =
-   PredType (() -> Coq_pred t) (() -> Coq_mem_pred t)
-
-type Coq_pred_sort t = ()
-
-mkPredType :: (a2 -> a1 -> Prelude.Bool) -> Coq_predType a1
-mkPredType toP =
-  PredType (unsafeCoerce toP) (\p -> Mem (\x -> unsafeCoerce toP p x))
-
-pred_of_mem :: (Coq_mem_pred a1) -> Coq_pred_sort a1
-pred_of_mem mp =
-  case mp of {
-   Mem p -> unsafeCoerce (\x -> p x)}
-
-mem :: (Coq_predType a1) -> (Coq_pred_sort a1) -> Coq_mem_pred a1
-mem pT =
-  case pT of {
-   PredType topred s -> s}
-
-in_mem :: a1 -> (Coq_mem_pred a1) -> Prelude.Bool
-in_mem x mp =
-  unsafeCoerce (\_ -> pred_of_mem) __ mp x
 

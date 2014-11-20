@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 {- For Hugs, use the option -F"cpp -P -traditional" -}
 
-module LinearScan.Main where
+module LinearScan.Top where
 
 
 import qualified Prelude
@@ -21,7 +21,6 @@ import qualified LinearScan.Range as Range
 import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
-import qualified LinearScan.Seq as Seq
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -1399,10 +1398,6 @@ linearScan :: ScanStateDesc -> Prelude.Either
 linearScan sd =
   unsafeCoerce (linearScan_func ((,) __ ((,) sd __)))
 
-_Blocks__computeBlockOrder :: ([] a1) -> [] a1
-_Blocks__computeBlockOrder blocks =
-  blocks
-
 determineIntervals :: (OpInfo a1) -> (OpList 
                       a1) -> ScanStateDesc
 determineIntervals opInfo ops =
@@ -1461,14 +1456,10 @@ determineIntervals opInfo ops =
     in
     Data.List.foldl' handleVar s2 varRanges}
 
-allocateRegisters :: (a1 -> [] a2) -> (OpInfo a2) -> ([] 
-                     a1) -> Prelude.Either SSError
-                     ([] (AllocationInfo a2))
-allocateRegisters blockToOpList opInfo blocks =
-  let {
-   ops = Seq.flatten
-           (Prelude.map blockToOpList (_Blocks__computeBlockOrder blocks))}
-  in
+allocateRegisters :: (OpInfo a1) -> (OpList a1) ->
+                     Prelude.Either SSError
+                     ([] (AllocationInfo a1))
+allocateRegisters opInfo ops =
   Lib.uncurry_sig (\x _ -> linearScan x)
     (determineIntervals opInfo ops)
 

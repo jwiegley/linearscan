@@ -10,7 +10,6 @@ Generalizable All Variables.
 Module MLinearSpec (Mach : Machine).
 
 Include MScanState Mach.
-Import Mach.
 
 (** * Linear scan specification *)
 
