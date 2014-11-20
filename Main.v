@@ -67,7 +67,7 @@ Definition allocateRegisters (blocks : seq blockType) :
   SSError + seq (AllocationInfo opType) :=
   let ops := flatten (map blockToOpList (computeBlockOrder blocks)) in
   let: (ops', exist sd st) := determineIntervals ops in
-  linearScan opInfo ops sd st.
+  linearScan opInfo ops' sd st.
 
 End Main.
 

@@ -240,19 +240,23 @@ Definition handleInterval {pre} :
 Require Import Coq.Program.Wf.
 
 Program Fixpoint linearScan
-  {opType : Set} (opInfo : OpInfo opType) (ops : seq opType)
+  {opType : Set} (opInfo : OpInfo opType) (ops : OpList opType)
   (sd : ScanStateDesc) (st : ScanState sd)
   {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  let: (plainOps, restOps) := span (predC (hasRefs opInfo)) ops in
   match List.destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
     let ssinfo := {| thisDesc  := sd
                    ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
+    (* Prove that every interval has an associated op. *)
+    let f p := let: (pos, op) := p in pos < nat_of_ord (fst x) in
+    let: (preOps, restOps) := span f ops in
+    (* jww (2014-11-20): Prove here that restOps is non-empty, and that fst of
+       its first element must equal fst x. *)
     match IState.runIState SSError handleInterval ssinfo with
     | inl err => inl err
     | inr (mreg, ssinfo') =>

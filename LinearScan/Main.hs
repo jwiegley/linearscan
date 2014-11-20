@@ -1026,7 +1026,71 @@ handleOp :: (OpInfo a1) -> a1 -> Prelude.Int ->
                          Coq_boundedRangeVec ->
                          Coq_boundedRangeVec
 handleOp opInfo o pos rest =
-  Lib.undefined
+  let {
+   liftOr = \f mx y -> Prelude.Just
+    (case mx of {
+      Prelude.Just x -> f x y;
+      Prelude.Nothing -> y})}
+  in
+  let {
+   savingBound = \x ->
+    case (Prelude.||) (isLoopBegin opInfo o)
+           (isLoopEnd opInfo o) of {
+     Prelude.True ->
+      case x of {
+       (,) y r ->
+        case y of {
+         (,) mb me -> (,) ((,) (liftOr Prelude.min mb pos)
+          (liftOr Prelude.max me pos)) r}};
+     Prelude.False -> x}}
+  in
+  let {
+   consr = \x req ->
+    let {upos = Range.Build_UsePos pos req} in
+    withRanges pos req upos ((Prelude.succ) ((Prelude.succ)
+      pos)) x}
+  in
+  let {
+   restVars' = Prelude.map savingBound
+                 (vars ((Prelude.succ) ((Prelude.succ) pos))
+                   rest)}
+  in
+  let {
+   restRegs' = LinearScan.Utils.vmap _MyMachine__maxReg savingBound
+                 (regs ((Prelude.succ) ((Prelude.succ) pos))
+                   rest)}
+  in
+  let {
+   unchanged = LinearScan.Utils.boundedTransport' pos ((Prelude.succ)
+                 ((Prelude.succ) pos)) (Build_boundedRangeVec
+                 restVars' restRegs')}
+  in
+  let {
+   rest2 = case varRefs opInfo o of {
+            [] -> unchanged;
+            (:) v vs ->
+             let {
+              x = consr
+                    (Seq.nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
+                      Prelude.Nothing) restVars' (varId v))
+                    (regRequired v)}
+             in
+             Build_boundedRangeVec
+             (Seq.set_nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
+               Prelude.Nothing) (vars pos unchanged)
+               (varId v) x) (regs pos unchanged)}}
+  in
+  case regRefs opInfo o of {
+   [] -> rest2;
+   (:) r rs ->
+    let {
+     x = consr (LinearScan.Utils.nth _MyMachine__maxReg restRegs' r)
+           Prelude.False}
+    in
+    Build_boundedRangeVec (vars pos rest2)
+    (LinearScan.Utils.set_nth _MyMachine__maxReg
+      (transportVecBounds pos _MyMachine__maxReg ((Prelude.succ)
+        ((Prelude.succ) pos)) restRegs') r x)}
 
 extractRange :: Coq_boundedTriple -> Prelude.Maybe
                              Range.RangeDesc
@@ -1342,7 +1406,7 @@ handleInterval pre =
 
 linearScan_func :: ((,) ()
                                 ((,) (OpInfo ())
-                                ((,) ([] ())
+                                ((,) (OpList ())
                                 ((,) ScanStateDesc ())))) ->
                                 Prelude.Either SSError
                                 ([] (AllocationInfo ()))
@@ -1386,8 +1450,8 @@ linearScan_func x =
             Prelude.Right ((:) this allocs)}}}};
    Prelude.Nothing -> Prelude.Right []}
 
-linearScan :: (OpInfo a1) -> ([] a1) ->
-                           ScanStateDesc -> Prelude.Either
+linearScan :: (OpInfo a1) -> (OpList 
+                           a1) -> ScanStateDesc -> Prelude.Either
                            SSError
                            ([] (AllocationInfo a1))
 linearScan opInfo ops sd =
@@ -1468,5 +1532,5 @@ allocateRegisters blockToOpList opInfo blocks =
            (Prelude.map blockToOpList (_Blocks__computeBlockOrder blocks))}
   in
   case determineIntervals opInfo ops of {
-   (,) ops' s -> linearScan opInfo ops s}
+   (,) ops' s -> linearScan opInfo ops' s}
 

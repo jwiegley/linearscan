@@ -153,7 +153,7 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
 
   (** Add a new use position to the beginning of the current range. *)
   let consr (x : boundedTriple pos.+2) req : boundedTriple pos :=
-      let upos := Build_UsePos pos req in
+      let upos := Build_Uvreplace (transportVecBounds (ltnSSn _) restRegs') r xsePos pos req in
       @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
 
   let restVars' := map savingBound (vars rest) in
@@ -164,32 +164,23 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
 
   let rest2 := match varRefs opInfo o with
       | nil => unchanged
-      | _ :: _ => undefined
+      | v :: vs =>
+         let x := consr (nth (None, None, None) restVars' (varId v))
+                        (regRequired v) in
+         {| vars := set_nth (None, None, None)
+                            (vars unchanged) (varId v) x
+          ; regs := regs unchanged
+          |}
       end in
 
   match regRefs opInfo o with
-  | nil => undefined
-  | _ :: _ => undefined
+  | nil => rest2
+  | r :: rs =>
+     let x := consr (vnth restRegs' r) false in
+     {| vars := vars rest2
+      ; regs := vreplace (transportVecBounds (ltnSSn _) restRegs') r x
+      |}
   end.
-  (* vec_rect SomeVar (fun _ _ => boundedRangeVec pos) *)
-  (*   (fun _ x _ _ => *)
-  (*      match x with *)
-  (*      | inl (v, req) => *)
-  (*        let x := consr (nth (None, None, None) restVars' v) req in *)
-  (*        let restVars'' := *)
-  (*            set_nth (None, None, None) *)
-  (*                    (transportBounds (ltnSSn _) restVars') v x in *)
-  (*        let restRegs'' := transportVecBounds (ltnSSn _) restRegs' in *)
-  (*        {| vars := restVars''; regs := restRegs'' |} *)
-
-  (*      | inr r => *)
-  (*        let x := consr (vnth restRegs' r) false in *)
-  (*        let restVars'' := transportBounds (ltnSSn _) restVars' in *)
-  (*        let restRegs'' := *)
-  (*            vreplace (transportVecBounds (ltnSSn _) restRegs') r x in *)
-  (*        {| vars := restVars''; regs := restRegs'' |} *)
-  (*     end) *)
-  (*   references. *)
 
 Definition extractRange (x : boundedTriple 1) : option RangeSig :=
   let: (mb, me, mr) := x in

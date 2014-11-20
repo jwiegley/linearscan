@@ -37,3 +37,12 @@ nat_eqType :: Eqtype.Equality__Coq_type
 nat_eqType =
   unsafeCoerce nat_eqMixin
 
+iter :: Prelude.Int -> (a1 -> a1) -> a1 -> a1
+iter n f x =
+  (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    x)
+    (\i ->
+    f (iter i f x))
+    n
+
