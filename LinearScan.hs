@@ -25,6 +25,4 @@ allocate blocks blockToOpList opInfo =
                 "There are no intervals to split"
             EFailedToAllocateRegister ->
                 "Failed to allocate register for current interval"
-            ESpillingNotYetImplemented ->
-                "Spilling is not yet implemented!"
         Right z -> Right z

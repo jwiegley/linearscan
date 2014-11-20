@@ -422,19 +422,15 @@ data SSError =
    ECurrentIsSingleton
  | ENoIntervalsToSplit
  | EFailedToAllocateRegister
- | ESpillingNotYetImplemented
 
-coq_SSError_rect :: a1 -> a1 -> a1 -> a1 -> SSError
-                                 -> a1
-coq_SSError_rect f f0 f1 f2 s =
+coq_SSError_rect :: a1 -> a1 -> a1 -> SSError -> a1
+coq_SSError_rect f f0 f1 s =
   case s of {
    ECurrentIsSingleton -> f;
    ENoIntervalsToSplit -> f0;
-   EFailedToAllocateRegister -> f1;
-   ESpillingNotYetImplemented -> f2}
+   EFailedToAllocateRegister -> f1}
 
-coq_SSError_rec :: a1 -> a1 -> a1 -> a1 -> SSError
-                                -> a1
+coq_SSError_rec :: a1 -> a1 -> a1 -> SSError -> a1
 coq_SSError_rec =
   coq_SSError_rect
 
@@ -820,23 +816,24 @@ regRequired v =
 
 data OpInfo opType =
    Build_OpInfo (opType -> Prelude.Bool) (opType -> Prelude.Bool) 
- (opType -> Prelude.Maybe ([] MyMachine__PhysReg)) (opType -> []
-                                                   VarInfo) 
- (opType -> [] MyMachine__PhysReg)
+ (opType -> Prelude.Maybe ([] MyMachine__PhysReg)) (opType -> Prelude.Bool) 
+ (opType -> [] VarInfo) (opType -> [] MyMachine__PhysReg)
 
 coq_OpInfo_rect :: ((a1 -> Prelude.Bool) -> (a1 -> Prelude.Bool)
                                 -> (a1 -> Prelude.Maybe
-                                ([] MyMachine__PhysReg)) -> (a1 -> []
+                                ([] MyMachine__PhysReg)) -> (a1 ->
+                                Prelude.Bool) -> (a1 -> []
                                 VarInfo) -> (a1 -> []
                                 MyMachine__PhysReg) -> a2) ->
                                 (OpInfo a1) -> a2
 coq_OpInfo_rect f o =
   case o of {
-   Build_OpInfo x x0 x1 x2 x3 -> f x x0 x1 x2 x3}
+   Build_OpInfo x x0 x1 x2 x3 x4 -> f x x0 x1 x2 x3 x4}
 
 coq_OpInfo_rec :: ((a1 -> Prelude.Bool) -> (a1 -> Prelude.Bool)
                                -> (a1 -> Prelude.Maybe
-                               ([] MyMachine__PhysReg)) -> (a1 -> []
+                               ([] MyMachine__PhysReg)) -> (a1 ->
+                               Prelude.Bool) -> (a1 -> []
                                VarInfo) -> (a1 -> []
                                MyMachine__PhysReg) -> a2) ->
                                (OpInfo a1) -> a2
@@ -846,86 +843,70 @@ coq_OpInfo_rec =
 isLoopBegin :: (OpInfo a1) -> a1 -> Prelude.Bool
 isLoopBegin o =
   case o of {
-   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 varRefs0
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
     regRefs0 -> isLoopBegin0}
 
 isLoopEnd :: (OpInfo a1) -> a1 -> Prelude.Bool
 isLoopEnd o =
   case o of {
-   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 varRefs0
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
     regRefs0 -> isLoopEnd0}
 
 isCall :: (OpInfo a1) -> a1 -> Prelude.Maybe
                        ([] MyMachine__PhysReg)
 isCall o =
   case o of {
-   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 varRefs0
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
     regRefs0 -> isCall0}
+
+hasRefs :: (OpInfo a1) -> a1 -> Prelude.Bool
+hasRefs o =
+  case o of {
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
+    regRefs0 -> hasRefs0}
 
 varRefs :: (OpInfo a1) -> a1 -> []
                         VarInfo
 varRefs o =
   case o of {
-   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 varRefs0
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
     regRefs0 -> varRefs0}
 
 regRefs :: (OpInfo a1) -> a1 -> []
                         MyMachine__PhysReg
 regRefs o =
   case o of {
-   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 varRefs0
+   Build_OpInfo isLoopBegin0 isLoopEnd0 isCall0 hasRefs0 varRefs0
     regRefs0 -> regRefs0}
 
-type OpList opType = [] opType
-
-type SpecialInstr =
-  Prelude.Maybe ([] VarId)
-  -- singleton inductive, whose constructor was SpillVictims
-  
-coq_SpecialInstr_rect :: ((Prelude.Maybe ([] VarId))
-                                      -> a1) -> SpecialInstr ->
-                                      a1
-coq_SpecialInstr_rect f s =
-  f s
-
-coq_SpecialInstr_rec :: ((Prelude.Maybe ([] VarId))
-                                     -> a1) -> SpecialInstr -> a1
-coq_SpecialInstr_rec =
-  coq_SpecialInstr_rect
+type OpList opType = [] ((,) Prelude.Int opType)
 
 data AllocationInfo opType =
-   Build_AllocationInfo (Prelude.Either SpecialInstr
-                                    opType) (VarId ->
-                                            MyMachine__PhysReg)
+   Operation opType
+ | AllocatedOperation opType (VarId -> Prelude.Maybe
+                                         MyMachine__PhysReg)
+ | SpillVictim (Prelude.Maybe VarId)
 
-coq_AllocationInfo_rect :: ((Prelude.Either
-                                        SpecialInstr a1) ->
-                                        (VarId ->
+coq_AllocationInfo_rect :: (a1 -> a2) -> (a1 ->
+                                        (VarId -> Prelude.Maybe
                                         MyMachine__PhysReg) -> a2) ->
-                                        (AllocationInfo a1) -> a2
-coq_AllocationInfo_rect f a =
+                                        ((Prelude.Maybe VarId) ->
+                                        a2) -> (AllocationInfo
+                                        a1) -> a2
+coq_AllocationInfo_rect f f0 f1 a =
   case a of {
-   Build_AllocationInfo x x0 -> f x x0}
+   Operation x -> f x;
+   AllocatedOperation x x0 -> f0 x x0;
+   SpillVictim x -> f1 x}
 
-coq_AllocationInfo_rec :: ((Prelude.Either
-                                       SpecialInstr a1) ->
-                                       (VarId ->
+coq_AllocationInfo_rec :: (a1 -> a2) -> (a1 ->
+                                       (VarId -> Prelude.Maybe
                                        MyMachine__PhysReg) -> a2) ->
-                                       (AllocationInfo a1) -> a2
+                                       ((Prelude.Maybe VarId) ->
+                                       a2) -> (AllocationInfo 
+                                       a1) -> a2
 coq_AllocationInfo_rec =
   coq_AllocationInfo_rect
-
-operation :: (AllocationInfo a1) -> Prelude.Either
-                          SpecialInstr a1
-operation a =
-  case a of {
-   Build_AllocationInfo operation0 allocations0 -> operation0}
-
-allocations :: (AllocationInfo a1) ->
-                            VarId -> MyMachine__PhysReg
-allocations a =
-  case a of {
-   Build_AllocationInfo operation0 allocations0 -> allocations0}
 
 type Coq_boundedRange = Specif.Coq_sig2 Range.RangeDesc
 
@@ -1017,18 +998,21 @@ withRanges pos req upos n _top_assumption_ =
   case _top_assumption_ of {
    (,) x x0 -> _evar_0_ x x0}
 
-applyList :: a1 -> (OpList a1) -> (Prelude.Int ->
+applyList :: a1 -> ([] a1) -> (Prelude.Int ->
                           Coq_boundedRangeVec) -> (a1 ->
                           Prelude.Int -> () ->
                           Coq_boundedRangeVec ->
-                          Coq_boundedRangeVec) ->
+                          Coq_boundedRangeVec) -> (,)
+                          (OpList a1)
                           Coq_boundedRangeVec
 applyList op ops base f =
   let {
    go i x xs =
      case xs of {
-      [] -> f x i __ (base i);
-      (:) y ys -> f x i __ (go ((Prelude.succ) ((Prelude.succ) i)) y ys)}}
+      [] -> (,) ((:) ((,) i x) []) (f x i __ (base i));
+      (:) y ys ->
+       case go ((Prelude.succ) ((Prelude.succ) i)) y ys of {
+        (,) ops' next -> (,) ((:) ((,) i x) ops') (f x i __ next)}}}
   in go ((Prelude.succ) 0) op ops
 
 emptyBoundedRangeVec :: Prelude.Int ->
@@ -1075,20 +1059,23 @@ extractRange x =
           Prelude.Nothing -> Range.packRange b});
        Prelude.Nothing -> Prelude.Nothing}}}
 
-processOperations :: (OpInfo a1) ->
-                                  (OpList a1) -> (,)
-                                  ([] (Prelude.Maybe Range.RangeDesc))
+processOperations :: (OpInfo a1) -> ([] a1) -> (,)
+                                  ((,) (OpList a1)
+                                  ([] (Prelude.Maybe Range.RangeDesc)))
                                   ([] (Prelude.Maybe Range.RangeDesc))
 processOperations opInfo ops =
   case ops of {
-   [] -> (,) [] (Data.List.replicate _MyMachine__maxReg Prelude.Nothing);
+   [] -> (,) ((,) [] [])
+    (Data.List.replicate _MyMachine__maxReg Prelude.Nothing);
    (:) x xs ->
     case applyList x xs emptyBoundedRangeVec
            (\x0 x1 _ -> handleOp opInfo x0 x1) of {
-     Build_boundedRangeVec vars' regs' -> (,)
-      (Prelude.map extractRange vars')
-      (LinearScan.Utils.vmap _MyMachine__maxReg extractRange
-        regs')}}
+     (,) ops' b ->
+      case b of {
+       Build_boundedRangeVec vars' regs' -> (,) ((,) ops'
+        (Prelude.map extractRange vars'))
+        (LinearScan.Utils.vmap _MyMachine__maxReg extractRange
+          regs')}}}
 
 intersectsWithFixedInterval :: ScanStateDesc ->
                                             PhysReg ->
@@ -1104,11 +1091,6 @@ intersectsWithFixedInterval pre reg =
             Prelude.Just i -> Interval.intervalIntersectionPoint ( int) ( i);
             Prelude.Nothing -> Prelude.Nothing})) Prelude.Nothing
         (fixedIntervals sd)))
-
-assignSpillSlotToCurrent :: ScanStateDesc ->
-                                         SState a1 a1 ()
-assignSpillSlotToCurrent pre h1 =
-  Prelude.Left ESpillingNotYetImplemented
 
 tryAllocateFreeReg :: ScanStateDesc ->
                                    SState a1 a1
@@ -1218,20 +1200,18 @@ allocateBlockedReg pre =
             Prelude.Nothing -> Prelude.False} of {
        Prelude.True ->
         stbind (\x ->
-          stbind (\x0 ->
-            stbind (\mloc ->
+          stbind (\mloc ->
+            stbind (\x0 ->
               stbind (\x1 ->
-                stbind (\x2 ->
-                  return_ Prelude.Nothing)
-                  (weakenStHasLenToSt pre))
-                (case mloc of {
-                  Prelude.Just n ->
-                   splitCurrentInterval pre (Prelude.Just n);
-                  Prelude.Nothing -> return_ ()}))
-              (intersectsWithFixedInterval pre reg))
-            (splitCurrentInterval pre
-              (Interval.firstUseReqReg ( (curIntDetails sd)))))
-          (assignSpillSlotToCurrent pre);
+                return_ Prelude.Nothing)
+                (weakenStHasLenToSt pre))
+              (case mloc of {
+                Prelude.Just n ->
+                 splitCurrentInterval pre (Prelude.Just n);
+                Prelude.Nothing -> return_ ()}))
+            (intersectsWithFixedInterval pre reg))
+          (splitCurrentInterval pre
+            (Interval.firstUseReqReg ( (curIntDetails sd))));
        Prelude.False ->
         let {pos = curPosition sd} in
         stbind (\x ->
@@ -1361,56 +1341,66 @@ handleInterval pre =
         (checkActiveIntervals pre position)))
 
 linearScan_func :: ((,) ()
+                                ((,) (OpInfo ())
                                 ((,) ([] ())
-                                ((,) ScanStateDesc ()))) ->
+                                ((,) ScanStateDesc ())))) ->
                                 Prelude.Either SSError
                                 ([] (AllocationInfo ()))
 linearScan_func x =
-  let {ops = Prelude.fst (Specif.projT2 x)} in
-  let {sd = Prelude.fst (Specif.projT2 (Specif.projT2 x))} in
+  let {opInfo = Prelude.fst (Specif.projT2 x)} in
+  let {ops = Prelude.fst (Specif.projT2 (Specif.projT2 x))} in
+  let {sd = Prelude.fst (Specif.projT2 (Specif.projT2 (Specif.projT2 x)))} in
   let {
-   linearScan0 = \ops0 sd0 ->
-    let {y = (,) __ ((,) ops0 ((,) sd0 __))} in
+   linearScan0 = \opInfo0 ops0 sd0 ->
+    let {y = (,) __ ((,) opInfo0 ((,) ops0 ((,) sd0 __)))} in
     linearScan_func ( y)}
   in
   let {filtered_var = LinearScan.Utils.uncons (unhandled sd)} in
   case filtered_var of {
    Prelude.Just s ->
-    let {ssinfo = Build_SSInfo sd __} in
-    let {
-     filtered_var0 = IState.runIState (handleInterval sd) ssinfo}
-    in
-    case filtered_var0 of {
-     Prelude.Left err -> Prelude.Left err;
-     Prelude.Right p ->
-      case p of {
-       (,) mreg ssinfo' ->
-        case mreg of {
-         Prelude.Just wildcard' ->
+    case s of {
+     (,) x0 s0 ->
+      let {ssinfo = Build_SSInfo sd __} in
+      let {
+       filtered_var0 = IState.runIState (handleInterval sd)
+                         ssinfo}
+      in
+      case filtered_var0 of {
+       Prelude.Left err -> Prelude.Left err;
+       Prelude.Right p ->
+        case p of {
+         (,) mreg ssinfo' ->
           let {
-           filtered_var1 = linearScan0 ops (thisDesc sd ssinfo')}
+           next = linearScan0 opInfo ops (thisDesc sd ssinfo')}
           in
-          case filtered_var1 of {
+          case next of {
            Prelude.Left err -> Prelude.Left err;
-           Prelude.Right xs -> Prelude.Right xs};
-         Prelude.Nothing -> Prelude.Left
-          EFailedToAllocateRegister}}};
-   Prelude.Nothing -> Prelude.Right Lib.undefined}
+           Prelude.Right allocs ->
+            let {
+             this = case mreg of {
+                     Prelude.Just reg -> AllocatedOperation
+                      Lib.undefined (\v -> Prelude.Nothing);
+                     Prelude.Nothing -> SpillVictim (Prelude.Just
+                      ( (Prelude.fst x0)))}}
+            in
+            Prelude.Right ((:) this allocs)}}}};
+   Prelude.Nothing -> Prelude.Right []}
 
-linearScan :: ([] a1) -> ScanStateDesc ->
-                           Prelude.Either SSError
+linearScan :: (OpInfo a1) -> ([] a1) ->
+                           ScanStateDesc -> Prelude.Either
+                           SSError
                            ([] (AllocationInfo a1))
-linearScan ops sd =
+linearScan opInfo ops sd =
   unsafeCoerce
-    (linearScan_func ((,) __ ((,) (unsafeCoerce ops) ((,) sd
-      __))))
+    (linearScan_func ((,) __ ((,) (unsafeCoerce opInfo) ((,)
+      (unsafeCoerce ops) ((,) sd __)))))
 
 _Blocks__computeBlockOrder :: ([] a1) -> [] a1
 _Blocks__computeBlockOrder blocks =
   blocks
 
-determineIntervals :: (OpInfo a1) -> (OpList 
-                      a1) -> ScanStateDesc
+determineIntervals :: (OpInfo a1) -> ([] a1) -> (,)
+                      (OpList a1) ScanStateDesc
 determineIntervals opInfo ops =
   let {
    mkint = \ss mx f ->
@@ -1435,37 +1425,39 @@ determineIntervals opInfo ops =
         (Prelude.map Prelude.id (handled sd))))}
   in
   case processOperations opInfo ops of {
-   (,) varRanges regRanges ->
-    let {
-     regs0 = LinearScan.Utils.vmap _MyMachine__maxReg (\mr ->
-               case mr of {
-                Prelude.Just r -> Prelude.Just
-                 (Interval.packInterval (Interval.Build_IntervalDesc
-                   (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
-                Prelude.Nothing -> Prelude.Nothing}) regRanges}
-    in
-    let {
-     s2 = packScanState (Build_ScanStateDesc
-            (nextInterval (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] []))
-            (intervals (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] [])) regs0
-            (unhandled (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] []))
-            (active (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] []))
-            (inactive (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] []))
-            (handled (Build_ScanStateDesc 0 []
-              (Data.List.replicate maxReg Prelude.Nothing) [] []
-              [] [])))}
-    in
-    Data.List.foldl' handleVar s2 varRanges}
+   (,) p regRanges ->
+    case p of {
+     (,) ops' varRanges ->
+      let {
+       regs0 = LinearScan.Utils.vmap _MyMachine__maxReg (\mr ->
+                 case mr of {
+                  Prelude.Just r -> Prelude.Just
+                   (Interval.packInterval (Interval.Build_IntervalDesc
+                     (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
+                  Prelude.Nothing -> Prelude.Nothing}) regRanges}
+      in
+      let {
+       s2 = packScanState (Build_ScanStateDesc
+              (nextInterval (Build_ScanStateDesc 0
+                [] (Data.List.replicate maxReg Prelude.Nothing)
+                [] [] [] []))
+              (intervals (Build_ScanStateDesc 0 []
+                (Data.List.replicate maxReg Prelude.Nothing) []
+                [] [] [])) regs0
+              (unhandled (Build_ScanStateDesc 0 []
+                (Data.List.replicate maxReg Prelude.Nothing) []
+                [] [] []))
+              (active (Build_ScanStateDesc 0 []
+                (Data.List.replicate maxReg Prelude.Nothing) []
+                [] [] []))
+              (inactive (Build_ScanStateDesc 0 []
+                (Data.List.replicate maxReg Prelude.Nothing) []
+                [] [] []))
+              (handled (Build_ScanStateDesc 0 []
+                (Data.List.replicate maxReg Prelude.Nothing) []
+                [] [] [])))}
+      in
+      (,) ops' (Data.List.foldl' handleVar s2 varRanges)}}
 
 allocateRegisters :: (a1 -> [] a2) -> (OpInfo a2) -> ([] 
                      a1) -> Prelude.Either SSError
@@ -1475,6 +1467,6 @@ allocateRegisters blockToOpList opInfo blocks =
    ops = Seq.flatten
            (Prelude.map blockToOpList (_Blocks__computeBlockOrder blocks))}
   in
-  Lib.uncurry_sig (\x _ -> linearScan ops x)
-    (determineIntervals opInfo ops)
+  case determineIntervals opInfo ops of {
+   (,) ops' s -> linearScan opInfo ops s}
 

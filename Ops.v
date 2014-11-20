@@ -31,19 +31,19 @@ Record OpInfo := {
   isLoopBegin : opType -> bool;
   isLoopEnd   : opType -> bool;
   isCall      : opType -> option (seq PhysReg);
+  hasRefs     : opType -> bool;
   varRefs     : opType -> seq VarInfo;
   regRefs     : opType -> seq PhysReg
 }.
 
-Definition OpList := seq opType.
+Definition OpList := seq (nat * opType).
 
-Inductive SpecialInstr :=
-  | SpillVictims of option (seq VarId).
-
-Record AllocationInfo := {
-  operation   : SpecialInstr + opType;
-  allocations : VarId -> PhysReg
-}.
+Inductive AllocationInfo :=
+  | Operation of opType
+  (* jww (2014-11-20): Prove that for any given operation, the [Allocation] is
+     never [Unallocated]. *)
+  | AllocatedOperation of opType & VarId -> option PhysReg
+  | SpillVictim of option VarId.
 
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
@@ -107,16 +107,18 @@ Section applyList.
 
 Import EqNotations.
 
-Definition applyList (op : opType) (ops : OpList)
+Definition applyList (op : opType) (ops : seq opType)
   (base : forall l, boundedRangeVec l.+2)
   (f : opType -> forall (pos : nat) (Hodd : odd pos),
          boundedRangeVec pos.+2 -> boundedRangeVec pos)
-   : boundedRangeVec 1 :=
-  let fix go i Hoddi x xs :=
+   : OpList * boundedRangeVec 1 :=
+  let fix go i Hoddi x xs : OpList * boundedRangeVec i :=
       match xs with
-        | nil => f x i Hoddi (base i)
-        | y :: ys =>
-          f x i Hoddi (go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys)
+      | nil => ([:: (i, x)], f x i Hoddi (base i))
+      | y :: ys =>
+          let: (ops', next) :=
+               go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys in
+          ((i, x) :: ops', f x i Hoddi next)
       end in
   go 1 (RangeTests.odd_1) op ops.
 
@@ -208,14 +210,14 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
 
 (** The list of operations is processed in reverse, so that the resulting
     sub-lists are also in order. *)
-Definition processOperations (opInfo : OpInfo) (ops : OpList) :
-  seq (option RangeSig) * Vec (option RangeSig) maxReg :=
+Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
+  OpList * seq (option RangeSig) * Vec (option RangeSig) maxReg :=
   match ops with
-  | nil => (nil, vconst None)
+  | nil => (nil, nil, vconst None)
   | x :: xs =>
-      let: {| vars := vars'; regs := regs' |} :=
+      let: (ops', {| vars := vars'; regs := regs' |}) :=
            applyList x xs emptyBoundedRangeVec (handleOp opInfo) in
-      (map extractRange vars', vmap extractRange regs')
+      (ops', map extractRange vars', vmap extractRange regs')
   end.
 
 End Ops.

@@ -36,7 +36,8 @@ Variable opType : Set.
 Variable blockToOpList : blockType -> seq opType.
 Variable opInfo : OpInfo opType.
 
-Definition determineIntervals (ops : OpList opType) : ScanStateSig :=
+Definition determineIntervals (ops : seq opType) :
+  OpList opType * ScanStateSig :=
   let mkint (ss : ScanStateSig)
             (mx : option RangeSig)
             (f : forall sd, ScanState sd -> forall d, Interval d
@@ -49,7 +50,8 @@ Definition determineIntervals (ops : OpList opType) : ScanStateSig :=
   let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
 
-  let: (varRanges, regRanges) := processOperations opInfo ops in
+  let: (ops', varRanges, regRanges) :=
+       processOperations opInfo ops in
   let regs := vmap (fun mr =>
                       if mr is Some r
                       then Some (packInterval (I_Sing r.2))
@@ -59,12 +61,13 @@ Definition determineIntervals (ops : OpList opType) : ScanStateSig :=
   let s1 := ScanState_setFixedIntervals s0 regs in
   let s2 := packScanState s1 in
 
-  foldl handleVar s2 varRanges.
+  (ops', foldl handleVar s2 varRanges).
 
 Definition allocateRegisters (blocks : seq blockType) :
   SSError + seq (AllocationInfo opType) :=
   let ops := flatten (map blockToOpList (computeBlockOrder blocks)) in
-  uncurry_sig (linearScan ops) (determineIntervals ops).
+  let: (ops', exist sd st) := determineIntervals ops in
+  linearScan opInfo ops sd st.
 
 End Main.
 

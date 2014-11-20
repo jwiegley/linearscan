@@ -218,6 +218,29 @@ Defined.
 
 Arguments safe_last [a] xs H.
 
+Fixpoint span {a} (p : a -> bool) (l : list a) : (list a * list a) :=
+  match l with
+  | nil => (nil, nil)
+  | x :: xs =>
+    if p x
+    then let: (ys,zs) := span p xs in (x::ys,zs)
+    else (nil,l)
+  end.
+
+Lemma span_spec {a} (l : list a) : forall p l1 l2,
+  (l1, l2) = span p l -> l = l1 ++ l2.
+Proof.
+  move=> p.
+  elim: l => /= [|x xs IHxs] l1 l2 Heqe.
+    by inv Heqe.
+  case E: (p x); rewrite E in Heqe.
+    destruct (span p xs) eqn:S.
+    inv Heqe.
+    specialize (IHxs l l0).
+    rewrite {}IHxs; by reflexivity.
+  inv Heqe.
+Qed.
+
 Lemma lt_size_rev : forall a (xs : seq a), 0 < size xs -> 0 < size (rev xs).
 Proof.
   move=> a.

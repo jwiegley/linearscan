@@ -21,10 +21,6 @@ ex_falso_quodlibet :: a1
 ex_falso_quodlibet =
   Logic.coq_False_rect
 
-uncurry_sig :: (a1 -> () -> a2) -> a1 -> a2
-uncurry_sig f p =
-  f p __
-
 fromMaybe :: a1 -> (Prelude.Maybe a1) -> a1
 fromMaybe d mx =
   case mx of {

@@ -23,13 +23,13 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
          then intervalIntersectionPoint int.2 i.2
          else None)) None (fixedIntervals sd).
 
-Definition assignSpillSlotToCurrent {pre P} `{HasWork P} :
-  SState pre P P unit.
-Proof.
-  constructor.
-  move=> H1.
-  apply (inl ESpillingNotYetImplemented).
-Defined.
+(* Definition assignSpillSlotToCurrent {pre P} `{HasWork P} : *)
+(*   SState pre P P unit. *)
+(* Proof. *)
+(*   constructor. *)
+(*   move=> H1. *)
+(*   apply (inl ??). *)
+(* Defined. *)
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -134,7 +134,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
         | Some n => n < start
         end)
     then
-      assignSpillSlotToCurrent ;;;
+      (* assignSpillSlotToCurrent ;;; *)
       splitCurrentInterval (firstUseReqReg current) ;;;
 
       mloc <<- intersectsWithFixedInterval reg ;;
@@ -239,12 +239,14 @@ Definition handleInterval {pre} :
 (* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
-Program Fixpoint linearScan {opType : Set} (ops : seq opType)
+Program Fixpoint linearScan
+  {opType : Set} (opInfo : OpInfo opType) (ops : seq opType)
   (sd : ScanStateDesc) (st : ScanState sd)
   {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
+  let: (plainOps, restOps) := span (predC (hasRefs opInfo)) ops in
   match List.destruct_list (unhandled sd) with
   | inleft (existT x (exist xs H)) =>
     let ssinfo := {| thisDesc  := sd
@@ -254,16 +256,19 @@ Program Fixpoint linearScan {opType : Set} (ops : seq opType)
     match IState.runIState SSError handleInterval ssinfo with
     | inl err => inl err
     | inr (mreg, ssinfo') =>
-        match mreg with
-        | None => inl EFailedToAllocateRegister
-        | Some _ =>
-            match linearScan ops (thisDesc ssinfo') (thisState ssinfo') with
-            | inl err => inl err
-            | inr xs => inr xs (* undefined *)
-            end
+        let next := linearScan opInfo ops (thisDesc ssinfo')
+                                          (thisState ssinfo') in
+        match next with
+        | inl err => inl err
+        | inr allocs =>
+            let this := match mreg return AllocationInfo opType with
+                | None     => SpillVictim opType (Some (nat_of_ord (fst x)))
+                | Some reg => AllocatedOperation undefined (fun v => None)
+                end in
+            inr (this :: allocs)
         end
     end
-  | inright _ => inr undefined
+  | inright _ => inr nil
   end.
 Obligation 1.
   (* We must prove that after every call to [handleInterval], the total extent
