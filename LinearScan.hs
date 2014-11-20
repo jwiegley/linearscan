@@ -3,10 +3,15 @@
 module LinearScan
     ( allocate
     , OpInfo(..)
-    , AllocationInfo
+    , AllocationInfo(..)
     ) where
 
 import LinearScan.Main
+    ( allocateRegisters
+    , SSError(..)
+    , OpInfo(..)
+    , AllocationInfo(..)
+    )
 
 allocate :: [block] -> (block -> [op]) -> OpInfo op
          -> Either String [AllocationInfo op]
