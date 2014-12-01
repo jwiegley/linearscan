@@ -1,7 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.NonEmpty.
-
-Require Import Coq.Classes.RelationClasses.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

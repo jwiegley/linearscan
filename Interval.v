@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.NonEmpty.
 
 Require Export LinearScan.Range.
 

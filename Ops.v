@@ -1,8 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Machine.
-Require Import LinearScan.NonEmpty.
 Require Import LinearScan.Range.
-Require Import LinearScan.Vector.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -153,7 +151,7 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
 
   (** Add a new use position to the beginning of the current range. *)
   let consr (x : boundedTriple pos.+2) req : boundedTriple pos :=
-      let upos := Build_Uvreplace (transportVecBounds (ltnSSn _) restRegs') r xsePos pos req in
+      let upos := Build_UsePos pos req in
       @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
 
   let restVars' := map savingBound (vars rest) in

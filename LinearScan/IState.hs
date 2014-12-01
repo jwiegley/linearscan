@@ -46,14 +46,6 @@ coq_IState_IFunctor _ _ _ _ f x st =
     case p of {
      (,) a st' -> Prelude.Right ((,) (f a) st')}}
 
-iget :: IState a1 a2 a2 a2
-iget i =
-  Prelude.Right ((,) i i)
-
-iput :: a3 -> IState a1 a2 a3 ()
-iput x s =
-  Prelude.Right ((,) () x)
-
 coq_IState_IApplicative :: IApplicative.IApplicative (IState a1 () () ())
 coq_IState_IApplicative =
   IApplicative.Build_IApplicative coq_IState_IFunctor (\_ _ x st ->

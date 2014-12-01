@@ -9,7 +9,6 @@
 Require Import LinearScan.Allocate.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
-Require Import LinearScan.NonEmpty.
 Require Import LinearScan.Machine.
 
 Module MyMachine <: Machine.
@@ -31,43 +30,33 @@ Section Main.
 
 Close Scope nat_scope.
 
-Variable blockType : Set.
+Variable blockType : Set -> Set.
 Variable opType : Set.
-Variable blockToOpList : blockType -> seq opType.
 Variable opInfo : OpInfo opType.
 
-Definition determineIntervals (ops : seq opType) :
-  OpList opType * ScanStateSig :=
-  let mkint (ss : ScanStateSig)
-            (mx : option RangeSig)
-            (f : forall sd, ScanState sd -> forall d, Interval d
-                   -> ScanStateSig) :=
-      let: (exist sd st) := ss in match mx with
-           | Some (exist _ r) => f _ st _ (I_Sing r)
-           | None => ss
-           end in
+Definition mainAlgorithm : BlockState opType blockType unit :=
+  (* order blocks and operations (including loop detection) *)
+  computeBlockOrder ;;;
+  numberOperations ;;;
 
-  let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
-        packScanState (ScanState_newUnhandled st i) in
+  (* create intervals with live ranges *)
+  computeLocalLiveSets ;;;
+  computeGlobalLiveSets ;;;
+  buildIntervals ;;;
 
-  let: (ops', varRanges, regRanges) :=
-       processOperations opInfo ops in
-  let regs := vmap (fun mr =>
-                      if mr is Some r
-                      then Some (packInterval (I_Sing r.2))
-                      else None) regRanges in
+  (* allocate registers *)
+  walkIntervals ;;;
+  resolveDataFlow ;;;
 
-  let s0 := ScanState_nil in
-  let s1 := ScanState_setFixedIntervals s0 regs in
-  let s2 := packScanState s1 in
+  (* replace virtual registers with physical registers *)
+  assignRegNum.
 
-  (ops', foldl handleVar s2 varRanges).
-
-Definition allocateRegisters (blocks : seq blockType) :
-  SSError + seq (AllocationInfo opType) :=
-  let ops := flatten (map blockToOpList (computeBlockOrder blocks)) in
-  let: (ops', exist sd st) := determineIntervals ops in
-  linearScan opInfo ops' sd st.
+Definition linearScan (blocks : seq (blockType opType)) :
+  SSError + seq (blockType opType) :=
+  match IState.runIState SSError mainAlgorithm blocks with
+  | inl err => inl err
+  | inr (_, res) => inr res
+  end.
 
 End Main.
 
@@ -109,9 +98,9 @@ Extract Inlined Constant boundedTransport =>
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction allocateRegisters NE_map.
+Separate Extraction linearScan NE_map.
 
 (* Show which axioms we depend on for this development. *)
-Print Assumptions allocateRegisters.
+Print Assumptions linearScan.
 
 (* Print Libraries. *)

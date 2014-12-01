@@ -29,22 +29,7 @@ idP b1 =
    Prelude.True -> ReflectT;
    Prelude.False -> ReflectF}
 
-andP :: Prelude.Bool -> Prelude.Bool -> Coq_reflect
-andP b1 b2 =
-  case b1 of {
-   Prelude.True ->
-    case b2 of {
-     Prelude.True -> ReflectT;
-     Prelude.False -> ReflectF};
-   Prelude.False -> ReflectF}
-
 type Coq_pred t = t -> Prelude.Bool
 
 type Coq_rel t = t -> Coq_pred t
-
-type Coq_simpl_rel t = (->) t (Coq_pred t)
-
-rel_of_simpl_rel :: (Coq_simpl_rel a1) -> Coq_rel a1
-rel_of_simpl_rel r x y =
-  (Prelude.$) r x y
 

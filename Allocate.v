@@ -239,7 +239,7 @@ Definition handleInterval {pre} :
 (* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
-Program Fixpoint linearScan
+Program Fixpoint walkIntervals
   {opType : Set} (opInfo : OpInfo opType) (ops : OpList opType)
   (sd : ScanStateDesc) (st : ScanState sd)
   {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
@@ -260,8 +260,8 @@ Program Fixpoint linearScan
     match IState.runIState SSError handleInterval ssinfo with
     | inl err => inl err
     | inr (mreg, ssinfo') =>
-        let next := linearScan opInfo ops (thisDesc ssinfo')
-                                          (thisState ssinfo') in
+        let next := walkIntervals opInfo ops (thisDesc ssinfo')
+                                             (thisState ssinfo') in
         match next with
         | inl err => inl err
         | inr allocs =>

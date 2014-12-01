@@ -20,10 +20,9 @@ import qualified LinearScan.Utils
     s/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/;
 
     s/data Coq_simpl_fun/newtype Coq_simpl_fun/;
-    s/_LinearScan__//g;
-    s/LinearScan__//g;
-    s/_MLS__MS__//g;
-    s/MLS__MS__//g;
+    s/_LinearScan__//g; s/LinearScan__//g;
+    s/_Blocks__//g; s/Blocks__//g;
+    s/_MLS__MS__//g; s/MLS__MS__//g;
 
     print;
 }

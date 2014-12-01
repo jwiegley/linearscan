@@ -1,4 +1,4 @@
-Require Import Ssr.
+Require Import LinearScan.Ssr.
 
 Section Vector.
 

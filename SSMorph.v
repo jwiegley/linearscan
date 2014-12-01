@@ -1,12 +1,5 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.NonEmpty.
-Require Import LinearScan.IEndo.
-Require Import LinearScan.IApplicative.
-Require Import LinearScan.IMonad.
-Require Import LinearScan.IState.
 Require Import LinearScan.Spec.
-
-Require Import Coq.Classes.RelationClasses.
 
 Require Export LinearScan.ScanState.
 
@@ -149,11 +142,6 @@ Arguments thisDesc  {_ P} _.
 Arguments thisHolds {_ P} _.
 Arguments thisState {_ P} _.
 
-Inductive SSError :=
-  | ECurrentIsSingleton
-  | ENoIntervalsToSplit
-  | EFailedToAllocateRegister.
-
 Definition SState (sd : ScanStateDesc) P Q :=
   IState SSError (SSInfo sd P) (SSInfo sd Q).
 
@@ -216,21 +204,6 @@ Proof.
   apply first_nonempty0.
   assumption.
 Defined.
-
-Definition stbind {P Q R a b}
-  (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
-  IState SSError P R b :=
-  @ijoin (IState SSError) _ P Q R b (@imap _ _ P Q _ _ f x).
-
-Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
-
-Notation "X <<- A ;; B" := (A >>>= (fun X => B))
-  (right associativity, at level 84, A1 at next level).
-
-Notation "A ;;; B" := (_ <<- A ;; B)
-  (right associativity, at level 84, A1 at next level).
-
-Definition return_ {I X} := @ipure (IState SSError) _ I X.
 
 Definition weakenStHasLenToSt {pre} :
   SState pre SSMorphStHasLen SSMorphSt unit.

@@ -1,4 +1,12 @@
+Require Export LinearScan.IApplicative.
+Require Export LinearScan.IEndo.
+Require Export LinearScan.IMonad.
+Require Export LinearScan.IState.
+Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Ssr.
+Require Export LinearScan.Vector.
+
+Require Export Coq.Classes.RelationClasses.
 
 Generalizable All Variables.
 Set Implicit Arguments.

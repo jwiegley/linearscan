@@ -38,7 +38,3 @@ set_nth x0 s n y =
       (set_nth x0 s' n' y))
       n}
 
-flatten :: ([] ([] a1)) -> [] a1
-flatten =
-  Prelude.foldr (Prelude.++) []
-
