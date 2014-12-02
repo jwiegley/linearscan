@@ -42,10 +42,10 @@ Definition mainAlgorithm : BlockState opType blockType unit :=
   (* create intervals with live ranges *)
   computeLocalLiveSets ;;;
   computeGlobalLiveSets ;;;
-  buildIntervals ;;;
+  ssig <<- buildIntervals ;;
 
   (* allocate registers *)
-  walkIntervals ;;;
+  let: allocs := walkIntervals ssig.2 in
   resolveDataFlow ;;;
 
   (* replace virtual registers with physical registers *)

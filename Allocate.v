@@ -1,3 +1,4 @@
+Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
 
 Require Export LinearScan.SSMorph.
@@ -8,8 +9,8 @@ Require LinearScan.Spec.
 
 Module MAllocate (Mach : Machine).
 
+Include MBlocks Mach.
 Include MSSMorph Mach.
-Include MOps Mach.
 
 Open Scope program_scope.
 
@@ -25,11 +26,6 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
 
 (* Definition assignSpillSlotToCurrent {pre P} `{HasWork P} : *)
 (*   SState pre P P unit. *)
-(* Proof. *)
-(*   constructor. *)
-(*   move=> H1. *)
-(*   apply (inl ??). *)
-(* Defined. *)
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
@@ -134,6 +130,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
         | Some n => n < start
         end)
     then
+      (* jww (2014-12-01): Need to determine what should happen here. *)
       (* assignSpillSlotToCurrent ;;; *)
       splitCurrentInterval (firstUseReqReg current) ;;;
 
@@ -236,13 +233,14 @@ Definition handleInterval {pre} :
     | None   => allocateBlockedReg
     end.
 
-(* Require Import Recdef. *)
 Require Import Coq.Program.Wf.
 
-Program Fixpoint walkIntervals
-  {opType : Set} (opInfo : OpInfo opType) (ops : OpList opType)
-  (sd : ScanStateDesc) (st : ScanState sd)
-  {measure (unhandledExtent sd)} : SSError + seq (AllocationInfo opType) :=
+(* Walk through all the intervals which had been defined previously as the
+   [unhandled] list, and use those to determine register allocations.  The
+   final result will be a [ScanState] whose [handled] list represents the
+   final allocations for each interval. *)
+Program Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState sd)
+  {measure (unhandledExtent sd)} : SSError + ScanStateSig :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
@@ -252,27 +250,11 @@ Program Fixpoint walkIntervals
                    ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
                    ; thisState := st
                    |} in
-    (* Prove that every interval has an associated op. *)
-    let f p := let: (pos, op) := p in pos < nat_of_ord (fst x) in
-    let: (preOps, restOps) := span f ops in
-    (* jww (2014-11-20): Prove here that restOps is non-empty, and that fst of
-       its first element must equal fst x. *)
     match IState.runIState SSError handleInterval ssinfo with
-    | inl err => inl err
-    | inr (mreg, ssinfo') =>
-        let next := walkIntervals opInfo ops (thisDesc ssinfo')
-                                             (thisState ssinfo') in
-        match next with
-        | inl err => inl err
-        | inr allocs =>
-            let this := match mreg return AllocationInfo opType with
-                | None     => SpillVictim opType (Some (nat_of_ord (fst x)))
-                | Some reg => AllocatedOperation undefined (fun v => None)
-                end in
-            inr (this :: allocs)
-        end
+    | inl err          => inl err
+    | inr (_, ssinfo') => walkIntervals (thisState ssinfo')
     end
-  | inright _ => inr nil
+  | inright _ => inr (packScanState st)
   end.
 Obligation 1.
   (* We must prove that after every call to [handleInterval], the total extent

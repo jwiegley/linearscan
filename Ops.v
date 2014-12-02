@@ -13,18 +13,24 @@ Import Mach.
 
 Section Ops.
 
-Variable opType : Set.
-
 Definition VarId := nat.
 
 Inductive VarKind := Input | Temp | Output.
 
+(* [VarInfo] abstracts information about the caller's notion of variables
+   associated with an operation. *)
 Record VarInfo := {
   varId       : VarId;
   varKind     : VarKind;
   regRequired : bool
 }.
 
+(* [opType] is the original operation type used by the caller. *)
+Variable opType : Set.
+
+(* The [OpInfo] structure is a collection of functions that allow us to
+   determine information about each operation coming from the caller's
+   side. *)
 Record OpInfo := {
   isLoopBegin : opType -> bool;
   isLoopEnd   : opType -> bool;
@@ -34,14 +40,21 @@ Record OpInfo := {
   regRefs     : opType -> seq PhysReg
 }.
 
-Definition OpList := seq (nat * opType).
+Inductive Allocation := Unallocated | Register of PhysReg | Spill.
 
-Inductive AllocationInfo :=
-  | Operation of opType
-  (* jww (2014-11-20): Prove that for any given operation, the [Allocation] is
-     never [Unallocated]. *)
-  | AllocatedOperation of opType & VarId -> option PhysReg
-  | SpillVictim of option VarId.
+(* [OpData] combines the original operation from the caller, plus any extra
+   information that we've generated during the course of our algorithm. *)
+Record OpData := {
+  baseOp  : opType;
+  opInfo  : OpInfo;
+  opId    : nat;
+  opIdOdd : odd opId;
+  opAlloc : VarId -> Allocation
+}.
+
+(* Finally, when we work with the list of operations, we will be working with
+   a list of our [OpData] structures. *)
+Definition OpList := seq OpData.
 
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
@@ -100,27 +113,6 @@ Proof.
   - exact: Hlt.
   - by exists rd.
 Defined.
-
-Section applyList.
-
-Import EqNotations.
-
-Definition applyList (op : opType) (ops : seq opType)
-  (base : forall l, boundedRangeVec l.+2)
-  (f : opType -> forall (pos : nat) (Hodd : odd pos),
-         boundedRangeVec pos.+2 -> boundedRangeVec pos)
-   : OpList * boundedRangeVec 1 :=
-  let fix go i Hoddi x xs : OpList * boundedRangeVec i :=
-      match xs with
-      | nil => ([:: (i, x)], f x i Hoddi (base i))
-      | y :: ys =>
-          let: (ops', next) :=
-               go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys in
-          ((i, x) :: ops', f x i Hoddi next)
-      end in
-  go 1 (RangeTests.odd_1) op ops.
-
-End applyList.
 
 Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
   {| vars := nil
@@ -197,6 +189,32 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
             end)
   end.
 
+Section applyList.
+
+Import EqNotations.
+
+Definition applyList (opInfo : OpInfo) (op : opType) (ops : seq opType)
+  (base : forall l, boundedRangeVec l.+2)
+  (f : opType -> forall (pos : nat) (Hodd : odd pos),
+         boundedRangeVec pos.+2 -> boundedRangeVec pos)
+   : OpList * boundedRangeVec 1 :=
+  let fix go i Hoddi x xs : OpList * boundedRangeVec i :=
+      let newop := {| baseOp  := op
+                    ; opInfo  := opInfo
+                    ; opId    := i
+                    ; opIdOdd := Hoddi
+                    ; opAlloc := fun _ => Unallocated |} in
+      match xs with
+      | nil => ([:: newop], f x i Hoddi (base i))
+      | y :: ys =>
+          let: (ops', next) :=
+               go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys in
+          (newop :: ops', f x i Hoddi next)
+      end in
+  go 1 (RangeTests.odd_1) op ops.
+
+End applyList.
+
 (** The list of operations is processed in reverse, so that the resulting
     sub-lists are also in order. *)
 Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
@@ -204,8 +222,9 @@ Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
   match ops with
   | nil => (nil, nil, vconst None)
   | x :: xs =>
-      let: (ops', {| vars := vars'; regs := regs' |}) :=
-           applyList x xs emptyBoundedRangeVec (handleOp opInfo) in
+      let: (ops', {| vars := vars'
+                   ; regs := regs' |}) :=
+           applyList opInfo x xs emptyBoundedRangeVec (handleOp opInfo) in
       (ops', map extractRange vars', vmap extractRange regs')
   end.
 

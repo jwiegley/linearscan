@@ -31,6 +31,7 @@ Notation "X <<- A ;; B" := (A >>>= (fun X => B))
 Notation "A ;;; B" := (_ <<- A ;; B)
   (right associativity, at level 84, A1 at next level).
 
+Definition error_ {I X} err := mkIState SSError I I X (fun _ => inl err).
 Definition return_ {I X} := @ipure (IState SSError) _ I X.
 
 (** ** ScanStateDesc *)
