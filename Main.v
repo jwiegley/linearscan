@@ -23,21 +23,22 @@ Definition PhysReg := 'I_maxReg.
 
 End MyMachine.
 
-Module Import LinearScan := MAllocate MyMachine.
-Module Import Blocks := MBlocks MyMachine.
+Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
 Close Scope nat_scope.
 
-Variable blockType : Set -> Set.
 Variable opType : Set.
 Variable opInfo : OpInfo opType.
+Variable blockType : Set.
+Variable blockInfo : BlockInfo opType blockType.
 
-Definition mainAlgorithm : BlockState opType blockType unit :=
+Definition mainAlgorithm :
+  IState SSError (seq blockType) (BlockList opType blockType) unit :=
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder ;;;
-  numberOperations ;;;
+  numberOperations opInfo blockInfo ;;;
 
   (* create intervals with live ranges *)
   computeLocalLiveSets ;;;
@@ -45,17 +46,20 @@ Definition mainAlgorithm : BlockState opType blockType unit :=
   ssig <<- buildIntervals ;;
 
   (* allocate registers *)
-  let: allocs := walkIntervals ssig.2 in
-  resolveDataFlow ;;;
+  match walkIntervals ssig.2 with
+  | inl err => error_ err
+  | inr ssig' =>
+      resolveDataFlow ;;;
 
-  (* replace virtual registers with physical registers *)
-  assignRegNum.
+      (* replace virtual registers with physical registers *)
+      assignRegNum
+  end.
 
-Definition linearScan (blocks : seq (blockType opType)) :
-  SSError + seq (blockType opType) :=
+Definition linearScan (blocks : seq blockType) :
+  SSError + seq blockType :=
   match IState.runIState SSError mainAlgorithm blocks with
   | inl err => inl err
-  | inr (_, res) => inr res
+  | inr (_, res) => inr (map (@baseBlock opType blockType) res)
   end.
 
 End Main.

@@ -1,3 +1,4 @@
+Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
 
 Require Export LinearScan.ScanState.
@@ -9,7 +10,7 @@ Generalizable All Variables.
 
 Module MLinearSpec (Mach : Machine).
 
-Include MScanState Mach.
+Include MBlocks Mach.
 
 (** * Linear scan specification *)
 

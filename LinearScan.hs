@@ -5,22 +5,21 @@
 
 module LinearScan
     ( allocate
+    , BlockInfo
     , OpInfo(..)
-    , AllocationInfo(..)
     ) where
 
 import LinearScan.Main
     ( linearScan
     , SSError(..)
+    , BlockInfo
     , OpInfo(..)
-    , AllocationInfo(..)
     )
 
-allocate :: [block] -> (block -> [op]) -> OpInfo op -> Either String [block]
+allocate :: [block] -> OpInfo op -> BlockInfo op block -> Either String [block]
 allocate [] _ _ = Left "No basic blocks were provided"
-allocate blocks _blockToOpList _opInfo =
-    case linearScan -- blockToOpList opInfo
-         blocks of
+allocate blocks opInfo blockToOpList =
+    case linearScan opInfo blockToOpList blocks of
         Left x -> Left $ case x of
             ECurrentIsSingleton ->
                 "Current interval is a singleton"

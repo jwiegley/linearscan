@@ -12,7 +12,7 @@ Generalizable All Variables.
 Module MBlocks (Mach : Machine).
 
 Include MOps Mach.
-Module Import M := MScanState Mach.
+Include MScanState Mach.
 
 Section Blocks.
 
@@ -31,6 +31,8 @@ Record BlockData := {
   blockOps  : OpList opType
 }.
 
+Definition BlockList := seq BlockData.
+
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
    Wimmer's thesis.  At the moment we're simply accepting whatever block order
@@ -46,21 +48,22 @@ Definition computeBlockOrder :
    the caller.  From this point on, all functions operate on this enriched
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
-Definition numberOperations (blockInfo : BlockInfo) (opInfo : OpInfo opType) :
-  IState SSError (seq blockType) (seq BlockData) unit :=
-  let f block x :=
-      let: (i, blocks') := x in
+Definition numberOperations (opInfo : OpInfo opType) (blockInfo : BlockInfo) :
+  IState SSError (seq blockType) BlockList unit :=
+  let f block (x : ({ i : nat | odd i } * BlockList)) :=
+      let: (exist i Hoddi, blocks') := x in
       let k op := {| baseOp  := op
                    ; opInfo  := opInfo
                    ; opId    := i
+                   ; opIdOdd := Hoddi
                    ; opAlloc := fun _ => Unallocated |} in
       let blk  := {| baseBlock := block
                    ; blockInfo := blockInfo
                    ; blockOps  := map k (blockToOpList blockInfo block) |} in
-      (i.+2, blk :: blocks') in
-  imodify SSError $ @snd _ _ \o foldr f (1, nil).
+      (exist odd i.+2 (odd_add_2 Hoddi), blk :: blocks') in
+  imodify SSError $ @snd _ _ \o foldr f (exist odd 1 odd_1, nil).
 
-Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
+Definition BlockState := IState SSError BlockList BlockList.
 
 (* jww (2014-12-01): The following two functions are used for computing
    accurate live ranges. they constitute a dataflow analysis which determines
@@ -84,9 +87,9 @@ Definition buildIntervals : BlockState ScanStateSig :=
         packScanState (ScanState_newUnhandled st i) in
 
   bxs <<- iget SSError ;;
-  let: (blocks, blockInfo) := bxs in
+  let: blocks := bxs in
   let ops := flatten (map blockOps blocks) in
-  let: (ops', varRanges, regRanges) := processOperations ops in
+  let: (varRanges, regRanges) := processOperations ops in
   let regs := vmap (fun mr =>
                       if mr is Some r
                       then Some (packInterval (I_Sing r.2))
@@ -104,11 +107,11 @@ Definition assignRegNum : BlockState unit := return_ tt.
 
 End Blocks.
 
-Arguments computeBlockOrder {opType blockType}.
-Arguments numberOperations {opType blockType}.
+Arguments computeBlockOrder {blockType}.
+Arguments numberOperations {opType blockType} opInfo blockInfo.
 Arguments computeLocalLiveSets {opType blockType}.
 Arguments computeGlobalLiveSets {opType blockType}.
-Arguments buildIntervals {opType _ blockType}.
+Arguments buildIntervals {opType _}.
 Arguments resolveDataFlow {opType blockType}.
 Arguments assignRegNum {opType blockType}.
 

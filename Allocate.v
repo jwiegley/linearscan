@@ -9,7 +9,6 @@ Require LinearScan.Spec.
 
 Module MAllocate (Mach : Machine).
 
-Include MBlocks Mach.
 Include MSSMorph Mach.
 
 Open Scope program_scope.

@@ -127,16 +127,19 @@ Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
    site. Therefore, the allocation pass cannot assign a register to any
    interval there, and all intervals are spilled before the call. *)
 
-Definition handleOp (opInfo : OpInfo) (o : opType)
-  (pos : nat) (Hodd : odd pos) (rest : boundedRangeVec pos.+2) :
-  boundedRangeVec pos :=
+Definition handleOp (op : OpData) (rest : boundedRangeVec (opId op).+2) :
+  boundedRangeVec (opId op) :=
+  let pos := opId op in
+  let Hodd := opIdOdd op in
+
   let liftOr f mx y :=
       Some (match mx with Some x => f x y | None => y end) in
 
   (** If the instruction at this position begins or ends a loop, extend the
       current range so that it starts at, or end at, this boundary. *)
   let savingBound x :=
-      if (isLoopBegin opInfo o) || (isLoopEnd opInfo o)
+      if (isLoopBegin (opInfo op) (baseOp op)) ||
+         (isLoopEnd (opInfo op) (baseOp op))
       then let: (mb, me, r) := x in
            (liftOr minn mb pos, liftOr maxn me pos, r)
       else x in
@@ -152,7 +155,7 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
       boundedTransport (ltnSSn _)
                        {| vars := restVars'; regs := restRegs' |} in
 
-  let rest2 := match varRefs opInfo o with
+  let rest2 := match varRefs (opInfo op) (baseOp op) with
       | nil => unchanged
       | v :: vs =>
          let x := consr (nth (None, None, None) restVars' (varId v))
@@ -163,7 +166,7 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
           |}
       end in
 
-  match regRefs opInfo o with
+  match regRefs (opInfo op) (baseOp op) with
   | nil => rest2
   | r :: rs =>
      let x := consr (vnth restRegs' r) false in
@@ -172,7 +175,7 @@ Definition handleOp (opInfo : OpInfo) (o : opType)
       |}
   end.
 
-Definition extractRange (x : boundedTriple 1) : option RangeSig :=
+Definition extractRange {n} (x : boundedTriple n) : option RangeSig :=
   let: (mb, me, mr) := x in
   match mr with
   | None => None
@@ -189,43 +192,28 @@ Definition extractRange (x : boundedTriple 1) : option RangeSig :=
             end)
   end.
 
-Section applyList.
-
-Import EqNotations.
-
-Definition applyList (opInfo : OpInfo) (op : opType) (ops : seq opType)
+Definition applyList (op : OpData) (ops : seq OpData)
   (base : forall l, boundedRangeVec l.+2)
-  (f : opType -> forall (pos : nat) (Hodd : odd pos),
-         boundedRangeVec pos.+2 -> boundedRangeVec pos)
-   : OpList * boundedRangeVec 1 :=
-  let fix go i Hoddi x xs : OpList * boundedRangeVec i :=
-      let newop := {| baseOp  := op
-                    ; opInfo  := opInfo
-                    ; opId    := i
-                    ; opIdOdd := Hoddi
-                    ; opAlloc := fun _ => Unallocated |} in
+  (f : forall op : OpData,
+         boundedRangeVec (opId op).+2 -> boundedRangeVec (opId op))
+   : boundedRangeVec (opId op) :=
+  let fix go x xs :=
       match xs with
-      | nil => ([:: newop], f x i Hoddi (base i))
-      | y :: ys =>
-          let: (ops', next) :=
-               go i.+2 (rew <- (odd_succ_succ _) in Hoddi) y ys in
-          (newop :: ops', f x i Hoddi next)
+      | nil     => f x (base (opId x))
+      | y :: ys => f x undefined (* (go y ys) *)
       end in
-  go 1 (RangeTests.odd_1) op ops.
-
-End applyList.
+  go op ops.
 
 (** The list of operations is processed in reverse, so that the resulting
     sub-lists are also in order. *)
-Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
-  OpList * seq (option RangeSig) * Vec (option RangeSig) maxReg :=
+Definition processOperations (ops : seq OpData) :
+  seq (option RangeSig) * Vec (option RangeSig) maxReg :=
   match ops with
-  | nil => (nil, nil, vconst None)
+  | nil => (nil, vconst None)
   | x :: xs =>
-      let: (ops', {| vars := vars'
-                   ; regs := regs' |}) :=
-           applyList opInfo x xs emptyBoundedRangeVec (handleOp opInfo) in
-      (ops', map extractRange vars', vmap extractRange regs')
+      let: {| vars := vars'; regs := regs' |} :=
+           applyList x xs emptyBoundedRangeVec handleOp in
+      (map extractRange vars', vmap extractRange regs')
   end.
 
 End Ops.

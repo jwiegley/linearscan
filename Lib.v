@@ -111,6 +111,8 @@ Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } 
 
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
+Definition odd_1 : odd 1. done. Qed.
+
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
@@ -120,6 +122,9 @@ Qed.
 
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
 Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
+
+Definition odd_add_2 {n} : odd n -> odd n.+2.
+Proof. by move=> H; rewrite odd_succ_succ. Defined.
 
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.

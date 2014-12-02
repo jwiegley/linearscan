@@ -15,12 +15,16 @@ import qualified LinearScan.Utils
     s/module (.+?) where/module LinearScan.\1 where/;
     s/module LinearScan..+?.Utils where/module LinearScan.Utils where/;
 
+    # Sometimes when generating type synonyms, the extraction mechanism will
+    # inexplicably flip type arguments. We undo these bugs here.
     s/o -> Prelude.Either a \(\(,\) errType i\)/i -> Prelude.Either errType ((,) a o)/;
     s/a -> \(,\) i o/i -> (,) a o/;
     s/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/;
+    s/opType -> \[\] blockType/blockType -> [] opType/;
 
     s/data Coq_simpl_fun/newtype Coq_simpl_fun/;
     s/_LinearScan__//g; s/LinearScan__//g;
+    s/_Allocate__//g; s/Allocate__//g;
     s/_Blocks__//g; s/Blocks__//g;
     s/_MLS__MS__//g; s/MLS__MS__//g;
 

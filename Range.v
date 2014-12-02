@@ -507,8 +507,6 @@ Definition testRangeSpan (start finish : nat) (Hodd : odd start)
 
 Example lt_1_9 : 1 < 9. done. Qed.
 
-Definition odd_1 : odd 1. done. Qed.
-
 Example testRangeSpan_1 :
   testRangeSpan odd_1 lt_1_9 1 = (None, Some [(|1|); (|3|); (|5|); (|7|)]).
 Proof. reflexivity. Qed.

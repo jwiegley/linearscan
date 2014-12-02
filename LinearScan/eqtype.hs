@@ -109,3 +109,36 @@ val_eqP :: Equality__Coq_type -> (Ssrbool.Coq_pred Equality__Coq_sort) ->
 val_eqP t p sT =
   inj_eqAxiom t (val p sT)
 
+pair_eq :: Equality__Coq_type -> Equality__Coq_type -> Ssrbool.Coq_simpl_rel
+           ((,) Equality__Coq_sort Equality__Coq_sort)
+pair_eq t1 t2 =
+   (\u v ->
+    (Prelude.&&) (eq_op t1 (Prelude.fst u) (Prelude.fst v))
+      (eq_op t2 (Prelude.snd u) (Prelude.snd v)))
+
+pair_eqP :: Equality__Coq_type -> Equality__Coq_type -> Equality__Coq_axiom
+            ((,) Equality__Coq_sort Equality__Coq_sort)
+pair_eqP t1 t2 _top_assumption_ =
+  let {
+   _evar_0_ = \x1 x2 _top_assumption_0 ->
+    let {
+     _evar_0_ = \y1 y2 ->
+      Ssrbool.iffP ((Prelude.&&) (eq_op t1 x1 y1) (eq_op t2 x2 y2))
+        (Ssrbool.andP (eq_op t1 x1 y1) (eq_op t2 x2 y2))}
+    in
+    case _top_assumption_0 of {
+     (,) x x0 -> _evar_0_ x x0}}
+  in
+  case _top_assumption_ of {
+   (,) x x0 -> _evar_0_ x x0}
+
+prod_eqMixin :: Equality__Coq_type -> Equality__Coq_type ->
+                Equality__Coq_mixin_of
+                ((,) Equality__Coq_sort Equality__Coq_sort)
+prod_eqMixin t1 t2 =
+  Equality__Mixin (Ssrbool.rel_of_simpl_rel (pair_eq t1 t2)) (pair_eqP t1 t2)
+
+prod_eqType :: Equality__Coq_type -> Equality__Coq_type -> Equality__Coq_type
+prod_eqType t1 t2 =
+  unsafeCoerce (prod_eqMixin t1 t2)
+
