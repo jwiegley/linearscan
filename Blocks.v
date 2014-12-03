@@ -28,10 +28,15 @@ Record BlockInfo := {
 Record BlockData := {
   baseBlock : blockType;
   blockInfo : BlockInfo;
-  blockOps  : OpList opType
+  blockOps  : seq (OpData opType)
 }.
 
-Definition BlockList := seq BlockData.
+Inductive BlockList : BlockData -> Prop :=
+  | BlockList_newBlock b binfo ops :
+      BlockList {| baseBlock := b
+                 ; blockInfo := binfo
+                 ; blockOps  := ops
+                 |}.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
@@ -46,9 +51,7 @@ Variable oinfo : OpInfo opType.
 Variable binfo : BlockInfo.
 
 Definition wrap_block
-  (x : { i : nat | odd i } * BlockList) (block : blockType) :=
-  let: (H, blocks) := x in
-
+  (x : { i : nat | odd i } * seq BlockData) (block : blockType) :=
   let k H op :=
       {| baseOp  := op
        ; opInfo  := oinfo
@@ -56,19 +59,16 @@ Definition wrap_block
        ; opIdOdd := H.2
        ; opAlloc := fun _ => Unallocated |} in
 
-  let f x op :=
-      match x with
-      | (H, ops) =>
-        let nop := k H op in
-        (exist odd (H.1).+2 (odd_add_2 H.2), nop :: ops)
+  let f x op := match x with
+      | (H, ops) => let nop := k H op in
+          (exist odd (H.1).+2 (odd_add_2 H.2), nop :: ops)
       end in
 
-  let: (H', ops') := foldl f (H, nil)
-                           (blockToOpList binfo block) in
-  let blk :=
-      {| baseBlock := block
-       ; blockInfo := binfo
-       ; blockOps  := rev ops' |} in
+  let: (H, blocks) := x in
+  let: (H', ops')  := foldl f (H, nil) (blockToOpList binfo block) in
+  let blk := {| baseBlock := block
+              ; blockInfo := binfo
+              ; blockOps  := rev ops' |} in
   (H', blk :: blocks).
 
 (* Confirm that [wrap_block] works for a single block that has three
@@ -158,7 +158,7 @@ Proof.
   by invert; invert.
 Qed.
 
-Definition blocksToBlockList : seq blockType -> BlockList :=
+Definition blocksToBlockList : seq blockType -> seq BlockData :=
   @snd _ _ \o foldl wrap_block (exist odd 1 odd_1, nil).
 
 (* This function not only numbers all operations for us, but adds any extra
@@ -167,34 +167,18 @@ Definition blocksToBlockList : seq blockType -> BlockList :=
    the caller.  From this point on, all functions operate on this enriched
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
-Definition numberOperations : IState SSError (seq blockType) BlockList unit :=
+Definition numberOperations :
+  IState SSError (seq blockType) (seq BlockData) unit :=
   imodify SSError blocksToBlockList.
 
-Inductive relseq {a : Type} (R : rel a) : seq a -> Type :=
-  | rl_nil         : relseq R nil
-  | rl_sing x      : relseq R [:: x]
-  | rl_cons x xs y : relseq R (x :: xs) -> R y x -> relseq R (y :: x :: xs).
-
-Definition is_seqn (x y : OpData opType) := opId x == (opId y).+2.
-
-Definition rel_OpList := { xs : seq (OpData opType) & relseq is_seqn xs }.
-
-Lemma foldl_cons : forall a b f (z : b) (x : a) xs,
-  foldl f z (x :: xs) = foldl f (f z x) xs.
-Proof. move=> a b f z x; elim=> //=. Qed.
-
-Lemma foldr_cons : forall a b f (z : b) (x : a) xs,
-  foldr f z (x :: xs) = f x (foldr f z xs).
-Proof. move=> a b f z x; elim=> //=. Qed.
-
 (*
-Definition wrap_block' (opInfo : OpInfo opType) (blockInfo : BlockInfo)
-  (x : { i : nat | odd i } * BlockList * rel_OpList) (block : blockType) :=
+Definition wrap_block' (x : { i : nat | odd i } * BlockList * rel_OpList)
+  (block : blockType) :=
   let: (H, blocks, rops) := x in
 
   let k H op :=
       {| baseOp  := op
-       ; opInfo  := opInfo
+       ; opInfo  := oinfo
        ; opId    := H.1
        ; opIdOdd := H.2
        ; opAlloc := fun _ => Unallocated |} in
@@ -210,7 +194,7 @@ Definition wrap_block' (opInfo : OpInfo opType) (blockInfo : BlockInfo)
                 existT (relseq is_seqn) [:: nop] (rl_sing _ nop)
               | existT _ (rl_sing x) =>
                 existT (relseq is_seqn) [:: nop; x]
-                       (@rl_cons _ is_seqn x nil nop (rl_sing _ x) refl_equal)
+                       (@rl_cons _ is_seqn x nil nop (rl_sing _ x) (eq_refl (opId nop)))
               | existT _ (rl_cons x xs y rs r) =>
                 undefined
             end in
@@ -218,32 +202,21 @@ Definition wrap_block' (opInfo : OpInfo opType) (blockInfo : BlockInfo)
       end in
 
   let: (H', ops', rops') := foldl f (H, nil, rops)
-                                  (blockToOpList blockInfo block) in
+                                  (blockToOpList binfo block) in
   let blk :=
       {| baseBlock := block
-       ; blockInfo := blockInfo
+       ; blockInfo := binfo
        ; blockOps  := rev ops' |} in
   (H', blk :: blocks, rops').
-
-Definition allOperations (blocks : seq blockType) :
-  let xs := blocksToBlockList blocks in
-  let ys := flatten (map blockOps xs) in
-  relseq is_sequential ys.
-Proof.
-  rewrite /= /blocksToBlockList /funcomp.
-  elim: blocks => [|b bs IHbs].
-    constructor.
-  rewrite /=.
-  case E: (blockToOpList binfo b) => /=.
-    inversion IHbs.
-  rewrite foldl_cons.
-    constructor.
-  constructor.
-    exact: IHxs.
-Qed.
 *)
 
-Definition BlockState := IState SSError BlockList BlockList.
+Definition allOperations (blocks : seq BlockData) :
+  let ys := flatten (map blockOps blocks) in relseq (@is_seqn _) ys.
+Proof.
+  rewrite /=.
+Admitted.
+
+Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
 
 (* jww (2014-12-01): The following two functions are used for computing
    accurate live ranges. they constitute a dataflow analysis which determines
@@ -268,8 +241,8 @@ Definition buildIntervals : BlockState ScanStateSig :=
 
   bxs <<- iget SSError ;;
   let: blocks := bxs in
-  let ops := flatten (map blockOps blocks) in
-  let: (varRanges, regRanges) := processOperations ops in
+  let ops := flatten (map (blockToOpList binfo \o baseBlock) blocks) in
+  let: (_, varRanges, regRanges) := processOperations oinfo ops in
   let regs := vmap (fun mr =>
                       if mr is Some r
                       then Some (packInterval (I_Sing r.2))
@@ -291,7 +264,7 @@ Arguments computeBlockOrder {blockType}.
 Arguments numberOperations {opType blockType} oinfo binfo.
 Arguments computeLocalLiveSets {opType blockType}.
 Arguments computeGlobalLiveSets {opType blockType}.
-Arguments buildIntervals {opType _}.
+Arguments buildIntervals {opType _} oinfo binfo.
 Arguments resolveDataFlow {opType blockType}.
 Arguments assignRegNum {opType blockType}.
 

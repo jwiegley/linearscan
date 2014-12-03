@@ -54,7 +54,46 @@ Record OpData := {
 
 (* Finally, when we work with the list of operations, we will be working with
    a list of our [OpData] structures. *)
-Definition OpList := seq OpData.
+Inductive OpList : seq OpData -> Prop :=
+  | OpList_sing op oinfo n nodd :
+      OpList [:: {| baseOp  := op
+                  ; opInfo  := oinfo
+                  ; opId    := n
+                  ; opIdOdd := nodd
+                  ; opAlloc := fun _ => Unallocated
+                  |} ]
+
+  | OpList_cons op oinfo n nodd f os :
+      let o := {| baseOp  := op
+                ; opInfo  := oinfo
+                ; opId    := n
+                ; opIdOdd := nodd
+                ; opAlloc := f
+                |} in
+      OpList [:: o & os ] ->
+      OpList [:: {| baseOp  := op
+                  ; opInfo  := oinfo
+                  ; opId    := n.+2
+                  ; opIdOdd := odd_add_2 nodd
+                  ; opAlloc := fun _ => Unallocated
+                  |}, o & os ].
+
+Definition OpList_rev `(OpList s) : OpList (rev s).
+(*
+Proof.
+  elim/last_ind: s => [|xs x IHxs] in OpList0 *.
+    inversion OpList0.
+  rewrite rev_rcons.
+  
+  elim: OpList0 => [op oinfo n nodd|op oinfo n nodd f os o H2 H3].
+    constructor.
+  rewrite rev_cons.
+  elim/last_ind: s => [|xs x IHxs] in OpList0 *.
+    inversion OpList0.
+  rewrite rev_rcons.
+  inversion OpList0.
+*)
+Admitted.
 
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
@@ -194,30 +233,84 @@ Definition extractRange {n} (x : boundedTriple n) : option RangeSig :=
 
 Lemma shift_range_vec : forall n m,
   n = m -> boundedRangeVec n -> boundedRangeVec m.
-Admitted.
+Proof. by move=> n m ->; exact. Qed.
 
+Inductive relseq {a : Type} (R : rel a) : seq a -> Type :=
+  | rl_nil       : relseq R nil
+  | rl_cons x xs : relseq R xs
+                     -> (match xs with
+                         | nil => true
+                         | y :: ys => R x y
+                         end)
+                     -> relseq R (x :: xs).
+
+Definition is_seqn (x y : OpData) := (opId x).+2 == opId y.
+
+Definition rel_OpList := { xs : seq OpData & relseq is_seqn xs }.
+
+Lemma cat_relseq : forall a R (x : a) xs y ys,
+  relseq R (rcons xs x) -> relseq R (y :: ys) -> R x y
+    -> relseq R (rcons xs x ++ y :: ys).
+Proof.
+  move=> a R x xs y ys Hxs Hys HR.
+  elim: xs => /= [|z zs IHzs] in Hxs *.
+    by constructor.
+  constructor.
+    apply: IHzs.
+    by inversion Hxs.
+  inversion Hxs; subst.
+  case E: (rcons zs x) H0 => //= H.
+  case: zs => // in IHzs Hxs E X *.
+Qed.
+
+(*
 Definition applyList (op : OpData) (ops : seq OpData)
+  (rops : relseq is_seqn (op :: ops))
   (base : forall l, boundedRangeVec l.+2)
   (f : forall op : OpData,
          boundedRangeVec (opId op).+2 -> boundedRangeVec (opId op))
-   : boundedRangeVec (opId op) :=
-  let fix go x xs :=
+   : boundedRangeVec (opId op).
+Proof.
+  elim: ops => [|y ys IHys] in op rops *.
+    exact: (f op (base (opId op))).
+  inversion rops; subst.
+  apply: (f op (@shift_range_vec (opId y) (opId op).+2 _ (IHys y _)));
+    last by [].
+  move: H0.
+  rewrite /is_seqn eq_sym.
+  by move/eqP.
+Defined.
+*)
+
+Definition applyList (opInfo : OpInfo) (op : opType) (ops : seq opType)
+  (base : forall l, boundedRangeVec l.+2)
+  (f : forall op : OpData,
+         boundedRangeVec (opId op).+2 -> boundedRangeVec (opId op))
+   : seq OpData * boundedRangeVec 1 :=
+  let fix go i Hoddi x xs : seq OpData * boundedRangeVec i :=
+      let newop := {| baseOp  := x
+                    ; opInfo  := opInfo
+                    ; opId    := i
+                    ; opIdOdd := Hoddi
+                    ; opAlloc := fun _ => Unallocated |} in
       match xs with
-      | nil     => f x (base (opId x))
-      | y :: ys => f x (@shift_range_vec (opId y) (opId x).+2 undefined (go y ys))
+      | nil => ([:: newop], f newop (base i))
+      | y :: ys =>
+          let: (ops', next) := go i.+2 (odd_add_2 Hoddi) y ys in
+          (newop :: ops', f newop next)
       end in
-  go op ops.
+  go 1 odd_1 op ops.
 
 (** The list of operations is processed in reverse, so that the resulting
     sub-lists are also in order. *)
-Definition processOperations (ops : seq OpData) :
-  seq (option RangeSig) * Vec (option RangeSig) maxReg :=
-  match ops with
-  | nil => (nil, vconst None)
-  | x :: xs =>
-      let: {| vars := vars'; regs := regs' |} :=
-           applyList x xs emptyBoundedRangeVec handleOp in
-      (map extractRange vars', vmap extractRange regs')
+Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
+  seq OpData * seq (option RangeSig) * Vec (option RangeSig) maxReg :=
+  match List.destruct_list ops with
+  | inright _ => (nil, nil, vconst None)
+  | inleft (existT x (exist xs H)) =>
+      let: (ops', {| vars := vars'; regs := regs' |}) :=
+           @applyList opInfo x xs emptyBoundedRangeVec handleOp in
+      (ops', map extractRange vars', vmap extractRange regs')
   end.
 
 End Ops.

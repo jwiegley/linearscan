@@ -199,6 +199,14 @@ Proof.
   rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
 Qed.
 
+Lemma foldl_cons : forall a b f (z : b) (x : a) xs,
+  foldl f z (x :: xs) = foldl f (f z x) xs.
+Proof. move=> a b f z x; elim=> //=. Qed.
+
+Lemma foldr_cons : forall a b f (z : b) (x : a) xs,
+  foldr f z (x :: xs) = f x (foldr f z xs).
+Proof. move=> a b f z x; elim=> //=. Qed.
+
 Definition sumf {a} f : seq a -> nat := foldl (fun n x => n + f x) 0.
 
 Definition sumlist : seq nat -> nat := foldl addn 0.

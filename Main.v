@@ -35,7 +35,7 @@ Variable blockType : Set.
 Variable blockInfo : BlockInfo opType blockType.
 
 Definition mainAlgorithm :
-  IState SSError (seq blockType) (BlockList opType blockType) unit :=
+  IState SSError (seq blockType) (seq (BlockData opType blockType)) unit :=
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder ;;;
   numberOperations opInfo blockInfo ;;;
@@ -43,7 +43,7 @@ Definition mainAlgorithm :
   (* create intervals with live ranges *)
   computeLocalLiveSets ;;;
   computeGlobalLiveSets ;;;
-  ssig <<- buildIntervals ;;
+  ssig <<- buildIntervals opInfo blockInfo ;;
 
   (* allocate registers *)
   match walkIntervals ssig.2 with

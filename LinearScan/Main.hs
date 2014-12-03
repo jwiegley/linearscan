@@ -10,6 +10,7 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
+import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
 import qualified LinearScan.IMonad as IMonad
@@ -208,8 +209,6 @@ opAlloc :: (OpData a1) -> VarId ->
 opAlloc o =
   case o of {
    Build_OpData baseOp0 opInfo0 opId0 opAlloc0 -> opAlloc0}
-
-type OpList opType = [] (OpData opType)
 
 type Coq_boundedRange = Specif.Coq_sig2 Range.RangeDesc
 
@@ -420,37 +419,95 @@ extractRange n x =
 shift_range_vec :: Prelude.Int -> Prelude.Int ->
                               Coq_boundedRangeVec ->
                               Coq_boundedRangeVec
-shift_range_vec =
-  Prelude.error "AXIOM TO BE REALIZED"
+shift_range_vec n m =
+  let {_evar_0_ = \x -> x} in  _evar_0_
 
-applyList :: (OpData a1) -> ([] (OpData a1))
-                        -> (Prelude.Int -> Coq_boundedRangeVec) ->
+data Coq_relseq a =
+   Coq_rl_nil
+ | Coq_rl_cons a ([] a) (Coq_relseq a)
+
+relseq_rect :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> ([] a1) ->
+                          (Coq_relseq a1) -> a2 -> () -> a2) -> ([]
+                          a1) -> (Coq_relseq a1) -> a2
+relseq_rect r f f0 l r0 =
+  case r0 of {
+   Coq_rl_nil -> f;
+   Coq_rl_cons x xs r1 ->
+    f0 x xs r1 (relseq_rect r f f0 xs r1) __}
+
+relseq_rec :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> ([] a1) ->
+                         (Coq_relseq a1) -> a2 -> () -> a2) -> ([]
+                         a1) -> (Coq_relseq a1) -> a2
+relseq_rec r =
+  relseq_rect r
+
+is_seqn :: (OpData a1) -> (OpData a1) ->
+                      Prelude.Bool
+is_seqn x y =
+  Eqtype.eq_op Ssrnat.nat_eqType
+    (unsafeCoerce ((Prelude.succ) ((Prelude.succ) (opId x))))
+    (unsafeCoerce (opId y))
+
+type Coq_rel_OpList opType =
+  (,) ([] (OpData opType))
+  (Coq_relseq (OpData opType))
+
+cat_relseq :: (Ssrbool.Coq_rel a1) -> a1 -> ([] a1) -> a1 -> ([]
+                         a1) -> (Coq_relseq a1) ->
+                         (Coq_relseq a1) -> Coq_relseq 
+                         a1
+cat_relseq r x xs y ys hxs hys =
+  let {_evar_0_ = \hxs0 -> Coq_rl_cons x ((:) y ys) hys} in
+  let {
+   _evar_0_0 = \z zs iHzs hxs0 -> Coq_rl_cons z
+    ((Prelude.++) (Seq.rcons zs x) ((:) y ys))
+    (iHzs
+      (case hxs0 of {
+        Coq_rl_nil -> Logic.coq_False_rect;
+        Coq_rl_cons x0 xs0 x1 ->  (\_ ->  (\x2 _ -> x2)) __ x1 __}))}
+  in
+  Datatypes.list_rect _evar_0_ _evar_0_0 xs hxs
+
+applyList :: (OpInfo a1) -> a1 -> ([] a1) ->
+                        (Prelude.Int -> Coq_boundedRangeVec) ->
                         ((OpData a1) ->
                         Coq_boundedRangeVec ->
-                        Coq_boundedRangeVec) ->
+                        Coq_boundedRangeVec) -> (,)
+                        ([] (OpData a1))
                         Coq_boundedRangeVec
-applyList op ops base f =
-  case ops of {
-   [] -> f op (base (opId op));
-   (:) y ys ->
-    f op
-      (shift_range_vec (opId y) ((Prelude.succ)
-        ((Prelude.succ) (opId op)))
-        (applyList y ys base f))}
+applyList opInfo0 op ops base f =
+  let {
+   go i x xs =
+     let {
+      newop = Build_OpData x opInfo0 i (\x0 ->
+       Unallocated)}
+     in
+     case xs of {
+      [] -> (,) ((:) newop []) (f newop (base i));
+      (:) y ys ->
+       case go ((Prelude.succ) ((Prelude.succ) i)) y ys of {
+        (,) ops' next -> (,) ((:) newop ops') (f newop next)}}}
+  in go ((Prelude.succ) 0) op ops
 
-processOperations :: ([] (OpData a1)) -> (,)
+processOperations :: (OpInfo a1) -> ([] a1) -> (,)
+                                ((,) ([] (OpData a1))
+                                ([] (Prelude.Maybe Range.RangeDesc)))
                                 ([] (Prelude.Maybe Range.RangeDesc))
-                                ([] (Prelude.Maybe Range.RangeDesc))
-processOperations ops =
-  case ops of {
-   [] -> (,) [] (Data.List.replicate _MyMachine__maxReg Prelude.Nothing);
-   (:) x xs ->
-    case applyList x xs emptyBoundedRangeVec
-           handleOp of {
-     Build_boundedRangeVec vars' regs' -> (,)
-      (Prelude.map (extractRange (opId x)) vars')
-      (LinearScan.Utils.vmap _MyMachine__maxReg
-        (extractRange (opId x)) regs')}}
+processOperations opInfo0 ops =
+  case LinearScan.Utils.uncons ops of {
+   Prelude.Just s ->
+    case s of {
+     (,) x s0 ->
+      case applyList opInfo0 x s0 emptyBoundedRangeVec
+             handleOp of {
+       (,) ops' b ->
+        case b of {
+         Build_boundedRangeVec vars' regs' -> (,) ((,) ops'
+          (Prelude.map (extractRange ((Prelude.succ) 0)) vars'))
+          (LinearScan.Utils.vmap _MyMachine__maxReg
+            (extractRange ((Prelude.succ) 0)) regs')}}};
+   Prelude.Nothing -> (,) ((,) [] [])
+    (Data.List.replicate _MyMachine__maxReg Prelude.Nothing)}
 
 maxReg :: Prelude.Int
 maxReg =
@@ -696,17 +753,17 @@ blockToOpList b =
 
 data BlockData opType blockType =
    Build_BlockData blockType (BlockInfo opType blockType) 
- (OpList opType)
+ ([] (OpData opType))
 
-coq_BlockData_rect :: (a2 -> (BlockInfo a1 a2) ->
-                                 (OpList a1) -> a3) ->
+coq_BlockData_rect :: (a2 -> (BlockInfo a1 a2) -> ([]
+                                 (OpData a1)) -> a3) ->
                                  (BlockData a1 a2) -> a3
 coq_BlockData_rect f b =
   case b of {
    Build_BlockData x x0 x1 -> f x x0 x1}
 
-coq_BlockData_rec :: (a2 -> (BlockInfo a1 a2) ->
-                                (OpList a1) -> a3) ->
+coq_BlockData_rec :: (a2 -> (BlockInfo a1 a2) -> ([]
+                                (OpData a1)) -> a3) ->
                                 (BlockData a1 a2) -> a3
 coq_BlockData_rec =
   coq_BlockData_rect
@@ -722,13 +779,11 @@ blockInfo b =
   case b of {
    Build_BlockData baseBlock0 blockInfo0 blockOps0 -> blockInfo0}
 
-blockOps :: (BlockData a1 a2) -> OpList a1
+blockOps :: (BlockData a1 a2) -> []
+                       (OpData a1)
 blockOps b =
   case b of {
    Build_BlockData baseBlock0 blockInfo0 blockOps0 -> blockOps0}
-
-type BlockList opType blockType =
-  [] (BlockData opType blockType)
 
 computeBlockOrder :: IState.IState SSError ([] a1)
                                 ([] a1) ()
@@ -737,30 +792,30 @@ computeBlockOrder =
 
 wrap_block :: (OpInfo a1) -> (BlockInfo 
                          a1 a2) -> ((,) Prelude.Int
-                         (BlockList a1 a2)) -> a2 -> (,)
+                         ([] (BlockData a1 a2))) -> a2 -> (,)
                          Prelude.Int ([] (BlockData a1 a2))
 wrap_block oinfo binfo x block =
+  let {
+   k = \h op -> Build_OpData op oinfo ( h) (\x0 ->
+    Unallocated)}
+  in
+  let {
+   f = \x0 op ->
+    case x0 of {
+     (,) h ops ->
+      let {nop = k h op} in
+      (,) ((Prelude.succ) ((Prelude.succ) ( h))) ((:) nop ops)}}
+  in
   case x of {
    (,) h blocks ->
-    let {
-     k = \h0 op -> Build_OpData op oinfo ( h0) (\x0 ->
-      Unallocated)}
-    in
-    let {
-     f = \x0 op ->
-      case x0 of {
-       (,) h0 ops ->
-        let {nop = k h0 op} in
-        (,) ((Prelude.succ) ((Prelude.succ) ( h0))) ((:) nop ops)}}
-    in
     case Data.List.foldl' f ((,) h []) (blockToOpList binfo block) of {
      (,) h' ops' ->
       let {blk = Build_BlockData block binfo (Seq.rev ops')} in
       (,) h' ((:) blk blocks)}}
 
 blocksToBlockList :: (OpInfo a1) -> (BlockInfo
-                                a1 a2) -> ([] a2) -> BlockList 
-                                a1 a2
+                                a1 a2) -> ([] a2) -> []
+                                (BlockData a1 a2)
 blocksToBlockList oinfo binfo =
   (Prelude..) Prelude.snd
     (Data.List.foldl' (wrap_block oinfo binfo) ((,)
@@ -768,46 +823,19 @@ blocksToBlockList oinfo binfo =
 
 numberOperations :: (OpInfo a1) -> (BlockInfo
                                a1 a2) -> IState.IState SSError
-                               ([] a2) (BlockList a1 a2) ()
+                               ([] a2) ([] (BlockData a1 a2)) 
+                               ()
 numberOperations oinfo binfo =
   IState.imodify (blocksToBlockList oinfo binfo)
 
-data Coq_relseq a =
-   Coq_rl_nil
- | Coq_rl_sing a
- | Coq_rl_cons a ([] a) a (Coq_relseq a)
-
-relseq_rect :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> a2) -> (a1 ->
-                          ([] a1) -> a1 -> (Coq_relseq a1) -> a2 ->
-                          () -> a2) -> ([] a1) -> (Coq_relseq 
-                          a1) -> a2
-relseq_rect r f f0 f1 l r0 =
-  case r0 of {
-   Coq_rl_nil -> f;
-   Coq_rl_sing x -> f0 x;
-   Coq_rl_cons x xs y r1 ->
-    f1 x xs y r1 (relseq_rect r f f0 f1 ((:) x xs) r1) __}
-
-relseq_rec :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> a2) -> (a1 ->
-                         ([] a1) -> a1 -> (Coq_relseq a1) -> a2 ->
-                         () -> a2) -> ([] a1) -> (Coq_relseq 
-                         a1) -> a2
-relseq_rec r =
-  relseq_rect r
-
-is_seqn :: (OpData a1) -> (OpData a1) ->
-                      Prelude.Bool
-is_seqn x y =
-  Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (opId x))
-    (unsafeCoerce ((Prelude.succ) ((Prelude.succ) (opId y))))
-
-type Coq_rel_OpList opType =
-  (,) ([] (OpData opType))
-  (Coq_relseq (OpData opType))
+allOperations :: ([] (BlockData a1 a2)) ->
+                            Coq_relseq (OpData a1)
+allOperations =
+  Prelude.error "AXIOM TO BE REALIZED"
 
 type BlockState opType blockType a =
-  IState.IState SSError (BlockList opType blockType)
-  (BlockList opType blockType) a
+  IState.IState SSError ([] (BlockData opType blockType))
+  ([] (BlockData opType blockType)) a
 
 computeLocalLiveSets :: BlockState a1 a2 ()
 computeLocalLiveSets =
@@ -817,9 +845,10 @@ computeGlobalLiveSets :: BlockState a1 a2 ()
 computeGlobalLiveSets =
   return_ ()
 
-buildIntervals :: BlockState a1 a2
+buildIntervals :: (OpInfo a1) -> (BlockInfo 
+                             a1 a2) -> BlockState a1 a2
                              ScanStateDesc
-buildIntervals =
+buildIntervals oinfo binfo =
   let {
    mkint = \ss mx f ->
     case mx of {
@@ -843,40 +872,47 @@ buildIntervals =
         (Prelude.map Prelude.id (handled sd))))}
   in
   stbind (\bxs ->
-    let {ops = Seq.flatten (Prelude.map blockOps bxs)} in
-    case processOperations ops of {
-     (,) varRanges regRanges ->
-      let {
-       regs0 = LinearScan.Utils.vmap _MyMachine__maxReg (\mr ->
-                 case mr of {
-                  Prelude.Just r -> Prelude.Just
-                   (Interval.packInterval (Interval.Build_IntervalDesc
-                     (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
-                  Prelude.Nothing -> Prelude.Nothing}) regRanges}
-      in
-      let {
-       s2 = packScanState (Build_ScanStateDesc
-              (nextInterval (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] []))
-              (intervals (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] [])) regs0
-              (unhandled (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] []))
-              (active (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] []))
-              (inactive (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] []))
-              (handled (Build_ScanStateDesc 0 []
-                (Data.List.replicate maxReg Prelude.Nothing) [] []
-                [] [])))}
-      in
-      (Prelude.$) return_
-        (Data.List.foldl' handleVar s2 varRanges)}) IState.iget
+    let {
+     ops = Seq.flatten
+             (Prelude.map
+               ((Prelude..) (blockToOpList binfo)
+                 baseBlock) bxs)}
+    in
+    case processOperations oinfo ops of {
+     (,) p regRanges ->
+      case p of {
+       (,) l varRanges ->
+        let {
+         regs0 = LinearScan.Utils.vmap _MyMachine__maxReg (\mr ->
+                   case mr of {
+                    Prelude.Just r -> Prelude.Just
+                     (Interval.packInterval (Interval.Build_IntervalDesc
+                       (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
+                    Prelude.Nothing -> Prelude.Nothing}) regRanges}
+        in
+        let {
+         s2 = packScanState (Build_ScanStateDesc
+                (nextInterval (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] []))
+                (intervals (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] [])) regs0
+                (unhandled (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] []))
+                (active (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] []))
+                (inactive (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] []))
+                (handled (Build_ScanStateDesc 0 []
+                  (Data.List.replicate maxReg Prelude.Nothing) []
+                  [] [] [])))}
+        in
+        (Prelude.$) return_
+          (Data.List.foldl' handleVar s2 varRanges)}}) IState.iget
 
 resolveDataFlow :: BlockState a1 a2 ()
 resolveDataFlow =
@@ -1637,7 +1673,7 @@ walkIntervals sd =
 
 mainAlgorithm :: (OpInfo a1) -> (BlockInfo a1 a2) ->
                  IState.IState SSError ([] a2)
-                 (BlockList a1 a2) ()
+                 ([] (BlockData a1 a2)) ()
 mainAlgorithm opInfo0 blockInfo0 =
   stbind (\x ->
     stbind (\x0 ->
@@ -1648,7 +1684,8 @@ mainAlgorithm opInfo0 blockInfo0 =
              Prelude.Left err -> error_ err;
              Prelude.Right ssig' ->
               stbind (\x3 -> assignRegNum)
-                resolveDataFlow}) buildIntervals)
+                resolveDataFlow})
+            (buildIntervals opInfo0 blockInfo0))
           computeGlobalLiveSets) computeLocalLiveSets)
       (numberOperations opInfo0 blockInfo0))
     computeBlockOrder
