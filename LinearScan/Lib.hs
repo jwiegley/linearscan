@@ -13,10 +13,6 @@ import qualified LinearScan.Logic as Logic
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
-undefined :: a1
-undefined =
-  Prelude.error "AXIOM TO BE REALIZED"
-
 ex_falso_quodlibet :: a1
 ex_falso_quodlibet =
   Logic.coq_False_rect

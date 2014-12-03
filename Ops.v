@@ -192,6 +192,10 @@ Definition extractRange {n} (x : boundedTriple n) : option RangeSig :=
             end)
   end.
 
+Lemma shift_range_vec : forall n m,
+  n = m -> boundedRangeVec n -> boundedRangeVec m.
+Admitted.
+
 Definition applyList (op : OpData) (ops : seq OpData)
   (base : forall l, boundedRangeVec l.+2)
   (f : forall op : OpData,
@@ -200,7 +204,7 @@ Definition applyList (op : OpData) (ops : seq OpData)
   let fix go x xs :=
       match xs with
       | nil     => f x (base (opId x))
-      | y :: ys => f x undefined (* (go y ys) *)
+      | y :: ys => f x (@shift_range_vec (opId y) (opId x).+2 undefined (go y ys))
       end in
   go op ops.
 

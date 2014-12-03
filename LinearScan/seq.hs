@@ -38,6 +38,16 @@ set_nth x0 s n y =
       (set_nth x0 s' n' y))
       n}
 
+catrev :: ([] a1) -> ([] a1) -> [] a1
+catrev s1 s2 =
+  case s1 of {
+   [] -> s2;
+   (:) x s1' -> catrev s1' ((:) x s2)}
+
+rev :: ([] a1) -> [] a1
+rev s =
+  catrev s []
+
 flatten :: ([] ([] a1)) -> [] a1
 flatten =
   Prelude.foldr (Prelude.++) []

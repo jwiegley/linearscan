@@ -22,6 +22,7 @@ import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
 import qualified LinearScan.Seq as Seq
+import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -416,6 +417,12 @@ extractRange n x =
           Prelude.Nothing -> Range.packRange b});
        Prelude.Nothing -> Prelude.Nothing}}}
 
+shift_range_vec :: Prelude.Int -> Prelude.Int ->
+                              Coq_boundedRangeVec ->
+                              Coq_boundedRangeVec
+shift_range_vec =
+  Prelude.error "AXIOM TO BE REALIZED"
+
 applyList :: (OpData a1) -> ([] (OpData a1))
                         -> (Prelude.Int -> Coq_boundedRangeVec) ->
                         ((OpData a1) ->
@@ -425,7 +432,11 @@ applyList :: (OpData a1) -> ([] (OpData a1))
 applyList op ops base f =
   case ops of {
    [] -> f op (base (opId op));
-   (:) y ys -> f op Lib.undefined}
+   (:) y ys ->
+    f op
+      (shift_range_vec (opId y) ((Prelude.succ)
+        ((Prelude.succ) (opId op)))
+        (applyList y ys base f))}
 
 processOperations :: ([] (OpData a1)) -> (,)
                                 ([] (Prelude.Maybe Range.RangeDesc))
@@ -724,26 +735,75 @@ computeBlockOrder :: IState.IState SSError ([] a1)
 computeBlockOrder =
   return_ ()
 
+wrap_block :: (OpInfo a1) -> (BlockInfo 
+                         a1 a2) -> ((,) Prelude.Int
+                         (BlockList a1 a2)) -> a2 -> (,)
+                         Prelude.Int ([] (BlockData a1 a2))
+wrap_block oinfo binfo x block =
+  case x of {
+   (,) h blocks ->
+    let {
+     k = \h0 op -> Build_OpData op oinfo ( h0) (\x0 ->
+      Unallocated)}
+    in
+    let {
+     f = \x0 op ->
+      case x0 of {
+       (,) h0 ops ->
+        let {nop = k h0 op} in
+        (,) ((Prelude.succ) ((Prelude.succ) ( h0))) ((:) nop ops)}}
+    in
+    case Data.List.foldl' f ((,) h []) (blockToOpList binfo block) of {
+     (,) h' ops' ->
+      let {blk = Build_BlockData block binfo (Seq.rev ops')} in
+      (,) h' ((:) blk blocks)}}
+
+blocksToBlockList :: (OpInfo a1) -> (BlockInfo
+                                a1 a2) -> ([] a2) -> BlockList 
+                                a1 a2
+blocksToBlockList oinfo binfo =
+  (Prelude..) Prelude.snd
+    (Data.List.foldl' (wrap_block oinfo binfo) ((,)
+      ((Prelude.succ) 0) []))
+
 numberOperations :: (OpInfo a1) -> (BlockInfo
                                a1 a2) -> IState.IState SSError
                                ([] a2) (BlockList a1 a2) ()
-numberOperations opInfo0 blockInfo0 =
-  let {
-   f = \block x ->
-    case x of {
-     (,) s blocks' ->
-      let {
-       k = \op -> Build_OpData op opInfo0 s (\x0 ->
-        Unallocated)}
-      in
-      let {
-       blk = Build_BlockData block blockInfo0
-        (Prelude.map k (blockToOpList blockInfo0 block))}
-      in
-      (,) ((Prelude.succ) ((Prelude.succ) s)) ((:) blk blocks')}}
-  in
-  (Prelude.$) IState.imodify
-    ((Prelude..) Prelude.snd (Prelude.foldr f ((,) ((Prelude.succ) 0) [])))
+numberOperations oinfo binfo =
+  IState.imodify (blocksToBlockList oinfo binfo)
+
+data Coq_relseq a =
+   Coq_rl_nil
+ | Coq_rl_sing a
+ | Coq_rl_cons a ([] a) a (Coq_relseq a)
+
+relseq_rect :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> a2) -> (a1 ->
+                          ([] a1) -> a1 -> (Coq_relseq a1) -> a2 ->
+                          () -> a2) -> ([] a1) -> (Coq_relseq 
+                          a1) -> a2
+relseq_rect r f f0 f1 l r0 =
+  case r0 of {
+   Coq_rl_nil -> f;
+   Coq_rl_sing x -> f0 x;
+   Coq_rl_cons x xs y r1 ->
+    f1 x xs y r1 (relseq_rect r f f0 f1 ((:) x xs) r1) __}
+
+relseq_rec :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> a2) -> (a1 ->
+                         ([] a1) -> a1 -> (Coq_relseq a1) -> a2 ->
+                         () -> a2) -> ([] a1) -> (Coq_relseq 
+                         a1) -> a2
+relseq_rec r =
+  relseq_rect r
+
+is_seqn :: (OpData a1) -> (OpData a1) ->
+                      Prelude.Bool
+is_seqn x y =
+  Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (opId x))
+    (unsafeCoerce ((Prelude.succ) ((Prelude.succ) (opId y))))
+
+type Coq_rel_OpList opType =
+  (,) ([] (OpData opType))
+  (Coq_relseq (OpData opType))
 
 type BlockState opType blockType a =
   IState.IState SSError (BlockList opType blockType)
