@@ -14,12 +14,6 @@ ncons :: Prelude.Int -> a1 -> ([] a1) -> [] a1
 ncons n x =
   Ssrnat.iter n (\x0 -> (:) x x0)
 
-rcons :: ([] a1) -> a1 -> [] a1
-rcons s z =
-  case s of {
-   [] -> (:) z [];
-   (:) x s' -> (:) x (rcons s' z)}
-
 nth :: a1 -> ([] a1) -> Prelude.Int -> a1
 nth x0 s n =
   case s of {

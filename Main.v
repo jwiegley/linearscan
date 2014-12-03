@@ -102,7 +102,7 @@ Extract Inlined Constant boundedTransport =>
 
 Extraction Blacklist String List Vector NonEmpty.
 
-Separate Extraction linearScan NE_map.
+Separate Extraction linearScan.
 
 (* Show which axioms we depend on for this development. *)
 Print Assumptions linearScan.

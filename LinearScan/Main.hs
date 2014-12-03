@@ -10,7 +10,6 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
-import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
 import qualified LinearScan.IMonad as IMonad
@@ -23,7 +22,6 @@ import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
 import qualified LinearScan.Seq as Seq
-import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -416,58 +414,6 @@ extractRange n x =
           Prelude.Nothing -> Range.packRange b});
        Prelude.Nothing -> Prelude.Nothing}}}
 
-shift_range_vec :: Prelude.Int -> Prelude.Int ->
-                              Coq_boundedRangeVec ->
-                              Coq_boundedRangeVec
-shift_range_vec n m =
-  let {_evar_0_ = \x -> x} in  _evar_0_
-
-data Coq_relseq a =
-   Coq_rl_nil
- | Coq_rl_cons a ([] a) (Coq_relseq a)
-
-relseq_rect :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> ([] a1) ->
-                          (Coq_relseq a1) -> a2 -> () -> a2) -> ([]
-                          a1) -> (Coq_relseq a1) -> a2
-relseq_rect r f f0 l r0 =
-  case r0 of {
-   Coq_rl_nil -> f;
-   Coq_rl_cons x xs r1 ->
-    f0 x xs r1 (relseq_rect r f f0 xs r1) __}
-
-relseq_rec :: (Ssrbool.Coq_rel a1) -> a2 -> (a1 -> ([] a1) ->
-                         (Coq_relseq a1) -> a2 -> () -> a2) -> ([]
-                         a1) -> (Coq_relseq a1) -> a2
-relseq_rec r =
-  relseq_rect r
-
-is_seqn :: (OpData a1) -> (OpData a1) ->
-                      Prelude.Bool
-is_seqn x y =
-  Eqtype.eq_op Ssrnat.nat_eqType
-    (unsafeCoerce ((Prelude.succ) ((Prelude.succ) (opId x))))
-    (unsafeCoerce (opId y))
-
-type Coq_rel_OpList opType =
-  (,) ([] (OpData opType))
-  (Coq_relseq (OpData opType))
-
-cat_relseq :: (Ssrbool.Coq_rel a1) -> a1 -> ([] a1) -> a1 -> ([]
-                         a1) -> (Coq_relseq a1) ->
-                         (Coq_relseq a1) -> Coq_relseq 
-                         a1
-cat_relseq r x xs y ys hxs hys =
-  let {_evar_0_ = \hxs0 -> Coq_rl_cons x ((:) y ys) hys} in
-  let {
-   _evar_0_0 = \z zs iHzs hxs0 -> Coq_rl_cons z
-    ((Prelude.++) (Seq.rcons zs x) ((:) y ys))
-    (iHzs
-      (case hxs0 of {
-        Coq_rl_nil -> Logic.coq_False_rect;
-        Coq_rl_cons x0 xs0 x1 ->  (\_ ->  (\x2 _ -> x2)) __ x1 __}))}
-  in
-  Datatypes.list_rect _evar_0_ _evar_0_0 xs hxs
-
 applyList :: (OpInfo a1) -> a1 -> ([] a1) ->
                         (Prelude.Int -> Coq_boundedRangeVec) ->
                         ((OpData a1) ->
@@ -494,20 +440,18 @@ processOperations :: (OpInfo a1) -> ([] a1) -> (,)
                                 ([] (Prelude.Maybe Range.RangeDesc)))
                                 ([] (Prelude.Maybe Range.RangeDesc))
 processOperations opInfo0 ops =
-  case LinearScan.Utils.uncons ops of {
-   Prelude.Just s ->
-    case s of {
-     (,) x s0 ->
-      case applyList opInfo0 x s0 emptyBoundedRangeVec
-             handleOp of {
-       (,) ops' b ->
-        case b of {
-         Build_boundedRangeVec vars' regs' -> (,) ((,) ops'
-          (Prelude.map (extractRange ((Prelude.succ) 0)) vars'))
-          (LinearScan.Utils.vmap _MyMachine__maxReg
-            (extractRange ((Prelude.succ) 0)) regs')}}};
-   Prelude.Nothing -> (,) ((,) [] [])
-    (Data.List.replicate _MyMachine__maxReg Prelude.Nothing)}
+  case ops of {
+   [] -> (,) ((,) [] [])
+    (Data.List.replicate _MyMachine__maxReg Prelude.Nothing);
+   (:) x xs ->
+    case applyList opInfo0 x xs emptyBoundedRangeVec
+           handleOp of {
+     (,) ops' b ->
+      case b of {
+       Build_boundedRangeVec vars' regs' -> (,) ((,) ops'
+        (Prelude.map (extractRange ((Prelude.succ) 0)) vars'))
+        (LinearScan.Utils.vmap _MyMachine__maxReg
+          (extractRange ((Prelude.succ) 0)) regs')}}}
 
 maxReg :: Prelude.Int
 maxReg =
