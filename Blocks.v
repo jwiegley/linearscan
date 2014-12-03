@@ -171,51 +171,6 @@ Definition numberOperations :
   IState SSError (seq blockType) (seq BlockData) unit :=
   imodify SSError blocksToBlockList.
 
-(*
-Definition wrap_block' (x : { i : nat | odd i } * BlockList * rel_OpList)
-  (block : blockType) :=
-  let: (H, blocks, rops) := x in
-
-  let k H op :=
-      {| baseOp  := op
-       ; opInfo  := oinfo
-       ; opId    := H.1
-       ; opIdOdd := H.2
-       ; opAlloc := fun _ => Unallocated |} in
-
-  let f (x : { i : nat | odd i } * seq (OpData opType) * rel_OpList) (op : opType) :
-      { i : nat | odd i } * seq (OpData opType) * rel_OpList :=
-      match x with
-      | (H, ops, rops) =>
-        let nop := k H op in
-        let rops' : rel_OpList :=
-            match rops return rel_OpList with
-              | existT _ rl_nil =>
-                existT (relseq is_seqn) [:: nop] (rl_sing _ nop)
-              | existT _ (rl_sing x) =>
-                existT (relseq is_seqn) [:: nop; x]
-                       (@rl_cons _ is_seqn x nil nop (rl_sing _ x) (eq_refl (opId nop)))
-              | existT _ (rl_cons x xs y rs r) =>
-                undefined
-            end in
-        (exist odd (H.1).+2 (odd_add_2 H.2), nop :: ops, rops')
-      end in
-
-  let: (H', ops', rops') := foldl f (H, nil, rops)
-                                  (blockToOpList binfo block) in
-  let blk :=
-      {| baseBlock := block
-       ; blockInfo := binfo
-       ; blockOps  := rev ops' |} in
-  (H', blk :: blocks, rops').
-*)
-
-Definition allOperations (blocks : seq BlockData) :
-  let ys := flatten (map blockOps blocks) in relseq (@is_seqn _) ys.
-Proof.
-  rewrite /=.
-Admitted.
-
 Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
 
 (* jww (2014-12-01): The following two functions are used for computing

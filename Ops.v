@@ -78,23 +78,6 @@ Inductive OpList : seq OpData -> Prop :=
                   ; opAlloc := fun _ => Unallocated
                   |}, o & os ].
 
-Definition OpList_rev `(OpList s) : OpList (rev s).
-(*
-Proof.
-  elim/last_ind: s => [|xs x IHxs] in OpList0 *.
-    inversion OpList0.
-  rewrite rev_rcons.
-  
-  elim: OpList0 => [op oinfo n nodd|op oinfo n nodd f os o H2 H3].
-    constructor.
-  rewrite rev_cons.
-  elim/last_ind: s => [|xs x IHxs] in OpList0 *.
-    inversion OpList0.
-  rewrite rev_rcons.
-  inversion OpList0.
-*)
-Admitted.
-
 Definition boundedRange (pos : nat) :=
   { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
 

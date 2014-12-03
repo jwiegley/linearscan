@@ -828,11 +828,6 @@ numberOperations :: (OpInfo a1) -> (BlockInfo
 numberOperations oinfo binfo =
   IState.imodify (blocksToBlockList oinfo binfo)
 
-allOperations :: ([] (BlockData a1 a2)) ->
-                            Coq_relseq (OpData a1)
-allOperations =
-  Prelude.error "AXIOM TO BE REALIZED"
-
 type BlockState opType blockType a =
   IState.IState SSError ([] (BlockData opType blockType))
   ([] (BlockData opType blockType)) a
