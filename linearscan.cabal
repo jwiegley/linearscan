@@ -12,7 +12,46 @@ cabal-version: >=1.10
 
 library
   default-language: Haskell2010
-  exposed-modules:  LinearScan
+  exposed-modules:
+    LinearScan
+    LinearScan.Datatypes
+    LinearScan.IApplicative
+    LinearScan.IEndo
+    LinearScan.IMonad
+    LinearScan.IState
+    LinearScan.Interval
+    LinearScan.Lib
+    LinearScan.List0
+    LinearScan.Logic
+    LinearScan.Main
+    LinearScan.NonEmpty0
+    LinearScan.Range
+    LinearScan.Specif
+    LinearScan.Utils
+    LinearScan.Vector0
+    LinearScan.Eqtype
+    LinearScan.Fintype
+    LinearScan.Seq
+    LinearScan.Ssrbool
+    LinearScan.Ssreflect
+    LinearScan.Ssrfun
+    LinearScan.Ssrnat
   ghc-options:      -fno-warn-deprecated-flags
   build-depends:    base >=4.7 && <4.8
                   , transformers
+
+test-suite test
+  default-language: Haskell2010
+  type:             exitcode-stdio-1.0
+  ghc-options:      -fno-warn-deprecated-flags
+  hs-source-dirs:   test
+  main-is:          Test.hs
+  build-depends: 
+        base >=3
+      , linearscan
+      , HUnit              >= 1.2.5
+      , hspec              >= 1.4.4
+      , hspec-expectations >= 0.3
+      , hoopl              >= 3.10
+      , containers         >= 0.5.5
+      , transformers       >= 0.3.0.0

@@ -6,7 +6,14 @@ MISSING  = \
 		      egrep -v 'Definition undefined'      |		\
 		      egrep -v new/
 
-all: Makefile.coq
+all: Makefile.coq				\
+     LinearScan/Eqtype.hs			\
+     LinearScan/Fintype.hs			\
+     LinearScan/Seq.hs				\
+     LinearScan/Ssrbool.hs			\
+     LinearScan/Ssreflect.hs			\
+     LinearScan/Ssrfun.hs			\
+     LinearScan/Ssrnat.hs
 	@$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
 	@$(MAKE) LinearScan/Main.hs
 	-@$(MISSING)
@@ -15,6 +22,27 @@ LinearScan/Main.hs: Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
 	@perl -i fixcode.pl LinearScan/*.hs
+
+LinearScan/Eqtype.hs: LinearScan/eqtype.hs
+	@mv $< $@
+
+LinearScan/Fintype.hs: LinearScan/fintype.hs
+	@mv $< $@
+
+LinearScan/Seq.hs: LinearScan/seq.hs
+	@mv $< $@
+
+LinearScan/Ssrbool.hs: LinearScan/ssrbool.hs
+	@mv $< $@
+
+LinearScan/Ssreflect.hs: LinearScan/ssreflect.hs
+	@mv $< $@
+
+LinearScan/Ssrfun.hs: LinearScan/ssrfun.hs
+	@mv $< $@
+
+LinearScan/Ssrnat.hs: LinearScan/ssrnat.hs
+	@mv $< $@
 
 Makefile.coq: _CoqProject
 	@coq_makefile -f _CoqProject -o $@
