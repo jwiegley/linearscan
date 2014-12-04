@@ -32,22 +32,32 @@ __ :: any
 __ = Prelude.error "Logical or arity value used"
 
 data IntervalDesc =
-   Build_IntervalDesc Prelude.Int Prelude.Int ([] Range.RangeDesc)
+   Build_IntervalDesc Prelude.Int Prelude.Int Prelude.Int ([]
+                                                          Range.RangeDesc)
+
+ivar :: IntervalDesc -> Prelude.Int
+ivar i =
+  case i of {
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> ivar0}
 
 ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
   case i of {
-   Build_IntervalDesc ibeg0 iend0 rds0 -> ibeg0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> ibeg0}
 
 iend :: IntervalDesc -> Prelude.Int
 iend i =
   case i of {
-   Build_IntervalDesc ibeg0 iend0 rds0 -> iend0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> iend0}
 
 rds :: IntervalDesc -> [] Range.RangeDesc
 rds i =
   case i of {
-   Build_IntervalDesc ibeg0 iend0 rds0 -> rds0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> rds0}
+
+getIntervalDesc :: IntervalDesc -> IntervalDesc
+getIntervalDesc d =
+  d
 
 packInterval :: IntervalDesc -> IntervalDesc
 packInterval d =
@@ -145,10 +155,10 @@ splitPosition d before splitBeforeLifetimeHole =
       (Lib.fromMaybe final (Lib.option_choose before (firstUseReqReg d))))
 
 intervalSpan :: ([] Range.RangeDesc) -> Prelude.Int -> Prelude.Int ->
-                Prelude.Int ->
+                Prelude.Int -> Prelude.Int ->
                 ((,) (Prelude.Maybe IntervalDesc)
                 (Prelude.Maybe IntervalDesc))
-intervalSpan rs before ib ie =
+intervalSpan rs before iv ib ie =
   let {f = \u -> (Prelude.<=) ((Prelude.succ) (Range.uloc u)) before} in
   (\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)
     (\r ->
@@ -162,9 +172,9 @@ intervalSpan rs before ib ie =
           let {
            _evar_0_ = let {
                        _evar_0_ = \_ _ -> (,) (Prelude.Just
-                        (Build_IntervalDesc (Range.rbeg ( r0))
+                        (Build_IntervalDesc iv (Range.rbeg ( r0))
                         (Range.rend ( r0)) ((:[]) ( r0)))) (Prelude.Just
-                        (Build_IntervalDesc (Range.rbeg ( r1))
+                        (Build_IntervalDesc iv (Range.rbeg ( r1))
                         (Range.rend ( r1)) ((:[]) ( r1))))}
                       in
                        _evar_0_}
@@ -174,7 +184,7 @@ intervalSpan rs before ib ie =
         let {
          _evar_0_0 = \_ ->
           let {
-           _evar_0_0 = \_ -> (,) (Prelude.Just (Build_IntervalDesc ib ie
+           _evar_0_0 = \_ -> (,) (Prelude.Just (Build_IntervalDesc iv ib ie
             ((:[]) r))) Prelude.Nothing}
           in
            _evar_0_0 __}
@@ -189,7 +199,7 @@ intervalSpan rs before ib ie =
          _evar_0_0 = \r1 ->
           let {
            _evar_0_0 = \_ -> (,) Prelude.Nothing (Prelude.Just
-            (Build_IntervalDesc ib ie ((:[]) r)))}
+            (Build_IntervalDesc iv ib ie ((:[]) r)))}
           in
            _evar_0_0 __}
         in
@@ -217,8 +227,8 @@ intervalSpan rs before ib ie =
             let {
              _evar_0_ = \_ _ ->
               (Prelude.flip (Prelude.$)) __ (\_ -> (,) (Prelude.Just
-                (Build_IntervalDesc (Range.rbeg ( r0)) (Range.rend ( r0))
-                ((:[]) ( r0)))) (Prelude.Just (Build_IntervalDesc
+                (Build_IntervalDesc iv (Range.rbeg ( r0)) (Range.rend ( r0))
+                ((:[]) ( r0)))) (Prelude.Just (Build_IntervalDesc iv
                 (Range.rbeg ( r1)) (Range.rend ( (Prelude.last rs0))) ((:) r1
                 rs0))))}
             in
@@ -233,7 +243,7 @@ intervalSpan rs before ib ie =
             let {
              _evar_0_0 = \_ ->
               let {
-               _top_assumption_2 = intervalSpan rs0 before
+               _top_assumption_2 = intervalSpan rs0 before iv
                                      (Range.rbeg ( (Prelude.head rs0)))
                                      (Range.rend ( (Prelude.last rs0)))}
               in
@@ -244,7 +254,7 @@ intervalSpan rs before ib ie =
                   let {
                    _evar_0_0 = \i1_2 ->
                     case i1_1 of {
-                     Build_IntervalDesc ibeg0 iend0 rds0 ->
+                     Build_IntervalDesc ivar0 ibeg0 iend0 rds0 ->
                       let {
                        _evar_0_0 = let {
                                     _evar_0_0 = \_ _ ->
@@ -259,6 +269,7 @@ intervalSpan rs before ib ie =
                                                          _evar_0_0 = \_ _ ->
                                                           (,) (Prelude.Just
                                                           (Build_IntervalDesc
+                                                          ivar0
                                                           (Range.rbeg ( r))
                                                           iend0 ((:) r
                                                           rds0)))
@@ -281,7 +292,7 @@ intervalSpan rs before ib ie =
                    _evar_0_1 = \_ ->
                     let {
                      _evar_0_1 = \_ _ _ -> (,) (Prelude.Just
-                      (Build_IntervalDesc (Range.rbeg ( r))
+                      (Build_IntervalDesc iv (Range.rbeg ( r))
                       (Range.rend ( (Prelude.last rs0))) ((:) r rs0)))
                       Prelude.Nothing}
                     in
@@ -297,8 +308,8 @@ intervalSpan rs before ib ie =
                    _evar_0_1 = \i1_2 ->
                     let {
                      _evar_0_1 = \_ _ _ -> (,) (Prelude.Just
-                      (Build_IntervalDesc ib (Range.rend ( r)) ((:[]) r)))
-                      (Prelude.Just (Build_IntervalDesc
+                      (Build_IntervalDesc iv ib (Range.rend ( r)) ((:[]) r)))
+                      (Prelude.Just (Build_IntervalDesc iv
                       (Range.rbeg ( (Prelude.head rs0)))
                       (Range.rend ( (Prelude.last rs0))) rs0))}
                     in
@@ -330,7 +341,7 @@ intervalSpan rs before ib ie =
          _evar_0_0 = \r1 ->
           let {
            _evar_0_0 = \_ -> (,) Prelude.Nothing (Prelude.Just
-            (Build_IntervalDesc ib ie ((:) r rs0)))}
+            (Build_IntervalDesc iv ib ie ((:) r rs0)))}
           in
            _evar_0_0 __}
         in
@@ -351,8 +362,8 @@ splitInterval :: Prelude.Int -> IntervalDesc ->
                  ((,) IntervalDesc IntervalDesc)
 splitInterval before d =
   let {
-   _evar_0_ = \ib ie rds0 ->
-    let {_top_assumption_ = intervalSpan rds0 before ib ie} in
+   _evar_0_ = \iv ib ie rds0 ->
+    let {_top_assumption_ = intervalSpan rds0 before iv ib ie} in
     let {
      _evar_0_ = \_top_assumption_0 ->
       let {
@@ -385,5 +396,5 @@ splitInterval before d =
      (,) x x0 -> _evar_0_ x x0 __}}
   in
   case d of {
-   Build_IntervalDesc x x0 x1 -> _evar_0_ x x0 x1}
+   Build_IntervalDesc x x0 x1 x2 -> _evar_0_ x x0 x1 x2}
 

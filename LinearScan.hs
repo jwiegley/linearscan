@@ -7,6 +7,7 @@ module LinearScan
     ( allocate
     , BlockInfo
     , OpInfo(..)
+    , OpData(..)
     ) where
 
 import LinearScan.Main
@@ -14,9 +15,10 @@ import LinearScan.Main
     , SSError(..)
     , BlockInfo
     , OpInfo(..)
+    , OpData(..)
     )
 
-allocate :: [block] -> OpInfo op -> BlockInfo op block -> Either String [block]
+allocate :: [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]
 allocate [] _ _ = Left "No basic blocks were provided"
 allocate blocks opInfo blockToOpList =
     case linearScan opInfo blockToOpList blocks of

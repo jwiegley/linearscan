@@ -191,6 +191,20 @@ Proof.
   exact: IHzs.
 Qed.
 
+Definition foldl_with_index
+  {A B : Type} (f : nat -> B -> A -> B) (b : B) (v : seq A) : B :=
+  let fix go n xs z :=
+      match xs with
+        | nil => z
+        | y :: ys => f n (go n.+1 ys z) y
+      end in
+  go 0 v b.
+
+Example ex_foldl_with_index_1 :
+  foldl_with_index (fun n z x => (n, x) :: z) nil [:: 1; 2; 3]
+    == [:: (0, 1); (1, 2); (2, 3)].
+Proof. reflexivity. Qed.
+
 Lemma fold_left_plus : forall a (f : a -> nat) xs n,
    foldl (fun n x => n + f x) n xs =
    foldl (fun n x => n + f x) 0 xs + n.

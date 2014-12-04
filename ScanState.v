@@ -31,7 +31,7 @@ Notation "X <<- A ;; B" := (A >>>= (fun X => B))
 Notation "A ;;; B" := (_ <<- A ;; B)
   (right associativity, at level 84, A1 at next level).
 
-Definition error_ {I} := @ierr SSError I.
+Definition error_ {I X} err := mkIState SSError I I X (fun _ => inl err).
 Definition return_ {I X} := @ipure (IState SSError) _ I X.
 
 (** ** ScanStateDesc *)
@@ -50,6 +50,8 @@ Record ScanStateDesc : Type := {
     intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
     fixedIntervals : fixedIntervalsType;
 
+    (* The [nat] in this member indicates the beginning position of the
+       interval. *)
     unhandled : list (IntervalId * nat);     (* starts after pos *)
     active    : list (IntervalId * PhysReg); (* ranges over pos *)
     inactive  : list (IntervalId * PhysReg); (* falls in lifetime hole *)

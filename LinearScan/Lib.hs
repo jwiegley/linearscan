@@ -35,3 +35,12 @@ option_choose x y =
    Prelude.Just a -> x;
    Prelude.Nothing -> y}
 
+foldl_with_index :: (Prelude.Int -> a2 -> a1 -> a2) -> a2 -> ([] a1) -> a2
+foldl_with_index f b v =
+  let {
+   go n xs z =
+     case xs of {
+      [] -> z;
+      (:) y ys -> f n (go ((Prelude.succ) n) ys z) y}}
+  in go 0 v b
+

@@ -181,37 +181,70 @@ Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
 Definition computeLocalLiveSets : BlockState unit := return_ tt.
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
-Definition buildIntervals : BlockState ScanStateSig :=
-  let mkint (ss : ScanStateSig)
+Definition buildIntervals : BlockState (seq (OpData opType) * ScanStateSig) :=
+  let mkint (vid : nat)
+            (ss : ScanStateSig)
             (mx : option RangeSig)
             (f : forall sd, ScanState sd -> forall d, Interval d
                    -> ScanStateSig) :=
       let: (exist sd st) := ss in match mx with
-           | Some (exist _ r) => f _ st _ (I_Sing r)
+           | Some (exist _ r) => f _ st _ (I_Sing vid r)
            | None => ss
            end in
 
-  let handleVar ss mx := mkint ss mx $ fun _ st _ i =>
+  let handleVar vid ss mx := mkint vid ss mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
 
   bxs <<- iget SSError ;;
   let: blocks := bxs in
   let ops := flatten (map (blockToOpList binfo \o baseBlock) blocks) in
-  let: (_, varRanges, regRanges) := processOperations oinfo ops in
+  let: (ops', varRanges, regRanges) := processOperations oinfo ops in
   let regs := vmap (fun mr =>
                       if mr is Some r
-                      then Some (packInterval (I_Sing r.2))
+                      then Some (packInterval (I_Sing 0 r.2))
                       else None) regRanges in
 
   let s0 := ScanState_nil in
   let s1 := ScanState_setFixedIntervals s0 regs in
   let s2 := packScanState s1 in
 
-  return_ $ foldl handleVar s2 varRanges.
+  return_ $ (ops', foldl_with_index handleVar s2 varRanges).
+
+Definition surjective `(f : X -> Y) : Prop := forall y, exists x, f x = y.
+
+Goal { n : nat | surjective (plus n) }.
+Proof.
+  exists 0.
+  rewrite /surjective.
+  move=> y.
+  exists y.
+  reflexivity.
+Qed.
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
-Definition assignRegNum : BlockState unit := return_ tt.
+Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
+  BlockState (seq (OpData opType)) :=
+  let f op :=
+      let o := baseOp op in
+      let vars := varRefs (opInfo op) o in
+      let k acc v :=
+          let vid := varId v in
+          let g h x :=
+              let: (xid, reg) := x in
+              let int := getInterval xid in
+              if (ivar int == vid) &&
+                 (ibeg int <= opId op < iend int)
+              then fun i => if i == vid then Register reg else h i
+              else h in
+          {| baseOp  := o
+           ; opInfo  := opInfo op
+           ; opId    := opId op
+           ; opIdOdd := opIdOdd op
+           ; opAlloc := foldl g (fun _ => Unallocated) (handled sd)
+           |} in
+      foldl k op vars in
+  return_ $ map f ops.
 
 End Blocks.
 
@@ -221,6 +254,6 @@ Arguments computeLocalLiveSets {opType blockType}.
 Arguments computeGlobalLiveSets {opType blockType}.
 Arguments buildIntervals {opType _} oinfo binfo.
 Arguments resolveDataFlow {opType blockType}.
-Arguments assignRegNum {opType blockType}.
+Arguments assignRegNum {opType blockType} ops {sd} st.
 
 End MBlocks.

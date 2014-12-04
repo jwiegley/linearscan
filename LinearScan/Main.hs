@@ -786,19 +786,20 @@ computeGlobalLiveSets =
 
 buildIntervals :: (OpInfo a1) -> (BlockInfo 
                              a1 a2) -> BlockState a1 a2
-                             ScanStateDesc
+                             ((,) ([] (OpData a1))
+                             ScanStateDesc)
 buildIntervals oinfo binfo =
   let {
-   mkint = \ss mx f ->
+   mkint = \vid ss mx f ->
     case mx of {
      Prelude.Just s ->
-      f ss __ (Interval.Build_IntervalDesc (Range.rbeg s) (Range.rend s)
+      f ss __ (Interval.Build_IntervalDesc vid (Range.rbeg s) (Range.rend s)
         ((:[]) s)) __;
      Prelude.Nothing -> ss}}
   in
   let {
-   handleVar = \ss mx ->
-    (Prelude.$) (mkint ss mx) (\sd _ d _ ->
+   handleVar = \vid ss mx ->
+    (Prelude.$) (mkint vid ss mx) (\sd _ d _ ->
       packScanState (Build_ScanStateDesc ((Prelude.succ)
         (nextInterval sd))
         (LinearScan.Utils.snoc (nextInterval sd)
@@ -820,12 +821,12 @@ buildIntervals oinfo binfo =
     case processOperations oinfo ops of {
      (,) p regRanges ->
       case p of {
-       (,) l varRanges ->
+       (,) ops' varRanges ->
         let {
          regs0 = LinearScan.Utils.vmap _MyMachine__maxReg (\mr ->
                    case mr of {
                     Prelude.Just r -> Prelude.Just
-                     (Interval.packInterval (Interval.Build_IntervalDesc
+                     (Interval.packInterval (Interval.Build_IntervalDesc 0
                        (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
                     Prelude.Nothing -> Prelude.Nothing}) regRanges}
         in
@@ -850,16 +851,68 @@ buildIntervals oinfo binfo =
                   (Data.List.replicate maxReg Prelude.Nothing) []
                   [] [] [])))}
         in
-        (Prelude.$) return_
-          (Data.List.foldl' handleVar s2 varRanges)}}) IState.iget
+        (Prelude.$) return_ ((,) ops'
+          (Lib.foldl_with_index handleVar s2 varRanges))}}) IState.iget
+
+coq_Unnamed_thm :: Prelude.Int
+coq_Unnamed_thm =
+  0
 
 resolveDataFlow :: BlockState a1 a2 ()
 resolveDataFlow =
   return_ ()
 
-assignRegNum :: BlockState a1 a2 ()
-assignRegNum =
-  return_ ()
+assignRegNum :: ([] (OpData a1)) ->
+                           ScanStateDesc -> BlockState 
+                           a1 a2 ([] (OpData a1))
+assignRegNum ops sd =
+  let {
+   f = \op ->
+    let {o = baseOp op} in
+    let {vars0 = varRefs (opInfo op) o} in
+    let {
+     k = \acc v ->
+      let {vid = varId v} in
+      let {
+       g = \h x ->
+        case x of {
+         (,) xid reg ->
+          case (Prelude.&&)
+                 (Eqtype.eq_op Ssrnat.nat_eqType
+                   (unsafeCoerce
+                     (Interval.ivar
+                       (Interval.getIntervalDesc
+                         (
+                           (LinearScan.Utils.nth (nextInterval sd)
+                             (intervals sd) xid)))))
+                   (unsafeCoerce vid))
+                 ((Prelude.&&)
+                   ((Prelude.<=)
+                     (Interval.ibeg
+                       (Interval.getIntervalDesc
+                         (
+                           (LinearScan.Utils.nth (nextInterval sd)
+                             (intervals sd) xid))))
+                     (opId op))
+                   ((Prelude.<=) ((Prelude.succ) (opId op))
+                     (Interval.iend
+                       (Interval.getIntervalDesc
+                         (
+                           (LinearScan.Utils.nth (nextInterval sd)
+                             (intervals sd) xid)))))) of {
+           Prelude.True -> (\i ->
+            case Eqtype.eq_op Ssrnat.nat_eqType i (unsafeCoerce vid) of {
+             Prelude.True -> Register reg;
+             Prelude.False -> h i});
+           Prelude.False -> h}}}
+      in
+      Build_OpData o (opInfo op) (opId op)
+      (Data.List.foldl' (unsafeCoerce g) (\x -> Unallocated)
+        (handled sd))}
+    in
+    Data.List.foldl' k op vars0}
+  in
+  (Prelude.$) return_ (Prelude.map f ops)
 
 coq_SSMorph_rect :: ScanStateDesc ->
                                ScanStateDesc -> (() -> () -> () ->
@@ -1612,29 +1665,33 @@ walkIntervals sd =
 
 mainAlgorithm :: (OpInfo a1) -> (BlockInfo a1 a2) ->
                  IState.IState SSError ([] a2)
-                 ([] (BlockData a1 a2)) ()
+                 ([] (BlockData a1 a2)) ([] (OpData a1))
 mainAlgorithm opInfo0 blockInfo0 =
   stbind (\x ->
     stbind (\x0 ->
       stbind (\x1 ->
         stbind (\x2 ->
-          stbind (\ssig ->
-            case walkIntervals ( ssig) of {
-             Prelude.Left err -> error_ err;
-             Prelude.Right ssig' ->
-              stbind (\x3 -> assignRegNum)
-                resolveDataFlow})
+          stbind (\res ->
+            case res of {
+             (,) ops ssig ->
+              case walkIntervals ( ssig) of {
+               Prelude.Left err -> error_ err;
+               Prelude.Right ssig' ->
+                stbind (\x3 ->
+                  assignRegNum ops ( ssig))
+                  resolveDataFlow}})
             (buildIntervals opInfo0 blockInfo0))
           computeGlobalLiveSets) computeLocalLiveSets)
       (numberOperations opInfo0 blockInfo0))
     computeBlockOrder
 
 linearScan :: (OpInfo a1) -> (BlockInfo a1 a2) -> ([] 
-              a2) -> Prelude.Either SSError ([] a2)
+              a2) -> Prelude.Either SSError
+              ([] (OpData a1))
 linearScan opInfo0 blockInfo0 blocks =
   case IState.runIState (mainAlgorithm opInfo0 blockInfo0) blocks of {
    Prelude.Left err -> Prelude.Left err;
    Prelude.Right p ->
     case p of {
-     (,) u res -> Prelude.Right (Prelude.map baseBlock res)}}
+     (,) res l -> Prelude.Right res}}
 
