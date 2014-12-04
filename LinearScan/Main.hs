@@ -172,18 +172,20 @@ coq_Allocation_rec =
 
 data OpData opType =
    Build_OpData opType (OpInfo opType) Prelude.Int 
- (VarId -> Allocation)
+ ([] ((,) VarId Allocation))
 
 coq_OpData_rect :: (a1 -> (OpInfo a1) -> Prelude.Int ->
-                              () -> (VarId -> Allocation)
-                              -> a2) -> (OpData a1) -> a2
+                              () -> ([]
+                              ((,) VarId Allocation)) ->
+                              a2) -> (OpData a1) -> a2
 coq_OpData_rect f o =
   case o of {
    Build_OpData x x0 x1 x2 -> f x x0 x1 __ x2}
 
 coq_OpData_rec :: (a1 -> (OpInfo a1) -> Prelude.Int ->
-                             () -> (VarId -> Allocation)
-                             -> a2) -> (OpData a1) -> a2
+                             () -> ([]
+                             ((,) VarId Allocation)) ->
+                             a2) -> (OpData a1) -> a2
 coq_OpData_rec =
   coq_OpData_rect
 
@@ -202,8 +204,8 @@ opId o =
   case o of {
    Build_OpData baseOp0 opInfo0 opId0 opAlloc0 -> opId0}
 
-opAlloc :: (OpData a1) -> VarId ->
-                      Allocation
+opAlloc :: (OpData a1) -> []
+                      ((,) VarId Allocation)
 opAlloc o =
   case o of {
    Build_OpData baseOp0 opInfo0 opId0 opAlloc0 -> opAlloc0}
@@ -424,10 +426,7 @@ applyList :: (OpInfo a1) -> a1 -> ([] a1) ->
 applyList opInfo0 op ops base f =
   let {
    go i x xs =
-     let {
-      newop = Build_OpData x opInfo0 i (\x0 ->
-       Unallocated)}
-     in
+     let {newop = Build_OpData x opInfo0 i []} in
      case xs of {
       [] -> (,) ((:) newop []) (f newop (base i));
       (:) y ys ->
@@ -739,10 +738,7 @@ wrap_block :: (OpInfo a1) -> (BlockInfo
                          ([] (BlockData a1 a2))) -> a2 -> (,)
                          Prelude.Int ([] (BlockData a1 a2))
 wrap_block oinfo binfo x block =
-  let {
-   k = \h op -> Build_OpData op oinfo ( h) (\x0 ->
-    Unallocated)}
-  in
+  let {k = \h op -> Build_OpData op oinfo ( h) []} in
   let {
    f = \x0 op ->
     case x0 of {
@@ -900,15 +896,11 @@ assignRegNum ops sd =
                          (
                            (LinearScan.Utils.nth (nextInterval sd)
                              (intervals sd) xid)))))) of {
-           Prelude.True -> (\i ->
-            case Eqtype.eq_op Ssrnat.nat_eqType i (unsafeCoerce vid) of {
-             Prelude.True -> Register reg;
-             Prelude.False -> h i});
+           Prelude.True -> (:) ((,) vid (Register reg)) h;
            Prelude.False -> h}}}
       in
       Build_OpData o (opInfo op) (opId op)
-      (Data.List.foldl' (unsafeCoerce g) (\x -> Unallocated)
-        (handled sd))}
+      (Data.List.foldl' g [] (handled sd))}
     in
     Data.List.foldl' k op vars0}
   in

@@ -49,7 +49,7 @@ Record OpData := {
   opInfo  : OpInfo;
   opId    : nat;
   opIdOdd : odd opId;
-  opAlloc : VarId -> Allocation
+  opAlloc : seq (VarId * Allocation)
 }.
 
 (* Finally, when we work with the list of operations, we will be working with
@@ -60,7 +60,7 @@ Inductive OpList : seq OpData -> Prop :=
                   ; opInfo  := oinfo
                   ; opId    := n
                   ; opIdOdd := nodd
-                  ; opAlloc := fun _ => Unallocated
+                  ; opAlloc := nil
                   |} ]
 
   | OpList_cons op oinfo n nodd f os :
@@ -75,7 +75,7 @@ Inductive OpList : seq OpData -> Prop :=
                   ; opInfo  := oinfo
                   ; opId    := n.+2
                   ; opIdOdd := odd_add_2 nodd
-                  ; opAlloc := fun _ => Unallocated
+                  ; opAlloc := nil
                   |}, o & os ].
 
 Definition boundedRange (pos : nat) :=
@@ -224,7 +224,7 @@ Definition applyList (opInfo : OpInfo) (op : opType) (ops : seq opType)
                     ; opInfo  := opInfo
                     ; opId    := i
                     ; opIdOdd := Hoddi
-                    ; opAlloc := fun _ => Unallocated |} in
+                    ; opAlloc := nil |} in
       match xs with
       | nil => ([:: newop], f newop (base i))
       | y :: ys =>

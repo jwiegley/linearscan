@@ -1,15 +1,21 @@
-{-# OPTIONS_GHC -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror -fno-warn-orphans #-}
 
 module LinearScan
     ( allocate
     , VarInfo(..)
+    , VarKind(..)
     , BlockInfo(..)
     , OpInfo(..)
     , OpData(..)
     ) where
 
 import qualified LinearScan.Main as LS
-import LinearScan.Main (PhysReg, VarId, VarKind, Allocation(..))
+import LinearScan.Main (PhysReg, VarId, VarKind(..), Allocation(..))
+
+instance Show Allocation where
+    show Unallocated    = "Unallocated"
+    show (Register reg) = "Register#" ++ show reg
+    show Spill          = "Spill"
 
 data VarInfo = VarInfo
     { varId       :: VarId
@@ -40,8 +46,14 @@ data OpData opType = OpData
     { baseOp  :: opType
     , opInfo  :: OpInfo opType
     , opId    :: Int
-    , opAlloc :: VarId -> Allocation
+    , opAlloc :: [(VarId, Allocation)]
     }
+
+instance Eq (OpData opType) where
+    OpData _b1 _i1 d1 _a1 == OpData _b2 _i2 d2 _a2 = d1 == d2
+
+instance Show (OpData opType) where
+    show (OpData _b _i d a) = "<OpData#" ++ show d ++ " " ++ show a ++ ">"
 
 allocate :: [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]
 allocate [] _ _ = Left "No basic blocks were provided"

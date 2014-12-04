@@ -57,7 +57,7 @@ Definition wrap_block
        ; opInfo  := oinfo
        ; opId    := H.1
        ; opIdOdd := H.2
-       ; opAlloc := fun _ => Unallocated |} in
+       ; opAlloc := nil |} in
 
   let f x op := match x with
       | (H, ops) => let nop := k H op in
@@ -81,19 +81,19 @@ Lemma wrap_block_spec : forall x y z b blk,
             ; opInfo  := oinfo
             ; opId    := 1
             ; opIdOdd := odd_1
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := y
             ; opInfo  := oinfo
             ; opId    := 3
             ; opIdOdd := odd_add_2 odd_1
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := z
             ; opInfo  := oinfo
             ; opId    := 5
             ; opIdOdd := odd_add_2 (odd_add_2 odd_1)
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ].
 Proof.
@@ -115,19 +115,19 @@ Lemma wrap_block_spec2 :
             ; opInfo  := oinfo
             ; opId    := 1
             ; opIdOdd := odd_1
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := b
             ; opInfo  := oinfo
             ; opId    := 3
             ; opIdOdd := odd_add_2 odd_1
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := c
             ; opInfo  := oinfo
             ; opId    := 5
             ; opIdOdd := odd_add_2 (odd_add_2 odd_1)
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ]
     /\ blockOps b2 =
@@ -135,13 +135,13 @@ Lemma wrap_block_spec2 :
             ; opInfo  := oinfo
             ; opId    := 7
             ; opIdOdd := odd_add_2 (odd_add_2 (odd_add_2 odd_1))
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := y
             ; opInfo  := oinfo
             ; opId    := 9
             ; opIdOdd := odd_add_2 (odd_add_2 (odd_add_2 (odd_add_2 odd_1)))
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ;   {| baseOp  := z
             ; opInfo  := oinfo
@@ -149,7 +149,7 @@ Lemma wrap_block_spec2 :
             ; opIdOdd := odd_add_2
                            (odd_add_2
                               (odd_add_2 (odd_add_2 (odd_add_2 odd_1))))
-            ; opAlloc := fun _ => Unallocated
+            ; opAlloc := nil
             |}
        ].
 Proof.
@@ -235,13 +235,13 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
               let int := getInterval xid in
               if (ivar int == vid) &&
                  (ibeg int <= opId op < iend int)
-              then fun i => if i == vid then Register reg else h i
+              then (vid, Register reg) :: h
               else h in
           {| baseOp  := o
            ; opInfo  := opInfo op
            ; opId    := opId op
            ; opIdOdd := opIdOdd op
-           ; opAlloc := foldl g (fun _ => Unallocated) (handled sd)
+           ; opAlloc := foldl g nil (handled sd)
            |} in
       foldl k op vars in
   return_ $ map f ops.
