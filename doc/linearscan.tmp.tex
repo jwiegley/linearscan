@@ -102,7 +102,7 @@ The Coq definitions and proofs, and the generated Haskell code can be found at
 % \clearpage
 % \lfoot{Non-Technical Data - Releasable to Foreign Persons.}
 
-\begin{MyCoqEval}
+\begin{coq_eval}
 Require Import ScanState.
 Require Import SSMorph.
 Require Import Machine.
@@ -143,7 +143,7 @@ Admitted.
 Definition transportId `(H : nextInterval st = nextInterval st')
   (x : IntervalId st) : IntervalId st'.
 Admitted.
-\end{MyCoqEval}
+\end{coq_eval}
 
 \section{Design evolution}
 \label{sec:evolve}
@@ -170,7 +170,7 @@ intervals (an interval corresponds to the range of program locations
 where a single ``virtual register'' is live) and moves selected
 intervals into either the ``handled'' or ``inactive'' sets.
 
-\begin{MyCoqExampleStar}
+\begin{coq_example*}
 Definition checkActiveIntervals st pos : ScanStateDesc :=
   let fix go st st0 (ints : list (IntervalId st)) (pos : nat) :=
     match ints with
@@ -185,33 +185,33 @@ Definition checkActiveIntervals st pos : ScanStateDesc :=
         go st st1 xs pos
     end in
   go st st [seq fst i | i <- active st] pos.
-\end{MyCoqExampleStar}
+\end{coq_example*}
 
 Now consider the following two Lemmas, which claim that (1)
 \texttt{checkActiveIntervals} does not disrupt the next interval to handle;
 and (2) \texttt{checkActiveIntervals} does not introduce any new intervals.
 
-\begin{MyCoqExampleStar}
+\begin{coq_example*}
 Lemma checkActiveIntervals_spec1 : forall st st' pos,
   st' = checkActiveIntervals st pos
     -> nextInterval st = nextInterval st'.
-\end{MyCoqExampleStar}
-\begin{MyCoqEval}
+\end{coq_example*}
+\begin{coq_eval}
 Admitted.
 
 Require Import Coq.Lists.List.
-\end{MyCoqEval}
+\end{coq_eval}
 
-\begin{MyCoqExampleStar}
+\begin{coq_example*}
 Lemma checkActiveIntervals_spec2 : forall st st' i pos
   (H : st' = checkActiveIntervals st pos),
   ~ In i (all_state_lists st)
     -> ~ In (transportId (checkActiveIntervals_spec1 H) i)
             (all_state_lists st').
-\end{MyCoqExampleStar}
-\begin{MyCoqEval}
+\end{coq_example*}
+\begin{coq_eval}
 Admitted.
-\end{MyCoqEval}
+\end{coq_eval}
 
 Because \texttt{checkActiveIntervals} operates by generating a new scan state
 on \emph{each} iteration of the loop, we need to prove that all properties are
@@ -224,7 +224,7 @@ to prove the desired property.  That is, rather than proving correctness
 ``from the outside'', the function was changed to produce the necessary
 evidence (as proof terms) needed by subsequent lemmas.
 
-\begin{MyCoqEval}
+\begin{coq_eval}
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Lists.List.
 Require Import Coq.Program.Wf.
@@ -234,7 +234,7 @@ Require Import Coq.Sorting.Sorted.
 Definition gtb x y :=match nat_compare x y with Gt => true | _ => false end.
 
 Definition definition_goes_here {a : Type} : a. Admitted.
-\end{MyCoqEval}
+\end{coq_eval}
 
 \subsubsection*{Lesson learned.}
 
@@ -251,7 +251,7 @@ so that such evidence would be available wherever needed.  Take for example an
 excerpt from an earlier version of the \texttt{ScanState} data structure,
 which records the overall state of several intermediary lists:
 
-\begin{MyCoqExampleStar}
+\begin{coq_example*}
 Record ScanStateV2 := {
     unhandled : list (nat * nat);
     active    : list nat;
@@ -262,7 +262,7 @@ Record ScanStateV2 := {
     lists_are_unique : uniq (map (@fst _ _) unhandled ++ active ++
                              inactive ++ handled)
 }.
-\end{MyCoqExampleStar}
+\end{coq_example*}
 
 In this structure we have four working lists, and two properties about
 the lists. Property \texttt{unhandled\_sorted} requires that the
@@ -415,10 +415,10 @@ requirements are of this relation.
 
 Here is the sort of function type we end up with:
 
-\begin{MyCoqExampleStar}
+\begin{coq_example*}
 Definition handleInterval {pre : ScanStateDesc}
   : SState pre SSMorphHasLen SSMorphSt (option PhysReg).
-\end{MyCoqExampleStar}
+\end{coq_example*}
 
 % Notes from talking with John
 % ----------------------------
