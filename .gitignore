@@ -5,3 +5,9 @@ dist
 Setup
 html
 /Makefile.coq
+/doc/linearscan.v.aux
+/doc/linearscan.v.bbl
+/doc/linearscan.v.blg
+/doc/linearscan.v.log
+/doc/linearscan.v.out
+/doc/linearscan.v.tex
