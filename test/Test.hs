@@ -222,4 +222,11 @@ main = hspec $
                    blockToList m
                 }
         it "Passes a basic check" $
-            allocate blocks oinfo binfo `shouldBe` Right []
+            allocate blocks oinfo binfo `shouldBe` Right
+                [ OpData
+                      { baseOp  = error "baseOp#1"
+                      , opInfo  = oinfo
+                      , opId    = 1
+                      , opAlloc = []
+                      }
+                ]

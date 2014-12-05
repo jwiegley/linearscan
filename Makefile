@@ -6,7 +6,10 @@ MISSING  = \
 		      egrep -v 'Definition undefined'      |		\
 		      egrep -v new/
 
-all: Makefile.coq				\
+VFILES = $(wildcard *.v)
+VOFILES = $(patsubst %.v,%.vo,$(VFILES))
+
+all: $(VOFILES)	LinearScan/Main.hs		\
      LinearScan/Eqtype.hs			\
      LinearScan/Fintype.hs			\
      LinearScan/Seq.hs				\
@@ -14,34 +17,36 @@ all: Makefile.coq				\
      LinearScan/Ssreflect.hs			\
      LinearScan/Ssrfun.hs			\
      LinearScan/Ssrnat.hs
+	-@$(MISSING) || exit 0
+
+%.vo: %.v Makefile.coq
 	@$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
 	@$(MAKE) LinearScan/Main.hs
-	-@$(MISSING)
 
 LinearScan/Main.hs: Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
 	@perl -i fixcode.pl LinearScan/*.hs
 
-LinearScan/Eqtype.hs: LinearScan/eqtype.hs
+LinearScan/Eqtype.hs: LinearScan/Main.hs LinearScan/eqtype.hs
 	@mv $< $@
 
-LinearScan/Fintype.hs: LinearScan/fintype.hs
+LinearScan/Fintype.hs: LinearScan/Main.hs LinearScan/fintype.hs
 	@mv $< $@
 
-LinearScan/Seq.hs: LinearScan/seq.hs
+LinearScan/Seq.hs: LinearScan/Main.hs LinearScan/seq.hs
 	@mv $< $@
 
-LinearScan/Ssrbool.hs: LinearScan/ssrbool.hs
+LinearScan/Ssrbool.hs: LinearScan/Main.hs LinearScan/ssrbool.hs
 	@mv $< $@
 
-LinearScan/Ssreflect.hs: LinearScan/ssreflect.hs
+LinearScan/Ssreflect.hs: LinearScan/Main.hs LinearScan/ssreflect.hs
 	@mv $< $@
 
-LinearScan/Ssrfun.hs: LinearScan/ssrfun.hs
+LinearScan/Ssrfun.hs: LinearScan/Main.hs LinearScan/ssrfun.hs
 	@mv $< $@
 
-LinearScan/Ssrnat.hs: LinearScan/ssrnat.hs
+LinearScan/Ssrnat.hs: LinearScan/Main.hs LinearScan/ssrnat.hs
 	@mv $< $@
 
 Makefile.coq: _CoqProject

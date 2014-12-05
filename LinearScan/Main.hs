@@ -870,7 +870,7 @@ assignRegNum ops sd =
      k = \acc v ->
       let {vid = varId v} in
       let {
-       g = \h x ->
+       h = \acc0 x ->
         case x of {
          (,) xid reg ->
           case (Prelude.&&)
@@ -896,11 +896,11 @@ assignRegNum ops sd =
                          (
                            (LinearScan.Utils.nth (nextInterval sd)
                              (intervals sd) xid)))))) of {
-           Prelude.True -> (:) ((,) vid (Register reg)) h;
-           Prelude.False -> h}}}
+           Prelude.True -> (:) ((,) vid (Register reg)) acc0;
+           Prelude.False -> acc0}}}
       in
       Build_OpData o (opInfo op) (opId op)
-      (Data.List.foldl' g [] (handled sd))}
+      (Data.List.foldl' h [] (handled sd))}
     in
     Data.List.foldl' k op vars0}
   in
