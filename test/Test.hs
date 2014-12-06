@@ -1,27 +1,40 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -Wall -fno-warn-unused-binds -Werror #-}
 
 module Main where
 
+{-
+
+The objective of these tests is to present a real world instruction stream to
+the register allocator algorithm, and verify that for certain inputs we get
+the expected outputs.  I've extracted several of the types from the Tempest
+compiler for which this algorithm was originally developed.  We link from this
+module to the Haskell interface code (LinearScan), which calls into the
+Haskell code that was extracted from Coq.
+
+-}
+
 import Compiler.Hoopl
 import Data.Foldable
 import Data.Map
 import LinearScan
+import qualified LinearScan.Main as LS
 import Test.Hspec
 
 ------------------------------------------------------------------------------
--- The input from the Tempest compiler has the following shape: Procedure a
--- IRVar, which means that instructions will ultimately refer to either
--- physical registers, or virtual variables.
+-- The input from the Tempest compiler has the following shape: 'Procedure a
+-- IRVar', which means that instructions ultimately refer to either physical
+-- registers, or virtual variables (by index).
 --
--- The output should be as close to the input as possible, with the difference
--- that it has type Procedure a Reg, meaning that only physical registers are
--- referenced.
+-- The output from the register allocator should be as close to the input as
+-- possible, with the difference that it has type 'Procedure a Reg', meaning
+-- that only physical registers are referenced.
 --
--- The main allocation algorithm roughly has this type at present:
+-- So the main allocation algorithm roughly has this type at present:
 --
 --     regAlloc :: Procedure a IRVar -> Procedure a Reg
 ------------------------------------------------------------------------------
@@ -133,6 +146,10 @@ nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
 nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
 
+instance Show (LS.OpData (Node () IRVar O O)) where
+    show (LS.Build_OpData a _b c d) =
+        "LS.OpData " ++ show a ++ " " ++ show c ++ " " ++ show d
+
 instance NonLocal (Node a v) where
   entryLabel (Node (Label l)         _) = l
   successors (Node (Jump l)          _) = [l]
@@ -227,6 +244,9 @@ main = hspec $
                       { baseOp  = error "baseOp#1"
                       , opInfo  = oinfo
                       , opId    = 1
-                      , opAlloc = []
+                      , opAlloc = [ (0, LS.Register 0)
+                                  , (1, LS.Register 1)
+                                  , (2, LS.Register 2)
+                                  ]
                       }
                 ]

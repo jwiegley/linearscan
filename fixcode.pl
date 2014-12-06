@@ -28,5 +28,7 @@ import qualified LinearScan.Utils
     s/_Blocks__//g; s/Blocks__//g;
     s/_MLS__MS__//g; s/MLS__MS__//g;
 
+    s/\| Spill/| Spill deriving (Prelude.Show, Prelude.Eq)/;
+
     print;
 }

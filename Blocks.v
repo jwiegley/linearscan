@@ -228,7 +228,7 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
   let f op :=
       let o := baseOp op in
       let vars := varRefs (opInfo op) o in
-      let k acc v :=
+      let k op' v :=
           let vid := varId v in
           let h acc x :=
               let: (xid, reg) := x in
@@ -237,11 +237,11 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
                  (ibeg int <= opId op < iend int)
               then (vid, Register reg) :: acc
               else acc in
-          {| baseOp  := o
-           ; opInfo  := opInfo op
-           ; opId    := opId op
-           ; opIdOdd := opIdOdd op
-           ; opAlloc := foldl h nil (handled sd)
+          {| baseOp  := o           (* op == op' throughout *)
+           ; opInfo  := opInfo op'
+           ; opId    := opId op'
+           ; opIdOdd := opIdOdd op'
+           ; opAlloc := foldl h nil (handled sd) ++ opAlloc op'
            |} in
       foldl k op vars in
   return_ $ map f ops.

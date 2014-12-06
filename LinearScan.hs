@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# OPTIONS_GHC -Wall -Werror -fno-warn-orphans #-}
 
 module LinearScan
@@ -11,11 +13,6 @@ module LinearScan
 
 import qualified LinearScan.Main as LS
 import LinearScan.Main (PhysReg, VarId, VarKind(..), Allocation(..))
-
-instance Show Allocation where
-    show Unallocated    = "Unallocated"
-    show (Register reg) = "Register#" ++ show reg
-    show Spill          = "Spill"
 
 data VarInfo = VarInfo
     { varId       :: VarId
@@ -50,12 +47,13 @@ data OpData opType = OpData
     }
 
 instance Eq (OpData opType) where
-    OpData _b1 _i1 d1 _a1 == OpData _b2 _i2 d2 _a2 = d1 == d2
+    OpData _b1 _i1 d1 a1 == OpData _b2 _i2 d2 a2 = d1 == d2 && a1 == a2
 
 instance Show (OpData opType) where
     show (OpData _b _i d a) = "<OpData#" ++ show d ++ " " ++ show a ++ ">"
 
-allocate :: [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]
+allocate :: (Show op, Show (LS.OpData op))
+         => [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]
 allocate [] _ _ = Left "No basic blocks were provided"
 allocate blocks oinfo binfo =
     let oinfo' = LS.Build_OpInfo

@@ -54,7 +54,7 @@ Definition mainAlgorithm :
       resolveDataFlow ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum ops ssig.2
+      assignRegNum ops ssig'.2
   end.
 
 Definition linearScan (blocks : seq blockType) :

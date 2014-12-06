@@ -155,7 +155,7 @@ regRefs o =
 data Allocation =
    Unallocated
  | Register MyMachine__PhysReg
- | Spill
+ | Spill deriving (Prelude.Show, Prelude.Eq)
 
 coq_Allocation_rect :: a1 -> (MyMachine__PhysReg -> a1) -> a1 ->
                                   Allocation -> a1
@@ -867,10 +867,10 @@ assignRegNum ops sd =
     let {o = baseOp op} in
     let {vars0 = varRefs (opInfo op) o} in
     let {
-     k = \acc v ->
+     k = \op' v ->
       let {vid = varId v} in
       let {
-       h = \acc0 x ->
+       h = \acc x ->
         case x of {
          (,) xid reg ->
           case (Prelude.&&)
@@ -896,11 +896,12 @@ assignRegNum ops sd =
                          (
                            (LinearScan.Utils.nth (nextInterval sd)
                              (intervals sd) xid)))))) of {
-           Prelude.True -> (:) ((,) vid (Register reg)) acc0;
-           Prelude.False -> acc0}}}
+           Prelude.True -> (:) ((,) vid (Register reg)) acc;
+           Prelude.False -> acc}}}
       in
-      Build_OpData o (opInfo op) (opId op)
-      (Data.List.foldl' h [] (handled sd))}
+      Build_OpData o (opInfo op') (opId op')
+      ((Prelude.++) (Data.List.foldl' h [] (handled sd))
+        (opAlloc op'))}
     in
     Data.List.foldl' k op vars0}
   in
@@ -1670,7 +1671,7 @@ mainAlgorithm opInfo0 blockInfo0 =
                Prelude.Left err -> error_ err;
                Prelude.Right ssig' ->
                 stbind (\x3 ->
-                  assignRegNum ops ( ssig))
+                  assignRegNum ops ( ssig'))
                   resolveDataFlow}})
             (buildIntervals opInfo0 blockInfo0))
           computeGlobalLiveSets) computeLocalLiveSets)
