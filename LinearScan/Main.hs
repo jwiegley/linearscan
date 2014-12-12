@@ -4,6 +4,7 @@
 module LinearScan.Main where
 
 
+import Debug.Trace
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -354,10 +355,8 @@ handleOp op rest =
                  (Build_boundedRangeVec restVars' restRegs')}
   in
   let {
-   rest2 = case varRefs (opInfo op)
-                  (baseOp op) of {
-            [] -> unchanged;
-            (:) v vs ->
+   rest2 = let {
+            k = \acc v ->
              let {
               x = consr
                     (Seq.nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
@@ -366,24 +365,25 @@ handleOp op rest =
              in
              Build_boundedRangeVec
              (Seq.set_nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
-               Prelude.Nothing)
-               (vars (opId op) unchanged)
-               (varId v) x)
-             (regs (opId op) unchanged)}}
+               Prelude.Nothing) (vars pos acc)
+               (varId v) x) (regs pos acc)}
+           in
+           Data.List.foldl' k unchanged
+             (varRefs (opInfo op)
+               (baseOp op))}
   in
-  case regRefs (opInfo op) (baseOp op) of {
-   [] -> rest2;
-   (:) r rs ->
+  let {
+   k = \acc r ->
     let {
      x = consr (LinearScan.Utils.nth _MyMachine__maxReg restRegs' r)
            Prelude.False}
     in
-    Build_boundedRangeVec
-    (vars (opId op) rest2)
-    (LinearScan.Utils.set_nth _MyMachine__maxReg
-      (transportVecBounds (opId op) _MyMachine__maxReg
-        ((Prelude.succ) ((Prelude.succ) (opId op))) restRegs') r
+    Build_boundedRangeVec (vars pos acc)
+    (LinearScan.Utils.set_nth _MyMachine__maxReg (regs pos acc) r
       x)}
+  in
+  Data.List.foldl' k rest2
+    (regRefs (opInfo op) (baseOp op))
 
 extractRange :: Prelude.Int -> Coq_boundedTriple ->
                            Prelude.Maybe Range.RangeDesc
@@ -800,9 +800,10 @@ buildIntervals oinfo binfo =
         (nextInterval sd))
         (LinearScan.Utils.snoc (nextInterval sd)
           (intervals sd) d) (fixedIntervals sd)
-        (Data.List.insertBy (Data.Ord.comparing Prelude.snd) ((,)
-          ( (nextInterval sd)) (Interval.ibeg d))
-          (Prelude.map Prelude.id (unhandled sd)))
+        (let xs = (Data.List.insertBy (Data.Ord.comparing Prelude.snd) ((,)
+              ( (nextInterval sd)) (Interval.ibeg d))
+              (Prelude.map Prelude.id (unhandled sd))) in
+         trace ("xs: " GHC.Base.++ Prelude.show xs) GHC.Base.$ xs)
         (Prelude.map Prelude.id (active sd))
         (Prelude.map Prelude.id (inactive sd))
         (Prelude.map Prelude.id (handled sd))))}
@@ -863,6 +864,11 @@ assignRegNum :: ([] (OpData a1)) ->
                            a1 a2 ([] (OpData a1))
 assignRegNum ops sd =
   let {
+   ints = (Prelude.++) (handled sd)
+            ((Prelude.++) (active sd) (inactive sd))}
+  in
+   trace ("ints: " GHC.Base.++ Prelude.show ints) GHC.Base.$
+  let {
    f = \op ->
     let {o = baseOp op} in
     let {vars0 = varRefs (opInfo op) o} in
@@ -900,8 +906,7 @@ assignRegNum ops sd =
            Prelude.False -> acc}}}
       in
       Build_OpData o (opInfo op') (opId op')
-      ((Prelude.++) (Data.List.foldl' h [] (handled sd))
-        (opAlloc op'))}
+      ((Prelude.++) (Data.List.foldl' h [] ints) (opAlloc op'))}
     in
     Data.List.foldl' k op vars0}
   in
@@ -1431,7 +1436,8 @@ tryAllocateFreeReg pre =
      (,) reg mres ->
       let {
        success = stbind (\x -> return_ reg)
-                   (moveUnhandledToActive pre reg)}
+                   (trace ("ints: " GHC.Base.++ Prelude.show reg) GHC.Base.$
+                    moveUnhandledToActive pre reg)}
       in
       let {
        maction = case mres of {
@@ -1637,6 +1643,7 @@ walkIntervals_func x =
     let {y = (,) sd0 __} in walkIntervals_func ( y)}
   in
   let {filtered_var = LinearScan.Utils.uncons (unhandled sd)} in
+  trace ("filtered_var: " GHC.Base.++ Prelude.show filtered_var) GHC.Base.$
   case filtered_var of {
    Prelude.Just s ->
     let {ssinfo = Build_SSInfo sd __} in

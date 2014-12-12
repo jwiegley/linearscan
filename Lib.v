@@ -196,12 +196,26 @@ Definition foldl_with_index
   let fix go n xs z :=
       match xs with
         | nil => z
-        | y :: ys => f n (go n.+1 ys z) y
+        | y :: ys => go n.+1 ys (f n z y)
       end in
   go 0 v b.
 
 Example ex_foldl_with_index_1 :
   foldl_with_index (fun n z x => (n, x) :: z) nil [:: 1; 2; 3]
+    == [:: (2, 3); (1, 2); (0, 1)].
+Proof. reflexivity. Qed.
+
+Definition foldr_with_index
+  {A B : Type} (f : nat -> A -> B -> B) (b : B) (v : seq A) : B :=
+  let fix go n xs z :=
+      match xs with
+        | nil => z
+        | y :: ys => f n y (go n.+1 ys z)
+      end in
+  go 0 v b.
+
+Example ex_foldr_with_index_1 :
+  foldr_with_index (fun n x z => (n, x) :: z) nil [:: 1; 2; 3]
     == [:: (0, 1); (1, 2); (2, 3)].
 Proof. reflexivity. Qed.
 

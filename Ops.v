@@ -177,25 +177,21 @@ Definition handleOp (op : OpData) (rest : boundedRangeVec (opId op).+2) :
       boundedTransport (ltnSSn _)
                        {| vars := restVars'; regs := restRegs' |} in
 
-  let rest2 := match varRefs (opInfo op) (baseOp op) with
-      | nil => unchanged
-      | v :: vs =>
-         let x := consr (nth (None, None, None) restVars' (varId v))
-                        (regRequired v) in
-         {| vars := set_nth (None, None, None)
-                            (vars unchanged) (varId v) x
-          ; regs := regs unchanged
-          |}
-      end in
+  let rest2 :=
+      let k acc v :=
+          let x := consr (nth (None, None, None) restVars' (varId v))
+                         (regRequired v) in
+          {| vars := set_nth (None, None, None) (vars acc) (varId v) x
+           ; regs := regs acc
+           |} in
+      foldl k unchanged (varRefs (opInfo op) (baseOp op)) in
 
-  match regRefs (opInfo op) (baseOp op) with
-  | nil => rest2
-  | r :: rs =>
-     let x := consr (vnth restRegs' r) false in
-     {| vars := vars rest2
-      ; regs := vreplace (transportVecBounds (ltnSSn _) restRegs') r x
-      |}
-  end.
+  let k acc r :=
+      let x := consr (vnth restRegs' r) false in
+      {| vars := vars acc
+       ; regs := vreplace (regs acc) r x
+       |} in
+  foldl k rest2 (regRefs (opInfo op) (baseOp op)).
 
 Definition extractRange {n} (x : boundedTriple n) : option RangeSig :=
   let: (mb, me, mr) := x in

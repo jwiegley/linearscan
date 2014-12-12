@@ -41,6 +41,6 @@ foldl_with_index f b v =
    go n xs z =
      case xs of {
       [] -> z;
-      (:) y ys -> f n (go ((Prelude.succ) n) ys z) y}}
+      (:) y ys -> go ((Prelude.succ) n) ys (f n z y)}}
   in go 0 v b
 

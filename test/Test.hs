@@ -244,9 +244,9 @@ main = hspec $
                       { baseOp  = error "baseOp#1"
                       , opInfo  = oinfo
                       , opId    = 1
-                      , opAlloc = [ (0, LS.Register 0)
+                      , opAlloc = [ (2, LS.Register 0)
                                   , (1, LS.Register 1)
-                                  , (2, LS.Register 2)
+                                  , (0, LS.Register 2)
                                   ]
                       }
                 ]

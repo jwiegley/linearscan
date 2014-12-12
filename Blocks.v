@@ -210,21 +210,11 @@ Definition buildIntervals : BlockState (seq (OpData opType) * ScanStateSig) :=
 
   return_ $ (ops', foldl_with_index handleVar s2 varRanges).
 
-Definition surjective `(f : X -> Y) : Prop := forall y, exists x, f x = y.
-
-Goal { n : nat | surjective (plus n) }.
-Proof.
-  exists 0.
-  rewrite /surjective.
-  move=> y.
-  exists y.
-  reflexivity.
-Qed.
-
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
 Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
   BlockState (seq (OpData opType)) :=
+  let ints := handled sd ++ active sd ++ inactive sd in
   let f op :=
       let o := baseOp op in
       let vars := varRefs (opInfo op) o in
@@ -241,7 +231,7 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
            ; opInfo  := opInfo op'
            ; opId    := opId op'
            ; opIdOdd := opIdOdd op'
-           ; opAlloc := foldl h nil (handled sd) ++ opAlloc op'
+           ; opAlloc := foldl h nil ints ++ opAlloc op'
            |} in
       foldl k op vars in
   return_ $ map f ops.
