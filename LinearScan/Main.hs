@@ -4,7 +4,6 @@
 module LinearScan.Main where
 
 
-import Debug.Trace
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -628,7 +627,7 @@ intervals_for_reg sd xs reg =
 registerWithHighestPos :: ([] (Prelude.Maybe Prelude.Int)) -> (,)
                                      Prelude.Int (Prelude.Maybe Prelude.Int)
 registerWithHighestPos =
-  (LinearScan.Utils.foldl'_with_index) maxReg (\reg res x ->
+  (LinearScan.Utils.vfoldl'_with_index) maxReg (\reg res x ->
     case res of {
      (,) r o ->
       case o of {
@@ -800,10 +799,9 @@ buildIntervals oinfo binfo =
         (nextInterval sd))
         (LinearScan.Utils.snoc (nextInterval sd)
           (intervals sd) d) (fixedIntervals sd)
-        (let xs = (Data.List.insertBy (Data.Ord.comparing Prelude.snd) ((,)
-              ( (nextInterval sd)) (Interval.ibeg d))
-              (Prelude.map Prelude.id (unhandled sd))) in
-         trace ("xs: " GHC.Base.++ Prelude.show xs) GHC.Base.$ xs)
+        (Data.List.insertBy (Data.Ord.comparing Prelude.snd) ((,)
+          ( (nextInterval sd)) (Interval.ibeg d))
+          (Prelude.map Prelude.id (unhandled sd)))
         (Prelude.map Prelude.id (active sd))
         (Prelude.map Prelude.id (inactive sd))
         (Prelude.map Prelude.id (handled sd))))}
@@ -851,10 +849,6 @@ buildIntervals oinfo binfo =
         (Prelude.$) return_ ((,) ops'
           (Lib.foldl_with_index handleVar s2 varRanges))}}) IState.iget
 
-coq_Unnamed_thm :: Prelude.Int
-coq_Unnamed_thm =
-  0
-
 resolveDataFlow :: BlockState a1 a2 ()
 resolveDataFlow =
   return_ ()
@@ -867,7 +861,6 @@ assignRegNum ops sd =
    ints = (Prelude.++) (handled sd)
             ((Prelude.++) (active sd) (inactive sd))}
   in
-   trace ("ints: " GHC.Base.++ Prelude.show ints) GHC.Base.$
   let {
    f = \op ->
     let {o = baseOp op} in
@@ -1436,8 +1429,7 @@ tryAllocateFreeReg pre =
      (,) reg mres ->
       let {
        success = stbind (\x -> return_ reg)
-                   (trace ("ints: " GHC.Base.++ Prelude.show reg) GHC.Base.$
-                    moveUnhandledToActive pre reg)}
+                   (moveUnhandledToActive pre reg)}
       in
       let {
        maction = case mres of {
@@ -1643,7 +1635,6 @@ walkIntervals_func x =
     let {y = (,) sd0 __} in walkIntervals_func ( y)}
   in
   let {filtered_var = LinearScan.Utils.uncons (unhandled sd)} in
-  trace ("filtered_var: " GHC.Base.++ Prelude.show filtered_var) GHC.Base.$
   case filtered_var of {
    Prelude.Just s ->
     let {ssinfo = Build_SSInfo sd __} in

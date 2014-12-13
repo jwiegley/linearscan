@@ -311,4 +311,4 @@ Extract Inlined Constant vmap     => "LinearScan.Utils.vmap".
 Extract Inlined Constant vnth     => "LinearScan.Utils.nth".
 
 Extract Inlined Constant vfoldl_with_index
-  => "(LinearScan.Utils.foldl'_with_index)".
+  => "(LinearScan.Utils.vfoldl'_with_index)".

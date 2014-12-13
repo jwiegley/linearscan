@@ -89,13 +89,12 @@ Definition intervals_for_reg {sd : ScanStateDesc}
            then xid :: acc
            else acc) nil xs.
 
-(** Given a vector of optional positions associated with register, return the
-    first register (counting downwards) which is either [None], or the highest
-    of [Some] value.
+(** Given a vector of optional positions associated with a register, return
+    the first register (counting upwards) which is either [None], or the
+    highest of [Some] value.
 
     The worst case scenario is that every register has [Some n] with the same
     n, in which case register 0 is selected. *)
-
 Definition registerWithHighestPos :
   Vec (option nat) maxReg -> 'I_maxReg * option nat :=
   vfoldl_with_index
