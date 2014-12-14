@@ -213,6 +213,9 @@ main = hspec $
         let c = IRVar { _ivVar = VirtualIV 2 Atom MaySpill
                       , _ivSrc = Nothing
                       }
+        let d = IRVar { _ivVar = VirtualIV 3 Atom MaySpill
+                      , _ivSrc = Nothing
+                      }
         let p body = Procedure
                 { procEntry = entry
                 , procCConv = InlineC
@@ -242,16 +245,9 @@ main = hspec $
         it "Works for a single instruction" $ do
             let body = blockCons (Node (Instr (Add a b c)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ OpData
-                      { baseOp  = error "baseOp#1"
-                      , opInfo  = oinfo
-                      , opId    = 1
-                      , opAlloc = [ (2, LS.Register 0)
-                                  , (1, LS.Register 1)
-                                  , (0, LS.Register 2)
-                                  ]
-                      }
-                ]
+                [ mkop oinfo 1 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ] ]
 
         it "Works for multiple instructions" $ do
             let body =
@@ -259,31 +255,36 @@ main = hspec $
                     blockCons (Node (Instr (Add a b c)) ()) $
                     blockCons (Node (Instr (Add a b c)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ OpData
-                      { baseOp  = error "baseOp#1"
-                      , opInfo  = oinfo
-                      , opId    = 1
-                      , opAlloc = [ (2, LS.Register 0)
-                                  , (1, LS.Register 1)
-                                  , (0, LS.Register 2)
-                                  ]
-                      }
-                , OpData
-                      { baseOp  = error "baseOp#3"
-                      , opInfo  = oinfo
-                      , opId    = 3
-                      , opAlloc = [ (2, LS.Register 0)
-                                  , (1, LS.Register 1)
-                                  , (0, LS.Register 2)
-                                  ]
-                      }
-                , OpData
-                      { baseOp  = error "baseOp#5"
-                      , opInfo  = oinfo
-                      , opId    = 5
-                      , opAlloc = [ (2, LS.Register 0)
-                                  , (1, LS.Register 1)
-                                  , (0, LS.Register 2)
-                                  ]
-                      }
-                ]
+                [ mkop oinfo 1 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 3 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 5 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ] ]
+
+        it "Another case with multiple instructions" $ do
+            let body =
+                    blockCons (Node (Instr (Add a b c)) ()) $
+                    blockCons (Node (Instr (Add a b d)) ()) $
+                    blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+            allocate (blocks body) oinfo binfo `shouldBe` Right
+                [ mkop oinfo 1 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 3 [ (3, LS.Register 3)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 5 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ] ]
+
+mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
+mkop oinfo i allocs = OpData
+    { baseOp  = error $ "baseOp#" ++ show i
+    , opInfo  = oinfo
+    , opId    = i
+    , opAlloc = allocs
+    }
