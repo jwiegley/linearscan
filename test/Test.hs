@@ -213,7 +213,7 @@ main = hspec $
         let c = IRVar { _ivVar = VirtualIV 2 Atom MaySpill
                       , _ivSrc = Nothing
                       }
-        let p = Procedure
+        let p body = Procedure
                 { procEntry = entry
                 , procCConv = InlineC
                 , procNamedLabels = singleton entry "entry"
@@ -221,10 +221,10 @@ main = hspec $
                     blockGraph
                       (blockJoin
                         (Node (Label entry) ())
-                        (blockCons (Node (Instr (Add a b c)) ()) emptyBlock)
+                        body
                         (Node (ReturnInstr [] Endt) ()))
                 }
-        let blocks = postorder_dfs_from (lblMapOfCC (procBody p)) entry
+        let blocks body = postorder_dfs_from (lblMapOfCC (procBody (p body))) entry
             oinfo = OpInfo
                 { isLoopBegin = const False
                 , isLoopEnd   = const False
@@ -238,12 +238,49 @@ main = hspec $
                    let (beg, m, end) = blockSplit block in
                    blockToList m
                 }
-        it "Passes a basic check" $
-            allocate blocks oinfo binfo `shouldBe` Right
+
+        it "Works for a single instruction" $ do
+            let body = blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+            allocate (blocks body) oinfo binfo `shouldBe` Right
                 [ OpData
                       { baseOp  = error "baseOp#1"
                       , opInfo  = oinfo
                       , opId    = 1
+                      , opAlloc = [ (2, LS.Register 0)
+                                  , (1, LS.Register 1)
+                                  , (0, LS.Register 2)
+                                  ]
+                      }
+                ]
+
+        it "Works for multiple instructions" $ do
+            let body =
+                    blockCons (Node (Instr (Add a b c)) ()) $
+                    blockCons (Node (Instr (Add a b c)) ()) $
+                    blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+            allocate (blocks body) oinfo binfo `shouldBe` Right
+                [ OpData
+                      { baseOp  = error "baseOp#1"
+                      , opInfo  = oinfo
+                      , opId    = 1
+                      , opAlloc = [ (2, LS.Register 0)
+                                  , (1, LS.Register 1)
+                                  , (0, LS.Register 2)
+                                  ]
+                      }
+                , OpData
+                      { baseOp  = error "baseOp#3"
+                      , opInfo  = oinfo
+                      , opId    = 3
+                      , opAlloc = [ (2, LS.Register 0)
+                                  , (1, LS.Register 1)
+                                  , (0, LS.Register 2)
+                                  ]
+                      }
+                , OpData
+                      { baseOp  = error "baseOp#5"
+                      , opInfo  = oinfo
+                      , opId    = 5
                       , opAlloc = [ (2, LS.Register 0)
                                   , (1, LS.Register 1)
                                   , (0, LS.Register 2)
