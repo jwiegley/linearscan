@@ -8,6 +8,8 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 import qualified LinearScan.Logic as Logic
+import qualified LinearScan.Specif as Specif
+import qualified LinearScan.Eqtype as Eqtype
 
 
 __ :: any
@@ -43,4 +45,29 @@ foldl_with_index f b v =
       [] -> z;
       (:) y ys -> go ((Prelude.succ) n) ys (f n z y)}}
   in go 0 v b
+
+dep_foldl_inv' :: (a1 -> Eqtype.Equality__Coq_type) -> a1 -> ([]
+                  Eqtype.Equality__Coq_sort) -> Prelude.Int -> (a1 -> []
+                  Eqtype.Equality__Coq_sort) -> (a1 -> a1 -> () ->
+                  Eqtype.Equality__Coq_sort -> Eqtype.Equality__Coq_sort) ->
+                  (a1 -> () -> Eqtype.Equality__Coq_sort -> ([]
+                  Eqtype.Equality__Coq_sort) -> () -> Specif.Coq_sig2 
+                  a1) -> a1
+dep_foldl_inv' e b v n q f f0 =
+  let {filtered_var = (,) (LinearScan.Utils.uncons v) n} in
+  case filtered_var of {
+   (,) s n0 ->
+    case s of {
+     Prelude.Just s0 ->
+      case s0 of {
+       (,) y s1 ->
+        (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+          (\_ ->
+          b)
+          (\n' ->
+          let {filtered_var0 = f0 b __ y s1 __} in
+          let {ys' = Prelude.map (f b filtered_var0 __) s1} in
+          dep_foldl_inv' e filtered_var0 ys' n' q f f0)
+          n0};
+     Prelude.Nothing -> b}}
 

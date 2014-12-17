@@ -117,39 +117,42 @@ End SortednessProof.
 
 Theorem allocated_regs_are_unique `(st : ScanState sd) :
   uniq ([ seq snd i | i <- active sd ]).
-Abort.
-(*
 Proof.
   ScanState_cases (induction st) Case.
-  - Case "ScanState_nil". constructor.
-  - Case "ScanState_newUnhandled".
-    by rewrite /widen_fst -!map_comp /funcomp //.
+  - Case "ScanState_nil". by [].
 
-  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_newUnhandled". by rewrite -map_comp.
+  - Case "ScanState_newInactive".  by rewrite -map_comp.
+
+  - Case "ScanState_setInterval".       exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
+
   - Case "ScanState_moveUnhandledToActive".
     move=> /= in IHst *; apply/andP; split=> //.
-
     (* jww (2014-10-31): Need the following evidence here:
          reg \notin [seq snd i | i <- act]
 
        This will need to come from the [ScanState_moveUnhandledToActive]
        constructor, but doing so will require obtaining it from the algorithm,
        which may be a substantial change. *)
+    admit.
 
-  - Case "ScanState_moveActiveToInactive".
-    move: IHst; set s2 := (X in uniq X) => IHst /=.
-
-  - Case "ScanState_moveActiveToHandled".
-    move: IHst; set s2 := (X in uniq X) => IHst /=.
+  - Case "ScanState_moveActiveToInactive". exact: proj_rem_uniq.
+  - Case "ScanState_moveActiveToHandled".  exact: proj_rem_uniq.
 
   - Case "ScanState_moveInactiveToActive".
-    rewrite /= -cons_uniq -map_cons.
+    rewrite /=.
+    apply/andP; split; last by [].
+    (* jww (2014-12-15): Here we need to know that:
+         snd x \notin [seq snd i | i <- active sd]
 
-  - Case "ScanState_moveInactiveToHandled".
-    by move: IHst; set s2 := (X in uniq X) => IHst.
+       I.e., that we are not adding a register to [active] which is already
+       present.  See the note above for [ScanState_moveUnhandledToActive],
+       since the requirements are the same. *)
+    admit.
+
+  - Case "ScanState_moveInactiveToHandled". by [].
 Qed.
-*)
 
 (** The number of active or inactive registers cannot exceed the number of
     registers available (or, if there are more register than intervals to be
@@ -210,20 +213,6 @@ Lemma move_inactive_to_handled : forall sd x,
 Proof.
   move=> sd x Huniq Hin.
   uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
-Qed.
-
-Lemma uniq_catA : forall (T : eqType) (s1 s2 s3 : seq T),
-  uniq ((s1 ++ s2) ++ s3) = uniq (s1 ++ s2 ++ s3).
-Proof.
-  move=> T.
-  elim=> //= [x xs IHxs] s2 s3.
-  rewrite IHxs.
-  congr (_ && _).
-  rewrite !mem_cat.
-  have ->: forall a b c, (a || b || c) = [|| a, b | c].
-    move=> a b c.
-    by rewrite Bool.orb_assoc.
-  by [].
 Qed.
 
 Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
@@ -290,12 +279,26 @@ Proof.
     exact: (@move_inactive_to_handled _ x IHst H).
 Qed.
 
+Theorem actives_are_unique `(st : ScanState sd) : uniq (active sd).
+Proof.
+  pose H1 := allocated_regs_are_unique st.
+  pose H2 := lists_are_unique st.
+  move: H2.
+  rewrite /all_state_lists cat_uniq.
+  move/and3P=> [_ _ H3].
+  move: H3.
+  rewrite cat_uniq.
+  rewrite /activeIds.
+  move/and3P=> [H3 _ _].
+  exact: uniq_proj.
+Qed.
+
 Theorem all_intervals_represented `(st : ScanState sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
   rewrite /all_state_lists
-          /unhandledIds /activeIds /inactiveIds /handledIds /=
-          !size_cat !size_map.
+          /unhandledIds /activeIds /inactiveIds /handledIds
+          /= !size_cat !size_map.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by [].
 

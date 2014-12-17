@@ -93,8 +93,7 @@ Arguments intervalCoversPos [d] i pos /.
 Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i.
 
 Definition Interval_is_singleton `(i : Interval d) :=
-  (NE_length (rds d) == 1)
-    && (NE_length (ups (NE_head (rds d)).1) == 1).
+  (NE_length (rds d) == 1) && (NE_length (ups (NE_head (rds d)).1) == 1).
 Arguments Interval_is_singleton [d] i /.
 
 (* This lemma proves that if an [Interval] is formed from the list of ranges,

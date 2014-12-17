@@ -204,18 +204,42 @@ main :: IO ()
 main = hspec $
     describe "first test" $ do
         let entry = runSimpleUniqueMonad freshLabel
-        let a = IRVar { _ivVar = VirtualIV 0 Atom MaySpill
-                      , _ivSrc = Nothing
-                      }
-        let b = IRVar { _ivVar = VirtualIV 1 Atom MaySpill
-                      , _ivSrc = Nothing
-                      }
-        let c = IRVar { _ivVar = VirtualIV 2 Atom MaySpill
-                      , _ivSrc = Nothing
-                      }
-        let d = IRVar { _ivVar = VirtualIV 3 Atom MaySpill
-                      , _ivSrc = Nothing
-                      }
+        let r0  = mkvar 0
+        let r1  = mkvar 1
+        let r2  = mkvar 2
+        let r3  = mkvar 3
+        let r4  = mkvar 4
+        let r5  = mkvar 5
+        let r6  = mkvar 6
+        let r7  = mkvar 7
+        let r8  = mkvar 8
+        let r9  = mkvar 9
+        let r10 = mkvar 10
+        let r11 = mkvar 11
+        let r12 = mkvar 12
+        let r13 = mkvar 13
+        let r14 = mkvar 14
+        let r15 = mkvar 15
+        let r16 = mkvar 16
+        let r17 = mkvar 17
+        let r18 = mkvar 18
+        let r19 = mkvar 19
+        let r20 = mkvar 20
+        let r21 = mkvar 21
+        let r22 = mkvar 22
+        let r23 = mkvar 23
+        let r24 = mkvar 24
+        let r25 = mkvar 25
+        let r26 = mkvar 26
+        let r27 = mkvar 27
+        let r28 = mkvar 28
+        let r29 = mkvar 29
+        let r30 = mkvar 30
+        let r31 = mkvar 31
+        let r32 = mkvar 32
+        let r33 = mkvar 33
+        let r34 = mkvar 34
+        let r35 = mkvar 35
         let p body = Procedure
                 { procEntry = entry
                 , procCConv = InlineC
@@ -243,7 +267,7 @@ main = hspec $
                 }
 
         it "Works for a single instruction" $ do
-            let body = blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+            let body = blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
                 [ mkop oinfo 1 [ (2, LS.Register 0)
                                , (1, LS.Register 1)
@@ -251,9 +275,9 @@ main = hspec $
 
         it "Works for multiple instructions" $ do
             let body =
-                    blockCons (Node (Instr (Add a b c)) ()) $
-                    blockCons (Node (Instr (Add a b c)) ()) $
-                    blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
                 [ mkop oinfo 1 [ (2, LS.Register 0)
                                , (1, LS.Register 1)
@@ -267,9 +291,9 @@ main = hspec $
 
         it "Another case with multiple instructions" $ do
             let body =
-                    blockCons (Node (Instr (Add a b c)) ()) $
-                    blockCons (Node (Instr (Add a b d)) ()) $
-                    blockCons (Node (Instr (Add a b c)) ()) emptyBlock
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
+                    blockCons (Node (Instr (Add r0 r1 r3)) ()) $
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
                 [ mkop oinfo 1 [ (2, LS.Register 0)
                                , (1, LS.Register 1)
@@ -280,6 +304,36 @@ main = hspec $
                 , mkop oinfo 5 [ (2, LS.Register 0)
                                , (1, LS.Register 1)
                                , (0, LS.Register 2) ] ]
+
+        it "Trivial case using too many variables" $ do
+            let body =
+                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
+                    blockCons (Node (Instr (Add r3 r4 r5)) ()) $
+                    blockCons (Node (Instr (Add r6 r7 r8)) ()) $
+                    blockCons (Node (Instr (Add r9 r10 r11)) ()) $
+                    blockCons (Node (Instr (Add r12 r13 r14)) ()) $
+                    blockCons (Node (Instr (Add r15 r16 r17)) ()) $
+                    blockCons (Node (Instr (Add r18 r19 r20)) ()) $
+                    blockCons (Node (Instr (Add r21 r22 r23)) ()) $
+                    blockCons (Node (Instr (Add r24 r25 r26)) ()) $
+                    blockCons (Node (Instr (Add r27 r28 r29)) ()) $
+                    blockCons (Node (Instr (Add r30 r31 r32)) ()) $
+                    blockCons (Node (Instr (Add r33 r34 r35)) ()) emptyBlock
+            allocate (blocks body) oinfo binfo `shouldBe` Right
+                [ mkop oinfo 1 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 3 [ (3, LS.Register 3)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ]
+                , mkop oinfo 5 [ (2, LS.Register 0)
+                               , (1, LS.Register 1)
+                               , (0, LS.Register 2) ] ]
+
+mkvar :: Int -> IRVar
+mkvar i = IRVar { _ivVar = VirtualIV i Atom MaySpill
+                , _ivSrc = Nothing
+                }
 
 mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
 mkop oinfo i allocs = OpData

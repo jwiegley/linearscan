@@ -300,7 +300,7 @@ Defined.
 Definition moveActiveToHandled `(st : ScanState sd) `(H: x \in active sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveActiveToInactive st H).
+  pose (ScanState_moveActiveToHandled st H).
   eexists. apply s.
   apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.

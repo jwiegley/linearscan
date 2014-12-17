@@ -355,7 +355,7 @@ handleOp op rest =
   in
   let {
    rest2 = let {
-            k = \acc v ->
+            k0 = \acc v ->
              let {
               x = consr
                     (Seq.nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
@@ -367,12 +367,12 @@ handleOp op rest =
                Prelude.Nothing) (vars pos acc)
                (varId v) x) (regs pos acc)}
            in
-           Data.List.foldl' k unchanged
+           Data.List.foldl' k0 unchanged
              (varRefs (opInfo op)
                (baseOp op))}
   in
   let {
-   k = \acc r ->
+   k0 = \acc r ->
     let {
      x = consr (LinearScan.Utils.nth _MyMachine__maxReg restRegs' r)
            Prelude.False}
@@ -381,7 +381,7 @@ handleOp op rest =
     (LinearScan.Utils.set_nth _MyMachine__maxReg (regs pos acc) r
       x)}
   in
-  Data.List.foldl' k rest2
+  Data.List.foldl' k0 rest2
     (regRefs (opInfo op) (baseOp op))
 
 extractRange :: Prelude.Int -> Coq_boundedTriple ->
@@ -737,12 +737,12 @@ wrap_block :: (OpInfo a1) -> (BlockInfo
                          ([] (BlockData a1 a2))) -> a2 -> (,)
                          Prelude.Int ([] (BlockData a1 a2))
 wrap_block oinfo binfo x block =
-  let {k = \h op -> Build_OpData op oinfo ( h) []} in
+  let {k0 = \h op -> Build_OpData op oinfo ( h) []} in
   let {
    f = \x0 op ->
     case x0 of {
      (,) h ops ->
-      let {nop = k h op} in
+      let {nop = k0 h op} in
       (,) ((Prelude.succ) ((Prelude.succ) ( h))) ((:) nop ops)}}
   in
   case x of {
@@ -866,7 +866,7 @@ assignRegNum ops sd =
     let {o = baseOp op} in
     let {vars0 = varRefs (opInfo op) o} in
     let {
-     k = \op' v ->
+     k0 = \op' v ->
       let {vid = varId v} in
       let {
        h = \acc x ->
@@ -901,7 +901,7 @@ assignRegNum ops sd =
       Build_OpData o (opInfo op') (opId op')
       ((Prelude.++) (Data.List.foldl' h [] ints) (opAlloc op'))}
     in
-    Data.List.foldl' k op vars0}
+    Data.List.foldl' k0 op vars0}
   in
   (Prelude.$) return_ (Prelude.map f ops)
 
@@ -1154,8 +1154,8 @@ moveActiveToHandled sd x =
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (nextInterval sd))
           (Fintype.ordinal_eqType maxReg)) x
-        (unsafeCoerce (active sd)))) ((:) (unsafeCoerce x)
-    (inactive sd)) (handled sd)
+        (unsafeCoerce (active sd)))) (inactive sd) ((:)
+    (unsafeCoerce x) (handled sd))
 
 moveActiveToInactive :: ScanStateDesc ->
                                    Eqtype.Equality__Coq_sort ->
@@ -1518,92 +1518,95 @@ allocateBlockedReg pre =
             (splitAnyInactiveIntervalForReg pre reg))
           (splitActiveIntervalForReg pre reg pos)}})
 
+morphlen_transport :: ScanStateDesc ->
+                                 ScanStateDesc ->
+                                 IntervalId -> IntervalId
+morphlen_transport b b' = GHC.Base.id
+  
+
+k :: ScanStateDesc -> ScanStateDesc -> ((,)
+                IntervalId PhysReg) -> (,)
+                IntervalId PhysReg
+k b b' x =
+  case x of {
+   (,) xid reg -> (,) (morphlen_transport b b' xid) reg}
+
+goActive :: Prelude.Int -> ScanStateDesc ->
+                       ScanStateDesc -> ((,) IntervalId
+                       PhysReg) -> ([]
+                       ((,) IntervalId PhysReg)) ->
+                       Specif.Coq_sig2 ScanStateDesc
+goActive pos sd z x xs =
+  case (Prelude.<=) ((Prelude.succ)
+         (Interval.intervalEnd
+           (
+             (LinearScan.Utils.nth (nextInterval z)
+               (intervals z) (Prelude.fst x))))) pos of {
+   Prelude.True -> moveActiveToHandled z (unsafeCoerce x);
+   Prelude.False ->
+    case Prelude.not
+           (Interval.intervalCoversPos
+             (
+               (LinearScan.Utils.nth (nextInterval z)
+                 (intervals z) (Prelude.fst x))) pos) of {
+     Prelude.True -> moveActiveToInactive z (unsafeCoerce x);
+     Prelude.False -> z}}
+
 checkActiveIntervals :: ScanStateDesc -> Prelude.Int ->
                                    SState () () ()
 checkActiveIntervals pre pos =
-  let {
-   go = let {
-         go sd ss ints =
-           case ints of {
-            [] -> ss;
-            (:) x xs ->
-             let {
-              st1 = case (Prelude.<=) ((Prelude.succ)
-                           (Interval.intervalEnd
-                             (
-                               (LinearScan.Utils.nth
-                                 (nextInterval sd)
-                                 (intervals sd)
-                                 (Prelude.fst ( x)))))) pos of {
-                     Prelude.True ->
-                      moveActiveToHandled sd ( (unsafeCoerce x));
-                     Prelude.False ->
-                      case Prelude.not
-                             (Interval.intervalCoversPos
-                               (
-                                 (LinearScan.Utils.nth
-                                   (nextInterval sd)
-                                   (intervals sd)
-                                   (Prelude.fst ( x)))) pos) of {
-                       Prelude.True ->
-                        moveActiveToInactive sd
-                          ( (unsafeCoerce x));
-                       Prelude.False -> ss}}}
-             in
-             go sd st1 xs}}
-        in go}
-  in
   (Prelude.$) (withScanStatePO pre) (\sd _ ->
-    IState.iput (Build_SSInfo
-      (unsafeCoerce go sd sd
-        (Prelude.const
-          (Eqtype.prod_eqType
-            (Fintype.ordinal_eqType (nextInterval sd))
-            (Fintype.ordinal_eqType maxReg))
-          (unsafeCoerce (active sd)))) __))
+    let {
+     res = Lib.dep_foldl_inv' (\s ->
+             Eqtype.prod_eqType
+               (Fintype.ordinal_eqType (nextInterval s))
+               (Fintype.ordinal_eqType maxReg)) sd
+             (unsafeCoerce (active sd))
+             (Data.List.length (active sd))
+             (unsafeCoerce active)
+             (unsafeCoerce (\x x0 _ -> k x x0))
+             (unsafeCoerce (\x _ x0 x1 _ ->
+               goActive pos sd x x0 x1))}
+    in
+    IState.iput (Build_SSInfo res __))
+
+goInactive :: Prelude.Int -> ScanStateDesc ->
+                         ScanStateDesc -> ((,) IntervalId
+                         PhysReg) -> ([]
+                         ((,) IntervalId PhysReg)) ->
+                         Specif.Coq_sig2 ScanStateDesc
+goInactive pos sd z x xs =
+  case (Prelude.<=) ((Prelude.succ)
+         (Interval.intervalEnd
+           (
+             (LinearScan.Utils.nth (nextInterval z)
+               (intervals z) (Prelude.fst x))))) pos of {
+   Prelude.True -> moveInactiveToHandled z (unsafeCoerce x);
+   Prelude.False ->
+    case Interval.intervalCoversPos
+           (
+             (LinearScan.Utils.nth (nextInterval z)
+               (intervals z) (Prelude.fst x))) pos of {
+     Prelude.True -> moveInactiveToActive z (unsafeCoerce x);
+     Prelude.False -> z}}
 
 checkInactiveIntervals :: ScanStateDesc -> Prelude.Int
                                      -> SState () () ()
 checkInactiveIntervals pre pos =
-  let {
-   go = let {
-         go sd ss ints =
-           case ints of {
-            [] -> ss;
-            (:) x xs ->
-             let {
-              st1 = case (Prelude.<=) ((Prelude.succ)
-                           (Interval.intervalEnd
-                             (
-                               (LinearScan.Utils.nth
-                                 (nextInterval sd)
-                                 (intervals sd)
-                                 (Prelude.fst ( x)))))) pos of {
-                     Prelude.True ->
-                      moveInactiveToHandled sd ( (unsafeCoerce x));
-                     Prelude.False ->
-                      case Interval.intervalCoversPos
-                             (
-                               (LinearScan.Utils.nth
-                                 (nextInterval sd)
-                                 (intervals sd)
-                                 (Prelude.fst ( x)))) pos of {
-                       Prelude.True ->
-                        moveInactiveToActive sd
-                          ( (unsafeCoerce x));
-                       Prelude.False -> ss}}}
-             in
-             go sd st1 xs}}
-        in go}
-  in
   (Prelude.$) (withScanStatePO pre) (\sd _ ->
-    IState.iput (Build_SSInfo
-      (unsafeCoerce go sd sd
-        (Prelude.const
-          (Eqtype.prod_eqType
-            (Fintype.ordinal_eqType (nextInterval sd))
-            (Fintype.ordinal_eqType maxReg))
-          (unsafeCoerce (inactive sd)))) __))
+    let {
+     res = Lib.dep_foldl_inv' (\s ->
+             Eqtype.prod_eqType
+               (Fintype.ordinal_eqType (nextInterval s))
+               (Fintype.ordinal_eqType maxReg)) sd
+             (unsafeCoerce (inactive sd))
+             (Data.List.length (inactive sd))
+             (unsafeCoerce inactive)
+             (unsafeCoerce (\x x0 _ -> k x x0))
+             (unsafeCoerce (\x _ x0 x1 _ ->
+               goInactive pos sd x x0 x1))}
+    in
+    IState.iput (Build_SSInfo res __))
 
 handleInterval :: ScanStateDesc -> SState 
                              () () (Prelude.Maybe PhysReg)

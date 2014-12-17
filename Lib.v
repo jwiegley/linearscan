@@ -100,6 +100,9 @@ Proof.
   by apply/orP; right.
 Defined.
 
+Definition all_in_list {a : eqType} (l : list a) : all (fun x => x \in l) l.
+Proof. apply/allP; elim: l => //=. Qed.
+
 Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } :=
   let fix go l :=
       match l with
@@ -457,4 +460,237 @@ Proof.
     exact: leq0n.
   move/(_ x H) => IHys {H}.
   exact: subn_leq.
+Qed.
+
+Lemma uniq_catA : forall (T : eqType) (s1 s2 s3 : seq T),
+  uniq ((s1 ++ s2) ++ s3) = uniq (s1 ++ s2 ++ s3).
+Proof.
+  move=> T.
+  elim=> //= [x xs IHxs] s2 s3.
+  rewrite IHxs.
+  congr (_ && _).
+  rewrite !mem_cat.
+  have ->: forall a b c, (a || b || c) = [|| a, b | c].
+    move=> a b c.
+    by rewrite Bool.orb_assoc.
+  by [].
+Qed.
+
+Lemma proj_rem_uniq (a b : eqType) (f : a -> b) : forall x xs,
+  uniq [seq f i | i <- xs] -> uniq [seq f i | i <- rem x xs].
+Proof. by move=> x xs; apply/subseq_uniq/map_subseq/rem_subseq. Qed.
+
+Lemma not_in_app : forall (a : eqType) x (l l' : list a),
+  x \notin (l ++ l') -> x \notin l.
+Proof.
+  move=> a x l l'.
+  rewrite mem_cat.
+  move/norP.
+  move=> H. inv H.
+Qed.
+
+Lemma map_f_notin :
+  forall (T1 T2 : eqType) (f : T1 -> T2) (s : seq T1) (x : T1),
+  injective f -> x \notin s -> f x \notin [seq f i | i <- s].
+Proof.
+  move=> T1 T2 f.
+  elim=> // x xs IHxs x0 Hinj.
+  rewrite in_cons.
+  move/norP => [H1 H2].
+  rewrite map_cons in_cons.
+  apply/norP; split.
+    by rewrite inj_eq.
+  exact: IHxs.
+Qed.
+
+Lemma in_proj : forall (a b : eqType) (x : a) (y : b) (xs : seq (a * b)),
+  x \notin [seq fst i | i <- xs] ->
+  y \notin [seq snd i | i <- xs] -> (x, y) \notin xs.
+Proof.
+  move=> a b x y.
+  elim=> //= [z zs IHzs] H1 H2.
+  rewrite in_cons.
+  rewrite in_cons in H1.
+  rewrite in_cons in H2.
+  apply/norP.
+  move/norP: H1 => [H3 H4].
+  move/norP: H2 => [H5 H6].
+  split.
+    case: z => /= [j k] in H3 H5 *.
+    move/eqP in H3.
+    move/eqP in H5.
+    apply/eqP.
+    move=> Hneg.
+    inversion Hneg.
+    contradiction.
+  apply: IHzs; by [].
+Qed.
+
+Lemma uniq_proj : forall (a b : eqType) (xs : seq (a * b)),
+  uniq [seq fst i | i <- xs] ->
+  uniq [seq snd i | i <- xs] -> uniq xs.
+Proof.
+  move=> a b.
+  elim=> //= [x xs IHxs] /andP [H1 H2] /andP [H3 H4].
+  case: x => /= [j k] in H1 H3 *.
+  apply/andP; split; last exact: IHxs.
+  exact: in_proj.
+Qed.
+
+Require Coq.Program.Wf.
+
+(*
+Program Fixpoint dep_foldl {A : Type} {B : A -> Type}
+  (f : forall b' : A, B b' -> A) (b : A) (v : seq (B b))
+  (P : forall b x, B b -> B (f b x)) {measure (size v)} : A :=
+  match v with
+  | nil => b
+  | y :: ys => @dep_foldl A B f (f b y) (map (P b y) ys) _ _
+  end.
+Obligation 2. by rewrite size_map. Qed.
+*)
+
+Lemma cat2s : forall a (x y : a) s, [:: x; y] ++ s = (x :: y :: s).
+Proof. by move=> a x y; elim=> //. Qed.
+
+Lemma subseq_in_cons : forall (a : eqType) x y (xs ys : seq a),
+  subseq (x :: xs) (y :: ys) -> x != y -> subseq (x :: xs) ys.
+Proof.
+  move=> a x y xs ys Hsub Hneq.
+  elim: ys => /= [|z zs IHzs] in Hsub *.
+    case E: (x == y).
+      move/negP: Hneq.
+      by rewrite E.
+    rewrite E in Hsub.
+    inversion Hsub.
+  case E: (x == y).
+    move/negP: Hneq.
+    by rewrite E.
+  rewrite E in Hsub.
+  assumption.
+Qed.
+
+Lemma subseq_sing : forall (a : eqType) (x : a) xs s,
+  subseq (x :: xs) s -> subseq [:: x] s.
+Proof.
+  move=> a x xs s Hsub.
+  elim: s => // [y ys IHys] in Hsub *.
+  rewrite sub1seq.
+  rewrite sub1seq in IHys.
+  rewrite in_cons.
+  apply/orP.
+  case E: (x == y).
+    by left.
+  right.
+  move/negP in E.
+  move/negP in E.
+  apply: IHys.
+  exact: subseq_in_cons.
+Qed.
+
+Lemma in_subseq_sing : forall {E : eqType} (s : seq E) v (y : E) ys,
+  v = y :: ys -> subseq v s -> y \in s.
+Proof.
+  move=> E s v y ys ->.
+  rewrite -sub1seq.
+  exact: subseq_sing.
+Qed.
+
+Lemma subseq_impl_cons : forall (a : eqType) (x : a) xs s,
+  subseq (x :: xs) s -> subseq xs s.
+Proof.
+  move=> a x xs s Hsub.
+  elim: s => // [y ys IHys] in Hsub *.
+Admitted.
+
+Lemma subseq_cons_add : forall (a : eqType) (x : a) xs s,
+  subseq xs s -> subseq xs (x :: s).
+Proof.
+  move=> a x.
+  elim=> // [y ys IHys] s Hsub.
+  rewrite /=.
+  case: (y == x).
+    exact: subseq_impl_cons.
+  exact.
+Qed.
+
+Lemma subseq_cons_rem : forall (a : eqType) (x : a) xs s,
+  subseq (x :: xs) s -> subseq xs (rem x s).
+Proof.
+  move=> a x xs.
+  elim=> //= [y ys IHys].
+  rewrite eq_sym.
+  case E: (y == x); first exact.
+  move/IHys => Hsub {IHys}.
+  exact: subseq_cons_add.
+Qed.
+
+Lemma widen_ord_refl : forall n (H : n <= n) x, widen_ord (m := n) H x = x.
+Proof.
+  move=> n H.
+  case=> m Hm.
+  rewrite /widen_ord /=.
+  congr (Ordinal _).
+  exact: eq_irrelevance.
+Qed.
+
+Lemma map_widen_ord_refl : forall b n (H : n <= n) (xs : seq ('I_n * b)),
+  [seq (let: (xid, reg) := i in (widen_ord (m:=n) H xid, reg)) | i <- xs] = xs.
+Proof.
+  move=> b n H.
+  elim=> //= [x xs IHxs].
+  rewrite IHxs.
+  case: x => [xid reg].
+  congr ((_, reg) :: xs).
+  exact: widen_ord_refl.
+Qed.
+
+Program Fixpoint dep_foldl_inv
+  {A : Type} {P : A -> Prop} {E : A -> eqType}
+  (b : A) (Pb : P b) (v : seq (E b)) (n : nat) (Hn : n == size v)
+  (Q : forall x : A, seq (E x)) (Hsub : subseq v (Q b))
+  (F : forall b b', E b -> E b')
+  (f : forall (z : A) (Pz : P z) (x : E z) (xs : seq (E z)), x \in Q z
+         -> { z' : A | P z' & subseq (map (F z z') xs) (Q z') })
+  {struct n} : { b' : A | P b' } :=
+  match (List.destruct_list v, n) with
+  | (inleft (existT y (exist ys H)), S n') =>
+      match f b Pb y ys (in_subseq_sing H Hsub) with
+      | exist2 b' Pb' Hsub' =>
+          let ys' := map (F b b') ys in
+          @dep_foldl_inv A P E b' Pb' ys' n' _ Q Hsub' F f
+      end
+  | _ => exist P b Pb
+  end.
+Obligation 1.
+  move: eqSS Hn => /= -> /eqP ->.
+  by rewrite size_map.
+Qed.
+
+Program Fixpoint dep_foldl_inv'
+  {A : Type} {P : A -> Prop} {R : A -> A -> Prop} {E : A -> eqType}
+  (b : A) (Pb : P b) (v : seq (E b)) (n : nat) (Hn : n == size v)
+  (Q : forall x : A, seq (E x)) (Hsub : subseq v (Q b))
+  (F : forall (b b' : A) (Rbb' : R b b'), E b -> E b')
+  (f : forall (z : A) (Pz : P z) (x : E z) (xs : seq (E z)),
+         subseq (x :: xs) (Q z)
+           -> { res : { z' : A | R z z' }
+              | P res.1 & subseq (map (F z res.1 res.2) xs) (Q res.1) })
+  {struct n} : { b' : A | P b' } :=
+  match (List.destruct_list v, n) with
+  | (inleft (existT y (exist ys H)), S n') =>
+      match f b Pb y ys Hsub with
+      | exist2 (exist b' Rbb') Pb' Hsub' =>
+          let ys' := map (F b b' Rbb') ys in
+          @dep_foldl_inv' A P R E b' Pb' ys' n' _ Q Hsub' F f
+      end
+  | _ => exist P b Pb
+  end.
+Obligation 2.
+  inversion Heq_anonymous.
+  clear Heq_anonymous0.
+  rewrite -H1 in Hn.
+  simpl in Hn.
+  move: eqSS Hn => /= -> /eqP ->.
+  by rewrite size_map.
 Qed.

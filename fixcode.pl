@@ -30,5 +30,7 @@ import qualified LinearScan.Utils
 
     s/\| Spill/| Spill deriving (Prelude.Show, Prelude.Eq)/;
 
+    s/morphlen_transport b b' =/morphlen_transport b b' = GHC.Base.id/;
+
     print;
 }
