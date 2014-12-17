@@ -355,7 +355,7 @@ handleOp op rest =
   in
   let {
    rest2 = let {
-            k0 = \acc v ->
+            k = \acc v ->
              let {
               x = consr
                     (Seq.nth ((,) ((,) Prelude.Nothing Prelude.Nothing)
@@ -367,12 +367,12 @@ handleOp op rest =
                Prelude.Nothing) (vars pos acc)
                (varId v) x) (regs pos acc)}
            in
-           Data.List.foldl' k0 unchanged
+           Data.List.foldl' k unchanged
              (varRefs (opInfo op)
                (baseOp op))}
   in
   let {
-   k0 = \acc r ->
+   k = \acc r ->
     let {
      x = consr (LinearScan.Utils.nth _MyMachine__maxReg restRegs' r)
            Prelude.False}
@@ -381,7 +381,7 @@ handleOp op rest =
     (LinearScan.Utils.set_nth _MyMachine__maxReg (regs pos acc) r
       x)}
   in
-  Data.List.foldl' k0 rest2
+  Data.List.foldl' k rest2
     (regRefs (opInfo op) (baseOp op))
 
 extractRange :: Prelude.Int -> Coq_boundedTriple ->
@@ -737,12 +737,12 @@ wrap_block :: (OpInfo a1) -> (BlockInfo
                          ([] (BlockData a1 a2))) -> a2 -> (,)
                          Prelude.Int ([] (BlockData a1 a2))
 wrap_block oinfo binfo x block =
-  let {k0 = \h op -> Build_OpData op oinfo ( h) []} in
+  let {k = \h op -> Build_OpData op oinfo ( h) []} in
   let {
    f = \x0 op ->
     case x0 of {
      (,) h ops ->
-      let {nop = k0 h op} in
+      let {nop = k h op} in
       (,) ((Prelude.succ) ((Prelude.succ) ( h))) ((:) nop ops)}}
   in
   case x of {
@@ -866,7 +866,7 @@ assignRegNum ops sd =
     let {o = baseOp op} in
     let {vars0 = varRefs (opInfo op) o} in
     let {
-     k0 = \op' v ->
+     k = \op' v ->
       let {vid = varId v} in
       let {
        h = \acc x ->
@@ -901,7 +901,7 @@ assignRegNum ops sd =
       Build_OpData o (opInfo op') (opId op')
       ((Prelude.++) (Data.List.foldl' h [] ints) (opAlloc op'))}
     in
-    Data.List.foldl' k0 op vars0}
+    Data.List.foldl' k op vars0}
   in
   (Prelude.$) return_ (Prelude.map f ops)
 
@@ -1524,10 +1524,10 @@ morphlen_transport :: ScanStateDesc ->
 morphlen_transport b b' = GHC.Base.id
   
 
-k :: ScanStateDesc -> ScanStateDesc -> ((,)
-                IntervalId PhysReg) -> (,)
-                IntervalId PhysReg
-k b b' x =
+mt_fst :: ScanStateDesc -> ScanStateDesc ->
+                     ((,) IntervalId PhysReg) -> (,)
+                     IntervalId PhysReg
+mt_fst b b' x =
   case x of {
    (,) xid reg -> (,) (morphlen_transport b b' xid) reg}
 
@@ -1557,14 +1557,14 @@ checkActiveIntervals :: ScanStateDesc -> Prelude.Int ->
 checkActiveIntervals pre pos =
   (Prelude.$) (withScanStatePO pre) (\sd _ ->
     let {
-     res = Lib.dep_foldl_inv' (\s ->
+     res = Lib.dep_foldl_inv (\s ->
              Eqtype.prod_eqType
                (Fintype.ordinal_eqType (nextInterval s))
                (Fintype.ordinal_eqType maxReg)) sd
              (unsafeCoerce (active sd))
              (Data.List.length (active sd))
              (unsafeCoerce active)
-             (unsafeCoerce (\x x0 _ -> k x x0))
+             (unsafeCoerce (\x x0 _ -> mt_fst x x0))
              (unsafeCoerce (\x _ x0 x1 _ ->
                goActive pos sd x x0 x1))}
     in
@@ -1595,14 +1595,14 @@ checkInactiveIntervals :: ScanStateDesc -> Prelude.Int
 checkInactiveIntervals pre pos =
   (Prelude.$) (withScanStatePO pre) (\sd _ ->
     let {
-     res = Lib.dep_foldl_inv' (\s ->
+     res = Lib.dep_foldl_inv (\s ->
              Eqtype.prod_eqType
                (Fintype.ordinal_eqType (nextInterval s))
                (Fintype.ordinal_eqType maxReg)) sd
              (unsafeCoerce (inactive sd))
              (Data.List.length (inactive sd))
              (unsafeCoerce inactive)
-             (unsafeCoerce (\x x0 _ -> k x x0))
+             (unsafeCoerce (\x x0 _ -> mt_fst x x0))
              (unsafeCoerce (\x _ x0 x1 _ ->
                goInactive pos sd x x0 x1))}
     in

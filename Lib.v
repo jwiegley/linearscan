@@ -596,12 +596,21 @@ Proof.
   exact: subseq_sing.
 Qed.
 
-Lemma subseq_impl_cons : forall (a : eqType) (x : a) xs s,
+Fixpoint subseq_impl_cons (a : eqType) (x : a) xs s :
   subseq (x :: xs) s -> subseq xs s.
 Proof.
-  move=> a x xs s Hsub.
-  elim: s => // [y ys IHys] in Hsub *.
-Admitted.
+  elim: s => //= [z zs IHzs].
+  case: xs => // [y ys] in IHzs *.
+  case: (x == z).
+    case: (y == z).
+      exact: subseq_impl_cons.
+    exact.
+  case: (y == z).
+    move=> Hsub.
+    specialize (IHzs Hsub).
+    exact: subseq_impl_cons.
+  exact.
+Qed.
 
 Lemma subseq_cons_add : forall (a : eqType) (x : a) xs s,
   subseq xs s -> subseq xs (x :: s).
@@ -646,28 +655,6 @@ Proof.
 Qed.
 
 Program Fixpoint dep_foldl_inv
-  {A : Type} {P : A -> Prop} {E : A -> eqType}
-  (b : A) (Pb : P b) (v : seq (E b)) (n : nat) (Hn : n == size v)
-  (Q : forall x : A, seq (E x)) (Hsub : subseq v (Q b))
-  (F : forall b b', E b -> E b')
-  (f : forall (z : A) (Pz : P z) (x : E z) (xs : seq (E z)), x \in Q z
-         -> { z' : A | P z' & subseq (map (F z z') xs) (Q z') })
-  {struct n} : { b' : A | P b' } :=
-  match (List.destruct_list v, n) with
-  | (inleft (existT y (exist ys H)), S n') =>
-      match f b Pb y ys (in_subseq_sing H Hsub) with
-      | exist2 b' Pb' Hsub' =>
-          let ys' := map (F b b') ys in
-          @dep_foldl_inv A P E b' Pb' ys' n' _ Q Hsub' F f
-      end
-  | _ => exist P b Pb
-  end.
-Obligation 1.
-  move: eqSS Hn => /= -> /eqP ->.
-  by rewrite size_map.
-Qed.
-
-Program Fixpoint dep_foldl_inv'
   {A : Type} {P : A -> Prop} {R : A -> A -> Prop} {E : A -> eqType}
   (b : A) (Pb : P b) (v : seq (E b)) (n : nat) (Hn : n == size v)
   (Q : forall x : A, seq (E x)) (Hsub : subseq v (Q b))
@@ -677,12 +664,12 @@ Program Fixpoint dep_foldl_inv'
            -> { res : { z' : A | R z z' }
               | P res.1 & subseq (map (F z res.1 res.2) xs) (Q res.1) })
   {struct n} : { b' : A | P b' } :=
-  match (List.destruct_list v, n) with
-  | (inleft (existT y (exist ys H)), S n') =>
+  match (v, n) with
+  | (y :: ys, S n') =>
       match f b Pb y ys Hsub with
       | exist2 (exist b' Rbb') Pb' Hsub' =>
           let ys' := map (F b b' Rbb') ys in
-          @dep_foldl_inv' A P R E b' Pb' ys' n' _ Q Hsub' F f
+          @dep_foldl_inv A P R E b' Pb' ys' n' _ Q Hsub' F f
       end
   | _ => exist P b Pb
   end.
@@ -690,6 +677,7 @@ Obligation 2.
   inversion Heq_anonymous.
   clear Heq_anonymous0.
   rewrite -H1 in Hn.
+  rewrite -H0 in Hn.
   simpl in Hn.
   move: eqSS Hn => /= -> /eqP ->.
   by rewrite size_map.

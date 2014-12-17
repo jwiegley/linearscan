@@ -162,7 +162,8 @@ Proof.
   exact: (widen_ord _).
 Defined.
 
-Definition k b b' (sslen : SSMorphLen b b') (x : IntervalId b * PhysReg) :=
+Definition mt_fst b b' (sslen : SSMorphLen b b')
+  (x : IntervalId b * PhysReg) :=
   match x with
   | (xid, reg) => (morphlen_transport b b' sslen xid, reg)
   end.
@@ -173,7 +174,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
   (Hsub : subseq (x :: xs) (active z)) :
   { res : {z' : ScanStateDesc | SSMorphLen z z'}
   | (ScanState res.1 /\ SSMorphLen sd res.1)
-  & subseq [seq k z res.1 res.2 i | i <- xs] (active res.1) } :=
+  & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (active res.1) } :=
   (* for each interval it in active do
        if it ends before position then
          move it from active to handled
@@ -197,7 +198,7 @@ Obligation 2.
   case: (iend (vnth (intervals z) o).1 < pos).
     rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
-    rewrite /k /morphlen_transport /=.
+    rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
     case=> [Hinc _ _ _ _].
     rewrite map_widen_ord_refl.
@@ -206,13 +207,13 @@ Obligation 2.
              pos < iend (vnth (intervals z) o).1)).
     rewrite /moveActiveToInactive /=.
     invert as [H1]; subst; simpl.
-    rewrite /k /morphlen_transport /=.
+    rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
     case=> [Hinc _ _ _ _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   invert as [H1]; subst; simpl.
-  rewrite /k /morphlen_transport /=.
+  rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
   case=> [Hinc _ _ _ _].
   rewrite map_widen_ord_refl.
@@ -224,11 +225,11 @@ Definition checkActiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let res : {sd' : ScanStateDesc | ScanState sd' /\ SSMorphLen sd sd'} :=
-        @dep_foldl_inv'
+        @dep_foldl_inv
           ScanStateDesc (fun sd' => ScanState sd' /\ SSMorphLen sd sd')
           SSMorphLen _ sd (conj st (newSSMorphLen sd))
           (active sd) (size (active sd)) (eq_refl _)
-          active (subseq_refl _) k (goActive pos sd) in
+          active (subseq_refl _) mt_fst (goActive pos sd) in
     let: exist sd' (conj st' H) := res in
     IState.iput SSError {| thisDesc  := sd'
                          ; thisHolds := H
@@ -275,7 +276,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
   (Hsub : subseq (x :: xs) (inactive z)) :
   { res : {z' : ScanStateDesc | SSMorphLen z z'}
   | (ScanState res.1 /\ SSMorphLen sd res.1)
-  & subseq [seq k z res.1 res.2 i | i <- xs] (inactive res.1) } :=
+  & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (inactive res.1) } :=
   (* for each interval it in inactive do
        if it ends before position then
          move it from inactive to handled
@@ -299,7 +300,7 @@ Obligation 2.
   case: (iend (vnth (intervals z) o).1 < pos).
     rewrite /moveInactiveToHandled /=.
     invert as [H1]; subst; simpl.
-    rewrite /k /morphlen_transport /=.
+    rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
     case=> [Hinc _ _ _ _].
     rewrite map_widen_ord_refl.
@@ -308,13 +309,13 @@ Obligation 2.
          pos < iend (vnth (intervals z) o).1).
     rewrite /moveInactiveToActive /=.
     invert as [H1]; subst; simpl.
-    rewrite /k /morphlen_transport /=.
+    rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
     case=> [Hinc _ _ _ _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   invert as [H1]; subst; simpl.
-  rewrite /k /morphlen_transport /=.
+  rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
   case=> [Hinc _ _ _ _].
   rewrite map_widen_ord_refl.
@@ -326,11 +327,11 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
   withScanStatePO $ fun sd (st : ScanState sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
     let res : {sd' : ScanStateDesc | ScanState sd' /\ SSMorphLen sd sd'} :=
-        @dep_foldl_inv'
+        @dep_foldl_inv
           ScanStateDesc (fun sd' => ScanState sd' /\ SSMorphLen sd sd')
           SSMorphLen _ sd (conj st (newSSMorphLen sd))
           (inactive sd) (size (inactive sd)) (eq_refl _)
-          inactive (subseq_refl _) k (goInactive pos sd) in
+          inactive (subseq_refl _) mt_fst (goInactive pos sd) in
     let: exist sd' (conj st' H) := res in
     IState.iput SSError {| thisDesc  := sd'
                          ; thisHolds := H
