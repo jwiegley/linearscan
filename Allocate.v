@@ -247,41 +247,6 @@ Definition checkActiveIntervals {pre} (pos : nat) :
                          ; thisHolds := H
                          ; thisState := st' |}.
 
-(*
-Definition checkActiveIntervals {pre} (pos : nat) :
-  SState pre SSMorphLen SSMorphLen unit :=
-  let fix go sd (ss : {sd0 : ScanStateDesc | ScanState sd0 & SSMorphLen sd sd0})
-          (ints : seq (IntervalId sd0 * PhysReg))
-          (Hactive : all (fun x => x \in active sd0) ints)
-      := match ints with
-      | nil => ss
-      | x :: xs =>
-          (* for each interval it in active do
-               if it ends before position then
-                 move it from active to handled
-               else if it does not cover position then
-                 move it from active to inactive *)
-          let: exist2 sd0 st0 H0 := ss in
-          let trans `(x1 : {sd1 : ScanStateDesc | ScanState sd1 & SSMorphLen sd0 sd1}) :
-              {sd1 : ScanStateDesc | ScanState sd1 & SSMorphLen sd sd1} :=
-              let: exist2 sd1 st1 H1 := x1 in
-              exist2 ScanState (SSMorphLen sd) sd1 st1 (transitivity H0 H1) in
-          let i := getInterval (fst x) in
-          if intervalEnd i < pos
-          then go sd (trans (@moveActiveToHandled _ st0 x undefined)) xs
-          else if ~~ intervalCoversPos i pos
-               then go sd (trans (moveActiveToInactive st0 undefined)) xs
-               else go sd ss xs
-      end in
-
-  withScanStatePO $ fun sd (st : ScanState sd) =>
-    let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let (sd',st',H) := go sd unchanged (active sd) in
-    IState.iput SSError {| thisDesc  := sd'
-                         ; thisHolds := H
-                         ; thisState := st' |}.
-*)
-
 Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
   (Pz : ScanState z /\ SSMorphLen sd z)
   (x : int_reg z) (xs : int_reg_seq z)
@@ -350,35 +315,6 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
     IState.iput SSError {| thisDesc  := sd'
                          ; thisHolds := H
                          ; thisState := st' |}.
-
-(*
-Definition checkInactiveIntervals {pre} (pos : nat) :
-  SState pre SSMorphLen SSMorphLen unit :=
-  let fix go sd (st : ScanState sd) ss ints :=
-    match ints with
-    | nil => ss
-    | x :: xs =>
-        (* for each interval it in inactive do
-             if it ends before position then
-               move it from inactive to handled
-             else if it covers position then
-               move it from inactive to active *)
-        let i := getInterval (fst x.1) in
-        let st1 :=
-            if intervalEnd i < pos
-            then moveInactiveToHandled st x.2
-            else if intervalCoversPos i pos
-                 then moveInactiveToActive st x.2
-                 else ss in
-        go sd st st1 xs
-    end in
-  withScanStatePO $ fun sd (st : ScanState sd) =>
-    let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let (sd',st',H) := go sd st unchanged (list_membership (inactive sd)) in
-    IState.iput SSError {| thisDesc  := sd'
-                         ; thisHolds := H
-                         ; thisState := st' |}.
-*)
 
 Definition handleInterval {pre} :
   SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
