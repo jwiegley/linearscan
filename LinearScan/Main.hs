@@ -1531,11 +1531,17 @@ mt_fst b b' x =
   case x of {
    (,) xid reg -> (,) (morphlen_transport b b' xid) reg}
 
+type Coq_int_reg = (,) IntervalId PhysReg
+
+type Coq_int_reg_seq = [] Coq_int_reg
+
+type Coq_intermediate_result =
+  Specif.Coq_sig2 ScanStateDesc
+
 goActive :: Prelude.Int -> ScanStateDesc ->
-                       ScanStateDesc -> ((,) IntervalId
-                       PhysReg) -> ([]
-                       ((,) IntervalId PhysReg)) ->
-                       Specif.Coq_sig2 ScanStateDesc
+                       ScanStateDesc -> Coq_int_reg ->
+                       Coq_int_reg_seq ->
+                       Coq_intermediate_result
 goActive pos sd z x xs =
   case (Prelude.<=) ((Prelude.succ)
          (Interval.intervalEnd
@@ -1571,10 +1577,9 @@ checkActiveIntervals pre pos =
     IState.iput (Build_SSInfo res __))
 
 goInactive :: Prelude.Int -> ScanStateDesc ->
-                         ScanStateDesc -> ((,) IntervalId
-                         PhysReg) -> ([]
-                         ((,) IntervalId PhysReg)) ->
-                         Specif.Coq_sig2 ScanStateDesc
+                         ScanStateDesc -> Coq_int_reg ->
+                         Coq_int_reg_seq ->
+                         Coq_intermediate_result
 goInactive pos sd z x xs =
   case (Prelude.<=) ((Prelude.succ)
          (Interval.intervalEnd

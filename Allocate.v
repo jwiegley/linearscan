@@ -168,33 +168,45 @@ Definition mt_fst b b' (sslen : SSMorphLen b b')
   | (xid, reg) => (morphlen_transport b b' sslen xid, reg)
   end.
 
+Definition int_reg (sd : ScanStateDesc) := (IntervalId sd * PhysReg)%type.
+
+Definition int_reg_seq (sd : ScanStateDesc) := seq (int_reg sd).
+
+Definition intermediate_result (sd z : ScanStateDesc) (xs : int_reg_seq z)
+  (f : forall sd' : ScanStateDesc, int_reg_seq sd') :=
+  { res : {z' : ScanStateDesc | SSMorphLen z z'}
+    | (ScanState res.1 /\ SSMorphLen sd res.1)
+    & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (f res.1) }.
+
 Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
   (Pz : ScanState z /\ SSMorphLen sd z)
-  (x : IntervalId z * PhysReg) (xs : seq (IntervalId z * PhysReg))
+  (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (active z)) :
-  { res : {z' : ScanStateDesc | SSMorphLen z z'}
-  | (ScanState res.1 /\ SSMorphLen sd res.1)
-  & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (active res.1) } :=
+  intermediate_result sd z xs active :=
   (* for each interval it in active do
        if it ends before position then
          move it from active to handled
        else if it does not cover position then
          move it from active to inactive *)
   let: conj st sslen := Pz in
-  let i := getInterval (fst x) in
-  let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
-  let ss := if intervalEnd i < pos
-            then moveActiveToHandled st Hin
-            else if ~~ intervalCoversPos i pos
-                 then moveActiveToInactive st Hin
-                 else exist2 _ _ z st (newSSMorphLen z) in
-  match ss with
-  | exist2 sd' st' sslen' =>
-      exist2 _ _ (exist _ sd' sslen')
-             (conj st' (transitivity sslen sslen')) _
+  match getInterval (fst x)
+  return intermediate_result sd z xs active with
+  | i =>
+    let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
+    let ss := if intervalEnd i < pos
+              then moveActiveToHandled st Hin
+              else if ~~ intervalCoversPos i pos
+                   then moveActiveToInactive st Hin
+                   else exist2 _ _ z st (newSSMorphLen z) in
+    match ss with
+    | exist2 sd' st' sslen' =>
+        exist2 _ _ (exist _ sd' sslen')
+               (conj st' (transitivity sslen sslen')) _
+    end
   end.
 Obligation 2.
   move: Heq_ss.
+  set o := fst x.
   case: (iend (vnth (intervals z) o).1 < pos).
     rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
@@ -272,31 +284,33 @@ Definition checkActiveIntervals {pre} (pos : nat) :
 
 Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
   (Pz : ScanState z /\ SSMorphLen sd z)
-  (x : IntervalId z * PhysReg) (xs : seq (IntervalId z * PhysReg))
+  (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z)) :
-  { res : {z' : ScanStateDesc | SSMorphLen z z'}
-  | (ScanState res.1 /\ SSMorphLen sd res.1)
-  & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (inactive res.1) } :=
+  intermediate_result sd z xs inactive :=
   (* for each interval it in inactive do
        if it ends before position then
          move it from inactive to handled
        else if it covers position then
          move it from inactive to active *)
   let: conj st sslen := Pz in
-  let i := getInterval (fst x) in
-  let Hin : x \in inactive z := @in_subseq_sing _ _ _ x xs _ Hsub in
-  let ss := if intervalEnd i < pos
-            then moveInactiveToHandled st Hin
-            else if intervalCoversPos i pos
-                 then moveInactiveToActive st Hin
-                 else exist2 _ _ z st (newSSMorphLen z) in
-  match ss with
-  | exist2 sd' st' sslen' =>
-      exist2 _ _ (exist _ sd' sslen')
-             (conj st' (transitivity sslen sslen')) _
+  match getInterval (fst x)
+  return intermediate_result sd z xs inactive with
+  | i =>
+    let Hin : x \in inactive z := @in_subseq_sing _ _ _ x xs _ Hsub in
+    let ss := if intervalEnd i < pos
+              then moveInactiveToHandled st Hin
+              else if intervalCoversPos i pos
+                   then moveInactiveToActive st Hin
+                   else exist2 _ _ z st (newSSMorphLen z) in
+    match ss with
+    | exist2 sd' st' sslen' =>
+        exist2 _ _ (exist _ sd' sslen')
+               (conj st' (transitivity sslen sslen')) _
+    end
   end.
 Obligation 2.
   move: Heq_ss.
+  set o := fst x.
   case: (iend (vnth (intervals z) o).1 < pos).
     rewrite /moveInactiveToHandled /=.
     invert as [H1]; subst; simpl.
@@ -406,7 +420,7 @@ Program Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState sd)
                    ; thisState := st
                    |} in
     match IState.runIState SSError handleInterval ssinfo with
-    | inl err          => inl err
+    | inl err => inl err
     | inr (_, ssinfo') => walkIntervals (thisState ssinfo')
     end
   | inright _ => inr (packScanState st)
