@@ -180,29 +180,27 @@ Defined.
 Arguments withScanStatePO {a pre P _} f.
 
 Definition liftLen {pre a} :
-  SState pre SSMorphLen SSMorphLen a
+  (forall sd : ScanStateDesc, SState sd SSMorphLen SSMorphLen a)
     -> SState pre SSMorphHasLen SSMorphHasLen a.
 Proof.
-  intros.
-  destruct X.
-  exists. intros.
-  destruct X.
-  destruct thisHolds0.
-  specialize (s
-    {| thisDesc  := thisDesc0
-     ; thisHolds := haslen_is_SSMorphLen0
-     ; thisState := thisState0
-     |}).
-  destruct s.
-    apply (inl s).
-  apply inr.
-  destruct p.
-  split. apply a0.
-  eexists.
-  apply Build_SSMorphHasLen.
-  apply haslen_is_SSMorphLen0.
-  apply first_nonempty0.
-  assumption.
+  move=> f.
+  exists=> [] [sd [morphlen Hempty] st].
+  pose ss := {| thisDesc  := sd
+              ; thisHolds := newSSMorphLen sd
+              ; thisState := st
+              |}.
+  case: (f sd) => /(_ ss) [err|[x [sd' morphlen' st']]].
+    exact: (inl err).
+  apply: inr.
+  split; first exact: x.
+  apply: {| thisDesc  := sd'
+          ; thisHolds := _
+          ; thisState := st'
+          |}.
+  apply: Build_SSMorphHasLen.
+    exact: (transitivity morphlen morphlen').
+  case: morphlen' => [_ _ H].
+  exact: H.
 Defined.
 
 Definition weakenStHasLenToSt {pre} :

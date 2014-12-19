@@ -320,15 +320,42 @@ main = hspec $
                     blockCons (Node (Instr (Add r30 r31 r32)) ()) $
                     blockCons (Node (Instr (Add r33 r34 r35)) ()) emptyBlock
             allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ mkop oinfo 1 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 3 [ (3, LS.Register 3)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 5 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ] ]
+                [ mkop oinfo  1 [ ( 2, LS.Register 0)
+                                , ( 1, LS.Register 1)
+                                , ( 0, LS.Register 2) ]
+                , mkop oinfo  3 [ ( 5, LS.Register 0)
+                                , ( 4, LS.Register 1)
+                                , ( 3, LS.Register 2) ]
+                , mkop oinfo  5 [ ( 8, LS.Register 0)
+                                , ( 7, LS.Register 1)
+                                , ( 6, LS.Register 2) ]
+                , mkop oinfo  7 [ (11, LS.Register 0)
+                                , (10, LS.Register 1)
+                                , ( 9, LS.Register 2) ]
+                , mkop oinfo  9 [ (14, LS.Register 0)
+                                , (13, LS.Register 1)
+                                , (12, LS.Register 2) ]
+                , mkop oinfo 11 [ (17, LS.Register 0)
+                                , (16, LS.Register 1)
+                                , (15, LS.Register 2) ]
+                , mkop oinfo 13 [ (20, LS.Register 0)
+                                , (19, LS.Register 1)
+                                , (18, LS.Register 2) ]
+                , mkop oinfo 15 [ (23, LS.Register 0)
+                                , (22, LS.Register 1)
+                                , (21, LS.Register 2) ]
+                , mkop oinfo 17 [ (26, LS.Register 0)
+                                , (25, LS.Register 1)
+                                , (24, LS.Register 2) ]
+                , mkop oinfo 19 [ (29, LS.Register 0)
+                                , (28, LS.Register 1)
+                                , (27, LS.Register 2) ]
+                , mkop oinfo 21 [ (32, LS.Register 0)
+                                , (31, LS.Register 1)
+                                , (30, LS.Register 2) ]
+                , mkop oinfo 23 [ (35, LS.Register 0)
+                                , (34, LS.Register 1)
+                                , (33, LS.Register 2) ] ]
 
 mkvar :: Int -> IRVar
 mkvar i = IRVar { _ivVar = VirtualIV i Atom MaySpill

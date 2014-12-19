@@ -1097,17 +1097,36 @@ withScanStatePO pre f i =
            Build_SSInfo thisDesc1 _ -> Build_SSInfo
             thisDesc1 __})})}}
 
-liftLen :: ScanStateDesc -> (SState () 
-                      () a1) -> SState () () a1
-liftLen pre x x0 =
-  case x0 of {
-   Build_SSInfo thisDesc0 _ ->
-    let {s = x (Build_SSInfo thisDesc0 __)} in
-    case s of {
-     Prelude.Left s0 -> Prelude.Left s0;
-     Prelude.Right p -> Prelude.Right
-      (case p of {
-        (,) a0 s0 -> (,) a0 (Build_SSInfo thisDesc0 __)})}}
+liftLen :: ScanStateDesc -> (ScanStateDesc ->
+                      SState () () a1) -> SState 
+                      () () a1
+liftLen pre f _top_assumption_ =
+  let {
+   _evar_0_ = \sd ->
+    let {ss = Build_SSInfo sd __} in
+    let {_top_assumption_0 = f sd} in
+    let {_top_assumption_1 = _top_assumption_0 ss} in
+    let {_evar_0_ = \err -> Prelude.Left err} in
+    let {
+     _evar_0_0 = \_top_assumption_2 ->
+      let {
+       _evar_0_0 = \x _top_assumption_3 ->
+        let {
+         _evar_0_0 = \sd' -> Prelude.Right ((,) x (Build_SSInfo sd'
+          __))}
+        in
+        case _top_assumption_3 of {
+         Build_SSInfo x0 x1 -> _evar_0_0 x0}}
+      in
+      case _top_assumption_2 of {
+       (,) x x0 -> _evar_0_0 x x0}}
+    in
+    case _top_assumption_1 of {
+     Prelude.Left x -> _evar_0_ x;
+     Prelude.Right x -> _evar_0_0 x}}
+  in
+  case _top_assumption_ of {
+   Build_SSInfo x x0 -> _evar_0_ x}
 
 weakenStHasLenToSt :: ScanStateDesc -> SState
                                  () () ()
@@ -1628,10 +1647,10 @@ handleInterval pre =
            Prelude.Nothing ->
             unsafeCoerce (allocateBlockedReg pre)})
           (tryAllocateFreeReg pre))
-        ((Prelude.$) (liftLen pre)
-          (checkInactiveIntervals pre position)))
-      ((Prelude.$) (liftLen pre)
-        (checkActiveIntervals pre position)))
+        (liftLen pre (\sd0 ->
+          checkInactiveIntervals sd0 position)))
+      (liftLen pre (\sd0 ->
+        checkActiveIntervals sd0 position)))
 
 walkIntervals_func :: ((,) ScanStateDesc ()) ->
                                  Prelude.Either SSError

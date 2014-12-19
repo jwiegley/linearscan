@@ -322,9 +322,9 @@ Definition handleInterval {pre} :
   withCursor $ fun _ cur =>
     let position := curPosition cur in
     (* // check for intervals in active that are handled or inactive *)
-    liftLen $ checkActiveIntervals position ;;;
+    liftLen (fun sd => @checkActiveIntervals sd position) ;;;
     (* // check for intervals in inactive that are handled or active *)
-    liftLen $ checkInactiveIntervals position ;;;
+    liftLen (fun sd => @checkInactiveIntervals sd position) ;;;
 
     (* // find a register for current
        tryAllocateFreeReg
