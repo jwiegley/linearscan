@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -208,113 +209,131 @@ lblMapOfCC :: Graph' block n C C -> LabelMap (block n C C)
 lblMapOfCC (GMany NothingO lm NothingO) = lm
 
 main :: IO ()
-main = hspec $
+main = hspec $ do
+    let basicAlloc = regs $ do
+            alloc 2 0
+            alloc 1 1
+            alloc 0 2
+
     describe "first test" $ do
-        let entry = runSimpleUniqueMonad freshLabel
-        let p body = Procedure
-                { procEntry = entry
-                , procCConv = InlineC
-                , procNamedLabels = singleton entry "entry"
-                , procBody =
-                    blockGraph
-                      (blockJoin
-                        (Node (Label entry) ())
-                        body
-                        (Node (ReturnInstr [] Endt) ()))
-                }
-        let blocks body = postorder_dfs_from (lblMapOfCC (procBody (p body))) entry
-            oinfo = OpInfo
-                { isLoopBegin = const False
-                , isLoopEnd   = const False
-                , isCall      = const Nothing
-                , hasRefs     = const False
-                , varRefs     = instrVarRefs
-                , regRefs     = const []
-                }
-            binfo = BlockInfo
-                { blockToOpList = \block ->
-                   let (beg, m, end) = blockSplit block in
-                   blockToList m
-                }
+        it "Works for a single instruction" $ asmTest
+            (add r0 r1 r2)
 
-        it "Works for a single instruction" $ do
-            let body = blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
-            allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ mkop oinfo 1 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ] ]
+            basicAlloc
 
-        it "Works for multiple instructions" $ do
-            let body =
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
-            allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ mkop oinfo 1 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 3 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 5 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ] ]
+        it "Works for multiple instructions" $ asmTest
+            (do add r0 r1 r2
+                add r0 r1 r2
+                add r0 r1 r2) $ do
 
-        it "Another case with multiple instructions" $ do
-            let body =
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
-                    blockCons (Node (Instr (Add r0 r1 r3)) ()) $
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) emptyBlock
-            allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ mkop oinfo 1 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 3 [ (3, LS.Register 3)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ]
-                , mkop oinfo 5 [ (2, LS.Register 0)
-                               , (1, LS.Register 1)
-                               , (0, LS.Register 2) ] ]
+            basicAlloc
+            basicAlloc
+            basicAlloc
 
-        it "Trivial case using too many variables" $ do
-            let body = compile addWith35Vars
-            allocate (blocks body) oinfo binfo `shouldBe` Right
-                [ mkop oinfo  1 [ ( 2, LS.Register 0)
-                                , ( 1, LS.Register 1)
-                                , ( 0, LS.Register 2) ]
-                , mkop oinfo  3 [ ( 5, LS.Register 0)
-                                , ( 4, LS.Register 1)
-                                , ( 3, LS.Register 2) ]
-                , mkop oinfo  5 [ ( 8, LS.Register 0)
-                                , ( 7, LS.Register 1)
-                                , ( 6, LS.Register 2) ]
-                , mkop oinfo  7 [ (11, LS.Register 0)
-                                , (10, LS.Register 1)
-                                , ( 9, LS.Register 2) ]
-                , mkop oinfo  9 [ (14, LS.Register 0)
-                                , (13, LS.Register 1)
-                                , (12, LS.Register 2) ]
-                , mkop oinfo 11 [ (17, LS.Register 0)
-                                , (16, LS.Register 1)
-                                , (15, LS.Register 2) ]
-                , mkop oinfo 13 [ (20, LS.Register 0)
-                                , (19, LS.Register 1)
-                                , (18, LS.Register 2) ]
-                , mkop oinfo 15 [ (23, LS.Register 0)
-                                , (22, LS.Register 1)
-                                , (21, LS.Register 2) ]
-                , mkop oinfo 17 [ (26, LS.Register 0)
-                                , (25, LS.Register 1)
-                                , (24, LS.Register 2) ]
-                , mkop oinfo 19 [ (29, LS.Register 0)
-                                , (28, LS.Register 1)
-                                , (27, LS.Register 2) ]
-                , mkop oinfo 21 [ (32, LS.Register 0)
-                                , (31, LS.Register 1)
-                                , (30, LS.Register 2) ]
-                , mkop oinfo 23 [ (35, LS.Register 0)
-                                , (34, LS.Register 1)
-                                , (33, LS.Register 2) ] ]
+        it "Another case with multiple instructions" $ asmTest
+            (do add r0 r1 r2
+                add r0 r1 r3
+                add r0 r1 r2) $ do
+
+            basicAlloc
+            regs $ do
+                alloc 3 3
+                alloc 1 1
+                alloc 0 2
+            basicAlloc
+
+        it "Trivial case using too many variables" $ asmTest
+            (do add r0 r1 r2
+                add r3 r4 r5
+                add r6 r7 r8
+                add r9 r10 r11
+                add r12 r13 r14
+                add r15 r16 r17
+                add r18 r19 r20
+                add r21 r22 r23
+                add r24 r25 r26
+                add r27 r28 r29
+                add r30 r31 r32
+                add r33 r34 r35) $ do
+
+            basicAlloc
+            regs $ do
+                alloc  5 0
+                alloc  4 1
+                alloc  3 2
+            regs $ do
+                alloc  8 0
+                alloc  7 1
+                alloc  6 2
+            regs $ do
+                alloc 11 0
+                alloc 10 1
+                alloc  9 2
+            regs $ do
+                alloc 14 0
+                alloc 13 1
+                alloc 12 2
+            regs $ do
+                alloc 17 0
+                alloc 16 1
+                alloc 15 2
+            regs $ do
+                alloc 20 0
+                alloc 19 1
+                alloc 18 2
+            regs $ do
+                alloc 23 0
+                alloc 22 1
+                alloc 21 2
+            regs $ do
+                alloc 26 0
+                alloc 25 1
+                alloc 24 2
+            regs $ do
+                alloc 29 0
+                alloc 28 1
+                alloc 27 2
+            regs $ do
+                alloc 32 0
+                alloc 31 1
+                alloc 30 2
+            regs $ do
+                alloc 35 0
+                alloc 34 1
+                alloc 33 2
+
+
+asmTest body result = do
+    let entry = runSimpleUniqueMonad freshLabel
+    let p b = Procedure
+            { procEntry = entry
+            , procCConv = InlineC
+            , procNamedLabels = singleton entry "entry"
+            , procBody =
+                blockGraph
+                  (blockJoin
+                    (Node (Label entry) ())
+                    b
+                    (Node (ReturnInstr [] Endt) ()))
+            }
+    let blocks b =
+            postorder_dfs_from (lblMapOfCC (procBody (p b))) entry
+        oinfo = OpInfo
+            { isLoopBegin = const False
+            , isLoopEnd   = const False
+            , isCall      = const Nothing
+            , hasRefs     = const False
+            , varRefs     = instrVarRefs
+            , regRefs     = const []
+            }
+        binfo = BlockInfo
+            { blockToOpList = \block ->
+               let (beg, m, end) = blockSplit block in
+               blockToList m
+            }
+    let body'   = blocks $ compile body
+    let result' = render oinfo result
+    allocate body' oinfo binfo `shouldBe` Right result'
 
 var :: Int -> IRVar
 var i = IRVar { _ivVar = VirtualIV i Atom MaySpill
@@ -358,6 +377,37 @@ r33 = var 33
 r34 = var 34
 r35 = var 35
 
+
+type Program a = Free (PNode IRVar O O) a
+
+compile :: Program () -> Block (Node () IRVar) O O
+compile (Pure ()) = emptyBlock
+compile (Free (PNode (Node n x))) = blockCons (Node n ()) (compile x)
+
+add :: IRVar -> IRVar -> IRVar -> Program ()
+add v0 v1 v2 = Free (PNode (Node (Instr (Add v0 v1 v2)) (Pure ())))
+
+
+data VarAlloc = VarAlloc
+    { raVarNum   :: Int
+    , raVarAlloc :: LS.Allocation
+    }
+    deriving (Eq, Show)
+
+data OpAlloc a = OpAlloc
+    { opAllocs :: [VarAlloc]
+    , opVar    :: a
+    }
+    deriving (Eq, Show, Functor)
+
+render :: OpInfo opType -> Allocs () -> [OpData opType]
+render oinfo = go 1
+  where
+    go _ (Pure ()) = []
+    go n (Free (Operation (OpAlloc as xs))) =
+        mkop oinfo n (Prelude.map (\(VarAlloc v a) -> (v, a)) as)
+            : go (n+2) xs
+
 mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
 mkop oinfo i allocs = OpData
     { baseOp  = error $ "baseOp#" ++ show i
@@ -366,26 +416,17 @@ mkop oinfo i allocs = OpData
     , opAlloc = allocs
     }
 
-type Program a = Free (PNode IRVar O O) a
+type Alloc a = Free OpAlloc a
 
-add :: IRVar -> IRVar -> IRVar -> Program ()
-add v0 v1 v2 = Free (PNode (Node (Instr (Add v0 v1 v2)) (Pure ())))
+data Operation a = Operation (OpAlloc a) deriving Functor
 
-addWith35Vars :: Program ()
-addWith35Vars = do
-    add r0 r1 r2
-    add r3 r4 r5
-    add r6 r7 r8
-    add r9 r10 r11
-    add r12 r13 r14
-    add r15 r16 r17
-    add r18 r19 r20
-    add r21 r22 r23
-    add r24 r25 r26
-    add r27 r28 r29
-    add r30 r31 r32
-    add r33 r34 r35
+type Allocs a = Free Operation a
 
-compile :: Program () -> Block (Node () IRVar) O O
-compile (Pure ()) = emptyBlock
-compile (Free (PNode (Node n x))) = blockCons (Node n ()) (compile x)
+alloc :: Int -> Int -> Alloc ()
+alloc v n = Free (OpAlloc [VarAlloc v (LS.Register n)] (Pure ()))
+
+regs :: Alloc () -> Allocs ()
+regs a = Free (Operation (OpAlloc (reduce a) (Pure ())))
+  where
+    reduce (Pure ()) = []
+    reduce (Free (OpAlloc as xs)) = as ++ reduce xs
