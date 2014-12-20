@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -Wall -fno-warn-unused-binds -Werror #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Main where
 
@@ -19,6 +20,7 @@ Haskell code that was extracted from Coq.
 -}
 
 import Compiler.Hoopl
+import Control.Monad.Free
 import Data.Foldable
 import Data.Map
 import LinearScan
@@ -142,6 +144,11 @@ data Node a v e x = Node
   , _nodeMeta    :: a
   } deriving Show
 
+data PNode v e x a = PNode (Node a v e x)
+
+instance Functor (PNode v e x) where
+    fmap f (PNode (Node x y)) = PNode (Node x (f y))
+
 nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
 nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
@@ -204,42 +211,6 @@ main :: IO ()
 main = hspec $
     describe "first test" $ do
         let entry = runSimpleUniqueMonad freshLabel
-        let r0  = mkvar 0
-        let r1  = mkvar 1
-        let r2  = mkvar 2
-        let r3  = mkvar 3
-        let r4  = mkvar 4
-        let r5  = mkvar 5
-        let r6  = mkvar 6
-        let r7  = mkvar 7
-        let r8  = mkvar 8
-        let r9  = mkvar 9
-        let r10 = mkvar 10
-        let r11 = mkvar 11
-        let r12 = mkvar 12
-        let r13 = mkvar 13
-        let r14 = mkvar 14
-        let r15 = mkvar 15
-        let r16 = mkvar 16
-        let r17 = mkvar 17
-        let r18 = mkvar 18
-        let r19 = mkvar 19
-        let r20 = mkvar 20
-        let r21 = mkvar 21
-        let r22 = mkvar 22
-        let r23 = mkvar 23
-        let r24 = mkvar 24
-        let r25 = mkvar 25
-        let r26 = mkvar 26
-        let r27 = mkvar 27
-        let r28 = mkvar 28
-        let r29 = mkvar 29
-        let r30 = mkvar 30
-        let r31 = mkvar 31
-        let r32 = mkvar 32
-        let r33 = mkvar 33
-        let r34 = mkvar 34
-        let r35 = mkvar 35
         let p body = Procedure
                 { procEntry = entry
                 , procCConv = InlineC
@@ -306,19 +277,7 @@ main = hspec $
                                , (0, LS.Register 2) ] ]
 
         it "Trivial case using too many variables" $ do
-            let body =
-                    blockCons (Node (Instr (Add r0 r1 r2)) ()) $
-                    blockCons (Node (Instr (Add r3 r4 r5)) ()) $
-                    blockCons (Node (Instr (Add r6 r7 r8)) ()) $
-                    blockCons (Node (Instr (Add r9 r10 r11)) ()) $
-                    blockCons (Node (Instr (Add r12 r13 r14)) ()) $
-                    blockCons (Node (Instr (Add r15 r16 r17)) ()) $
-                    blockCons (Node (Instr (Add r18 r19 r20)) ()) $
-                    blockCons (Node (Instr (Add r21 r22 r23)) ()) $
-                    blockCons (Node (Instr (Add r24 r25 r26)) ()) $
-                    blockCons (Node (Instr (Add r27 r28 r29)) ()) $
-                    blockCons (Node (Instr (Add r30 r31 r32)) ()) $
-                    blockCons (Node (Instr (Add r33 r34 r35)) ()) emptyBlock
+            let body = compile addWith35Vars
             allocate (blocks body) oinfo binfo `shouldBe` Right
                 [ mkop oinfo  1 [ ( 2, LS.Register 0)
                                 , ( 1, LS.Register 1)
@@ -357,10 +316,47 @@ main = hspec $
                                 , (34, LS.Register 1)
                                 , (33, LS.Register 2) ] ]
 
-mkvar :: Int -> IRVar
-mkvar i = IRVar { _ivVar = VirtualIV i Atom MaySpill
-                , _ivSrc = Nothing
-                }
+var :: Int -> IRVar
+var i = IRVar { _ivVar = VirtualIV i Atom MaySpill
+              , _ivSrc = Nothing
+              }
+
+r0  = var 0
+r1  = var 1
+r2  = var 2
+r3  = var 3
+r4  = var 4
+r5  = var 5
+r6  = var 6
+r7  = var 7
+r8  = var 8
+r9  = var 9
+r10 = var 10
+r11 = var 11
+r12 = var 12
+r13 = var 13
+r14 = var 14
+r15 = var 15
+r16 = var 16
+r17 = var 17
+r18 = var 18
+r19 = var 19
+r20 = var 20
+r21 = var 21
+r22 = var 22
+r23 = var 23
+r24 = var 24
+r25 = var 25
+r26 = var 26
+r27 = var 27
+r28 = var 28
+r29 = var 29
+r30 = var 30
+r31 = var 31
+r32 = var 32
+r33 = var 33
+r34 = var 34
+r35 = var 35
 
 mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
 mkop oinfo i allocs = OpData
@@ -369,3 +365,27 @@ mkop oinfo i allocs = OpData
     , opId    = i
     , opAlloc = allocs
     }
+
+type Program a = Free (PNode IRVar O O) a
+
+add :: IRVar -> IRVar -> IRVar -> Program ()
+add v0 v1 v2 = Free (PNode (Node (Instr (Add v0 v1 v2)) (Pure ())))
+
+addWith35Vars :: Program ()
+addWith35Vars = do
+    add r0 r1 r2
+    add r3 r4 r5
+    add r6 r7 r8
+    add r9 r10 r11
+    add r12 r13 r14
+    add r15 r16 r17
+    add r18 r19 r20
+    add r21 r22 r23
+    add r24 r25 r26
+    add r27 r28 r29
+    add r30 r31 r32
+    add r33 r34 r35
+
+compile :: Program () -> Block (Node () IRVar) O O
+compile (Pure ()) = emptyBlock
+compile (Free (PNode (Node n x))) = blockCons (Node n ()) (compile x)

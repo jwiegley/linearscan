@@ -55,3 +55,4 @@ test-suite test
       , hoopl              >= 3.10
       , containers         >= 0.5.5
       , transformers       >= 0.3.0.0
+      , free
