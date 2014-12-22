@@ -15,6 +15,7 @@ import Data.Foldable
 import Data.Map
 import LinearScan
 import qualified LinearScan.Main as LS
+import Test.Hspec
 
 ------------------------------------------------------------------------------
 -- The input from the Tempest compiler has the following shape: 'Procedure a

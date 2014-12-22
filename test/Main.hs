@@ -107,3 +107,22 @@ main = hspec $ do
                 alloc 35 0
                 alloc 34 1
                 alloc 33 2
+
+        it "Case with one long-lived variable" $ asmTest
+            (do add r0 r1 r2
+                add r0 r4 r5
+                add r0 r7 r8
+                add r0 r10 r11) $ do
+            basicAlloc
+            regs $ do
+                alloc  4 0
+                alloc  5 1
+                alloc  0 2
+            regs $ do
+                alloc  7 0
+                alloc  8 1
+                alloc  0 2
+            regs $ do
+                alloc  10 0
+                alloc  11 1
+                alloc  0  2
