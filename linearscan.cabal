@@ -45,7 +45,7 @@ test-suite test
   type:             exitcode-stdio-1.0
   ghc-options:      -fno-warn-deprecated-flags
   hs-source-dirs:   test
-  main-is:          Test.hs
+  main-is:          Main.hs
   build-depends: 
         base >=3
       , linearscan
