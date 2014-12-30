@@ -220,13 +220,13 @@ asmTest body result = do
                blockToList m
             }
 
-    let body'        = blocks $ compile body
-    let result'      = render oinfo result
-    let Right allocs = allocate body' oinfo binfo
-    length allocs `shouldBe` length result'
+    let body'    = blocks $ compile body
+    let result'  = render oinfo result
+    let Right xs = allocate body' oinfo binfo
+    length xs `shouldBe` length result'
 
     let test x y = x `shouldBe` y
-    zipWithM_ shouldBe allocs result'
+    zipWithM_ shouldBe xs result'
 
 var :: Int -> IRVar
 var i = IRVar { _ivVar = VirtualIV i Atom MaySpill
@@ -302,11 +302,11 @@ render oinfo = go 1
             : go (n+2) xs
 
 mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
-mkop oinfo i allocs = OpData
+mkop oinfo i xs = OpData
     { baseOp  = error $ "baseOp#" ++ show i
     , opInfo  = oinfo
     , opId    = i
-    , opAlloc = allocs
+    , opAlloc = xs
     }
 
 type Alloc a = Free OpAlloc a
@@ -317,6 +317,10 @@ type Allocs a = Free Operation a
 
 alloc :: Int -> Int -> Alloc ()
 alloc v n = Free (OpAlloc [VarAlloc v (LS.Register n)] (Pure ()))
+
+allocs :: [(Int, Int)] -> Alloc ()
+allocs []         = return ()
+allocs ((v,n):xs) = alloc v n >> allocs xs
 
 regs :: Alloc () -> Allocs ()
 regs a = Free (Operation (OpAlloc (reduce a) (Pure ())))
