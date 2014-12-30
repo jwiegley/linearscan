@@ -1159,7 +1159,7 @@ moveActiveToHandled sd x =
     (intervals sd) (fixedIntervals sd)
     (unhandled sd)
     (unsafeCoerce
-      ((Prelude.const Data.List.delete)
+      (Seq.rem
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (nextInterval sd))
           (Fintype.ordinal_eqType maxReg)) x
@@ -1174,7 +1174,7 @@ moveActiveToInactive sd x =
     (intervals sd) (fixedIntervals sd)
     (unhandled sd)
     (unsafeCoerce
-      ((Prelude.const Data.List.delete)
+      (Seq.rem
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (nextInterval sd))
           (Fintype.ordinal_eqType maxReg)) x
@@ -1189,7 +1189,7 @@ moveInactiveToActive sd x =
     (intervals sd) (fixedIntervals sd)
     (unhandled sd) ((:) (unsafeCoerce x) (active sd))
     (unsafeCoerce
-      ((Prelude.const Data.List.delete)
+      (Seq.rem
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (nextInterval sd))
           (Fintype.ordinal_eqType maxReg)) x
@@ -1203,7 +1203,7 @@ moveInactiveToHandled sd x =
     (intervals sd) (fixedIntervals sd)
     (unhandled sd) (active sd)
     (unsafeCoerce
-      ((Prelude.const Data.List.delete)
+      (Seq.rem
         (Eqtype.prod_eqType
           (Fintype.ordinal_eqType (nextInterval sd))
           (Fintype.ordinal_eqType maxReg)) x

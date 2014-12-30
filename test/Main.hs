@@ -116,14 +116,14 @@ main = hspec $ do
 
             basicAlloc
             regs $ do
-                alloc  4 0
-                alloc  5 1
+                alloc  5 0
+                alloc  4 1
                 alloc  0 2
             regs $ do
-                alloc  7 0
-                alloc  8 1
+                alloc  8 0
+                alloc  7 1
                 alloc  0 2
             regs $ do
-                alloc  10 0
-                alloc  11 1
+                alloc  11 0
+                alloc  10 1
                 alloc  0  2

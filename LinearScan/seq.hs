@@ -7,6 +7,7 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
+import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -47,6 +48,16 @@ catrev s1 s2 =
 rev :: ([] a1) -> [] a1
 rev s =
   catrev s []
+
+rem :: Eqtype.Equality__Coq_type -> Eqtype.Equality__Coq_sort -> ([]
+       Eqtype.Equality__Coq_sort) -> [] Eqtype.Equality__Coq_sort
+rem t x s =
+  case s of {
+   [] -> s;
+   (:) y t0 ->
+    case Eqtype.eq_op t y x of {
+     Prelude.True -> t0;
+     Prelude.False -> (:) y (rem t x t0)}}
 
 flatten :: ([] ([] a1)) -> [] a1
 flatten =
