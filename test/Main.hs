@@ -127,3 +127,23 @@ main = hspec $ do
                 alloc  11 0
                 alloc  10 1
                 alloc  0  2
+
+        it "Two long-lived variables" $ asmTest
+            (do add v0 v1 v2
+                add v0 v4 v5
+                add v0 v4 v8
+                add v0 v4 v11) $ do
+
+            basicAlloc
+            regs $ do
+                alloc  5 0
+                alloc  4 1
+                alloc  0 2
+            regs $ do
+                alloc  8 0
+                alloc  4 1
+                alloc  0 2
+            regs $ do
+                alloc  11 0
+                alloc  4  1
+                alloc  0  2
