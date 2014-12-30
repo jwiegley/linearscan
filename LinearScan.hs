@@ -77,8 +77,8 @@ allocate blocks oinfo binfo =
         binfo' = blockToOpList binfo in
     case LS.linearScan oinfo' binfo' blocks of
         Left x -> Left $ case x of
-            LS.ECurrentIsSingleton ->
-                "Current interval is a singleton"
+            LS.ECurrentIsSingleton n ->
+                "Current interval is a singleton (" ++ show n ++ ")"
             LS.ENoIntervalsToSplit ->
                 "There are no intervals to split"
             LS.EFailedToAllocateRegister ->

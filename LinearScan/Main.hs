@@ -458,18 +458,20 @@ maxReg =
 type PhysReg = Prelude.Int
 
 data SSError =
-   ECurrentIsSingleton
+   ECurrentIsSingleton Prelude.Int
  | ENoIntervalsToSplit
  | EFailedToAllocateRegister
 
-coq_SSError_rect :: a1 -> a1 -> a1 -> SSError -> a1
+coq_SSError_rect :: (Prelude.Int -> a1) -> a1 -> a1 ->
+                               SSError -> a1
 coq_SSError_rect f f0 f1 s =
   case s of {
-   ECurrentIsSingleton -> f;
+   ECurrentIsSingleton x -> f x;
    ENoIntervalsToSplit -> f0;
    EFailedToAllocateRegister -> f1}
 
-coq_SSError_rec :: a1 -> a1 -> a1 -> SSError -> a1
+coq_SSError_rec :: (Prelude.Int -> a1) -> a1 -> a1 ->
+                              SSError -> a1
 coq_SSError_rec =
   coq_SSError_rect
 
@@ -1230,7 +1232,9 @@ splitCurrentInterval pre before ssi =
         let {
          _evar_0_0 = \uid beg us holds0 ->
           let {int = LinearScan.Utils.nth _nextInterval_ intervals0 uid} in
-          let {_evar_0_0 = \_ -> Prelude.Left ECurrentIsSingleton}
+          let {
+           _evar_0_0 = \_ -> Prelude.Left (ECurrentIsSingleton
+            ( uid))}
           in
           let {
            _evar_0_1 = \_ -> Prelude.Right ((,) ()
@@ -1316,7 +1320,9 @@ splitAssignedIntervalForReg pre reg pos trueForActives ssi =
         let {
          _evar_0_0 = \aid _the_1st_wildcard_ ->
           let {int = LinearScan.Utils.nth ni intervals0 aid} in
-          let {_evar_0_0 = \_ -> Prelude.Left ECurrentIsSingleton}
+          let {
+           _evar_0_0 = \_ -> Prelude.Left (ECurrentIsSingleton
+            ( aid))}
           in
           let {
            _evar_0_1 = \_ -> Prelude.Right ((,) ()

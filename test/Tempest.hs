@@ -220,13 +220,15 @@ asmTest body result = do
                blockToList m
             }
 
-    let body'    = blocks $ compile body
-    let result'  = render oinfo result
-    let Right xs = allocate body' oinfo binfo
-    length xs `shouldBe` length result'
+    let body'   = blocks $ compile body
+    let result' = render oinfo result
+    case allocate body' oinfo binfo of
+        Left e   -> error $ "Allocation failed: " ++ e
+        Right xs -> do
+            length xs `shouldBe` length result'
 
-    let test x y = x `shouldBe` y
-    zipWithM_ shouldBe xs result'
+            let test x y = x `shouldBe` y
+            zipWithM_ shouldBe xs result'
 
 var :: Int -> IRVar
 var i = IRVar { _ivVar = VirtualIV i Atom MaySpill

@@ -13,8 +13,8 @@ Module MScanState (Mach : Machine).
 
 Include Mach.
 
-Inductive SSError :=
-  | ECurrentIsSingleton
+Inductive SSError : Set :=
+  | ECurrentIsSingleton : nat -> SSError
   | ENoIntervalsToSplit
   | EFailedToAllocateRegister.
 
