@@ -189,49 +189,49 @@ main = hspec $ do
             regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
             regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
 
-        -- it "Induce spillage of one variable" $ asmTest
-        --     (do add v0   v1  v2
-        --         add v3   v4  v5
-        --         add v6   v7  v8
-        --         add v9  v10 v11
-        --         add v12 v13 v14
-        --         add v15 v16 v17
-        --         add v18 v19 v20
-        --         add v21 v22 v23
-        --         add v24 v25 v26
-        --         add v27 v28 v29
-        --         add v30 v31 v32
-        --         add v0   v1  v2
-        --         add v3   v4  v5
-        --         add v6   v7  v8
-        --         add v9  v10 v11
-        --         add v12 v13 v14
-        --         add v15 v16 v17
-        --         add v18 v19 v20
-        --         add v21 v22 v23
-        --         add v24 v25 v26
-        --         add v27 v28 v29
-        --         add v30 v31 v32) $ do
+        it "Induce spillage of one variable" $ asmTest
+            (do add v0   v1  v2
+                add v3   v4  v5
+                add v6   v7  v8
+                add v9  v10 v11
+                add v12 v13 v14
+                add v15 v16 v17
+                add v18 v19 v20
+                add v21 v22 v23
+                add v24 v25 v26
+                add v27 v28 v29
+                add v30 v31 v32
+                add v0   v1  v2
+                add v3   v4  v5
+                add v6   v7  v8
+                add v9  v10 v11
+                add v12 v13 v14
+                add v15 v16 v17
+                add v18 v19 v20
+                add v21 v22 v23
+                add v24 v25 v26
+                add v27 v28 v29
+                add v30 v31 v32) $ do
 
-        --     regs $ alloc  2  0 >> alloc  1  1 >> alloc  0  2
-        --     regs $ alloc  5  3 >> alloc  4  4 >> alloc  3  5
-        --     regs $ alloc  8  6 >> alloc  7  7 >> alloc  6  8
-        --     regs $ alloc 11  9 >> alloc 10 10 >> alloc  9 11
-        --     regs $ alloc 14 12 >> alloc 13 13 >> alloc 12 14
-        --     regs $ alloc 17 15 >> alloc 16 16 >> alloc 15 17
-        --     regs $ alloc 20 18 >> alloc 19 19 >> alloc 18 20
-        --     regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
-        --     regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
-        --     regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
-        --     regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 32
-        --     regs $ alloc  2  0 >> alloc  1  1 >> alloc  0  2
-        --     regs $ alloc  5  3 >> alloc  4  4 >> alloc  3  5
-        --     regs $ alloc  8  6 >> alloc  7  7 >> alloc  6  8
-        --     regs $ alloc 11  9 >> alloc 10 10 >> alloc  9 11
-        --     regs $ alloc 14 12 >> alloc 13 13 >> alloc 12 14
-        --     regs $ alloc 17 15 >> alloc 16 16 >> alloc 15 17
-        --     regs $ alloc 20 18 >> alloc 19 19 >> alloc 18 20
-        --     regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
-        --     regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
-        --     regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
-        --     regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 32
+            regs $ alloc  2  0 >> alloc  1  1 >> alloc  0  2
+            regs $ alloc  5  3 >> alloc  4  4 >> alloc  3  5
+            regs $ alloc  8  6 >> alloc  7  7 >> alloc  6  8
+            regs $ alloc 11  9 >> alloc 10 10 >> alloc  9 11
+            regs $ alloc 14 12 >> alloc 13 13 >> alloc 12 14
+            regs $ alloc 17 15 >> alloc 16 16 >> alloc 15 17
+            regs $ alloc 20 18 >> alloc 19 19 >> alloc 18 20
+            regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
+            regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
+            regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
+            regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 32
+            regs $ alloc  2  0 >> alloc  1  1 >> alloc  0  2
+            regs $ alloc  5  3 >> alloc  4  4 >> alloc  3  5
+            regs $ alloc  8  6 >> alloc  7  7 >> alloc  6  8
+            regs $ alloc 11  9 >> alloc 10 10 >> alloc  9 11
+            regs $ alloc 14 12 >> alloc 13 13 >> alloc 12 14
+            regs $ alloc 17 15 >> alloc 16 16 >> alloc 15 17
+            regs $ alloc 20 18 >> alloc 19 19 >> alloc 18 20
+            regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
+            regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
+            regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
+            regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 32
