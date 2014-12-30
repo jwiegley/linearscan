@@ -222,12 +222,12 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
           let vid := varId v in
           let h acc x :=
               let: (xid, reg) := x in
-              let int := getInterval xid in
-              if (ivar int == vid) &&
-                 (ibeg int <= opId op < iend int)
-              then (vid, Register reg) :: acc
-              else acc in
-          {| baseOp  := o           (* op == op' throughout *)
+              (fun int =>
+                  if (ivar int == vid) &&
+                     (ibeg int <= opId op < iend int)
+                  then (vid, Register reg) :: acc
+                  else acc) (getInterval xid) in
+          {| baseOp  := o
            ; opInfo  := opInfo op'
            ; opId    := opId op'
            ; opIdOdd := opIdOdd op'

@@ -10,6 +10,7 @@
 module Tempest where
 
 import Compiler.Hoopl
+import Control.Monad
 import Control.Monad.Free
 import Data.Foldable
 import Data.Map
@@ -96,15 +97,15 @@ showInstr i = show i ++ foldMap (\r -> " " ++ show r) i
 
 instance Show v => Show (IRInstr v e x) where
   show (Label l)        = show l ++ ":"
-  show (Alloc g v1 v2)  = "\t@alloc " ++ show g ++
-                          (case v1 of Just v -> " " ++ show v ; _ -> " _")
-                          ++ " " ++ show v2
+  show (Alloc g x1 x2)  = "\t@alloc " ++ show g ++
+                          (case x1 of Just v -> " " ++ show v ; _ -> " _")
+                          ++ " " ++ show x2
   show (Reclaim v)      = "\t@reclaim " ++ show v
   show (Instr i)        = "\t" ++ showInstr i
   show (Call c i)       = "\t@call " ++ show c ++ " " ++ showInstr i
   show (LoadConst c v)  = "\t@lc " ++ show v ++ " " ++ show c
-  show (Move v1 v2)     = "\t@mvrr " ++ show v1 ++ " " ++ show v2
-  show (Copy v1 v2)     = "\t@cprr " ++ show v1 ++ " " ++ show v2
+  show (Move x1 x2)     = "\t@mvrr " ++ show x1 ++ " " ++ show x2
+  show (Copy x1 x2)     = "\t@cprr " ++ show x1 ++ " " ++ show x2
   show (Save (Linearity l) src dst)
                         = "\t@save " ++ show l ++ " " ++ show src ++ " " ++ show dst
   show (Restore (Linearity l) src dst)
@@ -118,11 +119,11 @@ instance Show v => Show (IRInstr v e x) where
                         = "\t@b" ++ show tst ++ " " ++ show v
                             ++ " " ++ show t
                             ++ "; @jmp " ++ show f
-  show (Stwb lin v1 v2 t f)
+  show (Stwb lin x1 x2 t f)
                         = (if isLinear lin then "\t@stwlb " else "\t@stwb ")
-                            ++ show v1 ++ " " ++ show v2
+                            ++ show x1 ++ " " ++ show x2
                             ++ " " ++ show f ++ "; @jmp " ++ show t
-  show (Strb v1 v2 t f) = "\t@strb " ++ show v1 ++ " " ++ show v2
+  show (Strb x1 x2 t f) = "\t@strb " ++ show x1 ++ " " ++ show x2
                             ++ " " ++ show f ++ "; @jmp " ++ show t
   show (ReturnInstr liveRegs i)   = "\t@return " ++ show liveRegs ++ " " ++ showInstr i
 
@@ -218,51 +219,56 @@ asmTest body result = do
                let (beg, m, end) = blockSplit block in
                blockToList m
             }
-    let body'   = blocks $ compile body
-    let result' = render oinfo result
-    allocate body' oinfo binfo `shouldBe` Right result'
+
+    let body'        = blocks $ compile body
+    let result'      = render oinfo result
+    let Right allocs = allocate body' oinfo binfo
+    length allocs `shouldBe` length result'
+
+    let test x y = x `shouldBe` y
+    zipWithM_ shouldBe allocs result'
 
 var :: Int -> IRVar
 var i = IRVar { _ivVar = VirtualIV i Atom MaySpill
               , _ivSrc = Nothing
               }
 
-r0  = var 0
-r1  = var 1
-r2  = var 2
-r3  = var 3
-r4  = var 4
-r5  = var 5
-r6  = var 6
-r7  = var 7
-r8  = var 8
-r9  = var 9
-r10 = var 10
-r11 = var 11
-r12 = var 12
-r13 = var 13
-r14 = var 14
-r15 = var 15
-r16 = var 16
-r17 = var 17
-r18 = var 18
-r19 = var 19
-r20 = var 20
-r21 = var 21
-r22 = var 22
-r23 = var 23
-r24 = var 24
-r25 = var 25
-r26 = var 26
-r27 = var 27
-r28 = var 28
-r29 = var 29
-r30 = var 30
-r31 = var 31
-r32 = var 32
-r33 = var 33
-r34 = var 34
-r35 = var 35
+v0  = var 0
+v1  = var 1
+v2  = var 2
+v3  = var 3
+v4  = var 4
+v5  = var 5
+v6  = var 6
+v7  = var 7
+v8  = var 8
+v9  = var 9
+v10 = var 10
+v11 = var 11
+v12 = var 12
+v13 = var 13
+v14 = var 14
+v15 = var 15
+v16 = var 16
+v17 = var 17
+v18 = var 18
+v19 = var 19
+v20 = var 20
+v21 = var 21
+v22 = var 22
+v23 = var 23
+v24 = var 24
+v25 = var 25
+v26 = var 26
+v27 = var 27
+v28 = var 28
+v29 = var 29
+v30 = var 30
+v31 = var 31
+v32 = var 32
+v33 = var 33
+v34 = var 34
+v35 = var 35
 
 
 type Program a = Free (PNode IRVar O O) a
@@ -272,7 +278,7 @@ compile (Pure ()) = emptyBlock
 compile (Free (PNode (Node n x))) = blockCons (Node n ()) (compile x)
 
 add :: IRVar -> IRVar -> IRVar -> Program ()
-add v0 v1 v2 = Free (PNode (Node (Instr (Add v0 v1 v2)) (Pure ())))
+add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))
 
 
 data VarAlloc = VarAlloc

@@ -50,7 +50,18 @@ instance Eq (OpData opType) where
     OpData _b1 _i1 d1 a1 == OpData _b2 _i2 d2 a2 = d1 == d2 && a1 == a2
 
 instance Show (OpData opType) where
-    show (OpData _b _i d a) = "<OpData#" ++ show d ++ " " ++ show a ++ ">"
+    show (OpData _b _i d a) =
+        "Op." ++ show d ++ " [" ++ vars ++ "]"
+      where
+        vars = foldr (\(v, al) rest ->
+                       "v" ++ show v ++ " => " ++ showAlloc al ++
+                       case rest of
+                           [] -> ""
+                           _  -> ", " ++ rest) "" a
+
+        showAlloc (LS.Register r) = show r
+        showAlloc LS.Unallocated  = "<unallocated>"
+        showAlloc LS.Spill        = "<spill>"
 
 allocate :: (Show op, Show (LS.OpData op))
          => [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]

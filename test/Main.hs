@@ -21,25 +21,25 @@ main = hspec $ do
             alloc 1 1
             alloc 0 2
 
-    describe "first test" $ do
-        it "Works for a single instruction" $ asmTest
-            (add r0 r1 r2)
+    describe "Sanity tests" $ do
+        it "Single instruction" $ asmTest
+            (add v0 v1 v2)
 
             basicAlloc
 
-        it "Works for multiple instructions" $ asmTest
-            (do add r0 r1 r2
-                add r0 r1 r2
-                add r0 r1 r2) $ do
+        it "Single, repeated instruction" $ asmTest
+            (do add v0 v1 v2
+                add v0 v1 v2
+                add v0 v1 v2) $ do
 
             basicAlloc
             basicAlloc
             basicAlloc
 
-        it "Another case with multiple instructions" $ asmTest
-            (do add r0 r1 r2
-                add r0 r1 r3
-                add r0 r1 r2) $ do
+        it "Multiple instructions" $ asmTest
+            (do add v0 v1 v2
+                add v0 v1 v3
+                add v0 v1 v2) $ do
 
             basicAlloc
             regs $ do
@@ -48,19 +48,19 @@ main = hspec $ do
                 alloc 0 2
             basicAlloc
 
-        it "Trivial case using too many variables" $ asmTest
-            (do add r0 r1 r2
-                add r3 r4 r5
-                add r6 r7 r8
-                add r9 r10 r11
-                add r12 r13 r14
-                add r15 r16 r17
-                add r18 r19 r20
-                add r21 r22 r23
-                add r24 r25 r26
-                add r27 r28 r29
-                add r30 r31 r32
-                add r33 r34 r35) $ do
+        it "More variables used than registers" $ asmTest
+            (do add v0 v1 v2
+                add v3 v4 v5
+                add v6 v7 v8
+                add v9 v10 v11
+                add v12 v13 v14
+                add v15 v16 v17
+                add v18 v19 v20
+                add v21 v22 v23
+                add v24 v25 v26
+                add v27 v28 v29
+                add v30 v31 v32
+                add v33 v34 v35) $ do
 
             basicAlloc
             regs $ do
@@ -108,11 +108,12 @@ main = hspec $ do
                 alloc 34 1
                 alloc 33 2
 
-        it "Case with one long-lived variable" $ asmTest
-            (do add r0 r1 r2
-                add r0 r4 r5
-                add r0 r7 r8
-                add r0 r10 r11) $ do
+        it "Single long-lived variable" $ asmTest
+            (do add v0 v1 v2
+                add v0 v4 v5
+                add v0 v7 v8
+                add v0 v10 v11) $ do
+
             basicAlloc
             regs $ do
                 alloc  4 0

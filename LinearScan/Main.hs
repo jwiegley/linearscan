@@ -872,29 +872,19 @@ assignRegNum ops sd =
        h = \acc x ->
         case x of {
          (,) xid reg ->
+          let {
+           int = Interval.getIntervalDesc
+                   (
+                     (LinearScan.Utils.nth (nextInterval sd)
+                       (intervals sd) xid))}
+          in
           case (Prelude.&&)
                  (Eqtype.eq_op Ssrnat.nat_eqType
-                   (unsafeCoerce
-                     (Interval.ivar
-                       (Interval.getIntervalDesc
-                         (
-                           (LinearScan.Utils.nth (nextInterval sd)
-                             (intervals sd) xid)))))
-                   (unsafeCoerce vid))
+                   (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
                  ((Prelude.&&)
-                   ((Prelude.<=)
-                     (Interval.ibeg
-                       (Interval.getIntervalDesc
-                         (
-                           (LinearScan.Utils.nth (nextInterval sd)
-                             (intervals sd) xid))))
-                     (opId op))
+                   ((Prelude.<=) (Interval.ibeg int) (opId op))
                    ((Prelude.<=) ((Prelude.succ) (opId op))
-                     (Interval.iend
-                       (Interval.getIntervalDesc
-                         (
-                           (LinearScan.Utils.nth (nextInterval sd)
-                             (intervals sd) xid)))))) of {
+                     (Interval.iend int))) of {
            Prelude.True -> (:) ((,) vid (Register reg)) acc;
            Prelude.False -> acc}}}
       in

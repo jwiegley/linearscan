@@ -189,9 +189,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
        else if it does not cover position then
          move it from active to inactive *)
   let: conj st sslen := Pz in
-  match getInterval (fst x)
-  return intermediate_result sd z xs active with
-  | i =>
+  let go i : intermediate_result sd z xs active :=
     let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let ss := if intervalEnd i < pos
               then moveActiveToHandled st Hin
@@ -200,10 +198,11 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
                    else exist2 _ _ z st (newSSMorphLen z) in
     match ss with
     | exist2 sd' st' sslen' =>
-        exist2 _ _ (exist _ sd' sslen')
-               (conj st' (transitivity sslen sslen')) _
-    end
-  end.
+        (exist2 _ _ (exist _ sd' sslen')
+                (conj st' (transitivity sslen sslen')) _
+           )
+    end in
+  go (getInterval (fst x)).
 Obligation 2.
   move: Heq_ss.
   set o := fst x.
