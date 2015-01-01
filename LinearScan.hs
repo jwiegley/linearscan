@@ -83,6 +83,8 @@ allocate blocks oinfo binfo =
                 "There are no intervals to split"
             LS.EFailedToAllocateRegister ->
                 "Failed to allocate register for current interval"
+            LS.ERegisterAlreadyAssigned n ->
+                "Register is already assigned (" ++ show n ++ ")"
         Right z -> Right $ map f z
   where
     f (LS.Build_OpData a (LS.Build_OpInfo b1 b2 b3 b4 b5 b6) c d) =

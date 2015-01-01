@@ -22,6 +22,7 @@ import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Fintype as Fintype
 import qualified LinearScan.Seq as Seq
+import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -461,17 +462,19 @@ data SSError =
    ECurrentIsSingleton Prelude.Int
  | ENoIntervalsToSplit
  | EFailedToAllocateRegister
+ | ERegisterAlreadyAssigned Prelude.Int
 
 coq_SSError_rect :: (Prelude.Int -> a1) -> a1 -> a1 ->
-                               SSError -> a1
-coq_SSError_rect f f0 f1 s =
+                               (Prelude.Int -> a1) -> SSError -> a1
+coq_SSError_rect f f0 f1 f2 s =
   case s of {
    ECurrentIsSingleton x -> f x;
    ENoIntervalsToSplit -> f0;
-   EFailedToAllocateRegister -> f1}
+   EFailedToAllocateRegister -> f1;
+   ERegisterAlreadyAssigned x -> f2 x}
 
-coq_SSError_rec :: (Prelude.Int -> a1) -> a1 -> a1 ->
-                              SSError -> a1
+coq_SSError_rec :: (Prelude.Int -> a1) -> a1 -> a1 -> (Prelude.Int
+                              -> a1) -> SSError -> a1
 coq_SSError_rec =
   coq_SSError_rect
 
@@ -1140,18 +1143,32 @@ moveUnhandledToActive :: ScanStateDesc ->
                                     PhysReg -> SState 
                                     a1 () ()
 moveUnhandledToActive pre reg x =
-  Prelude.Right ((,) ()
-    (case x of {
-      Build_SSInfo thisDesc0 thisHolds0 ->
-       case thisDesc0 of {
-        Build_ScanStateDesc nextInterval0 intervals0
-         fixedIntervals0 unhandled0 active0 inactive0 handled0 ->
-         case unhandled0 of {
-          [] -> Logic.coq_False_rect;
-          (:) p unhandled1 -> Build_SSInfo
-           (Build_ScanStateDesc nextInterval0 intervals0
-           fixedIntervals0 unhandled1 ((:) ((,) (Prelude.fst p) reg) active0)
-           inactive0 handled0) __}}}))
+  case x of {
+   Build_SSInfo thisDesc0 thisHolds0 ->
+    case thisDesc0 of {
+     Build_ScanStateDesc nextInterval0 intervals0 fixedIntervals0
+      unhandled0 active0 inactive0 handled0 ->
+      case unhandled0 of {
+       [] -> Logic.coq_False_rect;
+       (:) p unhandled1 ->
+        let {
+         _evar_0_ = \_ -> Prelude.Right ((,) () (Build_SSInfo
+          (Build_ScanStateDesc nextInterval0 intervals0
+          fixedIntervals0 unhandled1 ((:) ((,) (Prelude.fst p) reg) active0)
+          inactive0 handled0) __))}
+        in
+        let {
+         _evar_0_0 = \_ -> Prelude.Left (ERegisterAlreadyAssigned
+          ( reg))}
+        in
+        case Prelude.not
+               (Ssrbool.in_mem (unsafeCoerce reg)
+                 (Ssrbool.mem
+                   (Seq.seq_predType
+                     (Fintype.ordinal_eqType maxReg))
+                   (unsafeCoerce (Prelude.map (\i -> Prelude.snd i) active0)))) of {
+         Prelude.True -> _evar_0_ __;
+         Prelude.False -> _evar_0_0 __}}}}
 
 moveActiveToHandled :: ScanStateDesc ->
                                   Eqtype.Equality__Coq_sort ->
@@ -1384,9 +1401,26 @@ splitActiveIntervalForReg pre reg pos =
 splitAnyInactiveIntervalForReg :: ScanStateDesc ->
                                              PhysReg ->
                                              SState a1 () ()
-splitAnyInactiveIntervalForReg pre reg =
-  splitAssignedIntervalForReg pre reg Prelude.Nothing
-    Prelude.False
+splitAnyInactiveIntervalForReg pre reg ss =
+  (Prelude.flip (Prelude.$)) (\s _ _ ->
+    splitAssignedIntervalForReg s reg Prelude.Nothing
+      Prelude.False) (\_top_assumption_ ->
+    let {_top_assumption_0 = _top_assumption_ pre __ __} in
+    let {_top_assumption_1 = _top_assumption_0 ss} in
+    let {
+     _evar_0_ = \err -> Prelude.Right ((,) () (Build_SSInfo
+      (thisDesc pre ss) __))}
+    in
+    let {
+     _evar_0_0 = \_top_assumption_2 ->
+      let {_evar_0_0 = \_the_1st_wildcard_ ss' -> Prelude.Right ((,) () ss')}
+      in
+      case _top_assumption_2 of {
+       (,) x x0 -> _evar_0_0 x x0}}
+    in
+    case _top_assumption_1 of {
+     Prelude.Left x -> _evar_0_ x;
+     Prelude.Right x -> _evar_0_0 x})
 
 intersectsWithFixedInterval :: ScanStateDesc ->
                                           PhysReg ->
@@ -1530,8 +1564,8 @@ allocateBlockedReg pre =
                      (splitCurrentInterval pre (Prelude.Just n));
                   Prelude.Nothing -> moveUnhandledToActive pre reg}))
               (intersectsWithFixedInterval pre reg))
-            (splitAnyInactiveIntervalForReg pre reg))
-          (splitActiveIntervalForReg pre reg pos)}})
+            (splitActiveIntervalForReg pre reg pos))
+          (splitAnyInactiveIntervalForReg pre reg)}})
 
 morphlen_transport :: ScanStateDesc ->
                                  ScanStateDesc ->
@@ -1546,16 +1580,15 @@ mt_fst b b' x =
   case x of {
    (,) xid reg -> (,) (morphlen_transport b b' xid) reg}
 
-type Coq_int_reg = (,) IntervalId PhysReg
-
-type Coq_int_reg_seq = [] Coq_int_reg
+type Coq_int_reg_seq =
+  [] ((,) IntervalId PhysReg)
 
 type Coq_intermediate_result =
   Specif.Coq_sig2 ScanStateDesc
 
 goActive :: Prelude.Int -> ScanStateDesc ->
-                       ScanStateDesc -> Coq_int_reg ->
-                       Coq_int_reg_seq ->
+                       ScanStateDesc -> ((,) IntervalId
+                       PhysReg) -> Coq_int_reg_seq ->
                        Coq_intermediate_result
 goActive pos sd z x xs =
   case (Prelude.<=) ((Prelude.succ)
@@ -1591,42 +1624,77 @@ checkActiveIntervals pre pos =
     in
     IState.iput (Build_SSInfo res __))
 
+moveInactiveToActive' :: ScanStateDesc -> ((,)
+                                    IntervalId PhysReg)
+                                    -> Coq_int_reg_seq ->
+                                    Prelude.Either SSError
+                                    (Specif.Coq_sig2 ScanStateDesc)
+moveInactiveToActive' z x xs =
+  let {
+   filtered_var = Prelude.not
+                    (Ssrbool.in_mem (Prelude.snd (unsafeCoerce x))
+                      (Ssrbool.mem
+                        (Seq.seq_predType
+                          (Fintype.ordinal_eqType maxReg))
+                        (unsafeCoerce
+                          (Prelude.map (\i -> Prelude.snd i)
+                            (active z)))))}
+  in
+  case filtered_var of {
+   Prelude.True ->
+    let {filtered_var0 = moveInactiveToActive z (unsafeCoerce x)}
+    in
+    Prelude.Right filtered_var0;
+   Prelude.False -> Prelude.Left (ERegisterAlreadyAssigned
+    ( (Prelude.snd x)))}
+
 goInactive :: Prelude.Int -> ScanStateDesc ->
-                         ScanStateDesc -> Coq_int_reg ->
-                         Coq_int_reg_seq ->
+                         ScanStateDesc -> ((,) IntervalId
+                         PhysReg) -> Coq_int_reg_seq ->
+                         Prelude.Either SSError
                          Coq_intermediate_result
 goInactive pos sd z x xs =
+  let {f = \sd' -> Prelude.Right sd'} in
   case (Prelude.<=) ((Prelude.succ)
          (Interval.intervalEnd
            (
              (LinearScan.Utils.nth (nextInterval z)
                (intervals z) (Prelude.fst x))))) pos of {
-   Prelude.True -> moveInactiveToHandled z (unsafeCoerce x);
+   Prelude.True ->
+    let {filtered_var = moveInactiveToHandled z (unsafeCoerce x)}
+    in
+    f filtered_var;
    Prelude.False ->
     case Interval.intervalCoversPos
            (
              (LinearScan.Utils.nth (nextInterval z)
                (intervals z) (Prelude.fst x))) pos of {
-     Prelude.True -> moveInactiveToActive z (unsafeCoerce x);
-     Prelude.False -> z}}
+     Prelude.True ->
+      let {filtered_var = moveInactiveToActive' z x xs} in
+      case filtered_var of {
+       Prelude.Left err -> Prelude.Left err;
+       Prelude.Right s -> f s};
+     Prelude.False -> f z}}
 
 checkInactiveIntervals :: ScanStateDesc -> Prelude.Int
                                      -> SState () () ()
 checkInactiveIntervals pre pos =
   (Prelude.$) (withScanStatePO pre) (\sd _ ->
     let {
-     res = Lib.dep_foldl_inv (\s ->
-             Eqtype.prod_eqType
-               (Fintype.ordinal_eqType (nextInterval s))
-               (Fintype.ordinal_eqType maxReg)) sd
-             (unsafeCoerce (inactive sd))
-             (Data.List.length (inactive sd))
-             (unsafeCoerce inactive)
-             (unsafeCoerce (\x x0 _ -> mt_fst x x0))
-             (unsafeCoerce (\x _ x0 x1 _ ->
-               goInactive pos sd x x0 x1))}
+     eres = Lib.dep_foldl_invE (\s ->
+              Eqtype.prod_eqType
+                (Fintype.ordinal_eqType (nextInterval s))
+                (Fintype.ordinal_eqType maxReg)) sd
+              (unsafeCoerce (inactive sd))
+              (Data.List.length (inactive sd))
+              (unsafeCoerce inactive)
+              (unsafeCoerce (\x x0 _ -> mt_fst x x0))
+              (unsafeCoerce (\x _ x0 x1 _ ->
+                goInactive pos sd x x0 x1))}
     in
-    IState.iput (Build_SSInfo res __))
+    case eres of {
+     Prelude.Left err -> IState.ierr err;
+     Prelude.Right s -> IState.iput (Build_SSInfo s __)})
 
 handleInterval :: ScanStateDesc -> SState 
                              () () (Prelude.Maybe PhysReg)

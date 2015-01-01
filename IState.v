@@ -55,7 +55,7 @@ Obligation 2.
   by case.
 Qed.
 
-Definition ierr {i} (err : errType) : IState i i i :=
+Definition ierr {i} (err : errType) : IState i i unit :=
   mkIState (fun i => inl err).
 
 Definition iget  {i}     : IState i i i := mkIState (fun i => inr (i, i)).

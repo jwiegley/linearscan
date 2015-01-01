@@ -16,7 +16,8 @@ Include Mach.
 Inductive SSError : Set :=
   | ECurrentIsSingleton : nat -> SSError
   | ENoIntervalsToSplit
-  | EFailedToAllocateRegister.
+  | EFailedToAllocateRegister
+  | ERegisterAlreadyAssigned : nat -> SSError.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
@@ -206,8 +207,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; fixedIntervals   := fixints
        |} ->
-    (* jww (2014-11-05): NYI *)
-    (* reg \notin [seq snd i | i <- act ++ inact] -> *)
+    reg \notin [seq snd i | i <- act] ->
     ScanState
       {| nextInterval     := ni
        ; unhandled        := unh
@@ -244,6 +244,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
 
   | ScanState_moveInactiveToActive sd :
     ScanState sd -> forall x, x \in inactive sd ->
+    snd x \notin [seq snd i | i <- active sd] ->
     ScanState
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd

@@ -146,8 +146,9 @@ Definition SState (sd : ScanStateDesc) P Q :=
   IState SSError (SSInfo sd P) (SSInfo sd Q).
 
 Definition withScanState {a pre} {P Q}
-  (f : forall sd : ScanStateDesc, ScanState sd -> SState pre P Q a) :
-  SState pre P Q a := iget SSError >>>= fun i => f (thisDesc i) (thisState i).
+  (f : forall sd : ScanStateDesc, ScanState sd
+         -> SState pre P Q a) : SState pre P Q a :=
+  iget SSError >>>= fun i => f (thisDesc i) (thisState i).
 
 Arguments withScanState {a pre P Q} f.
 
@@ -271,8 +272,6 @@ Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P SSMorphSt unit.
 Proof.
   constructor. intros.
-  apply inr.
-  split. apply tt.
   destruct H.
   destruct X.
   specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
@@ -282,7 +281,11 @@ Proof.
   destruct len_is_SSMorph0.
   destruct unhandled0; simpl in *; first by [].
   destruct p.
-  pose (ScanState_moveUnhandledToActive reg thisState0).
+  case H: (reg \notin [seq snd i | i <- active0]);
+    last exact: (inl (ERegisterAlreadyAssigned reg)).
+  apply inr.
+  split. apply tt.
+  pose (ScanState_moveUnhandledToActive thisState0 H).
   eapply {| thisState := s |}.
   Grab Existential Variables.
   pose (unhandledExtent_cons (i, n) unhandled0 intervals0
@@ -313,16 +316,24 @@ Proof.
   apply Build_SSMorph; auto.
 Defined.
 
-Definition moveInactiveToActive `(st : ScanState sd) `(H : x \in inactive sd) :
+Definition moveInactiveToActive `(st : ScanState sd) `(H : x \in inactive sd)
+  (Hreg : snd x \notin [seq snd i | i <- active sd]) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
-  pose (ScanState_moveInactiveToActive st H).
+  pose (ScanState_moveInactiveToActive st H Hreg).
   eexists. apply s.
   apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.
 Defined.
 
-Definition moveInactiveToHandled `(st : ScanState sd) `(H : x \in inactive sd) :
+Lemma moveInactiveToActive_spec `(st : ScanState sd) `(H : x \in inactive sd)
+  (Hreg : snd x \notin [seq snd i | i <- active sd]) :
+  let: exist2 sd' st' sslen' := moveInactiveToActive st H Hreg in
+  nextInterval sd = nextInterval sd'.
+Proof. reflexivity. Qed.
+
+Definition moveInactiveToHandled `(st : ScanState sd)
+  `(H : x \in inactive sd) :
   { sd' : ScanStateDesc | ScanState sd' & SSMorphLen sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
@@ -516,7 +527,18 @@ Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
   splitAssignedIntervalForReg reg (Some pos) true.
 
 Definition splitAnyInactiveIntervalForReg {pre P} `{W : HasWork P}
-  (reg : PhysReg) : SState pre P SSMorphHasLen unit :=
-  splitAssignedIntervalForReg reg None false.
+  (reg : PhysReg) : SState pre P SSMorphHasLen unit.
+Proof.
+  exists=> [] ss.
+  have := splitAssignedIntervalForReg reg None false.
+  move=> /(_ pre P W); case; move=> /(_ ss).
+  case=> [err|[_ ss']]; right; split; try constructor.
+    case: W => /(_ pre (thisDesc ss) (thisHolds ss))
+            => sshaslen.
+    exact: {| thisDesc  := thisDesc ss
+            ; thisHolds := sshaslen
+            ; thisState := thisState ss |}.
+  exact: ss'.
+Defined.
 
 End MSSMorph.

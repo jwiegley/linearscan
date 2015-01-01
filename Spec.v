@@ -119,38 +119,15 @@ Theorem allocated_regs_are_unique `(st : ScanState sd) :
   uniq ([ seq snd i | i <- active sd ]).
 Proof.
   ScanState_cases (induction st) Case.
-  - Case "ScanState_nil". by [].
-
-  - Case "ScanState_newUnhandled". by rewrite -map_comp.
-  - Case "ScanState_newInactive".  by rewrite -map_comp.
-
-  - Case "ScanState_setInterval".       exact: IHst.
-  - Case "ScanState_setFixedIntervals". exact: IHst.
-
-  - Case "ScanState_moveUnhandledToActive".
-    move=> /= in IHst *; apply/andP; split=> //.
-    (* jww (2014-10-31): Need the following evidence here:
-         reg \notin [seq snd i | i <- act]
-
-       This will need to come from the [ScanState_moveUnhandledToActive]
-       constructor, but doing so will require obtaining it from the algorithm,
-       which may be a substantial change. *)
-    admit.
-
-  - Case "ScanState_moveActiveToInactive". exact: proj_rem_uniq.
-  - Case "ScanState_moveActiveToHandled".  exact: proj_rem_uniq.
-
-  - Case "ScanState_moveInactiveToActive".
-    rewrite /=.
-    apply/andP; split; last by [].
-    (* jww (2014-12-15): Here we need to know that:
-         snd x \notin [seq snd i | i <- active sd]
-
-       I.e., that we are not adding a register to [active] which is already
-       present.  See the note above for [ScanState_moveUnhandledToActive],
-       since the requirements are the same. *)
-    admit.
-
+  - Case "ScanState_nil".                   by [].
+  - Case "ScanState_newUnhandled".          by rewrite -map_comp.
+  - Case "ScanState_newInactive".           by rewrite -map_comp.
+  - Case "ScanState_setInterval".           exact: IHst.
+  - Case "ScanState_setFixedIntervals".     exact: IHst.
+  - Case "ScanState_moveUnhandledToActive". by apply/andP.
+  - Case "ScanState_moveActiveToInactive".  exact: proj_rem_uniq.
+  - Case "ScanState_moveActiveToHandled".   exact: proj_rem_uniq.
+  - Case "ScanState_moveInactiveToActive".  by apply/andP.
   - Case "ScanState_moveInactiveToHandled". by [].
 Qed.
 

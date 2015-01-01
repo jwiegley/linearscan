@@ -69,3 +69,29 @@ dep_foldl_inv e b v n q f f0 =
         dep_foldl_inv e filtered_var0 ys' n' q f f0)
         n0}}
 
+dep_foldl_invE :: (a2 -> Eqtype.Equality__Coq_type) -> a2 -> ([]
+                  Eqtype.Equality__Coq_sort) -> Prelude.Int -> (a2 -> []
+                  Eqtype.Equality__Coq_sort) -> (a2 -> a2 -> () ->
+                  Eqtype.Equality__Coq_sort -> Eqtype.Equality__Coq_sort) ->
+                  (a2 -> () -> Eqtype.Equality__Coq_sort -> ([]
+                  Eqtype.Equality__Coq_sort) -> () -> Prelude.Either 
+                  a1 (Specif.Coq_sig2 a2)) -> Prelude.Either a1 a2
+dep_foldl_invE e b v n q f f0 =
+  let {filtered_var = (,) v n} in
+  case filtered_var of {
+   (,) l n0 ->
+    case l of {
+     [] -> Prelude.Right b;
+     (:) y ys ->
+      (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+        (\_ -> Prelude.Right
+        b)
+        (\n' ->
+        let {filtered_var0 = f0 b __ y ys __} in
+        case filtered_var0 of {
+         Prelude.Left err -> Prelude.Left err;
+         Prelude.Right s ->
+          let {ys' = Prelude.map (f b s __) ys} in
+          dep_foldl_invE e s ys' n' q f f0})
+        n0}}
+

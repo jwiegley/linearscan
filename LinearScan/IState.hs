@@ -46,6 +46,10 @@ coq_IState_IFunctor _ _ _ _ f x st =
     case p of {
      (,) a st' -> Prelude.Right ((,) (f a) st')}}
 
+ierr :: a1 -> IState a1 a2 a2 ()
+ierr err i =
+  Prelude.Left err
+
 iget :: IState a1 a2 a2 a2
 iget i =
   Prelude.Right ((,) i i)
