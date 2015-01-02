@@ -360,6 +360,23 @@ Proof.
   by invert; apply ord_inj.
 Qed.
 
+Lemma widen_fst_inj : forall a n,
+  injective (widen_fst (a:=a) (n:=n)).
+Proof.
+  move=> a n.
+  rewrite /injective => x1 x2.
+  invert.
+  destruct x1.
+  destruct x2.
+  simpl in *. subst.
+  f_equal.
+  destruct o. destruct o0. subst.
+  unfold nat_of_ord in *.
+  rewrite H0 in i *.
+  have ->: i = i0 by exact: eq_irrelevance.
+  by [].
+Qed.
+
 Lemma no_ord_max : forall n (xs : seq ('I_n)),
   ord_max \notin [ seq widen_id i | i <- xs ].
 Proof.

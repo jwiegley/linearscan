@@ -385,4 +385,69 @@ Proof.
   exact: (in_notin Hin).
 Qed.
 
+Lemma neq_sym : forall (A : eqType) (x y : A),
+  x != y -> y != x.
+Proof.
+  move=> A x y Hneq.
+  move/eqP in Hneq.
+  apply/eqP.
+  by auto.
+Qed.
+
+Lemma in_rem : forall (a : eqType) (y x : a) xs,
+  y \in rem x xs -> x != y -> y \in xs.
+Proof.
+  move=> a y x.
+  elim=> // [z zs IHzs] Hrem Hneq.
+  rewrite in_cons.
+  apply/orP.
+  case Heq: (y == z).
+    by left.
+  right.
+  apply: IHzs; last by [].
+  have: y != z.
+    apply/eqP.
+    by move/eqP in Heq.
+  admit.
+Qed.
+
+Lemma no_overlapping_intervals `(st : ScanState sd) : forall x y,
+  x \in active sd -> y \in inactive sd ->
+    ~~ (intervalsIntersect (getInterval (fst x))
+                           (getInterval (fst y))).
+Proof.
+  move=> x y Hinx Hiny.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    have Hinx' := Hinx.
+    move: Hinx' => /mapP. case=> x0 _ Heqx.
+    have Hiny' := Hiny.
+    move: Hiny' => /mapP. case=> y0 _ Heqy.
+    subst.
+    rewrite !vnth_vshiftin.
+    move: Hinx Hiny.
+    rewrite !mem_map.
+    - exact: IHst.
+    - exact: widen_fst_inj.
+    - exact: widen_fst_inj.
+  - Case "ScanState_newInactive". admit.
+  - Case "ScanState_setInterval". admit.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
+  - Case "ScanState_moveUnhandledToActive". admit.
+  - Case "ScanState_moveActiveToInactive".
+    apply: IHst.
+    + case Heqe: (x == x0).
+        by move/eqP: Heqe => ->.
+      apply: (in_rem (y:=x) (x:=x0)).
+        by [].
+      apply: neq_sym.
+      move/eqP in Heqe.
+      by apply/eqP.
+    + admit.
+  - Case "ScanState_moveActiveToHandled". admit.
+  - Case "ScanState_moveInactiveToActive". admit.
+  - Case "ScanState_moveInactiveToHandled". admit.
+Qed.
+
 End MLinearSpec.

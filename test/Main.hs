@@ -189,7 +189,7 @@ main = hspec $ do
         regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
         regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
 
-    it "Induce spillage of one variable" $ asmTest
+    it "Spilling one variable" $ asmTest
         (do {-  1 -} add v0   v1  v2
             {-  3 -} add v3   v4  v5
             {-  5 -} add v6   v7  v8

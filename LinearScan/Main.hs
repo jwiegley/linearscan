@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-
+import Debug.Trace
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -463,6 +463,7 @@ data SSError =
  | ENoIntervalsToSplit
  | EFailedToAllocateRegister
  | ERegisterAlreadyAssigned Prelude.Int
+  deriving Prelude.Show
 
 coq_SSError_rect :: (Prelude.Int -> a1) -> a1 -> a1 ->
                                (Prelude.Int -> a1) -> SSError -> a1
@@ -1696,6 +1697,17 @@ checkInactiveIntervals pre pos =
      Prelude.Left err -> IState.ierr err;
      Prelude.Right s -> IState.iput (Build_SSInfo s __)})
 
+display :: Prelude.String -> SState a b c -> SState a b c
+display label k ss@(Build_SSInfo sd _) =
+    let f x = (unhandled x, active x, inactive x, handled x) in
+    case IState.runIState k
+             (trace (label GHC.Base.++ " - sd: "
+                           GHC.Base.++ Prelude.show (f sd)) ss) of
+        Prelude.Left e -> Prelude.error (Prelude.show e)
+        x@(Prelude.Right (_, Build_SSInfo sd' _)) ->
+            trace (label GHC.Base.++ " - sd': "
+                         GHC.Base.++ Prelude.show (f sd')) x
+
 handleInterval :: ScanStateDesc -> SState 
                              () () (Prelude.Maybe PhysReg)
 handleInterval pre =
@@ -1714,7 +1726,7 @@ handleInterval pre =
         (liftLen pre (\sd0 ->
           checkInactiveIntervals sd0 position)))
       (liftLen pre (\sd0 ->
-        checkActiveIntervals sd0 position)))
+        (display "checkActiveIntervals" GHC.Base.$ checkActiveIntervals sd0 position))))
 
 walkIntervals_func :: ((,) ScanStateDesc ()) ->
                                  Prelude.Either SSError
