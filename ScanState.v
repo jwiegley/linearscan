@@ -14,10 +14,11 @@ Module MScanState (Mach : Machine).
 Include Mach.
 
 Inductive SSError : Set :=
-  | ECurrentIsSingleton : nat -> SSError
+  | ECannotSplitSingleton : nat -> SSError
+  | ECannotSplitAssignedSingleton : nat -> SSError
   | ENoIntervalsToSplit
-  | EFailedToAllocateRegister
-  | ERegisterAlreadyAssigned : nat -> SSError.
+  | ERegisterAlreadyAssigned : nat -> SSError
+  | ERegisterAssignmentsOverlap : nat -> SSError.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :

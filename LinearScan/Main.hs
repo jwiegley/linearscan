@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-import Debug.Trace
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -459,23 +459,26 @@ maxReg =
 type PhysReg = Prelude.Int
 
 data SSError =
-   ECurrentIsSingleton Prelude.Int
+   ECannotSplitSingleton Prelude.Int
+ | ECannotSplitAssignedSingleton Prelude.Int
  | ENoIntervalsToSplit
- | EFailedToAllocateRegister
  | ERegisterAlreadyAssigned Prelude.Int
-  deriving Prelude.Show
+ | ERegisterAssignmentsOverlap Prelude.Int
 
-coq_SSError_rect :: (Prelude.Int -> a1) -> a1 -> a1 ->
-                               (Prelude.Int -> a1) -> SSError -> a1
-coq_SSError_rect f f0 f1 f2 s =
+coq_SSError_rect :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
+                               a1 -> (Prelude.Int -> a1) -> (Prelude.Int ->
+                               a1) -> SSError -> a1
+coq_SSError_rect f f0 f1 f2 f3 s =
   case s of {
-   ECurrentIsSingleton x -> f x;
-   ENoIntervalsToSplit -> f0;
-   EFailedToAllocateRegister -> f1;
-   ERegisterAlreadyAssigned x -> f2 x}
+   ECannotSplitSingleton x -> f x;
+   ECannotSplitAssignedSingleton x -> f0 x;
+   ENoIntervalsToSplit -> f1;
+   ERegisterAlreadyAssigned x -> f2 x;
+   ERegisterAssignmentsOverlap x -> f3 x}
 
-coq_SSError_rec :: (Prelude.Int -> a1) -> a1 -> a1 -> (Prelude.Int
-                              -> a1) -> SSError -> a1
+coq_SSError_rec :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
+                              a1 -> (Prelude.Int -> a1) -> (Prelude.Int ->
+                              a1) -> SSError -> a1
 coq_SSError_rec =
   coq_SSError_rect
 
@@ -1251,7 +1254,7 @@ splitCurrentInterval pre before ssi =
          _evar_0_0 = \uid beg us holds0 ->
           let {int = LinearScan.Utils.nth _nextInterval_ intervals0 uid} in
           let {
-           _evar_0_0 = \_ -> Prelude.Left (ECurrentIsSingleton
+           _evar_0_0 = \_ -> Prelude.Left (ECannotSplitSingleton
             ( uid))}
           in
           let {
@@ -1339,8 +1342,8 @@ splitAssignedIntervalForReg pre reg pos trueForActives ssi =
          _evar_0_0 = \aid _the_1st_wildcard_ ->
           let {int = LinearScan.Utils.nth ni intervals0 aid} in
           let {
-           _evar_0_0 = \_ -> Prelude.Left (ECurrentIsSingleton
-            ( aid))}
+           _evar_0_0 = \_ -> Prelude.Left
+            (ECannotSplitAssignedSingleton ( aid))}
           in
           let {
            _evar_0_1 = \_ -> Prelude.Right ((,) ()
@@ -1646,7 +1649,7 @@ moveInactiveToActive' z x xs =
     let {filtered_var0 = moveInactiveToActive z (unsafeCoerce x)}
     in
     Prelude.Right filtered_var0;
-   Prelude.False -> Prelude.Left (ERegisterAlreadyAssigned
+   Prelude.False -> Prelude.Left (ERegisterAssignmentsOverlap
     ( (Prelude.snd x)))}
 
 goInactive :: Prelude.Int -> ScanStateDesc ->
@@ -1697,17 +1700,6 @@ checkInactiveIntervals pre pos =
      Prelude.Left err -> IState.ierr err;
      Prelude.Right s -> IState.iput (Build_SSInfo s __)})
 
-display :: Prelude.String -> SState a b c -> SState a b c
-display label k ss@(Build_SSInfo sd _) =
-    let f x = (unhandled x, active x, inactive x, handled x) in
-    case IState.runIState k
-             (trace (label GHC.Base.++ " - sd: "
-                           GHC.Base.++ Prelude.show (f sd)) ss) of
-        Prelude.Left e -> Prelude.error (Prelude.show e)
-        x@(Prelude.Right (_, Build_SSInfo sd' _)) ->
-            trace (label GHC.Base.++ " - sd': "
-                         GHC.Base.++ Prelude.show (f sd')) x
-
 handleInterval :: ScanStateDesc -> SState 
                              () () (Prelude.Maybe PhysReg)
 handleInterval pre =
@@ -1726,7 +1718,7 @@ handleInterval pre =
         (liftLen pre (\sd0 ->
           checkInactiveIntervals sd0 position)))
       (liftLen pre (\sd0 ->
-        (display "checkActiveIntervals" GHC.Base.$ checkActiveIntervals sd0 position))))
+        checkActiveIntervals sd0 position)))
 
 walkIntervals_func :: ((,) ScanStateDesc ()) ->
                                  Prelude.Either SSError

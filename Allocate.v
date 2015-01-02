@@ -260,7 +260,7 @@ Program Definition moveInactiveToActive' `(st : ScanState z)
       | exist2 sd' st' sslen' =>
           inr (exist2 _ _ sd' st' (exist _ sslen' _))
       end
-  | false => inl (ERegisterAlreadyAssigned (snd x : PhysReg))
+  | false => inl (ERegisterAssignmentsOverlap (snd x : PhysReg))
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.

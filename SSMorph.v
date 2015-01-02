@@ -363,7 +363,7 @@ Proof.
   (* jww (2014-11-06): This could come from the input state, along the lines
      of SSMorphSplit, above. *)
   case Hnotsing: (Interval_is_singleton int.2).
-    apply (inl (ECurrentIsSingleton uid)). (* ERROR *)
+    apply (inl (ECannotSplitSingleton uid)). (* ERROR *)
   apply: (inr (tt, _)).
   move/negbT in Hnotsing.
   have Hlt := Interval_rds_size_bounded Hnotsing.
@@ -446,7 +446,7 @@ Proof.
   (* jww (2014-11-06): This could come from the input state, along the lines
      of SSMorphSplit, above. *)
   case Hnotsing: (Interval_is_singleton int.2).
-    apply (inl (ECurrentIsSingleton aid)). (* ERROR *)
+    apply (inl (ECannotSplitAssignedSingleton aid)). (* ERROR *)
   apply: (inr (tt, _)).
   move/negbT in Hnotsing.
   have Hlt := Interval_rds_size_bounded Hnotsing.
