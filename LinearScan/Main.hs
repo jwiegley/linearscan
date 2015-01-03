@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-
+import Debug.Trace
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -1517,19 +1517,29 @@ allocateBlockedReg :: ScanStateDesc -> SState
 allocateBlockedReg pre =
   (Prelude.$) (withCursor pre) (\sd _ ->
     let {start = Interval.intervalStart ( (curIntDetails sd))} in
+    let {pos = curPosition sd} in
     let {
-     go = Data.List.foldl' (\v p ->
-            case p of {
-             (,) i r ->
-              LinearScan.Utils.set_nth maxReg v r
-                (Interval.nextUseAfter
-                  (
-                    (LinearScan.Utils.nth (nextInterval sd)
-                      (intervals sd) i)) start)})}
+     go = \v p ->
+      case p of {
+       (,) i r ->
+        case Interval.findIntervalUsePos
+               (
+                 (LinearScan.Utils.nth (nextInterval sd)
+                   (intervals sd) i)) (\u ->
+               Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce pos)
+                 (unsafeCoerce (Range.uloc u))) of {
+         Prelude.Just p0 -> trace "Just" v;
+         Prelude.Nothing -> trace "Nothing" Prelude.$
+          LinearScan.Utils.set_nth maxReg v r
+            (Interval.nextUseAfter
+              (
+                (LinearScan.Utils.nth (nextInterval sd)
+                  (intervals sd) i)) start)}}}
     in
     let {
-     nextUsePos' = go (Data.List.replicate maxReg Prelude.Nothing)
-                     (active sd)}
+     nextUsePos' = Data.List.foldl' go
+                     (Data.List.replicate maxReg Prelude.Nothing)
+                     (traceShow (active sd) (active sd))}
     in
     let {
      intersectingIntervals = Prelude.filter (\x ->
@@ -1542,8 +1552,10 @@ allocateBlockedReg pre =
                                      (Prelude.fst x))))
                                (inactive sd)}
     in
-    let {nextUsePos = go nextUsePos' intersectingIntervals} in
-    case registerWithHighestPos nextUsePos of {
+    let {nextUsePos = Data.List.foldl' go nextUsePos' intersectingIntervals}
+    in
+    let reg'' = registerWithHighestPos (traceShow nextUsePos nextUsePos) in
+    case (traceShow reg'' reg'') of {
      (,) reg mres ->
       case case mres of {
             Prelude.Just n -> (Prelude.<=) ((Prelude.succ) n) start;
@@ -1562,7 +1574,6 @@ allocateBlockedReg pre =
           (splitCurrentInterval pre
             (Interval.firstUseReqReg ( (curIntDetails sd))));
        Prelude.False ->
-        let {pos = curPosition sd} in
         stbind (\x ->
           stbind (\x0 ->
             stbind (\mloc ->

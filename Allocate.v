@@ -90,20 +90,24 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
   withCursor $ fun sd cur =>
     let current := curInterval cur in
     let start   := intervalStart current in
+    let pos     := curPosition cur in
 
     (* set nextUsePos of all physical registers to maxInt
        for each interval it in active do
          nextUsePos[it.reg] = next use of it after start of current
        for each interval it in inactive intersecting with current do
          nextUsePos[it.reg] = next use of it after start of current *)
-    let go := foldl (fun v p =>
-                let: (i, r) := p in
-                vreplace v r (nextUseAfter (getInterval i) start)) in
-    let nextUsePos' := go (vconst None) (active sd) in
+    let go v p := let: (i, r) := p in
+        let int := getInterval i in
+        match findIntervalUsePos int (fun u => pos == uloc u) with
+        | Some _ => v
+        | None   => vreplace v r (nextUseAfter int start)
+        end in
+    let nextUsePos' := foldl go (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
-    let nextUsePos := go nextUsePos' intersectingIntervals in
+    let nextUsePos := foldl go nextUsePos' intersectingIntervals in
 
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
@@ -141,7 +145,6 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       weakenStHasLenToSt ;;;
       return_ None
     else
-      let pos := curPosition cur in
       splitAnyInactiveIntervalForReg reg ;;;
       splitActiveIntervalForReg reg pos ;;;
 
