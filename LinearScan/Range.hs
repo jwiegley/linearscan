@@ -8,7 +8,6 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 import qualified LinearScan.Lib as Lib
-import qualified LinearScan.NonEmpty0 as NonEmpty0
 
 
 __ :: any
@@ -98,16 +97,19 @@ rangeIntersectionPoint x y =
 findRangeUsePos :: RangeDesc -> (UsePos -> Prelude.Bool) -> Prelude.Maybe
                    UsePos
 findRangeUsePos r f =
-  let {n = ups r} in
-  NonEmpty0.coq_NonEmpty_rec (\u ->
-    let {b = f u} in
-    case b of {
-     Prelude.True -> Prelude.Just u;
-     Prelude.False -> Prelude.Nothing}) (\u us iHus ->
-    let {b = f u} in
-    case b of {
-     Prelude.True -> Prelude.Just u;
-     Prelude.False -> iHus}) n
+  let {
+   go xs =
+     (\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)
+       (\x ->
+       case f x of {
+        Prelude.True -> Prelude.Just x;
+        Prelude.False -> Prelude.Nothing})
+       (\x xs0 ->
+       case f x of {
+        Prelude.True -> Prelude.Just x;
+        Prelude.False -> go xs0})
+       xs}
+  in go (ups r)
 
 makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> ([] UsePos) ->
                     ([] UsePos) ->

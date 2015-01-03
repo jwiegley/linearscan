@@ -11,6 +11,7 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 import qualified LinearScan.Ssrbool as Ssrbool
+import qualified LinearScan.Ssrfun as Ssrfun
 
 
 
@@ -141,4 +142,43 @@ prod_eqMixin t1 t2 =
 prod_eqType :: Equality__Coq_type -> Equality__Coq_type -> Equality__Coq_type
 prod_eqType t1 t2 =
   unsafeCoerce (prod_eqMixin t1 t2)
+
+opt_eq :: Equality__Coq_type -> (Prelude.Maybe Equality__Coq_sort) ->
+          (Prelude.Maybe Equality__Coq_sort) -> Prelude.Bool
+opt_eq t u v =
+  Ssrfun._Option__apply (\x ->
+    Ssrfun._Option__apply (eq_op t x) Prelude.False v)
+    (Prelude.not (Ssrbool.isSome v)) u
+
+opt_eqP :: Equality__Coq_type -> Equality__Coq_axiom
+           (Prelude.Maybe Equality__Coq_sort)
+opt_eqP t _top_assumption_ =
+  let {
+   _evar_0_ = \x _top_assumption_0 ->
+    let {_evar_0_ = \y -> Ssrbool.iffP (eq_op t x y) (eqP t x y)} in
+    let {_evar_0_0 = Ssrbool.ReflectF} in
+    case _top_assumption_0 of {
+     Prelude.Just x0 -> _evar_0_ x0;
+     Prelude.Nothing -> _evar_0_0}}
+  in
+  let {
+   _evar_0_0 = \_top_assumption_0 ->
+    let {_evar_0_0 = \y -> Ssrbool.ReflectF} in
+    let {_evar_0_1 = Ssrbool.ReflectT} in
+    case _top_assumption_0 of {
+     Prelude.Just x -> _evar_0_0 x;
+     Prelude.Nothing -> _evar_0_1}}
+  in
+  case _top_assumption_ of {
+   Prelude.Just x -> _evar_0_ x;
+   Prelude.Nothing -> _evar_0_0}
+
+option_eqMixin :: Equality__Coq_type -> Equality__Coq_mixin_of
+                  (Prelude.Maybe Equality__Coq_sort)
+option_eqMixin t =
+  Equality__Mixin (opt_eq t) (opt_eqP t)
+
+option_eqType :: Equality__Coq_type -> Equality__Coq_type
+option_eqType t =
+  unsafeCoerce (option_eqMixin t)
 

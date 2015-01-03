@@ -1,4 +1,4 @@
-module LinearScan.NonEmpty0 where
+module LinearScan.Peano where
 
 
 import qualified Prelude

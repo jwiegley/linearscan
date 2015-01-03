@@ -313,16 +313,12 @@ Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) : option nat :
   then Some (minn (rbeg x) (rbeg y))
   else None.
 
-Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos.
-Proof.
-  induction (ups r) as [u|u us].
-    destruct (f u).
-      apply (Some u).
-    apply None.
-  destruct (f u).
-    apply (Some u).
-  apply IHus.
-Defined.
+Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
+  let fix go xs := match xs with
+      | NE_Sing x    => if f x then Some x else None
+      | NE_Cons x xs => if f x then Some x else go xs
+      end in
+  go (ups r).
 
 Record SplittableUsePos `(Range r) := {
     splittable_UsePos : UsePos;

@@ -438,21 +438,25 @@ Proof.
   case=> /=; case.
   case: desc => /= ni intervals0 ? unh active0 ? ? in holds intids st *.
 
-  case: intids
-    => //= [|aid _] len_is_SSMorph0 unhandled_nonempty first_nonempty.
-    apply (inl ENoIntervalsToSplit). (* ERROR *)
+  elim: intids
+    => /= [|aid aids IHaids] len_is_SSMorph0 unhandled_nonempty first_nonempty.
+    exact: (inl ENoIntervalsToSplit). (* ERROR *)
 
   set int := vnth intervals0 aid.
   (* jww (2014-11-06): This could come from the input state, along the lines
      of SSMorphSplit, above. *)
   case Hnotsing: (Interval_is_singleton int.2).
-    apply (inl (ECannotSplitAssignedSingleton aid)). (* ERROR *)
-  apply: (inr (tt, _)).
+    exact: IHaids.
+
   move/negbT in Hnotsing.
   have Hlt := Interval_rds_size_bounded Hnotsing.
 
-  move: (@splitPosition _ int.2 pos false Hlt)
-    => [pos' Hmid].
+  move: (@splitPosition _ int.2 pos false Hlt) => [pos' Hmid].
+  case: (pos == Some pos'.-1).
+    exact: IHaids.
+
+  apply: (inr (tt, _)).
+
   move: (splitInterval_spec Hmid).
   case: (splitInterval Hmid)
     => [[[id0 i0] [id1 i1]] [/= H1 H2 /eqP H3 /eqP H4 H5]] Hdim.
@@ -487,7 +491,7 @@ Proof.
     apply: (leq_trans _ total_extent_decreases).
     rewrite /unhandledExtent /=
             {holds state st new_inactive_added set_int_desc
-             unhandled_nonempty total_extent_decreases}.
+             unhandled_nonempty total_extent_decreases IHaids}.
     elim: unh => // [u us IHus] in first_nonempty Huniq_state Huniq_st *.
     case: us => /= [|y ys] in IHus first_nonempty Huniq_state Huniq_st *.
       simpl.

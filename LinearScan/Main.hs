@@ -10,6 +10,7 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
+import qualified LinearScan.Datatypes as Datatypes
 import qualified LinearScan.IApplicative as IApplicative
 import qualified LinearScan.IEndo as IEndo
 import qualified LinearScan.IMonad as IMonad
@@ -1339,54 +1340,60 @@ splitAssignedIntervalForReg pre reg pos trueForActives ssi =
         let {_evar_0_ = \_ _ _ -> Prelude.Left ENoIntervalsToSplit}
         in
         let {
-         _evar_0_0 = \aid _the_1st_wildcard_ ->
+         _evar_0_0 = \aid aids iHaids ->
           let {int = LinearScan.Utils.nth ni intervals0 aid} in
+          let {_evar_0_0 = \_ -> iHaids __ __ __} in
           let {
-           _evar_0_0 = \_ -> Prelude.Left
-            (ECannotSplitAssignedSingleton ( aid))}
-          in
-          let {
-           _evar_0_1 = \_ -> Prelude.Right ((,) ()
-            ((Prelude.flip (Prelude.$)) __ (\_ ->
+           _evar_0_1 = \_ ->
+            (Prelude.flip (Prelude.$)) __ (\_ ->
               let {
                _top_assumption_ = Interval.splitPosition ( int) pos
                                     Prelude.False}
               in
+              let {_evar_0_1 = iHaids __ __ __} in
               let {
-               _top_assumption_0 = Interval.splitInterval _top_assumption_
-                                     ( int)}
+               _evar_0_2 = Prelude.Right ((,) ()
+                (let {
+                  _top_assumption_0 = Interval.splitInterval _top_assumption_
+                                        ( int)}
+                 in
+                 let {
+                  _evar_0_2 = \_top_assumption_1 _top_assumption_2 ->
+                   let {
+                    _evar_0_2 = \_ ->
+                     (Prelude.flip (Prelude.$)) __ (\_ ->
+                       (Prelude.flip (Prelude.$)) __
+                         (let {
+                           new_inactive_added = Build_ScanStateDesc
+                            ((Prelude.succ) ni)
+                            (LinearScan.Utils.snoc ni
+                              (LinearScan.Utils.set_nth ni intervals0 aid
+                                _top_assumption_1) _top_assumption_2)
+                            _fixedIntervals_ (Prelude.map Prelude.id unh)
+                            (Prelude.map Prelude.id active0) ((:) ((,) 
+                            ( ni) reg) (Prelude.map Prelude.id _inactive_))
+                            (Prelude.map Prelude.id _handled_)}
+                          in
+                          \_ -> Build_SSInfo new_inactive_added __))}
+                   in
+                    _evar_0_2 __}
+                 in
+                 case _top_assumption_0 of {
+                  (,) x x0 -> _evar_0_2 x x0}))}
               in
-              let {
-               _evar_0_1 = \_top_assumption_1 _top_assumption_2 ->
-                let {
-                 _evar_0_1 = \_ ->
-                  (Prelude.flip (Prelude.$)) __ (\_ ->
-                    (Prelude.flip (Prelude.$)) __
-                      (let {
-                        new_inactive_added = Build_ScanStateDesc
-                         ((Prelude.succ) ni)
-                         (LinearScan.Utils.snoc ni
-                           (LinearScan.Utils.set_nth ni intervals0 aid
-                             _top_assumption_1) _top_assumption_2)
-                         _fixedIntervals_ (Prelude.map Prelude.id unh)
-                         (Prelude.map Prelude.id active0) ((:) ((,) ( ni)
-                         reg) (Prelude.map Prelude.id _inactive_))
-                         (Prelude.map Prelude.id _handled_)}
-                       in
-                       \_ -> Build_SSInfo new_inactive_added __))}
-                in
-                 _evar_0_1 __}
-              in
-              case _top_assumption_0 of {
-               (,) x x0 -> _evar_0_1 x x0})))}
+              case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                     (unsafeCoerce pos)
+                     (unsafeCoerce (Prelude.Just
+                       (Prelude.pred _top_assumption_))) of {
+               Prelude.True -> _evar_0_1;
+               Prelude.False -> _evar_0_2})}
           in
           case Interval.coq_Interval_is_singleton ( int) of {
            Prelude.True -> _evar_0_0 __;
            Prelude.False -> _evar_0_1 __}}
         in
-        case intids0 of {
-         [] -> _evar_0_;
-         (:) x x0 -> (\_ _ _ -> _evar_0_0 x x0)}}
+        Datatypes.list_rect _evar_0_ (\aid aids iHaids _ _ _ ->
+          _evar_0_0 aid aids iHaids) intids0}
       in
       case desc of {
        Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 ->
