@@ -99,10 +99,13 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
          nextUsePos[it.reg] = next use of it after start of current *)
     let go v p := let: (i, r) := p in
         let int := getInterval i in
-        match findIntervalUsePos int (fun u => pos == uloc u) with
-        | Some _ => v
-        | None   => vreplace v r (nextUseAfter int start)
-        end in
+        let atPos u := pos == uloc u in
+        let pos' :=
+            match findIntervalUsePos int atPos with
+            | Some _ => Some 0
+            | None   => nextUseAfter int start
+            end in
+        vreplace v r pos' in
     let nextUsePos' := foldl go (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))

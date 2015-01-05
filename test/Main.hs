@@ -223,7 +223,7 @@ main = hspec $ do
         regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
         regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
         regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
-        regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 29
+        regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 27
         regs $ alloc  2  0 >> alloc  1  1 >> alloc  0  2
         regs $ alloc  5  3 >> alloc  4  4 >> alloc  3  5
         regs $ alloc  8  6 >> alloc  7  7 >> alloc  6  8
@@ -234,4 +234,4 @@ main = hspec $ do
         regs $ alloc 23 21 >> alloc 22 22 >> alloc 21 23
         regs $ alloc 26 24 >> alloc 25 25 >> alloc 24 26
         regs $ alloc 29 27 >> alloc 28 28 >> alloc 27 29
-        regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 29
+        regs $ alloc 32 30 >> alloc 31 31 >> alloc 30 27

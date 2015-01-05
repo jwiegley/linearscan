@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-import Debug.Trace
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -620,19 +620,6 @@ unhandledExtent :: ScanStateDesc -> Prelude.Int
 unhandledExtent sd =
   totalExtent sd
     (Prelude.map (\i -> Prelude.fst i) (unhandled sd))
-
-intervals_for_reg :: ScanStateDesc -> ([]
-                                ((,) IntervalId PhysReg))
-                                -> PhysReg -> []
-                                IntervalId
-intervals_for_reg sd xs reg =
-  Data.List.foldl' (\acc x ->
-    case x of {
-     (,) xid r ->
-      case Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
-             (unsafeCoerce r) (unsafeCoerce reg) of {
-       Prelude.True -> (:) xid acc;
-       Prelude.False -> acc}}) [] xs
 
 registerWithHighestPos :: ([] (Prelude.Maybe Prelude.Int)) -> (,)
                                      Prelude.Int (Prelude.Maybe Prelude.Int)
@@ -1323,6 +1310,28 @@ splitCurrentInterval pre before ssi =
   case ssi of {
    Build_SSInfo x x0 -> _evar_0_ x x0 __}
 
+create_ssinfo :: Prelude.Int -> ([] Interval.IntervalDesc) ->
+                            Coq_fixedIntervalsType -> ([]
+                            ((,) Prelude.Int Prelude.Int)) -> ([]
+                            ((,) Prelude.Int PhysReg)) -> ([]
+                            ((,) Prelude.Int PhysReg)) -> ([]
+                            ((,) Prelude.Int PhysReg)) ->
+                            ScanStateDesc -> Prelude.Int ->
+                            Prelude.Int -> Interval.IntervalDesc ->
+                            Interval.IntervalDesc -> ([]
+                            ((,) Prelude.Int PhysReg)) -> ([]
+                            ((,) Prelude.Int PhysReg)) ->
+                            SSInfo ()
+create_ssinfo ni intervals0 fixedIntervals0 unh active0 inactive0 handled0 pre aid pos' id0 id1 active1 inactive1 =
+  let {
+   new_inactive_added = Build_ScanStateDesc ((Prelude.succ) ni)
+    (LinearScan.Utils.snoc ni
+      (LinearScan.Utils.set_nth ni intervals0 aid id0) id1) fixedIntervals0
+    (Prelude.map (\i -> Prelude.id i) unh) active1 inactive1
+    (Prelude.map (\i -> Prelude.id i) handled0)}
+  in
+  Build_SSInfo new_inactive_added __
+
 splitAssignedIntervalForReg :: ScanStateDesc ->
                                           PhysReg -> (Prelude.Maybe
                                           Prelude.Int) -> Prelude.Bool ->
@@ -1330,74 +1339,112 @@ splitAssignedIntervalForReg :: ScanStateDesc ->
 splitAssignedIntervalForReg pre reg pos trueForActives ssi =
   let {
    _evar_0_ = \desc holds ->
-    (Prelude.flip (Prelude.$))
-      (intervals_for_reg desc
-        (case trueForActives of {
-          Prelude.True -> active desc;
-          Prelude.False -> inactive desc}) reg) (\intids ->
+    let {
+     intlist = case trueForActives of {
+                Prelude.True -> active desc;
+                Prelude.False -> inactive desc}}
+    in
+    (Prelude.flip (Prelude.$)) __ (\_ ->
       let {
-       _evar_0_ = \ni intervals0 _fixedIntervals_ unh active0 _inactive_ _handled_ holds0 intids0 ->
-        let {_evar_0_ = \_ _ _ -> Prelude.Left ENoIntervalsToSplit}
-        in
-        let {
-         _evar_0_0 = \aid aids iHaids ->
-          let {int = LinearScan.Utils.nth ni intervals0 aid} in
-          let {_evar_0_0 = \_ -> iHaids __ __ __} in
-          let {
-           _evar_0_1 = \_ ->
-            (Prelude.flip (Prelude.$)) __ (\_ ->
-              let {
-               _top_assumption_ = Interval.splitPosition ( int) pos
-                                    Prelude.False}
-              in
-              let {_evar_0_1 = iHaids __ __ __} in
-              let {
-               _evar_0_2 = Prelude.Right ((,) ()
-                (let {
-                  _top_assumption_0 = Interval.splitInterval _top_assumption_
-                                        ( int)}
-                 in
-                 let {
-                  _evar_0_2 = \_top_assumption_1 _top_assumption_2 ->
-                   let {
-                    _evar_0_2 = \_ ->
-                     (Prelude.flip (Prelude.$)) __ (\_ ->
-                       (Prelude.flip (Prelude.$)) __
-                         (let {
-                           new_inactive_added = Build_ScanStateDesc
-                            ((Prelude.succ) ni)
-                            (LinearScan.Utils.snoc ni
-                              (LinearScan.Utils.set_nth ni intervals0 aid
-                                _top_assumption_1) _top_assumption_2)
-                            _fixedIntervals_ (Prelude.map Prelude.id unh)
-                            (Prelude.map Prelude.id active0) ((:) ((,) 
-                            ( ni) reg) (Prelude.map Prelude.id _inactive_))
-                            (Prelude.map Prelude.id _handled_)}
-                          in
-                          \_ -> Build_SSInfo new_inactive_added __))}
-                   in
-                    _evar_0_2 __}
-                 in
-                 case _top_assumption_0 of {
-                  (,) x x0 -> _evar_0_2 x x0}))}
-              in
-              case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                     (unsafeCoerce pos)
-                     (unsafeCoerce (Prelude.Just
-                       (Prelude.pred _top_assumption_))) of {
-               Prelude.True -> _evar_0_1;
-               Prelude.False -> _evar_0_2})}
-          in
-          case Interval.coq_Interval_is_singleton ( int) of {
-           Prelude.True -> _evar_0_0 __;
-           Prelude.False -> _evar_0_1 __}}
-        in
-        Datatypes.list_rect _evar_0_ (\aid aids iHaids _ _ _ ->
-          _evar_0_0 aid aids iHaids) intids0}
+       intids = Prelude.map (\i -> Prelude.fst i)
+                  (Prelude.filter (\i ->
+                    Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
+                      (Prelude.snd (unsafeCoerce i)) (unsafeCoerce reg))
+                    intlist)}
       in
-      case desc of {
-       Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 ->
-        _evar_0_ x x0 x1 x2 x3 x4 x5 holds intids __ __ __})}
+      (Prelude.flip (Prelude.$)) __ (\_ ->
+        let {
+         _evar_0_ = \_ ->
+          let {
+           _evar_0_ = \ni intervals0 _fixedIntervals_ unh active0 _inactive_ _handled_ holds0 intlist0 intids0 ->
+            let {_evar_0_ = \_ -> Prelude.Left ENoIntervalsToSplit}
+            in
+            let {
+             _evar_0_0 = \aid aids iHaids ->
+              let {int = LinearScan.Utils.nth ni intervals0 aid} in
+              let {_evar_0_0 = \_ -> iHaids __} in
+              let {
+               _evar_0_1 = \_ ->
+                (Prelude.flip (Prelude.$)) __ (\_ ->
+                  let {
+                   _top_assumption_ = Interval.splitPosition ( int) pos
+                                        Prelude.False}
+                  in
+                  let {_evar_0_1 = iHaids __} in
+                  let {
+                   _evar_0_2 = Prelude.Right ((,) ()
+                    (let {
+                      _top_assumption_0 = Interval.splitInterval
+                                            _top_assumption_ ( int)}
+                     in
+                     let {
+                      _evar_0_2 = \_top_assumption_1 _top_assumption_2 ->
+                       let {
+                        _evar_0_2 = \_ ->
+                         (Prelude.flip (Prelude.$)) __ (\_ ->
+                           let {
+                            _evar_0_2 = \_ _ ->
+                             (Prelude.flip (Prelude.$)) __
+                               (let {
+                                 _evar_0_2 = \_ ->
+                                  (Prelude.flip (Prelude.$)) __ (\_ ->
+                                    create_ssinfo ni intervals0
+                                      _fixedIntervals_ unh active0 _inactive_
+                                      _handled_ pre aid _top_assumption_
+                                      _top_assumption_1 _top_assumption_2
+                                      (Prelude.map (unsafeCoerce Prelude.id)
+                                        (Seq.rem
+                                          (Eqtype.prod_eqType
+                                            (Fintype.ordinal_eqType ni)
+                                            (Fintype.ordinal_eqType
+                                              maxReg))
+                                          (unsafeCoerce ((,) aid reg))
+                                          intlist0)) ((:) ((,) ( ni) reg)
+                                      ((:) (Prelude.id ((,) aid reg))
+                                      (Prelude.map Prelude.id _inactive_))))}
+                                in
+                                 _evar_0_2)}
+                           in
+                           let {
+                            _evar_0_3 = \_ _ ->
+                             (Prelude.flip (Prelude.$)) __ (\_ ->
+                               create_ssinfo ni intervals0
+                                 _fixedIntervals_ unh active0 _inactive_
+                                 _handled_ pre aid _top_assumption_
+                                 _top_assumption_1 _top_assumption_2
+                                 (Prelude.map Prelude.id active0) ((:) ((,)
+                                 ( ni) reg)
+                                 (Prelude.map Prelude.id _inactive_)))}
+                           in
+                           case trueForActives of {
+                            Prelude.True -> _evar_0_2 __ __;
+                            Prelude.False -> _evar_0_3 __ __})}
+                       in
+                        _evar_0_2 __}
+                     in
+                     case _top_assumption_0 of {
+                      (,) x x0 -> _evar_0_2 x x0}))}
+                  in
+                  case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                         (unsafeCoerce pos)
+                         (unsafeCoerce (Prelude.Just
+                           (Prelude.pred _top_assumption_))) of {
+                   Prelude.True -> _evar_0_1;
+                   Prelude.False -> _evar_0_2})}
+              in
+              case Interval.coq_Interval_is_singleton ( int) of {
+               Prelude.True -> _evar_0_0 __;
+               Prelude.False -> _evar_0_1 __}}
+            in
+            Datatypes.list_rect _evar_0_ (\aid aids iHaids _ ->
+              _evar_0_0 aid aids iHaids) intids0 __}
+          in
+          (\intlist0 _ intids0 _ ->
+          case desc of {
+           Build_ScanStateDesc x x0 x1 x2 x3 x4 x5 ->
+            _evar_0_ x x0 x1 x2 x3 x4 x5 holds intlist0 intids0})}
+        in
+        unsafeCoerce _evar_0_ __ intlist __ intids __))}
   in
   case ssi of {
    Build_SSInfo x x0 -> _evar_0_ x x0}
@@ -1522,24 +1569,29 @@ allocateBlockedReg pre =
      go = \v p ->
       case p of {
        (,) i r ->
-        case Interval.findIntervalUsePos
-               (
-                 (LinearScan.Utils.nth (nextInterval sd)
-                   (intervals sd) i)) (\u ->
-               Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce pos)
-                 (unsafeCoerce (Range.uloc u))) of {
-         Prelude.Just p0 -> trace "Just" v;
-         Prelude.Nothing -> trace "Nothing" Prelude.$
-          LinearScan.Utils.set_nth maxReg v r
-            (Interval.nextUseAfter
-              (
-                (LinearScan.Utils.nth (nextInterval sd)
-                  (intervals sd) i)) start)}}}
+        let {
+         atPos = \u ->
+          Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce pos)
+            (unsafeCoerce (Range.uloc u))}
+        in
+        let {
+         pos' = case Interval.findIntervalUsePos
+                       (
+                         (LinearScan.Utils.nth (nextInterval sd)
+                           (intervals sd) i)) atPos of {
+                 Prelude.Just p0 -> Prelude.Just 0;
+                 Prelude.Nothing ->
+                  Interval.nextUseAfter
+                    (
+                      (LinearScan.Utils.nth (nextInterval sd)
+                        (intervals sd) i)) start}}
+        in
+        LinearScan.Utils.set_nth maxReg v r pos'}}
     in
     let {
      nextUsePos' = Data.List.foldl' go
                      (Data.List.replicate maxReg Prelude.Nothing)
-                     (traceShow (active sd) (active sd))}
+                     (active sd)}
     in
     let {
      intersectingIntervals = Prelude.filter (\x ->
@@ -1554,8 +1606,7 @@ allocateBlockedReg pre =
     in
     let {nextUsePos = Data.List.foldl' go nextUsePos' intersectingIntervals}
     in
-    let reg'' = registerWithHighestPos (traceShow nextUsePos nextUsePos) in
-    case (traceShow reg'' reg'') of {
+    case registerWithHighestPos nextUsePos of {
      (,) reg mres ->
       case case mres of {
             Prelude.Just n -> (Prelude.<=) ((Prelude.succ) n) start;

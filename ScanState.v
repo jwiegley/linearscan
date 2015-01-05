@@ -83,13 +83,13 @@ Arguments totalExtent [sd] _ /.
 Definition unhandledExtent (sd : ScanStateDesc) : nat :=
   totalExtent [seq fst i | i <- unhandled sd].
 
-Definition intervals_for_reg {sd : ScanStateDesc}
-  (xs : seq (IntervalId sd * PhysReg)) (reg : PhysReg) : seq (IntervalId sd) :=
-  foldl (fun acc x =>
-           let: (xid, r) := x in
-           if r == reg
-           then xid :: acc
-           else acc) nil xs.
+Definition map_fst_filter_snd :
+  forall (a b : eqType) (i : b) (xs : seq (a * b)),
+  all (fun x => (x, i) \in xs) [seq fst x | x <- xs & snd x == i].
+Proof.
+  move=> a b i xs.
+  apply/all_filterP.
+Admitted.
 
 (** Given a vector of optional positions associated with a register, return
     the first register (counting upwards) which is either [None], or the
