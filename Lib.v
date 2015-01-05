@@ -344,6 +344,15 @@ Proof.
   exact: (ltn_trans H2).
 Qed.
 
+Definition map_fst_filter_snd :
+  forall (a b : eqType) (i : b) (xs : seq (a * b)),
+  all (fun x => (x, i) \in xs) [seq fst x | x <- xs & snd x == i].
+Proof.
+  move=> a b i xs.
+  apply/allP => x /mapP[[x1 y1]].
+  by rewrite mem_filter => /andP[/eqP/=-> pIxs ->].
+Qed.
+
 Definition widen_id {n} := widen_ord (leqnSn n).
 Arguments widen_id [n] i /.
 Definition widen_fst {n a} p := (@widen_id n (@fst _ a p), snd p).
