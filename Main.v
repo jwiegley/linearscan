@@ -44,8 +44,9 @@ Definition mainAlgorithm :
   (* create intervals with live ranges *)
   computeLocalLiveSets ;;;
   computeGlobalLiveSets ;;;
-  res <<- buildIntervals opInfo blockInfo ;;
-  let: (ops, ssig) := res in
+  blocks <<- iget SSError ;;
+  let: (ops, ssig) :=
+       buildIntervals opInfo blockInfo blocks in
 
   (* allocate registers *)
   match walkIntervals ssig.2 with
@@ -54,7 +55,7 @@ Definition mainAlgorithm :
       resolveDataFlow ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum ops ssig'.2
+      return_ (assignRegNum ops ssig'.2)
   end.
 
 Definition linearScan (blocks : seq blockType) :

@@ -31,12 +31,194 @@ Record BlockData := {
   blockOps  : seq (OpData opType)
 }.
 
-Inductive BlockList : BlockData -> Prop :=
-  | BlockList_newBlock b binfo ops :
-      BlockList {| baseBlock := b
-                 ; blockInfo := binfo
-                 ; blockOps  := ops
-                 |}.
+(* The predicate which applies to the first operator within the list of
+   blocks.  Is there no operators -- meaning it is a list of empty blocks --
+   then this function always returns true. *)
+Fixpoint firstOpPred (f : OpData opType -> bool)
+  (bs : seq BlockData) : bool :=
+  match bs with
+    | nil => true
+    | cons x xs =>
+        match blockOps x with
+        | nil => firstOpPred f xs
+        | cons op _ => f op
+        end
+    end.
+
+Definition maybeLast a (l : seq a) : option a :=
+  let fix go res xs :=
+      match xs with
+      | nil => res
+      | cons x xs => go (Some x) xs
+      end in
+  go None l.
+
+Example maybeLast_ex1 : maybeLast ([::] : seq nat) == None.
+Proof. by []. Qed.
+
+Example maybeLast_ex2 : maybeLast [:: 1] == Some 1.
+Proof. by []. Qed.
+
+Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
+Proof. by []. Qed.
+
+Definition lastOpPred (f : OpData opType -> bool)
+  (bs : seq BlockData) : bool :=
+  let fix go res blks :=
+      match blks with
+      | nil => res
+      | cons x xs =>
+          match maybeLast (blockOps x) with
+          | None    => go res xs
+          | Some op => go (f op) xs
+          end
+      end in
+  go true bs.
+
+Fixpoint opCount (bs : seq BlockData) : nat :=
+  match bs with
+  | nil => 0
+  | cons x xs => size (blockOps x) + opCount xs
+  end.
+
+Definition startsAtOne (b : BlockData) : bool :=
+  firstOpPred (fun op => opId op == 1) [:: b].
+
+(* ** BlockList
+
+   A [BlockList] maintains its list of blocks in reverse order.  For example,
+   if there were two blocks representing instructions 1-10, the block list
+   might look like : 6-10, followed by 1-5. *)
+
+Inductive BlockList : seq BlockData -> Type :=
+  | BlockList_firstBlock b : startsAtOne b -> BlockList [:: b]
+  | BlockList_nextBlock b bs :
+      BlockList bs
+        -> let f op :=
+               if opCount bs == 0
+               then opId op == 1
+               else let isNext nop := opId op == (opId nop).+2 in
+                    lastOpPred isNext bs in
+           firstOpPred f [:: b]
+        -> BlockList (b :: bs).
+
+Lemma mapBlockOps_spec
+  (f : forall op : OpData opType,
+         { op' : OpData opType | opId op' == opId op }) :
+  forall baseBlock0 blockInfo0 blockOps0,
+  startsAtOne
+    {|
+    baseBlock := baseBlock0;
+    blockInfo := blockInfo0;
+    blockOps := blockOps0 |} ->
+  startsAtOne
+    {|
+    baseBlock := baseBlock0;
+    blockInfo := blockInfo0;
+    blockOps := [seq (f op).1 | op <- blockOps0] |}.
+Proof.
+  move=> ? ?.
+  rewrite /startsAtOne.
+  elim=> //= [y ys IHys] H.
+  case: (f y) => x /= /eqP -> //.
+Qed.
+
+Lemma mapBlockOps_spec2
+  (f : forall op : OpData opType,
+         {op' : OpData opType | opId op' == opId op})
+  (zs : seq BlockData) :
+  forall baseBlock0 blockInfo0 blockOps0,
+  let k op :=
+      if opCount zs == 0
+      then opId op == 1
+      else let isNext nop := opId op == (opId nop).+2 in
+           lastOpPred isNext zs in
+  firstOpPred k
+    [:: {|
+        baseBlock := baseBlock0;
+        blockInfo := blockInfo0;
+        blockOps := blockOps0 |}] ->
+  firstOpPred k
+    [:: {|
+        baseBlock := baseBlock0;
+        blockInfo := blockInfo0;
+        blockOps := [seq (f op).1 | op <- blockOps0] |}].
+Proof.
+  move=> ? ?.
+  rewrite /firstOpPred.
+  elim=> //= [y ys IHys] H.
+  case: (f y) => x /= /eqP -> //.
+Qed.
+
+Fixpoint foldlBlockOps a (f : a -> OpData opType -> a) (z : a)
+  `(xs : BlockList bs) : a.
+Proof.
+  case: xs => [b _|b zs IHzs _ _].
+    case: b => [_ _ blockOps0].
+    exact: (foldl f z blockOps0).
+  case: b => [? ? blockOps0].
+  exact (foldlBlockOps a f (foldl f z blockOps0) zs IHzs).
+Defined.
+
+Definition mapBlockOps
+  (f : forall op : OpData opType,
+         { op' : OpData opType | opId op' == opId op })
+  `(xs : BlockList bs) : { bs' : seq BlockData & BlockList bs' }.
+Proof.
+  case: xs => [b H|b zs IHzs k Hfirst].
+    case: b => [baseBlock0 blockInfo0 blockOps0] in H *.
+    exists [:: {| baseBlock := baseBlock0
+                ; blockInfo := blockInfo0
+                ; blockOps  := map (fun op => proj1_sig (f op))
+                                   blockOps0
+                |} ].
+    constructor.
+    exact: mapBlockOps_spec.
+  case: b => [baseBlock0 blockInfo0 blockOps0] in Hfirst *.
+  exists [:: {| baseBlock := baseBlock0
+              ; blockInfo := blockInfo0
+              ; blockOps  := map (fun op => proj1_sig (f op))
+                                 blockOps0
+              |} & zs].
+  constructor.
+    exact: IHzs.
+  rewrite -[X in firstOpPred X _]/k.
+  move: Hfirst.
+  exact: mapBlockOps_spec2.
+Defined.
+
+Definition mapOpsWithPred
+  (f : option (OpData opType) -> OpData opType -> OpData opType)
+  (ops : seq (OpData opType)) : seq (OpData opType) :=
+  let fix go pre os := match os with
+      | nil => nil
+      | cons x xs =>
+          let newOp := f pre x in
+          newOp :: go (Some newOp) xs
+      end in
+  go None ops.
+
+Definition mapBlockOpsWithPred
+  (f : BlockData -> option (OpData opType) -> OpData opType
+         -> OpData opType)
+  (blocks : seq BlockData) : seq BlockData :=
+  let fix go pre blks := match blks with
+      | nil => nil
+      | cons x xs =>
+          let k op rest :=
+              let: (m, ys) := rest in
+              let op' := f x m op in
+              (Some op', op' :: ys) in
+          let: (lastOp, newOps) :=
+               foldr k (pre, [::]) (blockOps x) in
+          let x' :=
+              {| baseBlock := baseBlock x
+               ; blockInfo := blockInfo x
+               ; blockOps  := newOps
+               |} in
+          x' :: go lastOp xs
+      end in
+  go None blocks.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
@@ -50,8 +232,8 @@ Definition computeBlockOrder :
 Variable oinfo : OpInfo opType.
 Variable binfo : BlockInfo.
 
-Definition wrap_block
-  (x : { i : nat | odd i } * seq BlockData) (block : blockType) :=
+Definition wrap_block (H : { i : nat | odd i })
+  (blocks: seq BlockData) (block : blockType) :=
   let k H op :=
       {| baseOp  := op
        ; opInfo  := oinfo
@@ -59,12 +241,9 @@ Definition wrap_block
        ; opIdOdd := H.2
        ; opAlloc := nil |} in
 
-  let f x op := match x with
-      | (H, ops) => let nop := k H op in
-          (exist odd (H.1).+2 (odd_add_2 H.2), nop :: ops)
-      end in
+  let f x op := let: (H, ops) := x in
+      (exist odd (H.1).+2 (odd_add_2 H.2), k H op :: ops) in
 
-  let: (H, blocks) := x in
   let: (H', ops')  := foldl f (H, nil) (blockToOpList binfo block) in
   let blk := {| baseBlock := block
               ; blockInfo := binfo
@@ -75,7 +254,7 @@ Definition wrap_block
    operations. *)
 Lemma wrap_block_spec : forall x y z b blk,
   [:: x; y; z] = blockToOpList binfo blk
-    -> snd (wrap_block (exist odd 1 odd_1, nil) blk) = [:: b]
+    -> snd (wrap_block (exist odd 1 odd_1) [::] blk) = [:: b]
     -> blockOps b =
        [:: {| baseOp  := x
             ; opInfo  := oinfo
@@ -108,8 +287,8 @@ Lemma wrap_block_spec2 :
   forall a b c x y z b1 b2 blk1 blk2 H H',
   [:: a; b; c] = blockToOpList binfo blk1
     -> [:: x; y; z] = blockToOpList binfo blk2
-    -> wrap_block (exist odd 1 odd_1, nil) blk1 = (H, [:: b1])
-    -> wrap_block (H, nil) blk2 = (H', [:: b2])
+    -> wrap_block (exist odd 1 odd_1) [::] blk1 = (H, [:: b1])
+    -> wrap_block H [::] blk2 = (H', [:: b2])
     -> blockOps b1 =
        [:: {| baseOp  := a
             ; opInfo  := oinfo
@@ -159,7 +338,9 @@ Proof.
 Qed.
 
 Definition blocksToBlockList : seq blockType -> seq BlockData :=
-  @snd _ _ \o foldl wrap_block (exist odd 1 odd_1, nil).
+  let f acc x := let: (H, blocks) := acc in
+                 wrap_block H blocks x in
+  @snd _ _ \o foldl f (exist odd 1 odd_1, nil).
 
 (* This function not only numbers all operations for us, but adds any extra
    administrative information that we need to process the algorithm on this
@@ -181,7 +362,8 @@ Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
 Definition computeLocalLiveSets : BlockState unit := return_ tt.
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
-Definition buildIntervals : BlockState (seq (OpData opType) * ScanStateSig) :=
+Definition buildIntervals (blocks : seq BlockData) :
+  seq (OpData opType) * ScanStateSig :=
   let mkint (vid : nat)
             (ss : ScanStateSig)
             (mx : option RangeSig)
@@ -195,8 +377,6 @@ Definition buildIntervals : BlockState (seq (OpData opType) * ScanStateSig) :=
   let handleVar vid ss mx := mkint vid ss mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
 
-  bxs <<- iget SSError ;;
-  let: blocks := bxs in
   let ops := flatten (map (blockToOpList binfo \o baseBlock) blocks) in
   let: (ops', varRanges, regRanges) := processOperations oinfo ops in
   let regs := vmap (fun mr =>
@@ -208,12 +388,12 @@ Definition buildIntervals : BlockState (seq (OpData opType) * ScanStateSig) :=
   let s1 := ScanState_setFixedIntervals s0 regs in
   let s2 := packScanState s1 in
 
-  return_ $ (ops', foldl_with_index handleVar s2 varRanges).
+  (ops', foldl_with_index handleVar s2 varRanges).
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
 Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
-  BlockState (seq (OpData opType)) :=
+  seq (OpData opType) :=
   let ints := handled sd ++ active sd ++ inactive sd in
   let f op :=
       let o := baseOp op in
@@ -234,7 +414,7 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
            ; opAlloc := foldl h nil ints ++ opAlloc op'
            |} in
       foldl k op vars in
-  return_ $ map f ops.
+  map f ops.
 
 End Blocks.
 
@@ -242,8 +422,8 @@ Arguments computeBlockOrder {blockType}.
 Arguments numberOperations {opType blockType} oinfo binfo.
 Arguments computeLocalLiveSets {opType blockType}.
 Arguments computeGlobalLiveSets {opType blockType}.
-Arguments buildIntervals {opType _} oinfo binfo.
+Arguments buildIntervals {opType blockType} oinfo binfo blocks.
 Arguments resolveDataFlow {opType blockType}.
-Arguments assignRegNum {opType blockType} ops {sd} st.
+Arguments assignRegNum {opType} ops {sd} st.
 
 End MBlocks.
