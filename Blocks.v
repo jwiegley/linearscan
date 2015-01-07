@@ -151,14 +151,27 @@ Proof.
 Qed.
 
 Fixpoint foldlBlockOps a (f : a -> OpData opType -> a) (z : a)
-  `(xs : BlockList bs) : a.
-Proof.
-  case: xs => [b _|b zs IHzs _ _].
-    case: b => [_ _ blockOps0].
-    exact: (foldl f z blockOps0).
-  case: b => [? ? blockOps0].
-  exact (foldlBlockOps a f (foldl f z blockOps0) zs IHzs).
-Defined.
+  `(xs : BlockList bs) : a :=
+  match xs with
+    | BlockList_firstBlock b _ => foldl f z (blockOps b)
+    | BlockList_nextBlock b _ IHzs _ =>
+        foldlBlockOps f (foldl f z (blockOps b)) IHzs
+  end.
+
+Definition foldlBlockOpsWithPred a
+  (f : a -> option (OpData opType) -> OpData opType -> a) (z : a)
+  `(xs : BlockList bs) : a :=
+  let fix go zmp blks (blist : BlockList blks) :=
+      let k x op : a * option (OpData opType) :=
+          let: (z, pre) := x in
+          (f z pre op, Some op) in
+      match blist with
+        | BlockList_firstBlock b _ =>
+            foldl k zmp (blockOps b)
+        | BlockList_nextBlock b zs IHzs _ =>
+            go (foldl k zmp (blockOps b)) zs IHzs
+      end in
+  fst (go (z, None) bs xs).
 
 Definition mapBlockOps
   (f : forall op : OpData opType,
@@ -198,7 +211,7 @@ Definition mapOpsWithPred
       end in
   go None ops.
 
-Definition mapBlockOpsWithPred
+Definition mapBlockDataOpsWithPred
   (f : BlockData -> option (OpData opType) -> OpData opType
          -> OpData opType)
   (blocks : seq BlockData) : seq BlockData :=

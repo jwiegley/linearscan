@@ -801,27 +801,35 @@ foldlBlockOps :: (a3 -> (OpData a1) -> a3) -> a3 -> ([]
                             (BlockData a1 a2)) ->
                             (BlockList a1 a2) -> a3
 foldlBlockOps f z bs xs =
-  let {
-   _evar_0_ = \b ->
-    let {
-     _evar_0_ = \_the_1st_wildcard_ _the_2nd_wildcard_ blockOps0 ->
-      Data.List.foldl' f z blockOps0}
-    in
-    case b of {
-     Build_BlockData x x0 x1 -> _evar_0_ x x0 x1}}
-  in
-  let {
-   _evar_0_0 = \b zs iHzs ->
-    let {
-     _evar_0_0 = \_baseBlock_ _blockInfo_ blockOps0 ->
-      foldlBlockOps f (Data.List.foldl' f z blockOps0) zs iHzs}
-    in
-    case b of {
-     Build_BlockData x x0 x1 -> _evar_0_0 x x0 x1}}
-  in
   case xs of {
-   BlockList_firstBlock x -> _evar_0_ x;
-   BlockList_nextBlock x x0 x1 -> _evar_0_0 x x0 x1}
+   BlockList_firstBlock b ->
+    Data.List.foldl' f z (blockOps b);
+   BlockList_nextBlock b bs0 iHzs ->
+    foldlBlockOps f (Data.List.foldl' f z (blockOps b))
+      bs0 iHzs}
+
+foldlBlockOpsWithPred :: (a3 -> (Prelude.Maybe
+                                    (OpData a1)) ->
+                                    (OpData a1) -> a3) -> a3 -> ([]
+                                    (BlockData a1 a2)) ->
+                                    (BlockList a1 a2) -> a3
+foldlBlockOpsWithPred f z bs xs =
+  let {
+   go = let {
+         go zmp blks blist =
+           let {
+            k = \x op ->
+             case x of {
+              (,) z0 pre -> (,) (f z0 pre op) (Prelude.Just op)}}
+           in
+           case blist of {
+            BlockList_firstBlock b ->
+             Data.List.foldl' k zmp (blockOps b);
+            BlockList_nextBlock b zs iHzs ->
+             go (Data.List.foldl' k zmp (blockOps b)) zs iHzs}}
+        in go}
+  in
+  Prelude.fst (go ((,) z Prelude.Nothing) bs xs)
 
 mapBlockOps :: ((OpData a1) -> (OpData a1)) ->
                           ([] (BlockData a1 a2)) ->
@@ -870,12 +878,13 @@ mapOpsWithPred f ops =
        let {newOp = f pre x} in (:) newOp (go (Prelude.Just newOp) xs)}}
   in go Prelude.Nothing ops
 
-mapBlockOpsWithPred :: ((BlockData a1 a2) ->
-                                  (Prelude.Maybe (OpData a1)) ->
-                                  (OpData a1) -> OpData
-                                  a1) -> ([] (BlockData a1 a2)) ->
-                                  [] (BlockData a1 a2)
-mapBlockOpsWithPred f blocks =
+mapBlockDataOpsWithPred :: ((BlockData a1 a2) ->
+                                      (Prelude.Maybe (OpData a1))
+                                      -> (OpData a1) ->
+                                      OpData a1) -> ([]
+                                      (BlockData a1 a2)) -> []
+                                      (BlockData a1 a2)
+mapBlockDataOpsWithPred f blocks =
   let {
    go pre blks =
      case blks of {
