@@ -26,44 +26,30 @@ Record BlockInfo := {
 }.
 
 Record BlockData := {
-  baseBlock : blockType;
-  blockInfo : BlockInfo;
-  blockOps  : seq (OpData opType)
+  baseBlock   : blockType;
+  blockInfo   : BlockInfo;
+  blockOps    : seq (OpData opType);
+  blockOpList : OpList blockOps
 }.
 
 (* The predicate which applies to the first operator within the list of
-   blocks.  Is there no operators -- meaning it is a list of empty blocks --
-   then this function always returns true. *)
-Fixpoint firstOpPred (f : OpData opType -> bool)
-  (bs : seq BlockData) : bool :=
+   blocks.  This means the operator with the lowest [opId] -- not the actual
+   first op in the list , since operations are maintained in reverse order.
+
+   If there are no operators -- meaning it is a list of empty blocks -- then
+   this function always returns true. *)
+Fixpoint lastOpPred (f : OpData opType -> bool) (bs : seq BlockData) : bool :=
   match bs with
     | nil => true
     | cons x xs =>
         match blockOps x with
-        | nil => firstOpPred f xs
+        | nil => lastOpPred f xs
         | cons op _ => f op
         end
     end.
 
-Definition maybeLast a (l : seq a) : option a :=
-  let fix go res xs :=
-      match xs with
-      | nil => res
-      | cons x xs => go (Some x) xs
-      end in
-  go None l.
-
-Example maybeLast_ex1 : maybeLast ([::] : seq nat) == None.
-Proof. by []. Qed.
-
-Example maybeLast_ex2 : maybeLast [:: 1] == Some 1.
-Proof. by []. Qed.
-
-Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
-Proof. by []. Qed.
-
-Definition lastOpPred (f : OpData opType -> bool)
-  (bs : seq BlockData) : bool :=
+Definition firstOpPred (f : OpData opType -> bool) (bs : seq BlockData) :
+  bool :=
   let fix go res blks :=
       match blks with
       | nil => res
@@ -91,7 +77,8 @@ Definition startsAtOne (b : BlockData) : bool :=
    might look like : 6-10, followed by 1-5. *)
 
 Inductive BlockList : seq BlockData -> Type :=
-  | BlockList_firstBlock b : startsAtOne b -> BlockList [:: b]
+  | BlockList_firstBlock b :
+      startsAtOne b -> BlockList [:: b]
   | BlockList_nextBlock b bs :
       BlockList bs
         -> let f op :=
@@ -101,6 +88,45 @@ Inductive BlockList : seq BlockData -> Type :=
                     lastOpPred isNext bs in
            firstOpPred f [:: b]
         -> BlockList (b :: bs).
+
+(* Fold over all the operations represented by a sequence of blocks.  Note
+   that operations are visited in reverse order, from highest to lowest. *)
+Fixpoint foldlBlockOps {a} (f : a -> OpData opType -> a) (z : a)
+  `(xs : BlockList bs) : a :=
+  match xs with
+    | BlockList_firstBlock b _ => foldl f z (blockOps b)
+    | BlockList_nextBlock b _ IHzs _ =>
+        foldlBlockOps f (foldl f z (blockOps b)) IHzs
+  end.
+
+Definition blockListOps `(blocks : BlockList bs) : seq (OpData opType) :=
+  rev (foldlBlockOps (fun acc op => op :: acc) [::] blocks).
+
+Lemma all_pairmap_cons {a} f (x : a) w ws :
+  all id (pairmap f w ws) -> f x w -> all id (pairmap f x (w :: ws)).
+Proof.
+  move=> Hall Hf.
+  elim: ws => //= [|z zs IHzs] in Hall *; by intuition.
+Qed.
+
+Theorem BlockList_ops_sequential `(blocks : BlockList bs) :
+  match blockListOps blocks with
+  | nil => True
+  | x :: xs => all id (pairmap (fun y z => opId y == (opId z).+2) x xs)
+  end.
+Proof.
+  case: blocks => [b H|b zs IHzs k Hfirst].
+    rewrite /blockListOps /foldlBlockOps foldl_rev {H}.
+    case: b => [? ? ops Hops] /=.
+    elim: Hops => //= [? ? n nodd allocs ? _ IHops].
+    apply/andP; split; first by [].
+    exact: IHops.
+  rewrite /blockListOps /=.
+  case: b => [? ? ops Hops] /= in Hfirst *.
+  elim: Hops => //= [? ? n nodd|? ? n nodd allocs ? ? IHops] in Hfirst *.
+    admit.
+  admit.
+Qed.
 
 Lemma mapBlockOps_spec
   (f : forall op : OpData opType,
@@ -149,14 +175,6 @@ Proof.
   elim=> //= [y ys IHys] H.
   case: (f y) => x /= /eqP -> //.
 Qed.
-
-Fixpoint foldlBlockOps a (f : a -> OpData opType -> a) (z : a)
-  `(xs : BlockList bs) : a :=
-  match xs with
-    | BlockList_firstBlock b _ => foldl f z (blockOps b)
-    | BlockList_nextBlock b _ IHzs _ =>
-        foldlBlockOps f (foldl f z (blockOps b)) IHzs
-  end.
 
 Definition foldlBlockOpsWithPred a
   (f : a -> option (OpData opType) -> OpData opType -> a) (z : a)
@@ -375,8 +393,7 @@ Definition BlockState := IState SSError (seq BlockData) (seq BlockData).
 Definition computeLocalLiveSets : BlockState unit := return_ tt.
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
-Definition buildIntervals (blocks : seq BlockData) :
-  seq (OpData opType) * ScanStateSig :=
+Definition buildIntervals (blocks : seq BlockData) : ScanStateSig :=
   let mkint (vid : nat)
             (ss : ScanStateSig)
             (mx : option RangeSig)
@@ -406,7 +423,7 @@ Definition buildIntervals (blocks : seq BlockData) :
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
 Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
-  seq (OpData opType) :=
+  BlockState unit :=
   let ints := handled sd ++ active sd ++ inactive sd in
   let f op :=
       let o := baseOp op in
@@ -415,11 +432,16 @@ Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
           let vid := varId v in
           let h acc x :=
               let: (xid, reg) := x in
+              (* This strange use of a lambda is so that the generated code
+                 evaluates [getInterval] only once, and shares the resulting
+                 [int] at each use point; otherwise, if we use [let] or
+                 [match], Coq's extractor inlines each use of [int], resulting
+                 in no sharing of values. *)
               (fun int =>
-                  if (ivar int == vid) &&
-                     (ibeg int <= opId op < iend int)
-                  then (vid, Register reg) :: acc
-                  else acc) (getInterval xid) in
+                 if (ivar int == vid) &&
+                    (ibeg int <= opId op < iend int)
+                 then (vid, Register reg) :: acc
+                 else acc) (getInterval xid) in
           {| baseOp  := o
            ; opInfo  := opInfo op'
            ; opId    := opId op'

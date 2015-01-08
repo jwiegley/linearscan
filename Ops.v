@@ -32,6 +32,7 @@ Variable opType : Set.
    determine information about each operation coming from the caller's
    side. *)
 Record OpInfo := {
+  compareOp   : forall x y : opType, {x = y} + {x <> y};
   isLoopBegin : opType -> bool;
   isLoopEnd   : opType -> bool;
   isCall      : opType -> option (seq PhysReg);
@@ -41,6 +42,44 @@ Record OpInfo := {
 }.
 
 Inductive Allocation := Unallocated | Register of PhysReg | Spill.
+
+Section Eqalloc.
+
+Definition eqalloc a1 a2 :=
+  match a1, a2 with
+  | Unallocated, Unallocated => true
+  | Register r1, Register r2 => r1 == r2
+  | Spill,       Spill       => true
+  | _, _ => false
+  end.
+
+Lemma eqallocP : Equality.axiom eqalloc.
+Proof.
+  move.
+  case=> [|r1|]; case => [|r2|];
+  try constructor; try by [].
+  case: (r1 =P r2) => /= [<-|neqx].
+    rewrite eq_refl.
+    by constructor.
+  move/eqP in neqx.
+  move/negbTE in neqx.
+  rewrite neqx.
+  constructor.
+  move/eqP in neqx.
+  move=> H.
+  contradiction neqx.
+  congruence.
+Qed.
+
+Canonical alloc_eqMixin := EqMixin eqallocP.
+Canonical alloc_eqType := Eval hnf in EqType Allocation alloc_eqMixin.
+
+Lemma eqallocE : eqalloc = eqalloc. Proof. by []. Qed.
+
+Definition Allocation_eqType (A : eqType) :=
+  Equality.Pack alloc_eqMixin Allocation.
+
+End Eqalloc.
 
 (* [OpData] combines the original operation from the caller, plus any extra
    information that we've generated during the course of our algorithm. *)
@@ -52,9 +91,58 @@ Record OpData := {
   opAlloc : seq (VarId * Allocation)
 }.
 
+Section Eqop.
+
+Definition eqop o1 o2 :=
+  [&& proj1_sig
+        (Sumbool.bool_of_sumbool
+           (compareOp (opInfo o1) (baseOp o1) (baseOp o2)))
+  ,   opId o1 == opId o2
+  &   opAlloc o1 == opAlloc o2
+  ].
+
+Lemma eqopP : Equality.axiom eqop.
+Proof.
+  move.
+  case=> [a1 b1 c1 d1 e1];
+  case => [a2 b2 c2 d2 e2];
+  try constructor; try by [].
+  rewrite /eqop /=.
+
+  case: (compareOp b1 a1 a2) => [H|H];
+  last by constructor; move; invert; contradiction.
+  subst.
+  rewrite /=.
+
+  case E1: (c1 == c2) => /=;
+  move/eqP in E1;
+  last by constructor; move; invert; contradiction.
+
+  subst.
+  have ->: d1 = d2 by exact: eq_irrelevance.
+  case E2: (e1 == e2) => /=;
+  move/eqP in E2;
+  last by constructor; move; invert; contradiction.
+
+  subst.
+  constructor.
+  f_equal.
+  admit.                  (* jww (2015-01-07): axiom *)
+Qed.
+
+Canonical op_eqMixin := EqMixin eqopP.
+Canonical op_eqType := Eval hnf in EqType OpData op_eqMixin.
+
+Lemma eqopE : eqop = eq_op. Proof. by []. Qed.
+
+Definition OpData_eqType (A : eqType) :=
+  Equality.Pack op_eqMixin OpData.
+
+End Eqop.
+
 (* Finally, when we work with the list of operations, we will be working with
    a list of our [OpData] structures. *)
-Inductive OpList : seq OpData -> Prop :=
+Inductive OpList : seq OpData -> Type :=
   | OpList_sing op oinfo n nodd :
       OpList [:: {| baseOp  := op
                   ; opInfo  := oinfo

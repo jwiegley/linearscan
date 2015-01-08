@@ -58,6 +58,39 @@ Definition option_choose {a} (x y : option a) : option a :=
   | Some _ => x
   end.
 
+Definition maybeLast a (l : seq a) : option a :=
+  let fix go res xs :=
+      match xs with
+      | nil => res
+      | cons x xs => go (Some x) xs
+      end in
+  go None l.
+
+Example maybeLast_ex1 : maybeLast ([::] : seq nat) == None.
+Proof. by []. Qed.
+
+Example maybeLast_ex2 : maybeLast [:: 1] == Some 1.
+Proof. by []. Qed.
+
+Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
+Proof. by []. Qed.
+
+Lemma maybeLast_cons2 {a} (x : a) z zs :
+  maybeLast [:: x, z & zs] = maybeLast (z :: zs).
+Proof. elim: zs => //. Qed.
+
+Lemma maybeLast_cons {a} (x : a) xs :
+  maybeLast (x :: xs) =
+  match maybeLast xs with
+  | Some y => Some y
+  | None   => Some x
+  end.
+Proof.
+  elim: xs => //= [z zs IHzs] in x *.
+  rewrite maybeLast_cons2 IHzs.
+  case: (maybeLast zs) => //.
+Qed.
+
 Ltac move_to_top x :=
   match reverse goal with
   | H : _ |- _ => try move x after H
@@ -103,7 +136,8 @@ Defined.
 Definition all_in_list {a : eqType} (l : list a) : all (fun x => x \in l) l.
 Proof. apply/allP; elim: l => //=. Qed.
 
-Definition list_membership {a : eqType} (l : list a) : list { x : a | x \in l } :=
+Definition list_membership {a : eqType} (l : seq a) :
+  seq { x : a | x \in l } :=
   let fix go l :=
       match l with
       | nil => nil
@@ -222,7 +256,15 @@ Example ex_foldr_with_index_1 :
     == [:: (0, 1); (1, 2); (2, 3)].
 Proof. reflexivity. Qed.
 
-Lemma fold_left_plus : forall a (f : a -> nat) xs n,
+Lemma foldl_cons : forall a b f (z : b) (x : a) xs,
+  foldl f (f z x) xs = foldl f z (x :: xs).
+Proof. move=> a b f z x; elim=> //=. Qed.
+
+Lemma foldr_cons : forall a b f (z : b) (x : a) xs,
+  f x (foldr f z xs) = foldr f z (x :: xs).
+Proof. move=> a b f z x; elim=> //=. Qed.
+
+Lemma foldl_add : forall a (f : a -> nat) xs n,
    foldl (fun n x => n + f x) n xs =
    foldl (fun n x => n + f x) 0 xs + n.
 Proof.
@@ -230,13 +272,23 @@ Proof.
   rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
 Qed.
 
-Lemma foldl_cons : forall a b f (z : b) (x : a) xs,
-  foldl f z (x :: xs) = foldl f (f z x) xs.
-Proof. move=> a b f z x; elim=> //=. Qed.
+Lemma foldl_cat : forall a zs xs,
+  foldl (fun acc : seq a => cons^~ acc) zs xs =
+  foldl (fun acc : seq a => cons^~ acc) [::] xs ++ zs.
+Proof.
+  move=> a zs xs; elim: xs => // a' ? IHxs /= in zs *.
+  by rewrite IHxs [in RHS]IHxs /= cats1 -cat_rcons.
+Qed.
 
-Lemma foldr_cons : forall a b f (z : b) (x : a) xs,
-  foldr f z (x :: xs) = f x (foldr f z xs).
-Proof. move=> a b f z x; elim=> //=. Qed.
+Lemma foldl_rev {a} (xs : seq a) :
+  rev (foldl (fun acc : seq a => cons^~ acc) [::] xs) = xs.
+Proof.
+  elim: xs => //= [x xs IHxs].
+  rewrite -{2}IHxs -rev_rcons.
+  congr (rev _).
+  rewrite -cats1.
+  exact: foldl_cat.
+Qed.
 
 Definition sumf {a} f : seq a -> nat := foldl (fun n x => n + f x) 0.
 
@@ -247,14 +299,14 @@ Lemma sumf_cons : forall a f xs (x : a),
 Proof.
   move=> a f.
   rewrite /sumf /= => xs x.
-  by rewrite fold_left_plus addnC add0n.
+  by rewrite foldl_add addnC add0n.
 Qed.
 
 Lemma sumlist_cons : forall xs (x : nat),
   sumlist (x :: xs) = x + sumlist xs.
 Proof.
   rewrite /sumlist /= => xs x.
-  by rewrite fold_left_plus addnC add0n.
+  by rewrite foldl_add addnC add0n.
 Qed.
 
 Definition safe_hd {a} (xs : list a) : 0 < size xs -> a.
@@ -564,17 +616,6 @@ Proof.
 Qed.
 
 Require Coq.Program.Wf.
-
-(*
-Program Fixpoint dep_foldl {A : Type} {B : A -> Type}
-  (f : forall b' : A, B b' -> A) (b : A) (v : seq (B b))
-  (P : forall b x, B b -> B (f b x)) {measure (size v)} : A :=
-  match v with
-  | nil => b
-  | y :: ys => @dep_foldl A B f (f b y) (map (P b y) ys) _ _
-  end.
-Obligation 2. by rewrite size_map. Qed.
-*)
 
 Lemma cat2s : forall a (x y : a) s, [:: x; y] ++ s = (x :: y :: s).
 Proof. by move=> a x y; elim=> //. Qed.

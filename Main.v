@@ -35,8 +35,7 @@ Variable blockType : Set.
 Variable blockInfo : BlockInfo opType blockType.
 
 Definition mainAlgorithm :
-  IState SSError (seq blockType) (seq (BlockData opType blockType))
-         (seq (OpData opType)) :=
+  IState SSError (seq blockType) (seq blockType) unit :=
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder ;;;
   numberOperations opInfo blockInfo ;;;
@@ -45,8 +44,7 @@ Definition mainAlgorithm :
   computeLocalLiveSets ;;;
   computeGlobalLiveSets ;;;
   blocks <<- iget SSError ;;
-  let: (ops, ssig) :=
-       buildIntervals opInfo blockInfo blocks in
+  let ssig := buildIntervals opInfo blockInfo blocks in
 
   (* allocate registers *)
   match walkIntervals ssig.2 with
@@ -55,11 +53,10 @@ Definition mainAlgorithm :
       resolveDataFlow ;;;
 
       (* replace virtual registers with physical registers *)
-      return_ (assignRegNum ops ssig'.2)
+      assignRegNum ops ssig'.2
   end.
 
-Definition linearScan (blocks : seq blockType) :
-  SSError + seq (OpData opType) :=
+Definition linearScan (blocks : seq blockType) : SSError + seq blockType :=
   match IState.runIState SSError mainAlgorithm blocks with
   | inl err      => inl err
   | inr (res, _) => inr res
