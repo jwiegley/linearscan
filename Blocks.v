@@ -1,6 +1,5 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Machine.
-Require Import LinearScan.Ops.
 Require Import LinearScan.Range.
 Require Import LinearScan.ScanState.
 
@@ -11,245 +10,267 @@ Generalizable All Variables.
 
 Module MBlocks (Mach : Machine).
 
-Include MOps Mach.
 Include MScanState Mach.
 
 Section Blocks.
 
-Open Scope program_scope.
+(* The simplest way to get information about the IR instructions from the
+   caller is to receive the following data:
 
-Variable opType : Set.
-Variable blockType : Set.
+   NonEmpty (BlockId * NonEmpty (OpId * NonEmpty vars))
+
+   We receive an ordered list of blocks identified by an number pickedq by the
+   caller.  Each block is associated with a sequence of operations (the caller
+   should not inform us of empty blocks), and each operation relates to a
+   nonempty set of variables (the caller should not inform us of instructions
+   without variables).
+
+   In addition to this basic information, a set of functions associated with
+   blocks and operations is necessary in order to determine extra details
+   about those structures, such as the block IDs of all successors of a
+   specific block.  These are the [BlockInfo] and [OpInfo] records,
+   respectively.
+*)
+
+Definition VarId := nat.
+
+Inductive VarKind := Input | Temp | Output.
+
+Inductive Allocation := Unallocated | Register of PhysReg | Spill.
+
+(* [VarInfo] abstracts information about the caller's notion of variables
+   associated with an operation. *)
+Record VarInfo := {
+  varId       : VarId;          (* from 0 to highest var index *)
+  varKind     : VarKind;
+  varAlloc    : Allocation;
+  regRequired : bool
+}.
+
+Definition VarList := (seq VarInfo).
+
+Definition OpId := nat.
+
+Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
+
+(* The [OpInfo] structure is a collection of functions that allow us to
+   determine information about each operation coming from the caller's
+   side. *)
+Record OpInfo := {
+  opId    : OpId;
+  opKind  : OpKind;
+  varRefs : VarList;
+  regRefs : seq PhysReg
+}.
+
+Definition OpList := (NonEmpty OpInfo).
+
+Definition BlockId := nat.
 
 Record BlockInfo := {
-  blockToOpList : blockType -> seq opType
+  blockId     : BlockId;
+  blockOps    : NonEmpty OpInfo
 }.
 
-Record BlockData := {
-  baseBlock   : blockType;
-  blockInfo   : BlockInfo;
-  blockOps    : seq (OpData opType);
-  blockOpList : OpList blockOps
+Definition BlockList := (NonEmpty BlockInfo).
+
+Record BuildState := {
+  bsVars    : seq (seq nat);
+  bsNextPos : nat;
+  bsLoopBeg : option nat;
+  bsLoopEnd : option nat
 }.
 
-(* The predicate which applies to the first operator within the list of
-   blocks.  This means the operator with the lowest [opId] -- not the actual
-   first op in the list , since operations are maintained in reverse order.
+Definition buildIntervals (blocks : BlockList) : ScanStateSig :=
+  (* Create a vector from variables to lists of use positions *)
+  let bst :=
+    foldl (fun bacc blk =>
+      foldl (fun oacc op =>
+        {| bsVars    :=
+             foldl (fun vacc var =>
+               apply_nth [::] vacc (varId var)
+                         (fun xs => bsNextPos oacc :: xs))
+               (bsVars oacc) (varRefs op)
+         ; bsNextPos := (bsNextPos oacc).+2
+         ; bsLoopBeg :=
+             if (bsLoopBeg oacc, opKind op) is (None, LoopBegin)
+             then Some (bsNextPos oacc)
+             else bsLoopBeg oacc
+         ; bsLoopEnd :=
+             if (bsLoopEnd oacc, opKind op) is (None, LoopEnd)
+             then Some (bsNextPos oacc)
+             else bsLoopEnd oacc
+         |}) bacc (blockOps blk))
+      {| bsVars    := [::]
+       ; bsNextPos := 1
+       ; bsLoopBeg := None
+       ; bsLoopEnd := None
+       |} blocks in
+  (* Walk through all the operations, adding an address to each vector *)
+  undefined.
 
-   If there are no operators -- meaning it is a list of empty blocks -- then
-   this function always returns true. *)
-Fixpoint lastOpPred (f : OpData opType -> bool) (bs : seq BlockData) : bool :=
-  match bs with
-    | nil => true
-    | cons x xs =>
-        match blockOps x with
-        | nil => lastOpPred f xs
-        | cons op _ => f op
-        end
+Definition boundedRange (pos : nat) :=
+  { rd : RangeDesc | Range rd & pos <= NE_head (ups rd) }.
+
+Definition boundedTriple (pos : nat) :=
+  (option nat * option nat * option (boundedRange pos))%type.
+
+Record boundedRangeVec (pos : nat) := {
+  vars : seq (boundedTriple pos);
+  regs : Vec (boundedTriple pos) maxReg
+}.
+
+Definition transportTriple {pos : nat} `(Hlt : pos < n)
+  (x : boundedTriple n) : boundedTriple pos :=
+  let: (o1, o2, mo) := x in match mo with
+    | Some o => let: exist2 rd r H := o in
+      (o1, o2, Some (exist2 Range _ rd r (ltnW (leq_trans Hlt H))))
+    | None => (o1, o2, None)
     end.
 
-Definition firstOpPred (f : OpData opType -> bool) (bs : seq BlockData) :
-  bool :=
-  let fix go res blks :=
-      match blks with
-      | nil => res
-      | cons x xs =>
-          match maybeLast (blockOps x) with
-          | None    => go res xs
-          | Some op => go (f op) xs
-          end
-      end in
-  go true bs.
+Definition transportBounds (pos : nat) `(Hlt : pos < n) :
+  seq (boundedTriple n) -> seq (boundedTriple pos) :=
+  map (@transportTriple pos n Hlt).
 
-Fixpoint opCount (bs : seq BlockData) : nat :=
-  match bs with
-  | nil => 0
-  | cons x xs => size (blockOps x) + opCount xs
-  end.
+Definition transportVecBounds (pos m : nat) `(Hlt : pos < n) :
+  Vec (boundedTriple n) m -> Vec (boundedTriple pos) m :=
+  vmap (@transportTriple pos n Hlt).
 
-Definition startsAtOne (b : BlockData) : bool :=
-  firstOpPred (fun op => opId op == 1) [:: b].
+Definition boundedTransport (pos : nat) `(Hlt : pos < n)
+  (xs : boundedRangeVec n) : boundedRangeVec pos :=
+  {| vars := transportBounds    Hlt (vars xs)
+   ; regs := transportVecBounds Hlt (regs xs)
+   |}.
 
-(* ** BlockList
+Definition boundedSing (upos : UsePos) (Hodd : odd upos) : boundedRange upos :=
+  let r := R_Sing Hodd in exist2 Range _ r r (leqnn upos).
 
-   A [BlockList] maintains its list of blocks in reverse order.  For example,
-   if there were two blocks representing instructions 1-10, the block list
-   might look like : 6-10, followed by 1-5. *)
+Definition boundedCons (upos : UsePos) (Hodd : odd upos)
+  `(Hlt : upos < n) (xs : boundedRange n) : boundedRange upos :=
+  let: exist2 rd r H := xs in
+  let r' := R_Cons Hodd r (ltn_leq_trans Hlt H) in
+  exist2 Range _ r' r' (leqnn upos).
 
-Inductive BlockList : seq BlockData -> Type :=
-  | BlockList_firstBlock b :
-      startsAtOne b -> BlockList [:: b]
-  | BlockList_nextBlock b bs :
-      BlockList bs
-        -> let f op :=
-               if opCount bs == 0
-               then opId op == 1
-               else let isNext nop := opId op == (opId nop).+2 in
-                    lastOpPred isNext bs in
-           firstOpPred f [:: b]
-        -> BlockList (b :: bs).
-
-(* Fold over all the operations represented by a sequence of blocks.  Note
-   that operations are visited in reverse order, from highest to lowest. *)
-Fixpoint foldlBlockOps {a} (f : a -> OpData opType -> a) (z : a)
-  `(xs : BlockList bs) : a :=
-  match xs with
-    | BlockList_firstBlock b _ => foldl f z (blockOps b)
-    | BlockList_nextBlock b _ IHzs _ =>
-        foldlBlockOps f (foldl f z (blockOps b)) IHzs
-  end.
-
-Definition blockListOps `(blocks : BlockList bs) : seq (OpData opType) :=
-  rev (foldlBlockOps (fun acc op => op :: acc) [::] blocks).
-
-Lemma all_pairmap_cons {a} f (x : a) w ws :
-  all id (pairmap f w ws) -> f x w -> all id (pairmap f x (w :: ws)).
+Lemma withRanges (pos : nat) (Hodd : odd pos) (req : bool)
+  (upos : UsePos) (Heqe : upos = Build_UsePos pos req)
+  `(Hlt : upos < n) : boundedTriple n -> boundedTriple (uloc upos).
 Proof.
-  move=> Hall Hf.
-  elim: ws => //= [|z zs IHzs] in Hall *; by intuition.
-Qed.
-
-Theorem BlockList_ops_sequential `(blocks : BlockList bs) :
-  match blockListOps blocks with
-  | nil => True
-  | x :: xs => all id (pairmap (fun y z => opId y == (opId z).+2) x xs)
-  end.
-Proof.
-  case: blocks => [b H|b zs IHzs k Hfirst].
-    rewrite /blockListOps /foldlBlockOps foldl_rev {H}.
-    case: b => [? ? ops Hops] /=.
-    elim: Hops => //= [? ? n nodd allocs ? _ IHops].
-    apply/andP; split; first by [].
-    exact: IHops.
-  rewrite /blockListOps /=.
-  case: b => [? ? ops Hops] /= in Hfirst *.
-  elim: Hops => //= [? ? n nodd|? ? n nodd allocs ? ? IHops] in Hfirst *.
-    admit.
-  admit.
-Qed.
-
-Lemma mapBlockOps_spec
-  (f : forall op : OpData opType,
-         { op' : OpData opType | opId op' == opId op }) :
-  forall baseBlock0 blockInfo0 blockOps0,
-  startsAtOne
-    {|
-    baseBlock := baseBlock0;
-    blockInfo := blockInfo0;
-    blockOps := blockOps0 |} ->
-  startsAtOne
-    {|
-    baseBlock := baseBlock0;
-    blockInfo := blockInfo0;
-    blockOps := [seq (f op).1 | op <- blockOps0] |}.
-Proof.
-  move=> ? ?.
-  rewrite /startsAtOne.
-  elim=> //= [y ys IHys] H.
-  case: (f y) => x /= /eqP -> //.
-Qed.
-
-Lemma mapBlockOps_spec2
-  (f : forall op : OpData opType,
-         {op' : OpData opType | opId op' == opId op})
-  (zs : seq BlockData) :
-  forall baseBlock0 blockInfo0 blockOps0,
-  let k op :=
-      if opCount zs == 0
-      then opId op == 1
-      else let isNext nop := opId op == (opId nop).+2 in
-           lastOpPred isNext zs in
-  firstOpPred k
-    [:: {|
-        baseBlock := baseBlock0;
-        blockInfo := blockInfo0;
-        blockOps := blockOps0 |}] ->
-  firstOpPred k
-    [:: {|
-        baseBlock := baseBlock0;
-        blockInfo := blockInfo0;
-        blockOps := [seq (f op).1 | op <- blockOps0] |}].
-Proof.
-  move=> ? ?.
-  rewrite /firstOpPred.
-  elim=> //= [y ys IHys] H.
-  case: (f y) => x /= /eqP -> //.
-Qed.
-
-Definition foldlBlockOpsWithPred a
-  (f : a -> option (OpData opType) -> OpData opType -> a) (z : a)
-  `(xs : BlockList bs) : a :=
-  let fix go zmp blks (blist : BlockList blks) :=
-      let k x op : a * option (OpData opType) :=
-          let: (z, pre) := x in
-          (f z pre op, Some op) in
-      match blist with
-        | BlockList_firstBlock b _ =>
-            foldl k zmp (blockOps b)
-        | BlockList_nextBlock b zs IHzs _ =>
-            go (foldl k zmp (blockOps b)) zs IHzs
-      end in
-  fst (go (z, None) bs xs).
-
-Definition mapBlockOps
-  (f : forall op : OpData opType,
-         { op' : OpData opType | opId op' == opId op })
-  `(xs : BlockList bs) : { bs' : seq BlockData & BlockList bs' }.
-Proof.
-  case: xs => [b H|b zs IHzs k Hfirst].
-    case: b => [baseBlock0 blockInfo0 blockOps0] in H *.
-    exists [:: {| baseBlock := baseBlock0
-                ; blockInfo := blockInfo0
-                ; blockOps  := map (fun op => proj1_sig (f op))
-                                   blockOps0
-                |} ].
-    constructor.
-    exact: mapBlockOps_spec.
-  case: b => [baseBlock0 blockInfo0 blockOps0] in Hfirst *.
-  exists [:: {| baseBlock := baseBlock0
-              ; blockInfo := blockInfo0
-              ; blockOps  := map (fun op => proj1_sig (f op))
-                                 blockOps0
-              |} & zs].
-  constructor.
-    exact: IHzs.
-  rewrite -[X in firstOpPred X _]/k.
-  move: Hfirst.
-  exact: mapBlockOps_spec2.
+  move=> [p [[rd r Hr]| ]]; last first.
+    split. exact: p.
+    apply/Some/boundedSing.
+    by rewrite Heqe /=.
+  split. exact: p.
+  apply/Some/(@boundedCons upos).
+  - by rewrite Heqe /=.
+  - exact: n.
+  - exact: Hlt.
+  - by exists rd.
 Defined.
 
-Definition mapOpsWithPred
-  (f : option (OpData opType) -> OpData opType -> OpData opType)
-  (ops : seq (OpData opType)) : seq (OpData opType) :=
-  let fix go pre os := match os with
-      | nil => nil
-      | cons x xs =>
-          let newOp := f pre x in
-          newOp :: go (Some newOp) xs
-      end in
-  go None ops.
+Definition emptyBoundedRangeVec (n : nat) : boundedRangeVec n.+2 :=
+  {| vars := nil
+   ; regs := vconst (None, None, None)
+   |}.
 
-Definition mapBlockDataOpsWithPred
-  (f : BlockData -> option (OpData opType) -> OpData opType
-         -> OpData opType)
-  (blocks : seq BlockData) : seq BlockData :=
-  let fix go pre blks := match blks with
-      | nil => nil
-      | cons x xs =>
-          let k op rest :=
-              let: (m, ys) := rest in
-              let op' := f x m op in
-              (Some op', op' :: ys) in
-          let: (lastOp, newOps) :=
-               foldr k (pre, [::]) (blockOps x) in
-          let x' :=
-              {| baseBlock := baseBlock x
-               ; blockInfo := blockInfo x
-               ; blockOps  := newOps
-               |} in
-          x' :: go lastOp xs
+(* jww (2014-11-04): Still to be done:
+
+   Register constraints at method calls are also modeled using fixed
+   intervals: Because all registers are destroyed when the call is executed,
+   ranges of length 1 are added to all fixed intervals at the call
+   site. Therefore, the allocation pass cannot assign a register to any
+   interval there, and all intervals are spilled before the call. *)
+
+Definition handleOp (op : OpData) (rest : boundedRangeVec (opId op).+2) :
+  boundedRangeVec (opId op) :=
+  let pos := opId op in
+  let Hodd := opIdOdd op in
+
+  let liftOr f mx y :=
+      Some (match mx with Some x => f x y | None => y end) in
+
+  (** If the instruction at this position begins or ends a loop, extend the
+      current range so that it starts at, or end at, this boundary. *)
+  let savingBound x :=
+      if (isLoopBegin (opInfo op) (baseOp op)) ||
+         (isLoopEnd (opInfo op) (baseOp op))
+      then let: (mb, me, r) := x in
+           (liftOr minn mb pos, liftOr maxn me pos, r)
+      else x in
+
+  (** Add a new use position to the beginning of the current range. *)
+  let consr (x : boundedTriple pos.+2) req : boundedTriple pos :=
+      let upos := Build_UsePos pos req in
+      @withRanges pos Hodd _ upos refl_equal pos.+2 (ltnSSn _) x in
+
+  let restVars' := map savingBound (vars rest) in
+  let restRegs' := vmap savingBound (regs rest) in
+  let unchanged :=
+      boundedTransport (ltnSSn _)
+                       {| vars := restVars'; regs := restRegs' |} in
+
+  let rest2 :=
+      let k acc v :=
+          let x := consr (nth (None, None, None) restVars' (varId v))
+                         (regRequired v) in
+          {| vars := set_nth (None, None, None) (vars acc) (varId v) x
+           ; regs := regs acc
+           |} in
+      foldl k unchanged (varRefs (opInfo op) (baseOp op)) in
+
+  let k acc r :=
+      let x := consr (vnth restRegs' r) false in
+      {| vars := vars acc
+       ; regs := vreplace (regs acc) r x
+       |} in
+  foldl k rest2 (regRefs (opInfo op) (baseOp op)).
+
+Definition extractRange {n} (x : boundedTriple n) : option RangeSig :=
+  let: (mb, me, mr) := x in
+  match mr with
+  | None => None
+  | Some (exist2 rd r _) =>
+    let mres := match (mb, me) with
+      | (None, None)     => None
+      | (Some b, None)   => Some (b, rend rd)
+      | (None, Some e)   => Some (rbeg rd, e)
+      | (Some b, Some e) => Some (b, e)
       end in
-  go None blocks.
+    Some (match mres with
+            | None        => packRange r
+            | Some (b, e) => packRange (R_Extend b e r)
+            end)
+  end.
+
+Definition applyList (opInfo : OpInfo) (op : opType) (ops : seq opType)
+  (base : forall l, boundedRangeVec l.+2)
+  (f : forall op : OpData,
+         boundedRangeVec (opId op).+2 -> boundedRangeVec (opId op))
+   : seq OpData * boundedRangeVec 1 :=
+  let fix go i Hoddi x xs : seq OpData * boundedRangeVec i :=
+      let newop := {| baseOp  := x
+                    ; opInfo  := opInfo
+                    ; opId    := i
+                    ; opIdOdd := Hoddi
+                    ; opAlloc := nil |} in
+      match xs with
+      | nil => ([:: newop], f newop (base i))
+      | y :: ys =>
+          let: (ops', next) := go i.+2 (odd_add_2 Hoddi) y ys in
+          (newop :: ops', f newop next)
+      end in
+  go 1 odd_1 op ops.
+
+(** The list of operations is processed in reverse, so that the resulting
+    sub-lists are also in order. *)
+Definition processOperations (opInfo : OpInfo) (ops : seq opType) :
+  seq OpData * seq (option RangeSig) * Vec (option RangeSig) maxReg :=
+  match ops with
+  | nil => (nil, nil, vconst None)
+  | x :: xs =>
+      let: (ops', {| vars := vars'; regs := regs' |}) :=
+           @applyList opInfo x xs emptyBoundedRangeVec handleOp in
+      (ops', map extractRange vars', vmap extractRange regs')
+  end.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
@@ -259,119 +280,6 @@ Definition mapBlockDataOpsWithPred
    algorithm. *)
 Definition computeBlockOrder :
   IState SSError (seq blockType) (seq blockType) unit := return_ tt.
-
-Variable oinfo : OpInfo opType.
-Variable binfo : BlockInfo.
-
-Definition wrap_block (H : { i : nat | odd i })
-  (blocks: seq BlockData) (block : blockType) :=
-  let k H op :=
-      {| baseOp  := op
-       ; opInfo  := oinfo
-       ; opId    := H.1
-       ; opIdOdd := H.2
-       ; opAlloc := nil |} in
-
-  let f x op := let: (H, ops) := x in
-      (exist odd (H.1).+2 (odd_add_2 H.2), k H op :: ops) in
-
-  let: (H', ops')  := foldl f (H, nil) (blockToOpList binfo block) in
-  let blk := {| baseBlock := block
-              ; blockInfo := binfo
-              ; blockOps  := rev ops' |} in
-  (H', blk :: blocks).
-
-(* Confirm that [wrap_block] works for a single block that has three
-   operations. *)
-Lemma wrap_block_spec : forall x y z b blk,
-  [:: x; y; z] = blockToOpList binfo blk
-    -> snd (wrap_block (exist odd 1 odd_1) [::] blk) = [:: b]
-    -> blockOps b =
-       [:: {| baseOp  := x
-            ; opInfo  := oinfo
-            ; opId    := 1
-            ; opIdOdd := odd_1
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := y
-            ; opInfo  := oinfo
-            ; opId    := 3
-            ; opIdOdd := odd_add_2 odd_1
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := z
-            ; opInfo  := oinfo
-            ; opId    := 5
-            ; opIdOdd := odd_add_2 (odd_add_2 odd_1)
-            ; opAlloc := nil
-            |}
-       ].
-Proof.
-  move=> x y z b blk Heq.
-  rewrite /wrap_block -{}Heq /=.
-  by invert.
-Qed.
-
-(* Next, check that it works for two blocks, each of which has three
-  operations, and that numbering can continue across the blocks. *)
-Lemma wrap_block_spec2 :
-  forall a b c x y z b1 b2 blk1 blk2 H H',
-  [:: a; b; c] = blockToOpList binfo blk1
-    -> [:: x; y; z] = blockToOpList binfo blk2
-    -> wrap_block (exist odd 1 odd_1) [::] blk1 = (H, [:: b1])
-    -> wrap_block H [::] blk2 = (H', [:: b2])
-    -> blockOps b1 =
-       [:: {| baseOp  := a
-            ; opInfo  := oinfo
-            ; opId    := 1
-            ; opIdOdd := odd_1
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := b
-            ; opInfo  := oinfo
-            ; opId    := 3
-            ; opIdOdd := odd_add_2 odd_1
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := c
-            ; opInfo  := oinfo
-            ; opId    := 5
-            ; opIdOdd := odd_add_2 (odd_add_2 odd_1)
-            ; opAlloc := nil
-            |}
-       ]
-    /\ blockOps b2 =
-       [:: {| baseOp  := x
-            ; opInfo  := oinfo
-            ; opId    := 7
-            ; opIdOdd := odd_add_2 (odd_add_2 (odd_add_2 odd_1))
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := y
-            ; opInfo  := oinfo
-            ; opId    := 9
-            ; opIdOdd := odd_add_2 (odd_add_2 (odd_add_2 (odd_add_2 odd_1)))
-            ; opAlloc := nil
-            |}
-       ;   {| baseOp  := z
-            ; opInfo  := oinfo
-            ; opId    := 11
-            ; opIdOdd := odd_add_2
-                           (odd_add_2
-                              (odd_add_2 (odd_add_2 (odd_add_2 odd_1))))
-            ; opAlloc := nil
-            |}
-       ].
-Proof.
-  move=> a b c x y z b1 b2 blk1 blk2 H H' Heq Heq2.
-  rewrite /wrap_block /= -{}Heq -{}Heq2 /=.
-  by invert; invert.
-Qed.
-
-Definition blocksToBlockList : seq blockType -> seq BlockData :=
-  let f acc x := let: (H, blocks) := acc in
-                 wrap_block H blocks x in
-  @snd _ _ \o foldl f (exist odd 1 odd_1, nil).
 
 (* This function not only numbers all operations for us, but adds any extra
    administrative information that we need to process the algorithm on this

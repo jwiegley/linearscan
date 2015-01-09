@@ -133,6 +133,13 @@ Proof.
   by apply/orP; right.
 Defined.
 
+Lemma all_pairmap_cons {a} f (x : a) w ws :
+  all id (pairmap f w ws) -> f x w -> all id (pairmap f x (w :: ws)).
+Proof.
+  move=> Hall Hf.
+  elim: ws => //= [|z zs IHzs] in Hall *; by intuition.
+Qed.
+
 Definition all_in_list {a : eqType} (l : list a) : all (fun x => x \in l) l.
 Proof. apply/allP; elim: l => //=. Qed.
 
@@ -145,6 +152,21 @@ Definition list_membership {a : eqType} (l : seq a) :
           exist _ x (mem_head _ xs) :: map exist_in_cons (go xs)
       end in
   go l.
+
+Fixpoint apply_nth {a} (def : a) (v : seq a) i (f : a -> a) {struct i} :=
+  if v is x :: v'
+  then if i is i'.+1
+       then x :: apply_nth def v' i' f
+       else f x :: v'
+  else ncons i def [:: def].
+
+Lemma size_apply_nth a (v : seq a) i def f :
+  size (apply_nth def v i f) = if i < size v then size v else i.+1.
+Proof.
+  elim: v i => [|n v IHv] [|i] //=;
+  first by rewrite size_ncons /= addn1.
+  rewrite IHv; exact: fun_if.
+Qed.
 
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 

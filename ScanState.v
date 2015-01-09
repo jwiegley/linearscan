@@ -2,7 +2,6 @@ Require Import LinearScan.Lib.
 
 Require Export LinearScan.Machine.
 Require Export LinearScan.Interval.
-Require Export LinearScan.Ops.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
