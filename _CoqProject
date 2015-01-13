@@ -10,7 +10,6 @@ Lib.v
 Machine.v
 Main.v
 NonEmpty.v
-Ops.v
 Range.v
 SSMorph.v
 ScanState.v

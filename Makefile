@@ -4,7 +4,7 @@ MISSING  = \
                 ! -name '*2.v'                             |		\
 		xargs egrep -i -Hn '(admit|undefined)'     |		\
 		      egrep -v 'Definition undefined'      |		\
-		      egrep -v new/
+		      egrep -v '(old|new)/'
 
 VFILES = $(wildcard *.v)
 VOFILES = $(patsubst %.v,%.vo,$(VFILES))

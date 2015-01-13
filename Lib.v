@@ -172,12 +172,32 @@ Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
 Definition odd_1 : odd 1. done. Qed.
 
+Lemma odd_double_plus (n : nat) : odd n.*2.+1.
+Proof.
+  elim: n => [|n IHn] //=.
+  apply/negPn.
+  by rewrite odd_double.
+Qed.
+
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
   rewrite -subn_gt0 odd_gt0 // odd_sub // modd /=.
   exact/negPn.
 Qed.
+
+Lemma even_odd_plus n : ~~ odd n -> odd n.+1.
+Proof. case: n => //. Qed.
+
+(* Lemma ltn_even_odd n m : ~~ odd n && odd m -> n < m -> n.+1 <= m. *)
+(* Proof. *)
+(*   move/andP=> [neven modd] Hlt. *)
+(*   rewrite -subn_gt0 odd_gt0 //. *)
+(*   rewrite odd_sub //. *)
+(*     apply/addbP. *)
+(*     by rewrite modd -neven negbK. *)
+(*   exact: ltnW. *)
+(* Qed. *)
 
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
 Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.

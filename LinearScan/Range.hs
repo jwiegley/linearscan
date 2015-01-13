@@ -74,14 +74,6 @@ ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
 
-getRangeDesc :: RangeDesc -> RangeDesc
-getRangeDesc d =
-  d
-
-packRange :: RangeDesc -> RangeDesc
-packRange d =
-  d
-
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
   case (Prelude.<=) ((Prelude.succ) (rbeg x)) (rbeg y) of {

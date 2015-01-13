@@ -27,24 +27,16 @@ Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
-Close Scope nat_scope.
-
-Variable opType : Set.
-Variable opInfo : OpInfo opType.
-Variable blockType : Set.
-Variable blockInfo : BlockInfo opType blockType.
-
 Definition mainAlgorithm :
-  IState SSError (seq blockType) (seq blockType) unit :=
+  IState SSError BlockList BlockList unit :=
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder ;;;
-  numberOperations opInfo blockInfo ;;;
+  numberOperations ;;;
 
   (* create intervals with live ranges *)
   computeLocalLiveSets ;;;
   computeGlobalLiveSets ;;;
-  blocks <<- iget SSError ;;
-  let ssig := buildIntervals opInfo blockInfo blocks in
+  ssig <<- buildIntervals ;;
 
   (* allocate registers *)
   match walkIntervals ssig.2 with
@@ -53,13 +45,13 @@ Definition mainAlgorithm :
       resolveDataFlow ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum ops ssig'.2
+      assignRegNum ssig'.2
   end.
 
-Definition linearScan (blocks : seq blockType) : SSError + seq blockType :=
+Definition linearScan (blocks : BlockList) : SSError + BlockList :=
   match IState.runIState SSError mainAlgorithm blocks with
   | inl err      => inl err
-  | inr (res, _) => inr res
+  | inr (_, res) => inr res
   end.
 
 End Main.
@@ -97,8 +89,8 @@ Extract Inlined Constant list_membership    => "Prelude.const".
 
 (* Avoid extracting this function, which has no computational value, but Coq
    insists on ignoring its opacity. *)
-Extract Inlined Constant boundedTransport =>
-  "LinearScan.Utils.boundedTransport'".
+(* Extract Inlined Constant boundedTransport => *)
+(*   "LinearScan.Utils.boundedTransport'". *)
 
 Extraction Blacklist String List Vector NonEmpty.
 
