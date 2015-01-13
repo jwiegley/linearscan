@@ -49,7 +49,7 @@ Record VarInfo := {
   regRequired : bool
 }.
 
-Definition VarList := (seq VarInfo).
+Definition VarList := seq VarInfo.
 
 Definition OpId := nat.
 
@@ -65,7 +65,7 @@ Record OpInfo := {
   regRefs : seq PhysReg
 }.
 
-Definition OpList := (seq OpInfo).
+Definition OpList := seq OpInfo.
 
 Definition BlockId := nat.
 
@@ -74,7 +74,7 @@ Record BlockInfo := {
   blockOps    : OpList
 }.
 
-Definition BlockList := (NonEmpty BlockInfo).
+Definition BlockList := NonEmpty BlockInfo.
 
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.

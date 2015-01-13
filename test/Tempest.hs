@@ -14,6 +14,7 @@ import Control.Monad
 import Control.Monad.Free
 import Data.Foldable
 import Data.Map
+import Data.Monoid
 import LinearScan hiding (Call)
 import qualified LinearScan.Main as LS
 import Test.Hspec
@@ -65,7 +66,7 @@ type Failure a  = a
 -- | Type synonym for indicating an external name
 type Imported a = a
 
-data Reg = Reg deriving Show
+data Reg = Reg Int deriving Show
 
 data Instruction reg
   = Add          reg reg reg
@@ -181,13 +182,6 @@ data IRVar =
 type Input a  = Procedure a IRVar
 type Output a = Procedure a Reg
 
-instrVarRefs :: Show a => Node a IRVar e x -> [VarInfo]
-instrVarRefs (Node (Instr (Add a b c)) _) = varsIn a ++ varsIn b ++ varsIn c
-  where
-    varsIn (IRVar (VirtualIV n _ _) _) = [VarInfo n Input Unallocated False]
-    varsIn _ = []
-instrVarRefs i = error $ "instrVarRefs: NYI for " ++ show i
-
 lblMapOfCC :: Graph' block n C C -> LabelMap (block n C C)
 lblMapOfCC (GMany NothingO lm NothingO) = lm
 
@@ -270,53 +264,99 @@ add :: IRVar -> IRVar -> IRVar -> Program ()
 add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))
 
 
-data VarAlloc = VarAlloc
-    { raVarNum   :: Int
-    , raVarAlloc :: LS.Allocation
-    }
-    deriving (Eq, Show)
-
-data OpAlloc a = OpAlloc
-    { opAllocs :: [VarAlloc]
-    , opVar    :: a
+data BlocksF a = BlocksF
+    { wrapBlock :: [BlockInfo]
+    , wrapVar   :: a
     }
     deriving (Eq, Show, Functor)
 
-render :: Allocs () -> [BlockInfo]
-render = undefined -- go 1
-  -- where
-  --   go _ (Pure ()) = []
-  --   go n (Free (Operation (OpAlloc as xs))) =
-  --       mkop n (Prelude.map (\(VarAlloc v a) -> (v, a)) as)
-  --           : go (n+2) xs
+type Blocks a = Free BlocksF a
 
-mkop :: Int -> [VarInfo] -> OpInfo
-mkop i xs = OpInfo
-    { opId    = i
-    , opKind  = undefined
-    , varRefs = xs
-    , regRefs = undefined
-    }
+alloc :: Int -> Int -> Blocks ()
+alloc v n =
+    Free (BlocksF
+          [BlockInfo 0
+           [OpInfo 0 Normal
+            [VarInfo v Temp (LS.Register n) False] []]]
+          (Pure ()))
 
-type Alloc a = Free OpAlloc a
-
-data Operation a = Operation (OpAlloc a) deriving Functor
-
-type Allocs a = Free Operation a
-
-alloc :: Int -> Int -> Alloc ()
-alloc v n = Free (OpAlloc [VarAlloc v (LS.Register n)] (Pure ()))
-
-allocs :: [(Int, Int)] -> Alloc ()
+allocs :: [(Int, Int)] -> Blocks ()
 allocs []         = return ()
 allocs ((v,n):xs) = alloc v n >> allocs xs
 
-regs :: Alloc () -> Allocs ()
-regs a = Free (Operation (OpAlloc (reduce a) (Pure ())))
+op :: Blocks () -> Blocks ()
+op a = Free (BlocksF [BlockInfo 0 (reduce a)] (Pure ()))
   where
     reduce (Pure ()) = []
-    reduce (Free (OpAlloc as xs)) = as ++ reduce xs
+    reduce (Free (BlocksF [BlockInfo _ as] xs)) = as ++ reduce xs
+    reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
+
+block :: Blocks () -> Blocks ()
+block a = Free (BlocksF (reduce a) (Pure ()))
+  where
+    reduce (Pure ()) = []
+    reduce (Free (BlocksF as xs)) = as ++ reduce xs
+
+render :: Blocks () -> [BlockInfo]
+render = go (1 :: Int)
+  where
+    go _ (Pure ()) = []
+    go n (Free (BlocksF as xs)) = as ++ go (n+2) xs
 
 
 convertBlock :: Block (Node () IRVar) C C -> BlockInfo
-convertBlock = undefined
+convertBlock (BlockCC _pre body _post) =
+    BlockInfo
+        { blockId  = 0
+        , blockOps = Prelude.map convertNode (gatherNodes [] body)
+        }
+  where
+    gatherNodes :: [Node () IRVar O O] -> Block (Node () IRVar) O O
+                -> [Node () IRVar O O]
+    gatherNodes xs BNil = xs
+    gatherNodes xs (BMiddle node) = node : xs
+    gatherNodes xs (BCat left right) = gatherNodes (gatherNodes xs left) right
+    gatherNodes xs (BSnoc blk node) = gatherNodes xs blk ++ [node]
+    gatherNodes xs (BCons node blk) = gatherNodes (node : xs) blk
+
+convertNode :: Node () IRVar O O -> OpInfo
+convertNode (Node instr _meta) =
+    let (vars, regs) = go instr in
+    OpInfo
+        { opId    = 0
+        , opKind  = Normal
+        , varRefs = vars
+        , regRefs = regs
+        }
+  where
+    go :: IRInstr IRVar O O -> ([VarInfo], [LS.PhysReg])
+    go (Alloc _group _msrc _dst) = undefined
+    go (Reclaim _src) = undefined
+    go (Instr i) = convertInstr i
+    go (Call _conv _i) = undefined
+    go (LoadConst _const _dst) = undefined
+    go (Move _src _dst) = undefined
+    go (Copy _src _dst) = undefined
+    go (Save _lin _src _dst) = undefined
+    go (Restore _lin _src _dst) = undefined
+    go (SaveOffset _lin _off _src _dst) = undefined
+    go (RestoreOffset _lin _off _src _dst) = undefined
+
+convertInstr :: Instruction IRVar -> ([VarInfo], [LS.PhysReg])
+convertInstr = go
+  where
+    go (Add a b c) = mkv a <> mkv b <> mkv c
+    go Endt = undefined
+
+    mkv :: IRVar -> ([VarInfo], [LS.PhysReg])
+    mkv (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
+    mkv (IRVar (VirtualIV n _atomkind _spillability) _) = ([conv n], [])
+      where
+        conv :: Int -> VarInfo
+        conv idx =
+            VarInfo
+                { varId       = idx
+                , varKind     = Temp
+                , varAlloc    = Unallocated
+                , regRequired = False
+                }
