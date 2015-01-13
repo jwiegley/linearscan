@@ -87,11 +87,6 @@ Extract Inlined Constant widen_fst          => "Prelude.id".
 Extract Inlined Constant List.destruct_list => "LinearScan.Utils.uncons".
 Extract Inlined Constant list_membership    => "Prelude.const".
 
-(* Avoid extracting this function, which has no computational value, but Coq
-   insists on ignoring its opacity. *)
-(* Extract Inlined Constant boundedTransport => *)
-(*   "LinearScan.Utils.boundedTransport'". *)
-
 Extraction Blacklist String List Vector NonEmpty.
 
 Separate Extraction linearScan.

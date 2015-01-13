@@ -35,20 +35,29 @@ data IntervalDesc =
    Build_IntervalDesc Prelude.Int Prelude.Int Prelude.Int ([]
                                                           Range.RangeDesc)
 
+ivar :: IntervalDesc -> Prelude.Int
+ivar i =
+  case i of {
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> ivar0}
+
 ibeg :: IntervalDesc -> Prelude.Int
 ibeg i =
   case i of {
-   Build_IntervalDesc ivar ibeg0 iend0 rds0 -> ibeg0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> ibeg0}
 
 iend :: IntervalDesc -> Prelude.Int
 iend i =
   case i of {
-   Build_IntervalDesc ivar ibeg0 iend0 rds0 -> iend0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> iend0}
 
 rds :: IntervalDesc -> [] Range.RangeDesc
 rds i =
   case i of {
-   Build_IntervalDesc ivar ibeg0 iend0 rds0 -> rds0}
+   Build_IntervalDesc ivar0 ibeg0 iend0 rds0 -> rds0}
+
+getIntervalDesc :: IntervalDesc -> IntervalDesc
+getIntervalDesc d =
+  d
 
 packInterval :: IntervalDesc -> IntervalDesc
 packInterval d =

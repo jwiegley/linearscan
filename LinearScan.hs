@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -Wall -Werror -fno-warn-orphans #-}
 
@@ -6,76 +7,73 @@ module LinearScan
     ( allocate
     , VarInfo(..)
     , VarKind(..)
-    , BlockInfo(..)
+    , Allocation(..)
     , OpInfo(..)
-    , OpData(..)
+    , OpKind(..)
+    , BlockInfo(..)
     ) where
 
 import qualified LinearScan.Main as LS
-import LinearScan.Main (PhysReg, VarId, VarKind(..), Allocation(..))
+import LinearScan.Main
+    ( VarId
+    , VarKind(..)
+    , Allocation(..)
+    , OpId
+    , OpKind(..)
+    , PhysReg
+    , BlockId
+    )
 
 data VarInfo = VarInfo
     { varId       :: VarId
     , varKind     :: VarKind
+    , varAlloc    :: Allocation
     , regRequired :: Bool
     }
+    deriving (Eq, Show)
+
+deriving instance Eq VarKind
+deriving instance Show VarKind
 
 toVarInfo :: LS.VarInfo -> VarInfo
-toVarInfo (LS.Build_VarInfo a b c) = VarInfo a b c
+toVarInfo (LS.Build_VarInfo a b c d) = VarInfo a b c d
 
 fromVarInfo :: VarInfo -> LS.VarInfo
-fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
+fromVarInfo (VarInfo a b c d) = LS.Build_VarInfo a b c d
 
-data BlockInfo opType blockType = BlockInfo
-    { blockToOpList :: blockType -> [opType]
+data OpInfo = OpInfo
+    { opId    :: OpId
+    , opKind  :: OpKind
+    , varRefs :: [VarInfo]
+    , regRefs :: [PhysReg]
     }
+    deriving (Eq, Show)
 
-data OpInfo opType = OpInfo
-    { isLoopBegin :: opType -> Bool
-    , isLoopEnd   :: opType -> Bool
-    , isCall      :: opType -> Maybe [PhysReg]
-    , hasRefs     :: opType -> Bool
-    , varRefs     :: opType -> [VarInfo]
-    , regRefs     :: opType -> [PhysReg]
+deriving instance Eq OpKind
+deriving instance Show OpKind
+
+toOpInfo :: LS.OpInfo -> OpInfo
+toOpInfo (LS.Build_OpInfo a b c d) = OpInfo a b (map toVarInfo c) d
+
+fromOpInfo :: OpInfo -> LS.OpInfo
+fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b (map fromVarInfo c) d
+
+data BlockInfo = BlockInfo
+    { blockId  :: BlockId
+    , blockOps :: [OpInfo]
     }
+    deriving (Eq, Show)
 
-data OpData opType = OpData
-    { baseOp  :: opType
-    , opInfo  :: OpInfo opType
-    , opId    :: Int
-    , opAlloc :: [(VarId, Allocation)]
-    }
+toBlockInfo :: LS.BlockInfo -> BlockInfo
+toBlockInfo (LS.Build_BlockInfo a b) = BlockInfo a (map toOpInfo b)
 
-instance Eq (OpData opType) where
-    OpData _b1 _i1 d1 a1 == OpData _b2 _i2 d2 a2 = d1 == d2 && a1 == a2
+fromBlockInfo :: BlockInfo -> LS.BlockInfo
+fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a (map fromOpInfo b)
 
-instance Show (OpData opType) where
-    show (OpData _b _i d a) =
-        "Op." ++ show d ++ " [" ++ vars ++ "]"
-      where
-        vars = foldr (\(v, al) rest ->
-                       "v" ++ show v ++ " => " ++ showAlloc al ++
-                       case rest of
-                           [] -> ""
-                           _  -> ", " ++ rest) "" a
-
-        showAlloc (LS.Register r) = show r
-        showAlloc LS.Unallocated  = "<unallocated>"
-        showAlloc LS.Spill        = "<spill>"
-
-allocate :: (Show op, Show (LS.OpData op))
-         => [block] -> OpInfo op -> BlockInfo op block -> Either String [OpData op]
-allocate [] _ _ = Left "No basic blocks were provided"
-allocate blocks oinfo binfo =
-    let oinfo' = LS.Build_OpInfo
-            (isLoopBegin oinfo)
-            (isLoopEnd oinfo)
-            (isCall oinfo)
-            (hasRefs oinfo)
-            (map fromVarInfo . varRefs oinfo)
-            (regRefs oinfo)
-        binfo' = blockToOpList binfo in
-    case LS.linearScan oinfo' binfo' blocks of
+allocate :: [BlockInfo] -> Either String [BlockInfo]
+allocate [] = Left "No basic blocks were provided"
+allocate blocks =
+    case LS.linearScan (map fromBlockInfo blocks) of
         Left x -> Left $ case x of
             LS.ECannotSplitSingleton n ->
                 "Current interval is a singleton (" ++ show n ++ ")"
@@ -87,7 +85,4 @@ allocate blocks oinfo binfo =
                 "Register is already assigned (" ++ show n ++ ")"
             LS.ERegisterAssignmentsOverlap n ->
                 "Register assignments overlap (" ++ show n ++ ")"
-        Right z -> Right $ map f z
-  where
-    f (LS.Build_OpData a (LS.Build_OpInfo b1 b2 b3 b4 b5 b6) c d) =
-        OpData a (OpInfo b1 b2 b3 b4 (map toVarInfo . b5) b6) c d
+        Right z -> Right (map toBlockInfo z)

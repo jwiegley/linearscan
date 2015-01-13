@@ -404,16 +404,16 @@ type OpList = [] OpInfo
 type BlockId = Prelude.Int
 
 data BlockInfo =
-   Build_BlockInfo BlockId ([] OpInfo)
+   Build_BlockInfo BlockId OpList
 
-coq_BlockInfo_rect :: (BlockId -> ([] OpInfo)
-                                 -> a1) -> BlockInfo -> a1
+coq_BlockInfo_rect :: (BlockId -> OpList ->
+                                 a1) -> BlockInfo -> a1
 coq_BlockInfo_rect f b =
   case b of {
    Build_BlockInfo x x0 -> f x x0}
 
-coq_BlockInfo_rec :: (BlockId -> ([] OpInfo)
-                                -> a1) -> BlockInfo -> a1
+coq_BlockInfo_rec :: (BlockId -> OpList -> a1)
+                                -> BlockInfo -> a1
 coq_BlockInfo_rec =
   coq_BlockInfo_rect
 
@@ -422,7 +422,7 @@ blockId b =
   case b of {
    Build_BlockInfo blockId0 blockOps0 -> blockId0}
 
-blockOps :: BlockInfo -> [] OpInfo
+blockOps :: BlockInfo -> OpList
 blockOps b =
   case b of {
    Build_BlockInfo blockId0 blockOps0 -> blockOps0}
@@ -480,7 +480,7 @@ foldOpsRev :: (a1 -> OpInfo -> a1) -> a1 ->
                          BlockList -> a1
 foldOpsRev f z blocks =
   Data.List.foldl' (\bacc blk ->
-    Data.List.foldl' f bacc (Seq.rev ( (blockOps blk)))) z
+    Data.List.foldl' f bacc (Seq.rev (blockOps blk))) z
     (Seq.rev ( blocks))
 
 mapWithIndex :: (Prelude.Int -> a1 -> a2) -> ([] a1) -> [] a2
@@ -490,6 +490,12 @@ mapWithIndex f l =
       (Data.List.foldl' (\acc x ->
         case acc of {
          (,) n xs -> (,) ((Prelude.succ) n) ((:) (f n x) xs)}) ((,) 0 []) l))
+
+mapOps :: (OpInfo -> OpInfo) ->
+                     BlockList -> BlockList
+mapOps f =
+  Prelude.map (\blk -> Build_BlockInfo (blockId blk)
+    (Prelude.map f (blockOps blk)))
 
 processOperations :: BlockList -> BuildState
 processOperations blocks =
@@ -654,7 +660,43 @@ assignRegNum :: ScanStateDesc -> IState.IState
                            SSError BlockList
                            BlockList ()
 assignRegNum sd =
-  return_ ()
+  let {
+   ints = (Prelude.++) (handled sd)
+            ((Prelude.++) (active sd) (inactive sd))}
+  in
+  let {
+   f = \op ->
+    let {
+     k = \v ->
+      let {vid = varId v} in
+      let {
+       h = \acc x ->
+        case x of {
+         (,) xid reg ->
+          let {
+           int = Interval.getIntervalDesc
+                   (
+                     (LinearScan.Utils.nth (nextInterval sd)
+                       (intervals sd) xid))}
+          in
+          case (Prelude.&&)
+                 (Eqtype.eq_op Ssrnat.nat_eqType
+                   (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
+                 ((Prelude.&&)
+                   ((Prelude.<=) (Interval.ibeg int) (opId op))
+                   ((Prelude.<=) ((Prelude.succ) (opId op))
+                     (Interval.iend int))) of {
+           Prelude.True -> Build_VarInfo (varId v)
+            (varKind v) (Register reg)
+            (regRequired v);
+           Prelude.False -> acc}}}
+      in
+      Data.List.foldl' h v ints}
+    in
+    Build_OpInfo (opId op) (opKind op)
+    (Prelude.map k (varRefs op)) (regRefs op)}
+  in
+  IState.imodify (mapOps f)
 
 coq_SSMorph_rect :: ScanStateDesc ->
                                ScanStateDesc -> (() -> () -> () ->

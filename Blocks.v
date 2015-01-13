@@ -65,13 +65,13 @@ Record OpInfo := {
   regRefs : seq PhysReg
 }.
 
-Definition OpList := (NonEmpty OpInfo).
+Definition OpList := (seq OpInfo).
 
 Definition BlockId := nat.
 
 Record BlockInfo := {
   blockId     : BlockId;
-  blockOps    : NonEmpty OpInfo
+  blockOps    : OpList
 }.
 
 Definition BlockList := (NonEmpty BlockInfo).
@@ -79,51 +79,23 @@ Definition BlockList := (NonEmpty BlockInfo).
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.
 
-(* Definition transportBoundedRange {base : nat} `(Hlt : base < prev) *)
-(*   (x : BoundedRange prev) : BoundedRange base. *)
-(*   case: x => [r H]. *)
-(*   apply: exist. *)
-(*   apply: r. *)
-(*   exact/(leq_trans _ H)/ltnW. *)
-(* Defined. *)
+(* jww (2015-01-12): Some of the things described by Wimmer in the section on
+   dealing with computing of intervals have yet to be done:
 
-(* jww (2015-01-12): Most of the things described by Wimmer on the section
-   dealing with computing of intervals has yet to be done:
-
-   Loop handling
-   Call sites
-   Exception handling optimization
+   - Loop handling (reordering blocks to optimize allocation)
+   - Extending of ranges for input/output variables
+   - Purging registers at call sites
+   - Exception handling optimization
 *)
 
 Record BuildState := {
   bsPos  : nat;
   bsVars : seq (option (BoundedRange bsPos.*2.+1));
   bsRegs : Vec (option RangeSig) maxReg
-
-  (* jww (2015-01-09): For now, we're going to ignore the detrimental impact
-     of allowing spills to occur inside loops.  This is something we can
-     adjust later, once we've ensure that everything works in the simplistic
-     case.  For reference, the algorithm needed to implement this correctly
-     is in the section "5.3 Block Order" in Wimmer's thesis. *)
-
-  (* bsLoopBeg : option nat; *)
-  (* bsLoopEnd : option nat *)
-
-  (* ; bsLoopBeg := *)
-  (*     if (bsLoopBeg oacc, opKind op) is (None, LoopBegin) *)
-  (*     then Some (bsNextPos oacc) *)
-  (*     else bsLoopBeg oacc *)
-  (* ; bsLoopEnd := *)
-  (*     if (bsLoopEnd oacc, opKind op) is (None, LoopEnd) *)
-  (*     then Some (bsNextPos oacc) *)
-  (*     else bsLoopEnd oacc *)
-
-  (* ; bsLoopBeg := None *)
-  (* ; bsLoopEnd := None *)
 }.
 
 Definition foldOps a (f : a -> OpInfo -> a) (z : a) : BlockList -> a :=
-  NE_foldl (fun bacc blk => NE_foldl f bacc (blockOps blk)) z.
+  NE_foldl (fun bacc blk => foldl f bacc (blockOps blk)) z.
 
 Definition foldOpsRev a (f : a -> OpInfo -> a) (z : a)
   (blocks : BlockList) : a :=
@@ -133,6 +105,12 @@ Definition foldOpsRev a (f : a -> OpInfo -> a) (z : a)
 Definition mapWithIndex {a b} (f : nat -> a -> b) (l : seq a) : seq b :=
   rev (snd (foldl (fun acc x => let: (n, xs) := acc in
                                 (n.+1, f n x :: xs)) (0, [::]) l)).
+
+Definition mapOps (f : OpInfo -> OpInfo) : BlockList -> BlockList :=
+  NE_map (fun blk =>
+            {| blockId  := blockId blk
+             ; blockOps := map f (blockOps blk)
+             |}).
 
 Definition processOperations (blocks : BlockList) : BuildState.
   set opCount := foldOps (fun n _ => n.+1) 0 blocks.
@@ -200,20 +178,22 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
             (mx : option (BoundedRange pos.*2.+1))
             (f : forall sd, ScanState sd -> forall d, Interval d
                    -> ScanStateSig) :=
-      let: (exist sd st) := ss in match mx with
-           | Some (exist r _) => f _ st _ (I_Sing vid r.2)
-           | None => ss
-           end in
+      let: exist _ st := ss in
+      if mx is Some (exist r _)
+      then f _ st _ (I_Sing vid r.2)
+      else ss in
 
-  let handleVar pos vid ss mx := mkint vid ss pos mx $ fun _ st _ i =>
+  let handleVar pos vid ss mx :=
+      mkint vid ss pos mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i) in
 
   blocks <<- iget SSError ;;
   let: bs := processOperations blocks in
+
   let regs := vmap (fun mr =>
-                      if mr is Some r
-                      then Some (packInterval (I_Sing 0 r.2))
-                      else None) (bsRegs bs) in
+        if mr is Some r
+        then Some (packInterval (I_Sing 0 r.2))
+        else None) (bsRegs bs) in
 
   let s0 := ScanState_nil in
   let s1 := ScanState_setFixedIntervals s0 regs in
@@ -224,38 +204,34 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
 Definition assignRegNum `(st : ScanState sd) :
-  IState SSError BlockList BlockList unit := return_ tt.
-
-(*
-Definition assignRegNum (ops : seq (OpData opType)) `(st : ScanState sd) :
-  BlockState unit :=
+  IState SSError BlockList BlockList unit :=
   let ints := handled sd ++ active sd ++ inactive sd in
   let f op :=
-      let o := baseOp op in
-      let vars := varRefs (opInfo op) o in
-      let k op' v :=
-          let vid := varId v in
-          let h acc x :=
-              let: (xid, reg) := x in
-              (* This strange use of a lambda is so that the generated code
-                 evaluates [getInterval] only once, and shares the resulting
-                 [int] at each use point; otherwise, if we use [let] or
-                 [match], Coq's extractor inlines each use of [int], resulting
-                 in no sharing of values. *)
-              (fun int =>
-                 if (ivar int == vid) &&
-                    (ibeg int <= opId op < iend int)
-                 then (vid, Register reg) :: acc
-                 else acc) (getInterval xid) in
-          {| baseOp  := o
-           ; opInfo  := opInfo op'
-           ; opId    := opId op'
-           ; opIdOdd := opIdOdd op'
-           ; opAlloc := foldl h nil ints ++ opAlloc op'
-           |} in
-      foldl k op vars in
-  map f ops.
-*)
+    let k v :=
+      let vid := varId v in
+      let h acc x :=
+        let: (xid, reg) := x in
+        (* This strange use of a lambda is so that the generated code
+           evaluates [getInterval] only once, and shares the resulting [int]
+           at each use point; otherwise, if we use [let] or [match], Coq's
+           extractor inlines each use of [int], resulting in no sharing of
+           values. *)
+        (fun int =>
+           if (ivar int == vid) &&
+              (ibeg int <= opId op < iend int)
+           then {| varId       := varId v
+                 ; varKind     := varKind v
+                 ; varAlloc    := Register reg
+                 ; regRequired := regRequired v
+                 |}
+           else acc) (getInterval xid) in
+      foldl h v ints in
+    {| opId    := opId op
+     ; opKind  := opKind op
+     ; varRefs := map k (varRefs op)
+     ; regRefs := regRefs op
+     |} in
+  imodify SSError (mapOps f).
 
 End Blocks.
 

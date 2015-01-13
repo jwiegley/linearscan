@@ -14,7 +14,7 @@ import Control.Monad
 import Control.Monad.Free
 import Data.Foldable
 import Data.Map
-import LinearScan
+import LinearScan hiding (Call)
 import qualified LinearScan.Main as LS
 import Test.Hspec
 
@@ -141,9 +141,9 @@ nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
 nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
 
-instance Show (LS.OpData (Node () IRVar O O)) where
-    show (LS.Build_OpData a _b c d) =
-        "LS.OpData " ++ show a ++ " " ++ show c ++ " " ++ show d
+-- instance Show (LS.OpData (Node () IRVar O O)) where
+--     show (LS.Build_OpData a _b c d) =
+--         "LS.OpData " ++ show a ++ " " ++ show c ++ " " ++ show d
 
 instance NonLocal (Node a v) where
   entryLabel (Node (Label l)         _) = l
@@ -184,7 +184,7 @@ type Output a = Procedure a Reg
 instrVarRefs :: Show a => Node a IRVar e x -> [VarInfo]
 instrVarRefs (Node (Instr (Add a b c)) _) = varsIn a ++ varsIn b ++ varsIn c
   where
-    varsIn (IRVar (VirtualIV n _ _) _) = [VarInfo n Input False]
+    varsIn (IRVar (VirtualIV n _ _) _) = [VarInfo n Input Unallocated False]
     varsIn _ = []
 instrVarRefs i = error $ "instrVarRefs: NYI for " ++ show i
 
@@ -206,23 +206,10 @@ asmTest body result = do
             }
     let blocks b =
             postorder_dfs_from (lblMapOfCC (procBody (p b))) entry
-        oinfo = OpInfo
-            { isLoopBegin = const False
-            , isLoopEnd   = const False
-            , isCall      = const Nothing
-            , hasRefs     = const False
-            , varRefs     = instrVarRefs
-            , regRefs     = const []
-            }
-        binfo = BlockInfo
-            { blockToOpList = \block ->
-               let (beg, m, end) = blockSplit block in
-               blockToList m
-            }
 
     let body'   = blocks $ compile body
-    let result' = render oinfo result
-    case allocate body' oinfo binfo of
+    let result' = render result
+    case allocate (Prelude.map convertBlock body') of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
             length xs `shouldBe` length result'
@@ -295,20 +282,20 @@ data OpAlloc a = OpAlloc
     }
     deriving (Eq, Show, Functor)
 
-render :: OpInfo opType -> Allocs () -> [OpData opType]
-render oinfo = go 1
-  where
-    go _ (Pure ()) = []
-    go n (Free (Operation (OpAlloc as xs))) =
-        mkop oinfo n (Prelude.map (\(VarAlloc v a) -> (v, a)) as)
-            : go (n+2) xs
+render :: Allocs () -> [BlockInfo]
+render = undefined -- go 1
+  -- where
+  --   go _ (Pure ()) = []
+  --   go n (Free (Operation (OpAlloc as xs))) =
+  --       mkop n (Prelude.map (\(VarAlloc v a) -> (v, a)) as)
+  --           : go (n+2) xs
 
-mkop :: OpInfo opType -> Int -> [(LS.VarId, LS.Allocation)] -> OpData opType
-mkop oinfo i xs = OpData
-    { baseOp  = error $ "baseOp#" ++ show i
-    , opInfo  = oinfo
-    , opId    = i
-    , opAlloc = xs
+mkop :: Int -> [VarInfo] -> OpInfo
+mkop i xs = OpInfo
+    { opId    = i
+    , opKind  = undefined
+    , varRefs = xs
+    , regRefs = undefined
     }
 
 type Alloc a = Free OpAlloc a
@@ -329,3 +316,7 @@ regs a = Free (Operation (OpAlloc (reduce a) (Pure ())))
   where
     reduce (Pure ()) = []
     reduce (Free (OpAlloc as xs)) = as ++ reduce xs
+
+
+convertBlock :: Block (Node () IRVar) C C -> BlockInfo
+convertBlock = undefined
