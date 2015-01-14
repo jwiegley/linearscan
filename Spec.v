@@ -394,6 +394,7 @@ Proof.
   by auto.
 Qed.
 
+(*
 Lemma in_rem : forall (a : eqType) (y x : a) xs,
   y \in rem x xs -> x != y -> y \in xs.
 Proof.
@@ -408,7 +409,7 @@ Proof.
   have: y != z.
     apply/eqP.
     by move/eqP in Heq.
-  admit.
+  by [].
 Qed.
 
 Lemma no_overlapping_intervals `(st : ScanState sd) : forall x y,
@@ -431,10 +432,10 @@ Proof.
     - exact: IHst.
     - exact: widen_fst_inj.
     - exact: widen_fst_inj.
-  - Case "ScanState_newInactive". admit.
-  - Case "ScanState_setInterval". admit.
+  - Case "ScanState_newInactive". by [].
+  - Case "ScanState_setInterval". by [].
   - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive". admit.
+  - Case "ScanState_moveUnhandledToActive". by [].
   - Case "ScanState_moveActiveToInactive".
     apply: IHst.
     + case Heqe: (x == x0).
@@ -444,10 +445,11 @@ Proof.
       apply: neq_sym.
       move/eqP in Heqe.
       by apply/eqP.
-    + admit.
-  - Case "ScanState_moveActiveToHandled". admit.
-  - Case "ScanState_moveInactiveToActive". admit.
-  - Case "ScanState_moveInactiveToHandled". admit.
+    + by [].
+  - Case "ScanState_moveActiveToHandled". by [].
+  - Case "ScanState_moveInactiveToActive". by [].
+  - Case "ScanState_moveInactiveToHandled". by [].
 Qed.
+*)
 
 End MLinearSpec.
