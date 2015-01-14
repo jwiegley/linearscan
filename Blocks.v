@@ -128,17 +128,22 @@ Definition mapAccumLOps {a} (f : a -> OpInfo -> (a * OpInfo)) :
           ; blockOps := ops |})).
 
 Definition processOperations (blocks : BlockList) : BuildState.
-  pose opCount := foldOps (fun n _ => n.+1) 0 blocks.
+  have := foldOps (fun x op => let: (n, m) := x in
+    (n.+1, foldl (fun m v => maxn m (varId v)) m (varRefs op)))
+    (0, 0) blocks.
+  move=> [opCount highestVar].
   pose z := {| bsPos  := opCount
-             ; bsVars := nseq opCount None
+             ; bsVars := nseq highestVar.+1 None
              ; bsRegs := vconst None |}.
   apply: (foldOpsRev _ z blocks).
   case=> [pos vars regs] op.
-  (* jww (2015-01-13): assert: opId op == pos.*2.+1 *)
-  elim: pos => [|pos IHpos] in vars *.
+  case: pos => [|pos] in vars *.
     exact {| bsPos  := 0
            ; bsVars := vars
            ; bsRegs := regs |}.
+  apply: {| bsPos  := pos
+          ; bsVars := _
+          ; bsRegs := regs |}.
   have: seq (option (BoundedRange pos.*2.+1)).
     have H: forall n, n.*2.+1 < (n.+1).*2.+1
       by move=> n; rewrite doubleS.
@@ -155,7 +160,7 @@ Definition processOperations (blocks : BlockList) : BuildState.
       rewrite doubleS in Hlt.
       exact/ltnW.
     - by exists (exist _ _ (R_Sing Hodd)) => //.
-  by move/IHpos.
+  exact.
 Defined.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order

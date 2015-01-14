@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-
+import Debug.Trace
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -306,6 +306,7 @@ coq_Allocation_rec =
 data VarInfo =
    Build_VarInfo VarId VarKind Allocation 
  Prelude.Bool
+  deriving Prelude.Show
 
 coq_VarInfo_rect :: (VarId -> VarKind ->
                                Allocation -> Prelude.Bool -> a1) ->
@@ -368,6 +369,7 @@ coq_OpKind_rec =
 data OpInfo =
    Build_OpInfo OpId OpKind VarList 
  ([] PhysReg)
+  deriving Prelude.Show
 
 coq_OpInfo_rect :: (OpId -> OpKind ->
                               VarList -> ([] PhysReg) ->
@@ -517,54 +519,74 @@ mapAccumLOps f =
 
 processOperations :: BlockList -> BuildState
 processOperations blocks =
-  let {opCount = foldOps (\n x -> (Prelude.succ) n) 0 blocks} in
-  let {
-   z = Build_BuildState opCount (Seq.nseq opCount Prelude.Nothing)
-    (Data.List.replicate maxReg Prelude.Nothing)}
-  in
-  foldOpsRev (\_top_assumption_ ->
+  (Prelude.flip (Prelude.$))
+    (foldOps (\x op ->
+      case x of {
+       (,) n m -> (,) ((Prelude.succ) n)
+        (Data.List.foldl' (\m0 v -> Prelude.max m0 (varId v)) m
+          (varRefs op))}) ((,) 0 0) blocks) (\_top_assumption_ ->
     let {
-     _evar_0_ = \pos vars regs op ->
-      let {_evar_0_ = \vars0 -> Build_BuildState 0 vars0 regs} in
+     _evar_0_ = \opCount highestVar ->
       let {
-       _evar_0_0 = \pos0 iHpos vars0 ->
-        (Prelude.flip (Prelude.$))
-          ((Prelude.flip (Prelude.$)) __ (\_ ->
-            (Prelude.flip (Prelude.$)) vars0 (\vars' ->
-              let {
-               vars'0 = Prelude.map
-                          (Lib.option_map
-                            (transportBoundedRange ((Prelude.succ)
-                              (Ssrnat.double pos0)) ((Prelude.succ)
-                              (Ssrnat.double ((Prelude.succ) pos0))))) vars'}
-              in
-              Data.List.foldl' (\vars'1 v ->
-                let {
-                 upos = Range.Build_UsePos ((Prelude.succ)
-                  (Ssrnat.double pos0)) (regRequired v)}
-                in
-                (Prelude.flip (Prelude.$)) __ (\_ ->
-                  Seq.set_nth Prelude.Nothing vars'1 (varId v)
-                    (Prelude.Just
-                    (let {
-                      _evar_0_0 = \_top_assumption_0 -> Range.Build_RangeDesc
-                       (Range.uloc upos) (Range.rend ( _top_assumption_0))
-                       ((:) upos (Range.ups ( _top_assumption_0)))}
-                     in
-                     let {
-                      _evar_0_1 = Range.Build_RangeDesc (Range.uloc upos)
-                       ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
-                     in
-                     case Seq.nth Prelude.Nothing vars0 (varId v) of {
-                      Prelude.Just x -> _evar_0_0 x;
-                      Prelude.Nothing -> _evar_0_1})))) vars'0
-                (varRefs op)))) (\_top_assumption_0 ->
-          iHpos _top_assumption_0)}
+       z = Build_BuildState opCount
+        (Seq.nseq ((Prelude.succ) highestVar) Prelude.Nothing)
+        (Data.List.replicate maxReg Prelude.Nothing)}
       in
-      Datatypes.nat_rect _evar_0_ _evar_0_0 pos vars}
+      foldOpsRev (\_top_assumption_0 ->
+        let {
+         _evar_0_ = \pos vars regs op ->
+          let {_evar_0_ = \vars0 -> Build_BuildState 0 vars0 regs}
+          in
+          let {
+           _evar_0_0 = \pos0 vars0 -> Build_BuildState pos0
+            ((Prelude.flip (Prelude.$))
+              ((Prelude.flip (Prelude.$)) __ (\_ ->
+                (Prelude.flip (Prelude.$)) vars0 (\vars' ->
+                  let {
+                   vars'0 = Prelude.map
+                              (Lib.option_map
+                                (transportBoundedRange
+                                  ((Prelude.succ) (Ssrnat.double pos0))
+                                  ((Prelude.succ)
+                                  (Ssrnat.double ((Prelude.succ) pos0)))))
+                              vars'}
+                  in
+                  Data.List.foldl' (\vars'1 v ->
+                    let {
+                     upos = Range.Build_UsePos ((Prelude.succ)
+                      (Ssrnat.double pos0)) (regRequired v)}
+                    in
+                    (Prelude.flip (Prelude.$)) __ (\_ ->
+                      Seq.set_nth Prelude.Nothing vars'1 (varId v)
+                        (Prelude.Just
+                        (let {
+                          _evar_0_0 = \_top_assumption_1 ->
+                           Range.Build_RangeDesc (Range.uloc upos)
+                           (Range.rend ( _top_assumption_1)) ((:) upos
+                           (Range.ups ( _top_assumption_1)))}
+                         in
+                         let {
+                          _evar_0_1 = Range.Build_RangeDesc (Range.uloc upos)
+                           ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
+                         in
+                         case Seq.nth Prelude.Nothing vars0
+                                (varId v) of {
+                          Prelude.Just x -> _evar_0_0 x;
+                          Prelude.Nothing -> _evar_0_1})))) vars'0
+                    (varRefs op)))) (\x -> x)) regs}
+          in
+          (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+            (\_ ->
+            _evar_0_ vars)
+            (\x ->
+            _evar_0_0 x vars)
+            (traceShow op pos)}
+        in
+        case _top_assumption_0 of {
+         Build_BuildState x x0 x1 -> _evar_0_ x x0 x1}) z blocks}
     in
     case _top_assumption_ of {
-     Build_BuildState x x0 x1 -> _evar_0_ x x0 x1}) z blocks
+     (,) x x0 -> _evar_0_ x x0})
 
 computeBlockOrder :: IState.IState SSError
                                 BlockList BlockList 

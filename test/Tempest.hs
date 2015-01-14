@@ -209,13 +209,13 @@ asmTest body result = do
     case allocate (Prelude.map convertBlock body') of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
-            print ("----" :: String)
-            print xs
-            print ("----" :: String)
-            print result
-            print ("----" :: String)
-            print result'
-            print ("----" :: String)
+            -- print ("----" :: String)
+            -- print xs
+            -- print ("----" :: String)
+            -- print result
+            -- print ("----" :: String)
+            -- print result'
+            -- print ("----" :: String)
             length xs `shouldBe` length result'
 
             let test x y = x `shouldBe` y
