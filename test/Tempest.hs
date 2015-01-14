@@ -343,16 +343,15 @@ convertBlock :: Block (Node () IRVar) C C -> BlockInfo
 convertBlock (BlockCC _pre body _post) =
     BlockInfo
         { blockId  = 0
-        , blockOps = Prelude.map convertNode (gatherNodes [] body)
+        , blockOps = Prelude.map convertNode (gatherNodes body)
         }
   where
-    gatherNodes :: [Node () IRVar O O] -> Block (Node () IRVar) O O
-                -> [Node () IRVar O O]
-    gatherNodes xs BNil = xs
-    gatherNodes xs (BMiddle node) = node : xs
-    gatherNodes xs (BCat left right) = gatherNodes (gatherNodes xs left) right
-    gatherNodes xs (BSnoc blk node) = gatherNodes xs blk ++ [node]
-    gatherNodes xs (BCons node blk) = gatherNodes (node : xs) blk
+    gatherNodes :: Block (Node () IRVar) O O -> [Node () IRVar O O]
+    gatherNodes BNil              = []
+    gatherNodes (BMiddle node)    = [node]
+    gatherNodes (BCat left right) = gatherNodes left ++ gatherNodes right
+    gatherNodes (BSnoc blk node)  = gatherNodes blk ++ [node]
+    gatherNodes (BCons node blk)  = node : gatherNodes blk
 
 convertNode :: Node () IRVar O O -> OpInfo
 convertNode (Node instr _meta) =

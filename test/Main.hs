@@ -96,34 +96,6 @@ main = hspec $ do
             op $ alloc  0 2 >> alloc  4 1 >> alloc  8 0
             op $ alloc  0 2 >> alloc  4 1 >> alloc 11 0
 
-    it "More variables used than registers" $ asmTest
-        (do add v0 v1 v2
-            add v3 v4 v5
-            add v6 v7 v8
-            add v9 v10 v11
-            add v12 v13 v14
-            add v15 v16 v17
-            add v18 v19 v20
-            add v21 v22 v23
-            add v24 v25 v26
-            add v27 v28 v29
-            add v30 v31 v32
-            add v33 v34 v35) $
-
-        block $ do
-            op $ alloc  0 2 >> alloc  1 1 >> alloc  2 0
-            op $ alloc  3 2 >> alloc  4 1 >> alloc  5 0
-            op $ alloc  6 2 >> alloc  7 1 >> alloc  8 0
-            op $ alloc  9 2 >> alloc 10 1 >> alloc 11 0
-            op $ alloc 12 2 >> alloc 13 1 >> alloc 14 0
-            op $ alloc 15 2 >> alloc 16 1 >> alloc 17 0
-            op $ alloc 18 2 >> alloc 19 1 >> alloc 20 0
-            op $ alloc 21 2 >> alloc 22 1 >> alloc 23 0
-            op $ alloc 24 2 >> alloc 25 1 >> alloc 26 0
-            op $ alloc 27 2 >> alloc 28 1 >> alloc 29 0
-            op $ alloc 30 2 >> alloc 31 1 >> alloc 32 0
-            op $ alloc 33 2 >> alloc 34 1 >> alloc 35 0
-
     it "One variable with a long interval" $ asmTest
         (do add v0   v1  v2
             add v3   v4  v5

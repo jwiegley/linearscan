@@ -34,8 +34,6 @@ Open Scope program_scope.
    respectively.
 *)
 
-Definition VarId := nat.
-
 Inductive VarKind := Input | Temp | Output.
 
 Inductive Allocation := Unallocated | Register of PhysReg | Spill.
@@ -43,15 +41,11 @@ Inductive Allocation := Unallocated | Register of PhysReg | Spill.
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
 Record VarInfo := {
-  varId       : VarId;          (* from 0 to highest var index *)
+  varId       : nat;            (* from 0 to highest var index *)
   varKind     : VarKind;
   varAlloc    : Allocation;
   regRequired : bool
 }.
-
-Definition VarList := seq VarInfo.
-
-Definition OpId := nat.
 
 Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
 
@@ -59,19 +53,15 @@ Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
    determine information about each operation coming from the caller's
    side. *)
 Record OpInfo := {
-  opId    : OpId;
+  opId    : nat;
   opKind  : OpKind;
-  varRefs : VarList;
+  varRefs : seq VarInfo;
   regRefs : seq PhysReg
 }.
 
-Definition OpList := seq OpInfo.
-
-Definition BlockId := nat.
-
 Record BlockInfo := {
-  blockId     : BlockId;
-  blockOps    : OpList
+  blockId     : nat;
+  blockOps    : seq OpInfo
 }.
 
 Definition BlockList := NonEmpty BlockInfo.

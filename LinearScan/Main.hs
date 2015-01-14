@@ -3,7 +3,7 @@
 
 module LinearScan.Main where
 
-import Debug.Trace
+
 import qualified Prelude
 import qualified Data.List
 import qualified Data.Ord
@@ -266,13 +266,10 @@ curPosition :: ScanStateDesc -> Prelude.Int
 curPosition sd =
   Interval.intervalStart ( (curIntDetails sd))
 
-type VarId = Prelude.Int
-
 data VarKind =
    Input
  | Temp
  | Output
-  deriving Prelude.Show
 
 coq_VarKind_rect :: a1 -> a1 -> a1 -> VarKind -> a1
 coq_VarKind_rect f f0 f1 v =
@@ -304,24 +301,23 @@ coq_Allocation_rec =
   coq_Allocation_rect
 
 data VarInfo =
-   Build_VarInfo VarId VarKind Allocation 
+   Build_VarInfo Prelude.Int VarKind Allocation 
  Prelude.Bool
-  deriving Prelude.Show
 
-coq_VarInfo_rect :: (VarId -> VarKind ->
+coq_VarInfo_rect :: (Prelude.Int -> VarKind ->
                                Allocation -> Prelude.Bool -> a1) ->
                                VarInfo -> a1
 coq_VarInfo_rect f v =
   case v of {
    Build_VarInfo x x0 x1 x2 -> f x x0 x1 x2}
 
-coq_VarInfo_rec :: (VarId -> VarKind ->
+coq_VarInfo_rec :: (Prelude.Int -> VarKind ->
                               Allocation -> Prelude.Bool -> a1) ->
                               VarInfo -> a1
 coq_VarInfo_rec =
   coq_VarInfo_rect
 
-varId :: VarInfo -> VarId
+varId :: VarInfo -> Prelude.Int
 varId v =
   case v of {
    Build_VarInfo varId0 varKind0 varAlloc0 regRequired0 -> varId0}
@@ -343,16 +339,11 @@ regRequired v =
    Build_VarInfo varId0 varKind0 varAlloc0 regRequired0 ->
     regRequired0}
 
-type VarList = [] VarInfo
-
-type OpId = Prelude.Int
-
 data OpKind =
    Normal
  | LoopBegin
  | LoopEnd
  | Call
-  deriving Prelude.Show
 
 coq_OpKind_rect :: a1 -> a1 -> a1 -> a1 -> OpKind -> a1
 coq_OpKind_rect f f0 f1 f2 o =
@@ -367,24 +358,23 @@ coq_OpKind_rec =
   coq_OpKind_rect
 
 data OpInfo =
-   Build_OpInfo OpId OpKind VarList 
+   Build_OpInfo Prelude.Int OpKind ([] VarInfo) 
  ([] PhysReg)
-  deriving Prelude.Show
 
-coq_OpInfo_rect :: (OpId -> OpKind ->
-                              VarList -> ([] PhysReg) ->
+coq_OpInfo_rect :: (Prelude.Int -> OpKind -> ([]
+                              VarInfo) -> ([] PhysReg) ->
                               a1) -> OpInfo -> a1
 coq_OpInfo_rect f o =
   case o of {
    Build_OpInfo x x0 x1 x2 -> f x x0 x1 x2}
 
-coq_OpInfo_rec :: (OpId -> OpKind ->
-                             VarList -> ([] PhysReg) ->
+coq_OpInfo_rec :: (Prelude.Int -> OpKind -> ([]
+                             VarInfo) -> ([] PhysReg) ->
                              a1) -> OpInfo -> a1
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
-opId :: OpInfo -> OpId
+opId :: OpInfo -> Prelude.Int
 opId o =
   case o of {
    Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> opId0}
@@ -394,7 +384,7 @@ opKind o =
   case o of {
    Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> opKind0}
 
-varRefs :: OpInfo -> VarList
+varRefs :: OpInfo -> [] VarInfo
 varRefs o =
   case o of {
    Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> varRefs0}
@@ -404,30 +394,26 @@ regRefs o =
   case o of {
    Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> regRefs0}
 
-type OpList = [] OpInfo
-
-type BlockId = Prelude.Int
-
 data BlockInfo =
-   Build_BlockInfo BlockId OpList
+   Build_BlockInfo Prelude.Int ([] OpInfo)
 
-coq_BlockInfo_rect :: (BlockId -> OpList ->
-                                 a1) -> BlockInfo -> a1
+coq_BlockInfo_rect :: (Prelude.Int -> ([] OpInfo) -> a1)
+                                 -> BlockInfo -> a1
 coq_BlockInfo_rect f b =
   case b of {
    Build_BlockInfo x x0 -> f x x0}
 
-coq_BlockInfo_rec :: (BlockId -> OpList -> a1)
+coq_BlockInfo_rec :: (Prelude.Int -> ([] OpInfo) -> a1)
                                 -> BlockInfo -> a1
 coq_BlockInfo_rec =
   coq_BlockInfo_rect
 
-blockId :: BlockInfo -> BlockId
+blockId :: BlockInfo -> Prelude.Int
 blockId b =
   case b of {
    Build_BlockInfo blockId0 blockOps0 -> blockId0}
 
-blockOps :: BlockInfo -> OpList
+blockOps :: BlockInfo -> [] OpInfo
 blockOps b =
   case b of {
    Build_BlockInfo blockId0 blockOps0 -> blockOps0}
@@ -580,7 +566,7 @@ processOperations blocks =
             _evar_0_ vars)
             (\x ->
             _evar_0_0 x vars)
-            (traceShow op pos)}
+            pos}
         in
         case _top_assumption_0 of {
          Build_BuildState x x0 x1 -> _evar_0_ x x0 x1}) z blocks}

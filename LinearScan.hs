@@ -15,17 +15,14 @@ module LinearScan
 
 import qualified LinearScan.Main as LS
 import LinearScan.Main
-    ( VarId
-    , VarKind(..)
+    ( VarKind(..)
     , Allocation(..)
-    , OpId
     , OpKind(..)
     , PhysReg
-    , BlockId
     )
 
 data VarInfo = VarInfo
-    { varId       :: VarId
+    { varId       :: Int
     , varKind     :: VarKind
     , varAlloc    :: Allocation
     , regRequired :: Bool
@@ -33,7 +30,7 @@ data VarInfo = VarInfo
     deriving (Eq, Show)
 
 deriving instance Eq VarKind
--- deriving instance Show VarKind
+deriving instance Show VarKind
 
 toVarInfo :: LS.VarInfo -> VarInfo
 toVarInfo (LS.Build_VarInfo a b c d) = VarInfo a b c d
@@ -42,7 +39,7 @@ fromVarInfo :: VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c d) = LS.Build_VarInfo a b c d
 
 data OpInfo = OpInfo
-    { opId    :: OpId
+    { opId    :: Int
     , opKind  :: OpKind
     , varRefs :: [VarInfo]
     , regRefs :: [PhysReg]
@@ -50,7 +47,7 @@ data OpInfo = OpInfo
     deriving (Eq, Show)
 
 deriving instance Eq OpKind
--- deriving instance Show OpKind
+deriving instance Show OpKind
 
 toOpInfo :: LS.OpInfo -> OpInfo
 toOpInfo (LS.Build_OpInfo a b c d) = OpInfo a b (map toVarInfo c) d
@@ -59,7 +56,7 @@ fromOpInfo :: OpInfo -> LS.OpInfo
 fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b (map fromVarInfo c) d
 
 data BlockInfo = BlockInfo
-    { blockId  :: BlockId
+    { blockId  :: Int
     , blockOps :: [OpInfo]
     }
     deriving (Eq, Show)
