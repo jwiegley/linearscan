@@ -79,6 +79,14 @@ Definition BlockList := NonEmpty BlockInfo.
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.
 
+Definition transportBoundedRange {base : nat} `(Hlt : base < prev)
+  (x : BoundedRange prev) : BoundedRange base.
+  case: x => [r H].
+  apply: exist.
+  apply: r.
+  exact/(leq_trans _ H)/ltnW.
+Defined.
+
 (* jww (2015-01-12): Some of the things described by Wimmer in the section on
    dealing with computing of intervals have yet to be done:
 
@@ -112,35 +120,42 @@ Definition mapOps (f : OpInfo -> OpInfo) : BlockList -> BlockList :=
              ; blockOps := map f (blockOps blk)
              |}).
 
+Definition mapAccumLOps {a} (f : a -> OpInfo -> (a * OpInfo)) :
+  a -> BlockList -> a * BlockList :=
+  NE_mapAccumL (fun z blk =>
+    let: (z', ops) := mapAccumL f z (blockOps blk) in
+    (z', {| blockId  := blockId blk
+          ; blockOps := ops |})).
+
 Definition processOperations (blocks : BlockList) : BuildState.
-  set opCount := foldOps (fun n _ => n.+1) 0 blocks.
-  set z := {| bsPos  := opCount
-            ; bsVars := [::]
-            ; bsRegs := vconst None |}.
+  pose opCount := foldOps (fun n _ => n.+1) 0 blocks.
+  pose z := {| bsPos  := opCount
+             ; bsVars := nseq opCount None
+             ; bsRegs := vconst None |}.
   apply: (foldOpsRev _ z blocks).
-  case; case=> [|pos] vars regs op.
-    apply {| bsPos := 0; bsVars := vars; bsRegs := regs |}.
-  eapply
-    {| bsPos  := pos
-     ; bsVars := _
-     ; bsRegs := regs |}.
-  Grab Existential Variables.
-  - apply: mapWithIndex _ vars => n.
-    set upos :=
-      {| uloc   := pos.*2.+1
-       ; regReq := foldl (fun b v => b || regRequired v) false
-                         (varRefs op) |}.
+  case=> [pos vars regs] op.
+  (* jww (2015-01-13): assert: opId op == pos.*2.+1 *)
+  elim: pos => [|pos IHpos] in vars *.
+    exact {| bsPos  := 0
+           ; bsVars := vars
+           ; bsRegs := regs |}.
+  have: seq (option (BoundedRange pos.*2.+1)).
+    have H: forall n, n.*2.+1 < (n.+1).*2.+1
+      by move=> n; rewrite doubleS.
+    have vars' := vars.
+    move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
+    apply: foldl _ vars' (varRefs op) => vars' v.
+    set upos := {| uloc   := pos.*2.+1
+                 ; regReq := regRequired v |}.
     have Hodd : odd upos by rewrite /= odd_double.
-    case=> [[r /= Hlt]|];
-    case E: (n \in map varId (varRefs op)).
-    - apply: (Some _).
-      apply: (exist _ (exist _ _ (R_Cons Hodd r.2 _)) _) => //=.
+    apply: (set_nth None vars' (varId v) _).
+    apply: Some _.
+    case: (nth None vars (varId v)) => [[r /= Hlt]|].
+    - apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
       rewrite doubleS in Hlt.
       exact/ltnW.
-    - exact: None.
-    - apply: (Some _).
-      by exists (exist _ _ (R_Sing Hodd)) => //.
-    - exact: None.
+    - by exists (exist _ _ (R_Sing Hodd)) => //.
+  by move/IHpos.
 Defined.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
@@ -159,7 +174,13 @@ Definition computeBlockOrder :
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
 Definition numberOperations :
-  IState SSError BlockList BlockList unit := return_ tt.
+  IState SSError BlockList BlockList unit :=
+  let f n op :=
+    (n.+2, {| opId    := n
+            ; opKind  := opKind op
+            ; varRefs := varRefs op
+            ; regRefs := regRefs op |}) in
+  imodify SSError (@snd _ _ \o mapAccumLOps f 1).
 
 Definition BlockState := IState SSError BlockList BlockList.
 
@@ -188,18 +209,18 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
         packScanState (ScanState_newUnhandled st i) in
 
   blocks <<- iget SSError ;;
-  let: bs := processOperations blocks in
+  (fun bs =>
+     let regs := vmap (fun mr =>
+           if mr is Some r
+           then Some (packInterval (I_Sing 0 r.2))
+           else None) (bsRegs bs) in
 
-  let regs := vmap (fun mr =>
-        if mr is Some r
-        then Some (packInterval (I_Sing 0 r.2))
-        else None) (bsRegs bs) in
+     let s0 := ScanState_nil in
+     let s1 := ScanState_setFixedIntervals s0 regs in
+     let s2 := packScanState s1 in
 
-  let s0 := ScanState_nil in
-  let s1 := ScanState_setFixedIntervals s0 regs in
-  let s2 := packScanState s1 in
-
-  return_ $ foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs).
+     return_ $ foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs))
+  (processOperations blocks).
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
 

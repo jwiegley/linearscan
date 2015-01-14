@@ -33,7 +33,7 @@ data VarInfo = VarInfo
     deriving (Eq, Show)
 
 deriving instance Eq VarKind
-deriving instance Show VarKind
+-- deriving instance Show VarKind
 
 toVarInfo :: LS.VarInfo -> VarInfo
 toVarInfo (LS.Build_VarInfo a b c d) = VarInfo a b c d
@@ -50,7 +50,7 @@ data OpInfo = OpInfo
     deriving (Eq, Show)
 
 deriving instance Eq OpKind
-deriving instance Show OpKind
+-- deriving instance Show OpKind
 
 toOpInfo :: LS.OpInfo -> OpInfo
 toOpInfo (LS.Build_OpInfo a b c d) = OpInfo a b (map toVarInfo c) d

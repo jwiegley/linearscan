@@ -298,6 +298,20 @@ Example ex_foldr_with_index_1 :
     == [:: (0, 1); (1, 2); (2, 3)].
 Proof. reflexivity. Qed.
 
+Fixpoint mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
+  (s : A) (v : seq X) : A * seq Y :=
+  match v with
+  | nil => (s, nil)
+  | x :: xs =>
+    let: (s', y) := f s x in
+    let: (s'', ys) := mapAccumL f s' xs in
+    (s'', y :: ys)
+  end.
+
+Example ex_mapAccumL_1 :
+  mapAccumL (fun n x => (n.+1, x.+2)) 0 [:: 1; 2; 3] == (3, [:: 3; 4; 5]).
+Proof. reflexivity. Qed.
+
 Lemma foldl_cons : forall a b f (z : b) (x : a) xs,
   foldl f (f z x) xs = foldl f z (x :: xs).
 Proof. move=> a b f z x; elim=> //=. Qed.

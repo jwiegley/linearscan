@@ -9,9 +9,12 @@
 
 module Tempest where
 
+-- import Debug.Trace
 import Compiler.Hoopl
 import Control.Monad
 import Control.Monad.Free
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State
 import Data.Foldable
 import Data.Map
 import Data.Monoid
@@ -206,6 +209,13 @@ asmTest body result = do
     case allocate (Prelude.map convertBlock body') of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
+            print ("----" :: String)
+            print xs
+            print ("----" :: String)
+            print result
+            print ("----" :: String)
+            print result'
+            print ("----" :: String)
             length xs `shouldBe` length result'
 
             let test x y = x `shouldBe` y
@@ -270,38 +280,63 @@ data BlocksF a = BlocksF
     }
     deriving (Eq, Show, Functor)
 
-type Blocks a = Free BlocksF a
+type Blocks a = StateT Int (Free BlocksF) a
+
+instance Show a => Show (Blocks a) where
+    show x = show (runStateT x 0)
 
 alloc :: Int -> Int -> Blocks ()
-alloc v n =
-    Free (BlocksF
-          [BlockInfo 0
-           [OpInfo 0 Normal
-            [VarInfo v Temp (LS.Register n) False] []]]
-          (Pure ()))
+alloc v n = do
+    opid <- get
+    put (succ (succ opid))
+    lift $ Free $ BlocksF
+        [BlockInfo 0
+         [OpInfo opid Normal
+          [VarInfo v Temp (LS.Register n) False] []]]
+        (Pure ())
 
 allocs :: [(Int, Int)] -> Blocks ()
 allocs []         = return ()
 allocs ((v,n):xs) = alloc v n >> allocs xs
 
 op :: Blocks () -> Blocks ()
-op a = Free (BlocksF [BlockInfo 0 (reduce a)] (Pure ()))
+op a = do
+    n <- get
+    put (succ (succ n))
+    lift $ Free $ BlocksF
+        [BlockInfo 0 [OpInfo
+            { opId    = n
+            , opKind  = Normal
+            , varRefs = reduce (runStateT a 0)
+            , regRefs = []
+            }]] (Pure ())
   where
-    reduce (Pure ()) = []
-    reduce (Free (BlocksF [BlockInfo _ as] xs)) = as ++ reduce xs
+    phi (BlocksF _ x) = x
+
+    reduce (Pure _) = []
+    reduce (Free (BlocksF [BlockInfo _ as] xs)) =
+        Prelude.concatMap varRefs as ++ reduce xs
     reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
 
 block :: Blocks () -> Blocks ()
-block a = Free (BlocksF (reduce a) (Pure ()))
+block a = do
+    n <- get
+    let m = runStateT a n
+    let ((), n') = iter phi m
+    put n'
+    lift $ Free (BlocksF [BlockInfo 0 (reduce m)] (Pure ()))
   where
-    reduce (Pure ()) = []
-    reduce (Free (BlocksF as xs)) = as ++ reduce xs
+    phi (BlocksF _ x) = x
+
+    reduce (Pure _) = []
+    reduce (Free (BlocksF [BlockInfo _ as] xs)) = as ++ reduce xs
+    reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
 
 render :: Blocks () -> [BlockInfo]
-render = go (1 :: Int)
+render blks = go (evalStateT blks 1)
   where
-    go _ (Pure ()) = []
-    go n (Free (BlocksF as xs)) = as ++ go (n+2) xs
+    go (Pure ()) = []
+    go (Free (BlocksF as xs)) = as ++ go xs
 
 
 convertBlock :: Block (Node () IRVar) C C -> BlockInfo
