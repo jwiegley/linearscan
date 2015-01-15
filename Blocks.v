@@ -89,7 +89,7 @@ Defined.
 Record BuildState := {
   bsPos  : nat;
   bsVars : seq (option (BoundedRange bsPos.*2.+1));
-  bsRegs : Vec (option RangeSig) maxReg
+  bsRegs : Vec (option (BoundedRange bsPos.*2.+1)) maxReg
 }.
 
 Definition foldOps a (f : a -> OpInfo -> a) (z : a) : BlockList -> a :=
@@ -127,30 +127,45 @@ Definition processOperations (blocks : BlockList) : BuildState.
              ; bsRegs := vconst None |}.
   apply: (foldOpsRev _ z blocks).
   case=> [pos vars regs] op.
-  case: pos => [|pos] in vars *.
+  have H: forall n, n.*2.+1 < (n.+1).*2.+1
+    by move=> n; rewrite doubleS.
+  case: pos => [|pos] in vars regs *.
     exact {| bsPos  := 0
            ; bsVars := vars
            ; bsRegs := regs |}.
   apply: {| bsPos  := pos
           ; bsVars := _
-          ; bsRegs := regs |}.
-  have: seq (option (BoundedRange pos.*2.+1)).
-    have H: forall n, n.*2.+1 < (n.+1).*2.+1
-      by move=> n; rewrite doubleS.
-    have vars' := vars.
-    move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
-    apply: foldl _ vars' (varRefs op) => vars' v.
-    set upos := {| uloc   := pos.*2.+1
-                 ; regReq := regRequired v |}.
-    have Hodd : odd upos by rewrite /= odd_double.
-    apply: (set_nth None vars' (varId v) _).
-    apply: Some _.
-    case: (nth None vars (varId v)) => [[r /= Hlt]|].
-    - apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
-      rewrite doubleS in Hlt.
-      exact/ltnW.
-    - by exists (exist _ _ (R_Sing Hodd)) => //.
-  exact.
+          ; bsRegs := _ |}.
+  - have: seq (option (BoundedRange pos.*2.+1)).
+      have vars' := vars.
+      move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
+      apply: foldl _ vars' (varRefs op) => vars' v.
+      set upos := {| uloc   := pos.*2.+1
+                   ; regReq := regRequired v |}.
+      have Hodd : odd upos by rewrite /= odd_double.
+      apply: (set_nth None vars' (varId v) _).
+      apply: Some _.
+      case: (nth None vars (varId v)) => [[r /= Hlt]|].
+      + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
+        rewrite doubleS in Hlt.
+        exact/ltnW.
+      + by exists (exist _ _ (R_Sing Hodd)) => //.
+    exact.
+  - have: Vec (option (BoundedRange pos.*2.+1)) maxReg.
+      have regs' := regs.
+      move/(vmap (option_map (transportBoundedRange (H pos)))) in regs'.
+      apply: foldl _ regs' (regRefs op) => regs' reg.
+      set upos := {| uloc   := pos.*2.+1
+                   ; regReq := true |}.
+      have Hodd : odd upos by rewrite /= odd_double.
+      apply: (vreplace regs' reg _).
+      apply: Some _.
+      case: (vnth regs reg) => [[r /= Hlt]|].
+      + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
+        rewrite doubleS in Hlt.
+        exact/ltnW.
+      + by exists (exist _ _ (R_Sing Hodd)) => //.
+    exact.
 Defined.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
@@ -206,7 +221,7 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
   blocks <<- iget SSError ;;
   (fun bs =>
      let regs := vmap (fun mr =>
-           if mr is Some r
+           if mr is Some (exist r _)
            then Some (packInterval (I_Sing 0 r.2))
            else None) (bsRegs bs) in
 

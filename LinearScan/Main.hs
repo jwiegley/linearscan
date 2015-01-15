@@ -433,20 +433,20 @@ data BuildState =
                                           (Prelude.Maybe
                                           BoundedRange)) ([]
                                                                    (Prelude.Maybe
-                                                                   Range.RangeDesc))
+                                                                   BoundedRange))
 
 coq_BuildState_rect :: (Prelude.Int -> ([]
                                   (Prelude.Maybe BoundedRange)) ->
-                                  ([] (Prelude.Maybe Range.RangeDesc)) -> a1)
-                                  -> BuildState -> a1
+                                  ([] (Prelude.Maybe BoundedRange))
+                                  -> a1) -> BuildState -> a1
 coq_BuildState_rect f b =
   case b of {
    Build_BuildState x x0 x1 -> f x x0 x1}
 
 coq_BuildState_rec :: (Prelude.Int -> ([]
                                  (Prelude.Maybe BoundedRange)) ->
-                                 ([] (Prelude.Maybe Range.RangeDesc)) -> a1)
-                                 -> BuildState -> a1
+                                 ([] (Prelude.Maybe BoundedRange))
+                                 -> a1) -> BuildState -> a1
 coq_BuildState_rec =
   coq_BuildState_rect
 
@@ -462,7 +462,7 @@ bsVars b =
    Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsVars0}
 
 bsRegs :: BuildState -> []
-                     (Prelude.Maybe Range.RangeDesc)
+                     (Prelude.Maybe BoundedRange)
 bsRegs b =
   case b of {
    Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsRegs0}
@@ -521,13 +521,15 @@ processOperations blocks =
       foldOpsRev (\_top_assumption_0 ->
         let {
          _evar_0_ = \pos vars regs op ->
-          let {_evar_0_ = \vars0 -> Build_BuildState 0 vars0 regs}
-          in
-          let {
-           _evar_0_0 = \pos0 vars0 -> Build_BuildState pos0
-            ((Prelude.flip (Prelude.$))
-              ((Prelude.flip (Prelude.$)) __ (\_ ->
-                (Prelude.flip (Prelude.$)) vars0 (\vars' ->
+          (Prelude.flip (Prelude.$)) __ (\_ ->
+            let {
+             _evar_0_ = \vars0 regs0 -> Build_BuildState 0 vars0
+              regs0}
+            in
+            let {
+             _evar_0_0 = \pos0 vars0 regs0 -> Build_BuildState pos0
+              ((Prelude.flip (Prelude.$))
+                ((Prelude.flip (Prelude.$)) vars0 (\vars' ->
                   let {
                    vars'0 = Prelude.map
                               (Lib.option_map
@@ -559,14 +561,48 @@ processOperations blocks =
                                 (varId v) of {
                           Prelude.Just x -> _evar_0_0 x;
                           Prelude.Nothing -> _evar_0_1})))) vars'0
-                    (varRefs op)))) (\x -> x)) regs}
-          in
-          (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
-            (\_ ->
-            _evar_0_ vars)
-            (\x ->
-            _evar_0_0 x vars)
-            pos}
+                    (varRefs op))) (\x -> x))
+              ((Prelude.flip (Prelude.$))
+                ((Prelude.flip (Prelude.$)) regs0 (\regs' ->
+                  let {
+                   regs'0 = LinearScan.Utils.vmap maxReg
+                              (Lib.option_map
+                                (transportBoundedRange
+                                  ((Prelude.succ) (Ssrnat.double pos0))
+                                  ((Prelude.succ)
+                                  (Ssrnat.double ((Prelude.succ) pos0)))))
+                              regs'}
+                  in
+                  Data.List.foldl' (\regs'1 reg ->
+                    let {
+                     upos = Range.Build_UsePos ((Prelude.succ)
+                      (Ssrnat.double pos0)) Prelude.True}
+                    in
+                    (Prelude.flip (Prelude.$)) __ (\_ ->
+                      LinearScan.Utils.set_nth maxReg regs'1 reg
+                        (Prelude.Just
+                        (let {
+                          _evar_0_0 = \_top_assumption_1 ->
+                           Range.Build_RangeDesc (Range.uloc upos)
+                           (Range.rend ( _top_assumption_1)) ((:) upos
+                           (Range.ups ( _top_assumption_1)))}
+                         in
+                         let {
+                          _evar_0_1 = Range.Build_RangeDesc (Range.uloc upos)
+                           ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
+                         in
+                         case LinearScan.Utils.nth maxReg regs0
+                                reg of {
+                          Prelude.Just x -> _evar_0_0 x;
+                          Prelude.Nothing -> _evar_0_1})))) regs'0
+                    (regRefs op))) (\x -> x))}
+            in
+            (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+              (\_ ->
+              _evar_0_ vars regs)
+              (\x ->
+              _evar_0_0 x vars regs)
+              pos)}
         in
         case _top_assumption_0 of {
          Build_BuildState x x0 x1 -> _evar_0_ x x0 x1}) z blocks}
@@ -634,9 +670,9 @@ buildIntervals =
     let {
      regs = LinearScan.Utils.vmap maxReg (\mr ->
               case mr of {
-               Prelude.Just r -> Prelude.Just
+               Prelude.Just y -> Prelude.Just
                 (Interval.packInterval (Interval.Build_IntervalDesc 0
-                  (Range.rbeg ( r)) (Range.rend ( r)) ((:[]) ( r))));
+                  (Range.rbeg ( y)) (Range.rend ( y)) ((:[]) ( y))));
                Prelude.Nothing -> Prelude.Nothing}) (bsRegs bs)}
     in
     let {
