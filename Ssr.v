@@ -42,7 +42,6 @@ Extract Inlined Constant plus      => "(Prelude.+)".
 Extract Inlined Constant predn     => "Prelude.pred".
 Extract Inlined Constant proj1_sig => "".
 Extract Inlined Constant projT1    => "Prelude.fst".
-(* Extract Inlined Constant rem       => "(Prelude.const Data.List.delete)". *)
 Extract Inlined Constant size      => "Data.List.length".
 Extract Inlined Constant snd       => "Prelude.snd".
 Extract Inlined Constant subn      => "(Prelude.-)".

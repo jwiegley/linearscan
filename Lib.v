@@ -168,6 +168,15 @@ Proof.
   rewrite IHv; exact: fun_if.
 Qed.
 
+Lemma neq_sym : forall (A : eqType) (x y : A),
+  x != y -> y != x.
+Proof.
+  move=> A x y Hneq.
+  move/eqP in Hneq.
+  apply/eqP.
+  by auto.
+Qed.
+
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
 Definition odd_1 : odd 1. done. Qed.
@@ -269,6 +278,10 @@ Proof.
     by rewrite eq_sym.
   exact: IHzs.
 Qed.
+
+Definition mapWithIndex {a b} (f : nat -> a -> b) (l : seq a) : seq b :=
+  rev (snd (foldl (fun acc x => let: (n, xs) := acc in
+                                (n.+1, f n x :: xs)) (0, [::]) l)).
 
 Definition foldl_with_index
   {A B : Type} (f : nat -> B -> A -> B) (b : B) (v : seq A) : B :=

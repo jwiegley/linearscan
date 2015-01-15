@@ -100,16 +100,6 @@ Definition foldOpsRev a (f : a -> OpInfo -> a) (z : a)
   foldl (fun bacc blk => foldl f bacc (rev (blockOps blk)))
         z (rev blocks).
 
-Definition mapWithIndex {a b} (f : nat -> a -> b) (l : seq a) : seq b :=
-  rev (snd (foldl (fun acc x => let: (n, xs) := acc in
-                                (n.+1, f n x :: xs)) (0, [::]) l)).
-
-Definition mapOps (f : OpInfo -> OpInfo) : BlockList -> BlockList :=
-  NE_map (fun blk =>
-            {| blockId  := blockId blk
-             ; blockOps := map f (blockOps blk)
-             |}).
-
 Definition mapAccumLOps {a} (f : a -> OpInfo -> (a * OpInfo)) :
   a -> BlockList -> a * BlockList :=
   NE_mapAccumL (fun z blk =>
@@ -200,6 +190,7 @@ Definition BlockState := IState SSError BlockList BlockList.
    these are being left unimplemented, but this is very likely something that
    will need to be done for the sake of the correctness of the algorithm. *)
 Definition computeLocalLiveSets : BlockState unit := return_ tt.
+
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
 Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
@@ -233,6 +224,12 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
   (processOperations blocks).
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
+
+Definition mapOps (f : OpInfo -> OpInfo) : BlockList -> BlockList :=
+  NE_map (fun blk =>
+            {| blockId  := blockId blk
+             ; blockOps := map f (blockOps blk)
+             |}).
 
 Definition assignRegNum `(st : ScanState sd) :
   IState SSError BlockList BlockList unit :=

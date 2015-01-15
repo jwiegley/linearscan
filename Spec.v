@@ -385,15 +385,6 @@ Proof.
   exact: (in_notin Hin).
 Qed.
 
-Lemma neq_sym : forall (A : eqType) (x y : A),
-  x != y -> y != x.
-Proof.
-  move=> A x y Hneq.
-  move/eqP in Hneq.
-  apply/eqP.
-  by auto.
-Qed.
-
 (*
 Lemma in_rem : forall (a : eqType) (y x : a) xs,
   y \in rem x xs -> x != y -> y \in xs.

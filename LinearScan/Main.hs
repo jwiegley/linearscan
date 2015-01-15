@@ -480,20 +480,6 @@ foldOpsRev f z blocks =
     Data.List.foldl' f bacc (Seq.rev (blockOps blk))) z
     (Seq.rev ( blocks))
 
-mapWithIndex :: (Prelude.Int -> a1 -> a2) -> ([] a1) -> [] a2
-mapWithIndex f l =
-  Seq.rev
-    (Prelude.snd
-      (Data.List.foldl' (\acc x ->
-        case acc of {
-         (,) n xs -> (,) ((Prelude.succ) n) ((:) (f n x) xs)}) ((,) 0 []) l))
-
-mapOps :: (OpInfo -> OpInfo) ->
-                     BlockList -> BlockList
-mapOps f =
-  Prelude.map (\blk -> Build_BlockInfo (blockId blk)
-    (Prelude.map f (blockOps blk)))
-
 mapAccumLOps :: (a1 -> OpInfo -> (,) a1
                            OpInfo) -> a1 -> BlockList ->
                            (,) a1 BlockList
@@ -703,6 +689,12 @@ buildIntervals =
 resolveDataFlow :: BlockState ()
 resolveDataFlow =
   return_ ()
+
+mapOps :: (OpInfo -> OpInfo) ->
+                     BlockList -> BlockList
+mapOps f =
+  Prelude.map (\blk -> Build_BlockInfo (blockId blk)
+    (Prelude.map f (blockOps blk)))
 
 assignRegNum :: ScanStateDesc -> IState.IState
                            SSError BlockList
