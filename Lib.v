@@ -198,16 +198,6 @@ Qed.
 Lemma even_odd_plus n : ~~ odd n -> odd n.+1.
 Proof. case: n => //. Qed.
 
-(* Lemma ltn_even_odd n m : ~~ odd n && odd m -> n < m -> n.+1 <= m. *)
-(* Proof. *)
-(*   move/andP=> [neven modd] Hlt. *)
-(*   rewrite -subn_gt0 odd_gt0 //. *)
-(*   rewrite odd_sub //. *)
-(*     apply/addbP. *)
-(*     by rewrite modd -neven negbK. *)
-(*   exact: ltnW. *)
-(* Qed. *)
-
 Lemma odd_succ_succ n : odd (n.+2) = odd n.
 Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
 
@@ -414,18 +404,27 @@ Proof.
   inv Heqe.
 Qed.
 
-Lemma lt_size_rev : forall a (xs : seq a), 0 < size xs -> 0 < size (rev xs).
+Lemma lt_size_rev : forall a (xs : seq a),
+  0 < size xs -> 0 < size (rev xs).
 Proof.
   move=> a.
   elim=> //= [x xs IHxs] H.
   by rewrite size_rev /=.
 Qed.
 
-(* Lemma hd_last_spec : forall a (xs : seq a) (H : 0 < size xs), *)
-(*   safe_hd xs H = safe_last (rev xs) (lt_size_rev H). *)
-(* Proof. *)
-(*   move=> a. *)
-(*   case=> [//|y ys] /= H. *)
+(*
+Lemma last_cons_rev : forall a (y : a) ys H,
+  safe_last (rev (y :: ys)) H = y.
+Proof.
+
+Lemma hd_last_spec : forall a (xs : seq a) (H : 0 < size xs),
+  safe_hd xs H = safe_last (rev xs) (lt_size_rev H).
+Proof.
+  move=> a.
+  elim=> [//|y ys IHys] /= H.
+  by rewrite last_cons_rev.
+Qed.
+*)
 
 Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).
@@ -520,13 +519,11 @@ Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
 Proof. move=> a x; elim=> //. Qed.
 
 Fixpoint insert {a} (P : rel a) (z : a) (l : list a) : list a :=
-  match l with
-    | nil => [:: z]
-    | cons x xs =>
-      if P x z
-      then x :: insert P z xs
-      else z :: x :: xs
-  end.
+  if l is x :: xs
+  then if P x z
+       then x :: insert P z xs
+       else z :: x :: xs
+  else [:: z].
 
 Arguments insert {a} P z l : simpl never.
 
