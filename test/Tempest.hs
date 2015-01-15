@@ -291,7 +291,7 @@ alloc v n = do
     put (succ (succ opid))
     lift $ Free $ BlocksF
         [BlockInfo 0
-         [OpInfo opid Normal
+         [OpInfo opid 0 Normal
           [VarInfo v Temp (LS.Register n) False] []]]
         (Pure ())
 
