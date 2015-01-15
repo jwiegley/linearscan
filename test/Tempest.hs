@@ -306,6 +306,7 @@ op a = do
     lift $ Free $ BlocksF
         [BlockInfo 0 [OpInfo
             { opId    = n
+            , opMeta  = 0
             , opKind  = Normal
             , varRefs = reduce (runStateT a 0)
             , regRefs = []
@@ -358,6 +359,7 @@ convertNode (Node instr _meta) =
     let (vars, regs) = go instr in
     OpInfo
         { opId    = 0
+        , opMeta  = 0
         , opKind  = Normal
         , varRefs = vars
         , regRefs = regs
