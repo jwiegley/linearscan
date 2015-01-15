@@ -358,41 +358,49 @@ coq_OpKind_rec =
   coq_OpKind_rect
 
 data OpInfo =
-   Build_OpInfo Prelude.Int OpKind ([] VarInfo) 
+   Build_OpInfo Prelude.Int Prelude.Int OpKind ([]
+                                                                   VarInfo) 
  ([] PhysReg)
 
-coq_OpInfo_rect :: (Prelude.Int -> OpKind -> ([]
-                              VarInfo) -> ([] PhysReg) ->
-                              a1) -> OpInfo -> a1
+coq_OpInfo_rect :: (Prelude.Int -> Prelude.Int -> OpKind
+                              -> ([] VarInfo) -> ([]
+                              PhysReg) -> a1) -> OpInfo
+                              -> a1
 coq_OpInfo_rect f o =
   case o of {
-   Build_OpInfo x x0 x1 x2 -> f x x0 x1 x2}
+   Build_OpInfo x x0 x1 x2 x3 -> f x x0 x1 x2 x3}
 
-coq_OpInfo_rec :: (Prelude.Int -> OpKind -> ([]
-                             VarInfo) -> ([] PhysReg) ->
-                             a1) -> OpInfo -> a1
+coq_OpInfo_rec :: (Prelude.Int -> Prelude.Int -> OpKind
+                             -> ([] VarInfo) -> ([]
+                             PhysReg) -> a1) -> OpInfo ->
+                             a1
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
 opId :: OpInfo -> Prelude.Int
 opId o =
   case o of {
-   Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> opId0}
+   Build_OpInfo opId0 opMeta0 opKind0 varRefs0 regRefs0 -> opId0}
+
+opMeta :: OpInfo -> Prelude.Int
+opMeta o =
+  case o of {
+   Build_OpInfo opId0 opMeta0 opKind0 varRefs0 regRefs0 -> opMeta0}
 
 opKind :: OpInfo -> OpKind
 opKind o =
   case o of {
-   Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> opKind0}
+   Build_OpInfo opId0 opMeta0 opKind0 varRefs0 regRefs0 -> opKind0}
 
 varRefs :: OpInfo -> [] VarInfo
 varRefs o =
   case o of {
-   Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> varRefs0}
+   Build_OpInfo opId0 opMeta0 opKind0 varRefs0 regRefs0 -> varRefs0}
 
 regRefs :: OpInfo -> [] PhysReg
 regRefs o =
   case o of {
-   Build_OpInfo opId0 opKind0 varRefs0 regRefs0 -> regRefs0}
+   Build_OpInfo opId0 opMeta0 opKind0 varRefs0 regRefs0 -> regRefs0}
 
 data BlockInfo =
    Build_BlockInfo Prelude.Int ([] OpInfo)
@@ -608,8 +616,8 @@ numberOperations :: IState.IState SSError
 numberOperations =
   let {
    f = \n op -> (,) ((Prelude.succ) ((Prelude.succ) n))
-    (Build_OpInfo n (opKind op) (varRefs op)
-    (regRefs op))}
+    (Build_OpInfo n (opMeta op) (opKind op)
+    (varRefs op) (regRefs op))}
   in
   IState.imodify
     ((Prelude..) Prelude.snd (mapAccumLOps f ((Prelude.succ) 0)))
@@ -733,8 +741,9 @@ assignRegNum sd =
       in
       Data.List.foldl' h v ints}
     in
-    Build_OpInfo (opId op) (opKind op)
-    (Prelude.map k (varRefs op)) (regRefs op)}
+    Build_OpInfo (opId op) (opMeta op)
+    (opKind op) (Prelude.map k (varRefs op))
+    (regRefs op)}
   in
   IState.imodify (mapOps f)
 

@@ -54,6 +54,7 @@ Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
    side. *)
 Record OpInfo := {
   opId    : nat;
+  opMeta  : nat;                (* a user chosen number *)
   opKind  : OpKind;
   varRefs : seq VarInfo;
   regRefs : seq PhysReg
@@ -177,6 +178,7 @@ Definition numberOperations :
   IState SSError BlockList BlockList unit :=
   let f n op :=
     (n.+2, {| opId    := n
+            ; opMeta  := opMeta op
             ; opKind  := opKind op
             ; varRefs := varRefs op
             ; regRefs := regRefs op |}) in
@@ -255,6 +257,7 @@ Definition assignRegNum `(st : ScanState sd) :
            else acc) (getInterval xid) in
       foldl h v ints in
     {| opId    := opId op
+     ; opMeta  := opMeta op
      ; opKind  := opKind op
      ; varRefs := map k (varRefs op)
      ; regRefs := regRefs op

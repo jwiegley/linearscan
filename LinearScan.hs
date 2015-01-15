@@ -40,6 +40,7 @@ fromVarInfo (VarInfo a b c d) = LS.Build_VarInfo a b c d
 
 data OpInfo = OpInfo
     { opId    :: Int
+    , opMeta  :: Int
     , opKind  :: OpKind
     , varRefs :: [VarInfo]
     , regRefs :: [PhysReg]
@@ -50,10 +51,10 @@ deriving instance Eq OpKind
 deriving instance Show OpKind
 
 toOpInfo :: LS.OpInfo -> OpInfo
-toOpInfo (LS.Build_OpInfo a b c d) = OpInfo a b (map toVarInfo c) d
+toOpInfo (LS.Build_OpInfo a b c d e) = OpInfo a b c (map toVarInfo d) e
 
 fromOpInfo :: OpInfo -> LS.OpInfo
-fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b (map fromVarInfo c) d
+fromOpInfo (OpInfo a b c d e) = LS.Build_OpInfo a b c (map fromVarInfo d) e
 
 data BlockInfo = BlockInfo
     { blockId  :: Int
