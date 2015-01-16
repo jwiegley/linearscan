@@ -19,7 +19,6 @@ import Data.Foldable
 import Data.Map
 import Data.Monoid
 import LinearScan hiding (Call)
-import qualified LinearScan.Main as LS
 import Test.Hspec
 
 ------------------------------------------------------------------------------
@@ -144,10 +143,6 @@ instance Functor (PNode v e x) where
 nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
 nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
-
--- instance Show (LS.OpData (Node () IRVar O O)) where
---     show (LS.Build_OpData a _b c d) =
---         "LS.OpData " ++ show a ++ " " ++ show c ++ " " ++ show d
 
 instance NonLocal (Node a v) where
   entryLabel (Node (Label l)         _) = l
@@ -292,7 +287,7 @@ alloc v n = do
     lift $ Free $ BlocksF
         [BlockInfo 0
          [OpInfo opid 0 Normal
-          [VarInfo v Temp (LS.Register n) False] []]]
+          [VarInfo v Temp (Register n) False] []]]
         (Pure ())
 
 allocs :: [(Int, Int)] -> Blocks ()
@@ -365,7 +360,7 @@ convertNode (Node instr _meta) =
         , regRefs = regs
         }
   where
-    go :: IRInstr IRVar O O -> ([VarInfo], [LS.PhysReg])
+    go :: IRInstr IRVar O O -> ([VarInfo], [PhysReg])
     go (Alloc _group _msrc _dst) = undefined
     go (Reclaim _src) = undefined
     go (Instr i) = convertInstr i
@@ -378,13 +373,13 @@ convertNode (Node instr _meta) =
     go (SaveOffset _lin _off _src _dst) = undefined
     go (RestoreOffset _lin _off _src _dst) = undefined
 
-convertInstr :: Instruction IRVar -> ([VarInfo], [LS.PhysReg])
+convertInstr :: Instruction IRVar -> ([VarInfo], [PhysReg])
 convertInstr = go
   where
     go (Add a b c) = mkv a <> mkv b <> mkv c
     go Endt = undefined
 
-    mkv :: IRVar -> ([VarInfo], [LS.PhysReg])
+    mkv :: IRVar -> ([VarInfo], [PhysReg])
     mkv (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
     mkv (IRVar (VirtualIV n _atomkind _spillability) _) = ([conv n], [])
       where
