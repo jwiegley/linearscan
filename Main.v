@@ -27,29 +27,37 @@ Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
-Definition mainAlgorithm :
-  IState SSError BlockList BlockList unit :=
+Definition mainAlgorithm {blockType opType varType : Set}
+  (binfo : BlockInfo blockType opType)
+  (oinfo : OpInfo opType varType)
+  (vinfo : VarInfo varType) :
+  IState SSError (BlockList blockType) (BlockList blockType) unit :=
   (* order blocks and operations (including loop detection) *)
-  computeBlockOrder ;;;
-  numberOperations ;;;
+  computeBlockOrder blockType ;;;
+  numberOperations blockType ;;;
 
   (* create intervals with live ranges *)
-  computeLocalLiveSets ;;;
-  computeGlobalLiveSets ;;;
-  ssig <<- buildIntervals ;;
+  computeLocalLiveSets blockType ;;;
+  computeGlobalLiveSets blockType ;;;
+  ssig <<- buildIntervals vinfo oinfo binfo ;;
 
   (* allocate registers *)
   match walkIntervals ssig.2 with
   | inl err => error_ err
   | inr ssig' =>
-      resolveDataFlow ;;;
+      resolveDataFlow blockType ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum ssig'.2
+      assignRegNum vinfo oinfo binfo ssig'.2
   end.
 
-Definition linearScan (blocks : BlockList) : SSError + BlockList :=
-  match IState.runIState SSError mainAlgorithm blocks with
+Definition linearScan {blockType opType varType : Set}
+  (binfo : BlockInfo blockType opType)
+  (oinfo : OpInfo opType varType)
+  (vinfo : VarInfo varType) (blocks : BlockList blockType) :
+  SSError + BlockList blockType :=
+  let main := mainAlgorithm binfo oinfo vinfo in
+  match IState.runIState SSError main blocks with
   | inl err      => inl err
   | inr (_, res) => inr res
   end.

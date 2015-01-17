@@ -199,9 +199,24 @@ asmTest body result = do
     let blocks b =
             postorder_dfs_from (lblMapOfCC (procBody (p b))) entry
 
+    let binfo = BlockInfo
+            { blockOps    = undefined
+            , setBlockOps = undefined
+            }
+    let oinfo = OpInfo
+            { opKind  = const Normal
+            , varRefs = undefined
+            , regRefs = const []
+            }
+    let vinfo = VarInfo
+            { varId       = undefined
+            , varKind     = const Temp
+            , regRequired = const False
+            }
+
     let body'   = blocks $ compile body
     let result' = render result
-    case allocate (Prelude.map convertBlock body') of
+    case allocate binfo oinfo vinfo body' of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
             -- print ("----" :: String)
@@ -269,8 +284,31 @@ add :: IRVar -> IRVar -> IRVar -> Program ()
 add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))
 
 
+data VarData = VarData
+    { _varId       :: Int
+    , _varKind     :: VarKind
+    , _varAlloc    :: Allocation
+    , _regRequired :: Bool
+    }
+    deriving (Eq, Show)
+
+data OpData = OpData
+    { _opId    :: Int
+    , _opMeta  :: Int
+    , _opKind  :: OpKind
+    , _varRefs :: [VarData]
+    , _regRefs :: [PhysReg]
+    }
+    deriving (Eq, Show)
+
+data BlockData = BlockData
+    { _blockId  :: Int
+    , _blockOps :: [OpData]
+    }
+    deriving (Eq, Show)
+
 data BlocksF a = BlocksF
-    { wrapBlock :: [BlockInfo]
+    { wrapBlock :: [BlockData]
     , wrapVar   :: a
     }
     deriving (Eq, Show, Functor)
@@ -285,9 +323,9 @@ alloc v n = do
     opid <- get
     put (succ (succ opid))
     lift $ Free $ BlocksF
-        [BlockInfo 0
-         [OpInfo opid 0 Normal
-          [VarInfo v Temp (Register n) False] []]]
+        [BlockData 0
+         [OpData opid 0 Normal
+          [VarData v Temp (Register n) False] []]]
         (Pure ())
 
 allocs :: [(Int, Int)] -> Blocks ()
@@ -299,19 +337,17 @@ op a = do
     n <- get
     put (succ (succ n))
     lift $ Free $ BlocksF
-        [BlockInfo 0 [OpInfo
-            { opId    = n
-            , opMeta  = 0
-            , opKind  = Normal
-            , varRefs = reduce (runStateT a 0)
-            , regRefs = []
+        [BlockData 0 [OpData
+            { _opKind  = Normal
+            , _varRefs = reduce (runStateT a 0)
+            , _regRefs = []
             }]] (Pure ())
   where
     phi (BlocksF _ x) = x
 
     reduce (Pure _) = []
-    reduce (Free (BlocksF [BlockInfo _ as] xs)) =
-        Prelude.concatMap varRefs as ++ reduce xs
+    reduce (Free (BlocksF [BlockData _ as] xs)) =
+        Prelude.concatMap _varRefs as ++ reduce xs
     reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
 
 block :: Blocks () -> Blocks ()
@@ -320,26 +356,25 @@ block a = do
     let m = runStateT a n
     let ((), n') = iter phi m
     put n'
-    lift $ Free (BlocksF [BlockInfo 0 (reduce m)] (Pure ()))
+    lift $ Free (BlocksF [BlockData 0 (reduce m)] (Pure ()))
   where
     phi (BlocksF _ x) = x
 
     reduce (Pure _) = []
-    reduce (Free (BlocksF [BlockInfo _ as] xs)) = as ++ reduce xs
+    reduce (Free (BlocksF [BlockData _ as] xs)) = as ++ reduce xs
     reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
 
-render :: Blocks () -> [BlockInfo]
+render :: Blocks () -> [BlockData]
 render blks = go (evalStateT blks 1)
   where
     go (Pure ()) = []
     go (Free (BlocksF as xs)) = as ++ go xs
 
 
-convertBlock :: Block (Node () IRVar) C C -> BlockInfo
+convertBlock :: Block (Node () IRVar) C C -> BlockData
 convertBlock (BlockCC _pre body _post) =
-    BlockInfo
-        { blockId  = 0
-        , blockOps = Prelude.map convertNode (gatherNodes body)
+    BlockData
+        { _blockOps = Prelude.map convertNode (gatherNodes body)
         }
   where
     gatherNodes :: Block (Node () IRVar) O O -> [Node () IRVar O O]
@@ -349,18 +384,16 @@ convertBlock (BlockCC _pre body _post) =
     gatherNodes (BSnoc blk node)  = gatherNodes blk ++ [node]
     gatherNodes (BCons node blk)  = node : gatherNodes blk
 
-convertNode :: Node () IRVar O O -> OpInfo
+convertNode :: Node () IRVar O O -> OpData
 convertNode (Node instr _meta) =
     let (vars, regs) = go instr in
-    OpInfo
-        { opId    = 0
-        , opMeta  = 0
-        , opKind  = Normal
-        , varRefs = vars
-        , regRefs = regs
+    OpData
+        { _opKind  = Normal
+        , _varRefs = vars
+        , _regRefs = regs
         }
   where
-    go :: IRInstr IRVar O O -> ([VarInfo], [PhysReg])
+    go :: IRInstr IRVar O O -> ([VarData], [PhysReg])
     go (Alloc _group _msrc _dst) = undefined
     go (Reclaim _src) = undefined
     go (Instr i) = convertInstr i
@@ -373,21 +406,20 @@ convertNode (Node instr _meta) =
     go (SaveOffset _lin _off _src _dst) = undefined
     go (RestoreOffset _lin _off _src _dst) = undefined
 
-convertInstr :: Instruction IRVar -> ([VarInfo], [PhysReg])
+convertInstr :: Instruction IRVar -> ([VarData], [PhysReg])
 convertInstr = go
   where
     go (Add a b c) = mkv a <> mkv b <> mkv c
     go Endt = undefined
 
-    mkv :: IRVar -> ([VarInfo], [PhysReg])
+    mkv :: IRVar -> ([VarData], [PhysReg])
     mkv (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
     mkv (IRVar (VirtualIV n _atomkind _spillability) _) = ([conv n], [])
       where
-        conv :: Int -> VarInfo
+        conv :: Int -> VarData
         conv idx =
-            VarInfo
-                { varId       = idx
-                , varKind     = Temp
-                , varAlloc    = Unallocated
-                , regRequired = False
+            VarData
+                { _varId       = idx
+                , _varKind     = Temp
+                , _regRequired = False
                 }

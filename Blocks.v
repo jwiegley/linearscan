@@ -16,6 +16,8 @@ Section Blocks.
 
 Open Scope program_scope.
 
+Variables blockType opType varType : Set.
+
 (* The simplest way to get information about the IR instructions from the
    caller is to receive the following data:
 
@@ -40,32 +42,36 @@ Inductive Allocation := Unallocated | Register of PhysReg | Spill.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
-Record VarInfo := {
-  varId       : nat;            (* from 0 to highest var index *)
-  varKind     : VarKind;
-  varAlloc    : Allocation;
-  regRequired : bool
+Record VarInfo (varType : Set) := {
+  varId       : varType -> nat;     (* from 0 to highest var index *)
+  varKind     : varType -> VarKind;
+  regRequired : varType -> bool
 }.
+
+Variable vinfo : VarInfo varType.
 
 Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
 
 (* The [OpInfo] structure is a collection of functions that allow us to
    determine information about each operation coming from the caller's
    side. *)
-Record OpInfo := {
-  opId    : nat;
-  opMeta  : nat;                (* a user chosen number *)
-  opKind  : OpKind;
-  varRefs : seq VarInfo;
-  regRefs : seq PhysReg
+Record OpInfo (opType varType : Set) := {
+  opKind      : opType -> OpKind;
+  varRefs     : opType -> seq varType;
+  applyAllocs : opType -> seq (nat * PhysReg) -> opType;
+  regRefs     : opType -> seq PhysReg
 }.
 
-Record BlockInfo := {
-  blockId     : nat;
-  blockOps    : seq OpInfo
+Variable oinfo : OpInfo opType varType.
+
+Record BlockInfo (blockType opType : Set) := {
+  blockOps    : blockType -> seq opType;
+  setBlockOps : blockType -> seq opType -> blockType
 }.
 
-Definition BlockList := NonEmpty BlockInfo.
+Variable binfo : BlockInfo blockType opType.
+
+Definition BlockList := NonEmpty blockType.
 
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.
@@ -93,24 +99,24 @@ Record BuildState := {
   bsRegs : Vec (option (BoundedRange bsPos.*2.+1)) maxReg
 }.
 
-Definition foldOps a (f : a -> OpInfo -> a) (z : a) : BlockList -> a :=
-  NE_foldl (fun bacc blk => foldl f bacc (blockOps blk)) z.
+Definition foldOps {a} (f : a -> opType -> a) (z : a) : BlockList -> a :=
+  NE_foldl (fun bacc blk => foldl f bacc (blockOps binfo blk)) z.
 
-Definition foldOpsRev a (f : a -> OpInfo -> a) (z : a)
+Definition foldOpsRev {a} (f : a -> opType -> a) (z : a)
   (blocks : BlockList) : a :=
-  foldl (fun bacc blk => foldl f bacc (rev (blockOps blk)))
+  foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
         z (rev blocks).
 
-Definition mapAccumLOps {a} (f : a -> OpInfo -> (a * OpInfo)) :
+Definition mapAccumLOps {a} (f : a -> opType -> (a * opType)) :
   a -> BlockList -> a * BlockList :=
   NE_mapAccumL (fun z blk =>
-    let: (z', ops) := mapAccumL f z (blockOps blk) in
-    (z', {| blockId  := blockId blk
-          ; blockOps := ops |})).
+    let: (z', ops) := mapAccumL f z (blockOps binfo blk) in
+    (z', setBlockOps binfo blk ops)).
 
 Definition processOperations (blocks : BlockList) : BuildState.
   have := foldOps (fun x op => let: (n, m) := x in
-    (n.+1, foldl (fun m v => maxn m (varId v)) m (varRefs op)))
+    (n.+1, foldl (fun m v => maxn m (varId vinfo v))
+                 m (varRefs oinfo op)))
     (0, 0) blocks.
   move=> [opCount highestVar].
   pose z := {| bsPos  := opCount
@@ -130,13 +136,13 @@ Definition processOperations (blocks : BlockList) : BuildState.
   - have: seq (option (BoundedRange pos.*2.+1)).
       have vars' := vars.
       move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
-      apply: foldl _ vars' (varRefs op) => vars' v.
+      apply: foldl _ vars' (varRefs oinfo op) => vars' v.
       set upos := {| uloc   := pos.*2.+1
-                   ; regReq := regRequired v |}.
+                   ; regReq := regRequired vinfo v |}.
       have Hodd : odd upos by rewrite /= odd_double.
-      apply: (set_nth None vars' (varId v) _).
+      apply: (set_nth None vars' (varId vinfo v) _).
       apply: Some _.
-      case: (nth None vars (varId v)) => [[r /= Hlt]|].
+      case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|].
       + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
         rewrite doubleS in Hlt.
         exact/ltnW.
@@ -145,7 +151,7 @@ Definition processOperations (blocks : BlockList) : BuildState.
   - have: Vec (option (BoundedRange pos.*2.+1)) maxReg.
       have regs' := regs.
       move/(vmap (option_map (transportBoundedRange (H pos)))) in regs'.
-      apply: foldl _ regs' (regRefs op) => regs' reg.
+      apply: foldl _ regs' (regRefs oinfo op) => regs' reg.
       set upos := {| uloc   := pos.*2.+1
                    ; regReq := true |}.
       have Hodd : odd upos by rewrite /= odd_double.
@@ -175,14 +181,14 @@ Definition computeBlockOrder :
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
 Definition numberOperations :
-  IState SSError BlockList BlockList unit :=
-  let f n op :=
-    (n.+2, {| opId    := n
-            ; opMeta  := opMeta op
-            ; opKind  := opKind op
-            ; varRefs := varRefs op
-            ; regRefs := regRefs op |}) in
-  imodify SSError (@snd _ _ \o mapAccumLOps f 1).
+  IState SSError BlockList BlockList unit := return_ tt.
+  (* let f n op := *)
+  (*   (n.+2, {| opId    := n *)
+  (*           ; opMeta  := opMeta op *)
+  (*           ; opKind  := opKind op *)
+  (*           ; varRefs := varRefs op *)
+  (*           ; regRefs := regRefs op |}) in *)
+  (* imodify SSError (@snd _ _ \o mapAccumLOps f 1). *)
 
 Definition BlockState := IState SSError BlockList BlockList.
 
@@ -227,18 +233,14 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
-Definition mapOps (f : OpInfo -> OpInfo) : BlockList -> BlockList :=
-  NE_map (fun blk =>
-            {| blockId  := blockId blk
-             ; blockOps := map f (blockOps blk)
-             |}).
+Definition mapOps (f : opType -> opType) : BlockList -> BlockList :=
+  NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))).
 
 Definition assignRegNum `(st : ScanState sd) :
   IState SSError BlockList BlockList unit :=
   let ints := handled sd ++ active sd ++ inactive sd in
-  let f op :=
+  let f n op :=
     let k v :=
-      let vid := varId v in
       let h acc x :=
         let: (xid, reg) := x in
         (* This strange use of a lambda is so that the generated code
@@ -246,32 +248,15 @@ Definition assignRegNum `(st : ScanState sd) :
            at each use point; otherwise, if we use [let] or [match], Coq's
            extractor inlines each use of [int], resulting in no sharing of
            values. *)
-        (fun int =>
+        (fun vid int =>
            if (ivar int == vid) &&
-              (ibeg int <= opId op < iend int)
-           then {| varId       := varId v
-                 ; varKind     := varKind v
-                 ; varAlloc    := Register reg
-                 ; regRequired := regRequired v
-                 |}
-           else acc) (getInterval xid) in
-      foldl h v ints in
-    {| opId    := opId op
-     ; opMeta  := opMeta op
-     ; opKind  := opKind op
-     ; varRefs := map k (varRefs op)
-     ; regRefs := regRefs op
-     |} in
-  imodify SSError (mapOps f).
+              (ibeg int <= n < iend int)
+           then (vid, reg) :: acc
+           else acc) (varId vinfo v) (getInterval xid) in
+      foldl h [::] ints in
+    (n.+2, applyAllocs oinfo op (flatten (map k (varRefs oinfo op)))) in
+  imodify SSError (@snd _ _ \o mapAccumLOps f 1).
 
 End Blocks.
-
-Arguments computeBlockOrder.
-Arguments numberOperations.
-Arguments computeLocalLiveSets.
-Arguments computeGlobalLiveSets.
-Arguments buildIntervals.
-Arguments resolveDataFlow.
-Arguments assignRegNum {sd} st.
 
 End MBlocks.
