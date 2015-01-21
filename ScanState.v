@@ -134,6 +134,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := vconst None
        |}
 
+  (* This is the only constructor which may add work to the scan state. *)
   | ScanState_newUnhandled sd :
     ScanState sd -> forall `(i : Interval d),
     let n   := (ord_max, ibeg d) in

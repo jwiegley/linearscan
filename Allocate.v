@@ -23,9 +23,6 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
          then intervalIntersectionPoint int.2 i.2
          else None)) None (fixedIntervals sd).
 
-(* Definition assignSpillSlotToCurrent {pre P} `{HasWork P} : *)
-(*   SState pre P P unit. *)
-
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
@@ -39,13 +36,19 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go n := foldl (fun v p => let: (i, r) := p in vreplace v r (n i)) in
-    let freeUntilPos' := go (fun _ => Some 0) (vconst None) (active sd) in
+    let go f v p :=
+        let: (i, r) := p in
+        vreplace v r (match vnth v r with
+                      | Some n => Some (minn n (f i : option nat))
+                      | None => f i
+                      end) in
+    let freeUntilPos' := foldl (go (fun _ => Some 0)) (vconst None)
+                               (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
     let freeUntilPos :=
-        go (fun i => intervalIntersectionPoint (getInterval i) current)
+        foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
            freeUntilPos' intersectingIntervals in
 
     (* reg = register with highest freeUntilPos *)
@@ -105,7 +108,10 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
             | Some _ => Some 0
             | None   => nextUseAfter int start
             end in
-        vreplace v r pos' in
+        vreplace v r (match vnth v r with
+                      | Some n => Some (minn n pos')
+                      | None => pos'
+                      end) in
     let nextUsePos' := foldl go (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
@@ -116,30 +122,30 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
     (* mres = highest use position of the found register *)
     let (reg, mres) := registerWithHighestPos nextUsePos in
 
-    (* if first usage of current is after nextUsePos[reg] then
-         // all other intervals are used before current, so it is best
-         // to spill current itself
-         assign spill slot to current
-         split current before its first use position that requires a register
-       else
-         // spill intervals that currently block reg
-         current.reg = reg
-         split active interval for reg at position
-         split any inactive interval for reg at the end of its lifetime hole *)
-
-    (* // make sure that current does not intersect with
-       // the fixed interval for reg
-       if current intersects with the fixed interval for reg then
-         split current before this intersection *)
     if (match mres with
         | None   => false
         | Some n => n < start
         end)
     then
-      (* jww (2014-12-01): Need to determine what should happen here. *)
-      (* assignSpillSlotToCurrent ;;; *)
+      (* if first usage of current is after nextUsePos[reg] then
+           // all other intervals are used before current, so it is best
+           // to spill current itself
+           assign spill slot to current
+           split current before its first use position that requires a
+             register *)
       splitCurrentInterval (firstUseReqReg current) ;;;
 
+      (* This scenario can only occur if the beginning of the current interval
+         (the current position) is less than its first use position.  Thus,
+         when we split we are simply throwing away the first part of the
+         interval (with no use positions) up until [pos], and then keeping the
+         rest of the interval on the unhandled list so it can be processed
+         later. *)
+
+      (* // make sure that current does not intersect with
+         // the fixed interval for reg
+         if current intersects with the fixed interval for reg then
+           split current before this intersection *)
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc with
       | Some n => splitCurrentInterval (Some n)
@@ -148,9 +154,20 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       weakenStHasLenToSt ;;;
       return_ None
     else
+      (* // spill intervals that currently block reg
+         current.reg = reg
+         split active interval for reg at position
+         split any inactive interval for reg at the end of its lifetime hole *)
       splitAnyInactiveIntervalForReg reg ;;;
       splitActiveIntervalForReg reg pos ;;;
 
+      (* The remainder of these active and inactive intervals goes back onto
+         the unhandled list. *)
+
+      (* // make sure that current does not intersect with
+         // the fixed interval for reg
+         if current intersects with the fixed interval for reg then
+           split current before this intersection *)
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc
       with

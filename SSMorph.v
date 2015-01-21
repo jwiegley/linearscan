@@ -279,7 +279,7 @@ Proof.
   destruct ssMorphHasLen0.
   destruct haslen_is_SSMorphLen0.
   destruct len_is_SSMorph0.
-  destruct unhandled0; simpl in *; first by [].
+  destruct unhandled0; first by [].
   destruct p.
   case H: (reg \notin [seq snd i | i <- active0]);
     last exact: (inl (ERegisterAlreadyAssigned reg)).
