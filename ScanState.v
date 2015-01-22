@@ -17,7 +17,8 @@ Inductive SSError : Set :=
   | ECannotSplitAssignedSingleton : nat -> SSError
   | ENoIntervalsToSplit
   | ERegisterAlreadyAssigned : nat -> SSError
-  | ERegisterAssignmentsOverlap : nat -> SSError.
+  | ERegisterAssignmentsOverlap : nat -> SSError
+  | EFuelExhausted : SSError.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
@@ -75,12 +76,14 @@ Arguments handledIds /.
 Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 Arguments getInterval [sd] i /.
 
+(*
 Definition totalExtent `(xs : seq (IntervalId sd)) : nat :=
   sumlist [seq (intervalExtent (getInterval i)) | i <- xs].
 Arguments totalExtent [sd] _ /.
 
 Definition unhandledExtent (sd : ScanStateDesc) : nat :=
   totalExtent [seq fst i | i <- unhandled sd].
+*)
 
 (** Given a vector of optional positions associated with a register, return
     the first register (counting upwards) which is either [None], or the
@@ -122,9 +125,11 @@ Definition registerWithHighestPos :
 
     5. Move an item from the inactive list to the active or handled lists. *)
 
-Inductive ScanState : ScanStateDesc -> Prop :=
+Inductive ScanStateStatus := Pending | InUse.
+
+Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
   | ScanState_nil :
-    ScanState
+    ScanState Pending
       {| nextInterval     := 0
        ; unhandled        := nil
        ; active           := nil
@@ -135,11 +140,20 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   (* This is the only constructor which may add work to the scan state. *)
-  | ScanState_newUnhandled sd :
-    ScanState sd -> forall `(i : Interval d),
+  | ScanState_newUnhandled b sd :
+    ScanState b sd -> forall `(i : Interval d),
     let n   := (ord_max, ibeg d) in
     let unh := map widen_fst (unhandled sd) in
-    ScanState
+    (if b is Pending
+     then (* While a [ScanState] is [Pending], unhandled intervals may be
+             added at any position.  Once it is finalized and [InUse],
+             unhandled intervals (arising from splits) may only be added after
+             the current position. *)
+          True
+     else if unhandled sd is (_, u) :: _
+          then u < ibeg d
+          else False) ->
+    ScanState b
       {| nextInterval     := (nextInterval sd).+1
        ; unhandled        := insert (lebf (@snd _ _)) n unh
        ; active           := map widen_fst (active sd)
@@ -149,25 +163,15 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        |}
 
-  | ScanState_newInactive sd reg :
-    ScanState sd -> forall `(i : Interval d),
-    let inact := map widen_fst (inactive sd) in
-    ScanState
-      {| nextInterval     := (nextInterval sd).+1
-       ; unhandled        := map widen_fst (unhandled sd)
-       ; active           := map widen_fst (active sd)
-       ; inactive         := (ord_max, reg) :: inact
-       ; handled          := map widen_fst (handled sd)
-       ; intervals        := vshiftin (intervals sd) (d; i)
-       ; fixedIntervals   := fixedIntervals sd
-       |}
+  | ScanState_finalize sd :
+      ScanState Pending sd -> ScanState InUse sd
 
   | ScanState_setInterval sd :
-    ScanState sd -> forall xid `(i : Interval d),
+    ScanState InUse sd -> forall xid `(i : Interval d),
     let xi := (vnth (intervals sd) xid).2 in
-    intervalExtent i < intervalExtent xi ->
+    (* intervalExtent i < intervalExtent xi -> *)
     intervalStart i == intervalStart xi ->
-    ScanState
+    ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := active sd
@@ -178,8 +182,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_setFixedIntervals sd :
-    ScanState sd -> forall (regs : fixedIntervalsType),
-    ScanState
+    ScanState Pending sd -> forall (regs : fixedIntervalsType),
+    ScanState Pending
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := active sd
@@ -191,7 +195,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
 
   | ScanState_moveUnhandledToActive
       ni unh act inact hnd ints fixints x reg :
-    ScanState
+    ScanState InUse
       {| nextInterval     := ni
        ; unhandled        := x :: unh
        ; active           := act
@@ -201,7 +205,7 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixints
        |} ->
     reg \notin [seq snd i | i <- act] ->
-    ScanState
+    ScanState InUse
       {| nextInterval     := ni
        ; unhandled        := unh
        ; active           := (fst x, reg) :: act
@@ -212,8 +216,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveActiveToInactive sd :
-    ScanState sd -> forall x, x \in active sd ->
-    ScanState
+    ScanState InUse sd -> forall x, x \in active sd ->
+    ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := rem x (active sd)
@@ -224,8 +228,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveActiveToHandled sd :
-    ScanState sd -> forall x, x \in active sd ->
-    ScanState
+    ScanState InUse sd -> forall x, x \in active sd ->
+    ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := rem x (active sd)
@@ -236,9 +240,9 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveInactiveToActive sd :
-    ScanState sd -> forall x, x \in inactive sd ->
+    ScanState InUse sd -> forall x, x \in inactive sd ->
     snd x \notin [seq snd i | i <- active sd] ->
-    ScanState
+    ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := x :: active sd
@@ -249,8 +253,8 @@ Inductive ScanState : ScanStateDesc -> Prop :=
        |}
 
   | ScanState_moveInactiveToHandled sd :
-    ScanState sd -> forall x, x \in inactive sd ->
-    ScanState
+    ScanState InUse sd -> forall x, x \in inactive sd ->
+    ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := active sd
@@ -264,7 +268,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
   | Case_aux c "ScanState_newUnhandled"
-  | Case_aux c "ScanState_newInactive"
+  | Case_aux c "ScanState_finalize"
   | Case_aux c "ScanState_setInterval"
   | Case_aux c "ScanState_setFixedIntervals"
   | Case_aux c "ScanState_moveUnhandledToActive"
@@ -274,13 +278,14 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
 
-Notation ScanStateSig := { sd : ScanStateDesc | ScanState sd }.
+Definition ScanStateSig (b : ScanStateStatus) :=
+  { sd : ScanStateDesc | ScanState b sd }.
 
-Definition getScanStateDesc `(st : ScanState sd) := sd.
+Definition getScanStateDesc `(st : ScanState InUse sd) := sd.
 Arguments getScanStateDesc [sd] st /.
 
-Definition packScanState `(st : ScanState sd) := exist ScanState sd st.
-Arguments packScanState [sd] st /.
+Definition packScanState `(st : ScanState b sd) := exist (ScanState b) sd st.
+Arguments packScanState [b sd] st /.
 
 (** ** ScanStateCursor *)
 
@@ -289,7 +294,7 @@ Arguments packScanState [sd] st /.
     exists, so it combines that assertion with a view onto that element. *)
 
 Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
-    curState  : ScanState sd;
+    curState  : ScanState InUse sd;
     curExists : size (unhandled sd) > 0;
 
     curId := safe_hd _ curExists;

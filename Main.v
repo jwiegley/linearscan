@@ -42,7 +42,8 @@ Definition mainAlgorithm {blockType opType varType : Set}
   ssig <<- buildIntervals vinfo oinfo binfo ;;
 
   (* allocate registers *)
-  match walkIntervals ssig.2 with
+  blocks <<- iget SSError ;;
+  match walkIntervals ssig.2 1 (NE_length blocks) with
   | inl err => error_ err
   | inr ssig' =>
       resolveDataFlow blockType ;;;

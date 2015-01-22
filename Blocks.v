@@ -38,7 +38,22 @@ Variables blockType opType varType : Set.
 
 Inductive VarKind := Input | Temp | Output.
 
-Inductive Allocation := Unallocated | Register of PhysReg | Spill.
+(* When use of a variable is encountered, one or more actions should be taken: *)
+Inductive VarAction :=
+  (* Load the variable into a register prior to the current operation.
+     This is the first load of the value. *)
+  | RegLoad of PhysReg
+  (* Restore from the given memory offset to the specified register before the
+     current operation. *)
+  | RegRestore of nat & PhysReg
+  (* The value is currently in the given register. *)
+  | RegUse of PhysReg
+  (* Spill the variable from the register to the specified memory offset,
+     after the current operation. *)
+  | RegUseThenSpill of PhysReg & nat
+  (* The value is in the given register, but is not needed beyond this
+     point. *)
+  | RegDump of PhysReg.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
@@ -58,7 +73,7 @@ Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
 Record OpInfo (opType varType : Set) := {
   opKind      : opType -> OpKind;
   varRefs     : opType -> seq varType;
-  applyAllocs : opType -> seq (nat * PhysReg) -> opType;
+  applyAllocs : opType -> seq (nat * VarAction) -> opType;
   regRefs     : opType -> seq PhysReg
 }.
 
@@ -201,21 +216,24 @@ Definition computeLocalLiveSets : BlockState unit := return_ tt.
 
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
-Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
+Definition buildIntervals :
+  IState SSError BlockList BlockList (ScanStateSig InUse) :=
   let mkint (vid : nat)
-            (ss : ScanStateSig)
+            (ss : ScanStateSig Pending)
             (pos : nat)
             (mx : option (BoundedRange pos.*2.+1))
-            (f : forall sd, ScanState sd -> forall d, Interval d
-                   -> ScanStateSig) :=
+            (f : forall sd, ScanState Pending sd -> forall d, Interval d
+                   -> ScanStateSig Pending) :=
       let: exist _ st := ss in
       if mx is Some (exist r _)
       then f _ st _ (I_Sing vid r.2)
+           (* jww (2015-01-20): At the present time there is no use of
+              "lifetime holes", and so [I_Cons] is never used here. *)
       else ss in
 
   let handleVar pos vid ss mx :=
       mkint vid ss pos mx $ fun _ st _ i =>
-        packScanState (ScanState_newUnhandled st i) in
+        packScanState (ScanState_newUnhandled st i I) in
 
   blocks <<- iget SSError ;;
   (fun bs =>
@@ -227,8 +245,10 @@ Definition buildIntervals : IState SSError BlockList BlockList ScanStateSig :=
      let s0 := ScanState_nil in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
-
-     return_ $ foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs))
+     let s3 := foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs) in
+     let s4 := ScanState_finalize s3.2 in
+     let s5 := packScanState s4 in
+     return_ s5)
   (processOperations blocks).
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
@@ -236,7 +256,7 @@ Definition resolveDataFlow : BlockState unit := return_ tt.
 Definition mapOps (f : opType -> opType) : BlockList -> BlockList :=
   NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))).
 
-Definition assignRegNum `(st : ScanState sd) :
+Definition assignRegNum `(st : ScanState InUse sd) :
   IState SSError BlockList BlockList unit :=
   let ints := handled sd ++ active sd ++ inactive sd in
   let f n op :=
@@ -251,7 +271,9 @@ Definition assignRegNum `(st : ScanState sd) :
         (fun vid int =>
            if (ivar int == vid) &&
               (ibeg int <= n < iend int)
-           then (vid, reg) :: acc
+           then (vid, RegLoad reg) :: acc
+                (* jww (2015-01-20): We cannot always so RegLoad here, but
+                   must differentiate based on the circumstance. *)
            else acc) (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in
     (n.+2, applyAllocs oinfo op (flatten (map k (varRefs oinfo op)))) in

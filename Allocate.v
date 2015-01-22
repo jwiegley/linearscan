@@ -197,11 +197,11 @@ Definition int_reg_seq sd := seq (int_reg sd).
 Definition intermediate_result (sd z : ScanStateDesc) (xs : int_reg_seq z)
   (f : forall sd' : ScanStateDesc, int_reg_seq sd') :=
   { res : {z' : ScanStateDesc | SSMorphLen z z'}
-  | (ScanState res.1 /\ SSMorphLen sd res.1)
+  | (ScanState InUse res.1 /\ SSMorphLen sd res.1)
   & subseq [seq mt_fst z res.1 res.2 i | i <- xs] (f res.1) }.
 
 Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
-  (Pz : ScanState z /\ SSMorphLen sd z)
+  (Pz : ScanState InUse z /\ SSMorphLen sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (active z)) :
   intermediate_result sd z xs active :=
@@ -231,7 +231,7 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ _ _ _].
+    case=> [Hinc _ _ _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   case: (~~ (ibeg (vnth (intervals z) o).1 <=
@@ -240,24 +240,24 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ _ _ _].
+    case=> [Hinc _ _ _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ _ _ _].
+  case=> [Hinc _ _ _].
   rewrite map_widen_ord_refl.
   exact: subseq_impl_cons.
 Qed.
 
 Definition checkActiveIntervals {pre} (pos : nat) :
   SState pre SSMorphLen SSMorphLen unit :=
-  withScanStatePO $ fun sd (st : ScanState sd) =>
+  withScanStatePO $ fun sd (st : ScanState InUse sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let res : {sd' : ScanStateDesc | ScanState sd' /\ SSMorphLen sd sd'} :=
+    let res : {sd' : ScanStateDesc | ScanState InUse sd' /\ SSMorphLen sd sd'} :=
         @dep_foldl_inv
-          ScanStateDesc (fun sd' => ScanState sd' /\ SSMorphLen sd sd')
+          ScanStateDesc (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
           SSMorphLen _ sd (conj st (newSSMorphLen sd))
           (active sd) (size (active sd)) (eq_refl _)
           active (subseq_refl _) mt_fst (goActive pos sd) in
@@ -266,12 +266,12 @@ Definition checkActiveIntervals {pre} (pos : nat) :
                          ; thisHolds := H
                          ; thisState := st' |}.
 
-Program Definition moveInactiveToActive' `(st : ScanState z)
+Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z))
   (Hin : x \in inactive z) :
   SSError +
-  { sd' : ScanStateDesc | ScanState sd'
+  { sd' : ScanStateDesc | ScanState InUse sd'
   & { sslen : SSMorphLen z sd'
     | subseq [seq mt_fst z sd' sslen i | i <- xs]
              (inactive sd')
@@ -287,13 +287,13 @@ Program Definition moveInactiveToActive' `(st : ScanState z)
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [Hinc _ _ _ _].
+  case: sslen'; case=> [Hinc _ _ _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
 
 Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
-  (Pz : ScanState z /\ SSMorphLen sd z)
+  (Pz : ScanState InUse z /\ SSMorphLen sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z)) :
   SSError + intermediate_result sd z xs inactive :=
@@ -309,7 +309,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
     let Hin : x \in inactive z :=
         @in_subseq_sing _ _ _ x xs _ Hsub in
     let f (sd'    : ScanStateDesc)
-          (st'    : ScanState sd')
+          (st'    : ScanState InUse sd')
           (sslen' : SSMorphLen z sd')
           (Hsub'  : subseq [seq mt_fst z sd' sslen' i | i <- xs]
                            (inactive sd')) :=
@@ -331,7 +331,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
 Obligation 2.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ _ _ _].
+  case=> [Hinc _ _ _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -343,11 +343,12 @@ Defined.
 
 Definition checkInactiveIntervals {pre} (pos : nat) :
   SState pre SSMorphLen SSMorphLen unit :=
-  withScanStatePO $ fun sd (st : ScanState sd) =>
+  withScanStatePO $ fun sd (st : ScanState InUse sd) =>
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let eres : SSError + {sd' : ScanStateDesc | ScanState sd' /\ SSMorphLen sd sd'} :=
+    let eres : SSError + {sd' : ScanStateDesc
+                         | ScanState InUse sd' /\ SSMorphLen sd sd'} :=
         @dep_foldl_invE SSError
-          ScanStateDesc (fun sd' => ScanState sd' /\ SSMorphLen sd sd')
+          ScanStateDesc (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
           SSMorphLen _ sd (conj st (newSSMorphLen sd))
           (inactive sd) (size (inactive sd)) (eq_refl _)
           inactive (subseq_refl _) mt_fst (goInactive pos sd) in
@@ -387,27 +388,48 @@ Require Import Coq.Program.Wf.
    [unhandled] list, and use those to determine register allocations.  The
    final result will be a [ScanState] whose [handled] list represents the
    final allocations for each interval. *)
-Program Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState sd)
-  {measure (unhandledExtent sd)} : SSError + ScanStateSig :=
+Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
+  (thisPos positions : nat) : SSError + ScanStateSig InUse :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  match List.destruct_list (unhandled sd) with
-  | inleft (existT x (exist xs H)) =>
-    let ssinfo := {| thisDesc  := sd
-                   ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
-                   ; thisState := st
-                   |} in
-    match IState.runIState SSError handleInterval ssinfo with
-    | inl err => inl err
-    | inr (_, ssinfo') => walkIntervals (thisState ssinfo')
-    end
-  | inright _ => inr (packScanState st)
-  end.
-Obligation 1.
-  (* We must prove that after every call to [handleInterval], the total extent
-     of the remaining unhandled intervals is less than it was before. *)
-  by intros; clear; case: ssinfo' => ? /= [? /ltP].
-Qed.
+  if positions is S n
+  then match List.destruct_list (unhandled sd) with
+       | inleft (existT x (exist xs H)) =>
+         let fix go beg xs ss :=
+             if thisPos == beg
+             then let ssinfo :=
+                      {| thisDesc  := sd
+                       ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
+                       ; thisState := st |} in
+                  match IState.runIState SSError handleInterval ssinfo with
+                  | inl err => inl err
+                  | inr (_, ssinfo') =>
+                      let ss' := exist _ (thisDesc ssinfo')
+                                         (thisState ssinfo') in
+                      (* A [ScanState InUse] may not insert new unhandled
+                         intervals at the same position as [thisPos], and so
+                         even though [unhandled sd] may have been changed by
+                         the call to [handleInterval], it will not have
+                         changed it with respect to subsequent intervals at
+                         the same position.  Thus, we may safely make the
+                         assumption that if another interval at the same
+                         position exists in [xs], then it will also be there
+                         in [unhandled sd] when [go] is next evaluated. *)
+                      match xs with
+                      | [::]    => inr ss'
+                      | y :: ys => go (snd y) ys ss'
+                      end
+                  end
+             else inr ss in
+         match go (snd x) xs (exist _ sd st) with
+         | inl err => inl err
+         | inr ss  => walkIntervals ss.2 thisPos.+2 n
+         end
+       | inright _ => inr (packScanState st)
+       end
+  else (* jww (2015-01-20): It should be possible, by proof, to ensure that
+          the following case is impossible. *)
+       inl EFuelExhausted.
 
 End MAllocate.

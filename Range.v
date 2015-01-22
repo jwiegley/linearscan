@@ -30,40 +30,53 @@ Arguments upos_lt x y /.
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
+Lemma NE_StronglySorted_UsePos_impl : forall xs,
+  NE_StronglySorted upos_lt xs -> NE_head xs < (NE_last xs).+1.
+Proof.
+  intros.
+  induction xs; simpl in *; auto.
+  inversion H.
+  apply NE_Forall_last in H3.
+  exact/ltnW.
+Qed.
+
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
-Definition UsePosSublistsOf (f : UsePos -> bool) (l : NonEmpty UsePos) :=
-  { p : (option (NonEmpty UsePos) * option (NonEmpty UsePos))
-  | match p with
+Definition UsePosSublistsOf (before : nat)
+  `(H : NE_StronglySorted upos_lt l) :=
+  { p : option (NonEmpty UsePos) * option (NonEmpty UsePos)
+  | let f x := x < before in match p with
     | (Some l1, Some l2) =>
         [ /\ l = NE_append l1 l2
-        ,    NE_all_true f l1
-        &    ~~ f (NE_head l2)
+        &    NE_last l1 < before <= NE_head l2
         ]
 
-    | (Some l1, None) => l = l1 /\ NE_all_true f l1
-    | (None, Some l2) => l = l2 /\ ~~ f (NE_head l2)
+    | (Some l1, None) => l = l1 /\ NE_last l1 < before
+    | (None, Some l2) => l = l2 /\ before <= NE_head l2
     | (None, None)    => False
     end
   }.
 
 (** Return two sublists of [l] such that for every element in the first
     sublist, [f elem] return [true]. *)
-Fixpoint usePosSpan (f : UsePos -> bool) (l : NonEmpty UsePos) :
-  UsePosSublistsOf f l.
+Fixpoint usePosSpan (before : nat) `(H : NE_StronglySorted upos_lt l) :
+  UsePosSublistsOf before H.
 Proof.
   destruct l as [x|x xs] eqn:Heqe.
-    destruct (f x) eqn:Heqef.
+    destruct (x < before) eqn:Heqef.
       exists (Some (NE_Sing x), None).
-      by split; constructor.
+      by split.
     exists (None, Some (NE_Sing x)).
-      by split; try apply negbT.
+      by split; try rewrite leqNgt Heqef.
 
-  destruct (f x) eqn:Heqef.
-  - Case "f x = true".
-    destruct (usePosSpan f xs)
+  destruct (x < before) eqn:Heqef.
+  - Case "x < before".
+    destruct (usePosSpan before xs)
       as [[[l1| ] [l2| ]] Hsublists];
+    try match goal with
+          [ |- NE_StronglySorted _ _ ] => by inversion H
+        end;
     inversion Hsublists;
 
     [ SCase "sublists = (Some, Some)";
@@ -75,17 +88,14 @@ Proof.
     simpl; split; f_equal; try assumption;
     intuition; constructor; assumption.
 
-  - Case "f x = false".
+  - Case "before <= x".
     eexists (None, Some (NE_Cons x xs)).
-    by split; try apply negbT.
+    by split; try rewrite leqNgt Heqef.
 Defined.
 
-Lemma usePosSpan_spec (f : UsePos -> bool) (l : NonEmpty UsePos) :
-  forall res, res = usePosSpan f l -> res.1 <> (None, None).
-Proof.
-  elim: l => [a|a l IHl] res Heqe;
-  case: res Heqe => [[[o| ] [o0| ]] H] //.
-Qed.
+Lemma usePosSpan_spec (before : nat) `(H : NE_StronglySorted upos_lt l) :
+  (usePosSpan before H).1 <> (None, None).
+Proof. by case: (usePosSpan before H) => [[[?| ] [?| ]] ?]. Qed.
 
 (** ** RangeDesc *)
 
@@ -133,13 +143,13 @@ Inductive Range : RangeDesc -> Prop :=
            ; ups  := NE_Cons u (ups x)
            |}
 
-  (** The address bounds of a [Range] may be arbitrarily extended, without
-      reference to use positions.  This is useful when all of the use
-      positions occur in a loop, for example, and you wish for the [Range] to
-      bound the entire loop. *)
+  (** The address bounds of a [Range] may be arbitrarily set beyond its use
+      positions.  This is useful when all of the use positions occur in a
+      loop, for example, and you wish for the [Range] to bound the entire
+      loop. *)
   | R_Extend x b' e' : Range x ->
-    Range {| rbeg := minn b' (rbeg x)
-           ; rend := maxn e' (rend x)
+    Range {| rbeg := minn b' (NE_head (ups x))
+           ; rend := maxn e' (NE_last (ups x)).+1
            ; ups  := ups x
            |}.
 
@@ -158,16 +168,16 @@ Coercion getRangeDesc : Range >-> RangeDesc.
 Definition packRange `(r : Range d) := exist Range d r.
 Arguments packRange [d] r /.
 
-Definition rangeExtent `(Range r) := rend r - rbeg r.
-Arguments rangeExtent [r] _ /.
+(* Definition rangeExtent `(Range r) := rend r - rbeg r. *)
+(* Arguments rangeExtent [r] _ /. *)
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
-Proof. induction r; auto. simpl. apply leq_min. assumption. Qed.
+Proof. induction r; auto. simpl. apply leq_min. by []. Qed.
 
 Lemma Range_end_bounded `(r : Range rd) : uloc (NE_last (ups rd)) < rend rd.
-Proof. induction r; auto. apply ltn_max. assumption. Qed.
+Proof. induction r; auto. apply ltn_max. by []. Qed.
 
 Theorem Range_sorted `(r : Range rd) : NE_StronglySorted upos_lt (ups rd).
 Proof.
@@ -210,7 +220,8 @@ Proof.
     apply NE_Forall_last in H3.
     exact/(ltn_trans H0)/(ltn_trans H3).
   - Case "R_Extend".
-    exact/ltn_min/ltn_max.
+    apply/ltn_min/ltn_max.
+    by move/NE_StronglySorted_UsePos_impl: (Range_sorted r).
 Qed.
 
 Lemma Range_ups_bounded `(r : Range rd) : NE_head (ups rd) <= NE_last (ups rd).
@@ -228,7 +239,7 @@ Definition Range_fromList `(us : NonEmpty UsePos) :
               ; rend := (uloc (NE_last us)).+1
               ; ups  := us |}.
 Proof.
-  elim: us => [a|a us IHus] Hsorted Hforall //.
+  elim: us => [a|a us IHus] Hsorted Hforall.
     by apply R_Sing; inv Hforall.
   inv Hsorted; inv Hforall; simpl in *.
   specialize (IHus H1 H4).
@@ -236,42 +247,42 @@ Proof.
   by inversion H2; auto.
 Defined.
 
-Definition Range_weaken_beg : forall b x y xs,
-  Range {| rbeg := x
-         ; rend := y
-         ; ups  := xs |}
-    -> b <= x
-    -> Range {| rbeg := b; rend := y; ups := xs |}.
+Definition Range_change_beg (b : nat) `(r : Range rd) :
+  b <= NE_head (ups rd)
+    -> Range {| rbeg := b; rend := rend r; ups := ups rd |}.
 Proof.
-  move=> b x y xs H Hlt.
-  move: (R_Extend b y H) => /=.
-  by rewrite (maxnn y) (minn_idPl Hlt).
+  move=> Hlt.
+  move: (R_Extend b (rend r) r) => /=.
+  move: (Range_end_bounded r) => /= Hgt.
+  by rewrite (minn_idPl Hlt) (maxn_idPl Hgt).
+Defined.
+
+Definition Range_change_end (e : nat) `(r : Range rd) :
+  NE_last (ups rd) < e
+    -> Range {| rbeg := rbeg r; rend := e; ups := ups rd |}.
+Proof.
+  move=> Hgt.
+  move: (R_Extend (rbeg r) e r) => /=.
+  move: (Range_beg_bounded r) => /= Hlt.
+  by rewrite (minn_idPl Hlt) (maxn_idPl Hgt).
 Defined.
 
 Definition Range_append_fst
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups  := NE_append l1 l2 |}) :
-  Range {| rbeg := rbeg0
-         ; rend := (uloc (NE_last l1)).+1
-         ; ups  := l1 |}.
+  forall rend, NE_last l1 < rend <= NE_head l2
+    -> Range {| rbeg := rbeg0
+              ; rend := rend
+              ; ups  := l1 |}.
 Proof.
+  move=> rend /andP [Hlt1 Hlt2].
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [Hsortedl _].
   move/NE_Forall_append: (Range_all_odd r) => /= [Hforall _].
-  move: (@NE_head_append_spec) (Range_beg_bounded r) => ->.
-  move/Range_weaken_beg: (Range_fromList Hsortedl Hforall). exact.
-Defined.
-
-Definition Range_weaken_end : forall e x y xs,
-  Range {| rbeg := x
-         ; rend := y
-         ; ups  := xs |}
-    -> y <= e
-    -> Range {| rbeg := x; rend := e; ups := xs |}.
-Proof.
-  move=> e x y xs H Hgt.
-  move: (R_Extend x e H) => /=.
-  by rewrite (minnn x) (maxn_idPl Hgt).
+  move: (@NE_head_append_spec) (Range_beg_bounded r) => /= -> Hbeg.
+  move: (Range_fromList Hsortedl Hforall) => r'.
+  move: (R_Extend rbeg0 rend r') => /=.
+  by rewrite (minn_idPl Hbeg) (maxn_idPl Hlt1).
 Defined.
 
 Definition Range_append_snd
@@ -284,8 +295,10 @@ Definition Range_append_snd
 Proof.
   move/NE_StronglySorted_inv_app: (Range_sorted r) => [_ Hsortedr].
   move/NE_Forall_append: (Range_all_odd r) => /= [_ Hforall].
-  move: (@NE_last_append_spec) (Range_end_bounded r) => ->.
-  move/Range_weaken_end: (Range_fromList Hsortedr Hforall). exact.
+  move: (@NE_last_append_spec) (Range_end_bounded r) => /= -> Hbeg.
+  move: (Range_fromList Hsortedr Hforall) => r'.
+  move: (R_Extend (NE_head l2) rend0 r') => /=.
+  by rewrite (minnn _) (maxn_idPl Hbeg).
 Defined.
 
 Lemma Range_append_spec
@@ -320,98 +333,122 @@ Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
       end in
   go (ups r).
 
-Record SplittableUsePos `(Range r) := {
-    splittable_UsePos : UsePos;
-    splittable_WithinRange :
-      NE_head (ups r) < splittable_UsePos < NE_last (ups r)
-}.
-
-Record DividedRange `(r : Range rd) (f : UsePos -> bool)
+Record DividedRange `(r : Range rd) (before : nat)
   `(r1 : Range rd1) `(r2 : Range rd2) : Prop := {
     _ : ups rd = NE_append (ups rd1) (ups rd2);
-    _ : NE_all_true f (ups rd1);
-    _ : ~~ f (NE_head (ups rd2));
+    _ : rend rd1 <= before <= rbeg rd2;
     _ : rbeg r == rbeg rd1;
-    _ : rend r == rend rd2;
-    _ : (uloc (NE_last (ups rd1))).+1 == rend rd1;
-    _ : uloc (NE_head (ups rd2)) == rbeg rd2;
-    _ : rend rd1 < rbeg rd2
+    _ : rend r == rend rd2
 }.
 
-Definition SubRangesOf (f : UsePos -> bool) `(r : Range rd)
-  (p : (option RangeSig * option RangeSig)) :=
+Definition SubRangesOf `(r : Range rd) (before : nat)
+  (p : option RangeSig * option RangeSig) :=
   match p with
-  | (Some r1, Some r2) => DividedRange r f r1.2 r2.2
-  | (Some r1, None)    => ups rd = ups r1.1 /\ NE_all_true f (ups r1.1)
-  | (None, Some r2)    => ups rd = ups r2.1 /\ ~~ f (NE_head (ups r2.1))
+  | (Some r1, Some r2) => DividedRange r before r1.2 r2.2
+  | (Some r1, None)    => [/\ ups rd = ups r1.1
+                          ,   rbeg rd = rbeg r1.1
+                          ,   rend r1.1 <= rend rd
+                          &   rend r1.1 <= before ]
+  | (None, Some r2)    => [/\ ups rd = ups r2.1
+                          ,   rend rd = rend r2.1
+                          ,   rbeg rd <= rbeg r2.1
+                          &   before <= rbeg r2.1]
   | (None, None)       => False
   end.
 
-Definition makeDividedRange (f : UsePos -> bool) `(r : Range rd)
+Definition makeDividedRange `(r : Range rd) (before : nat)
   (l1 l2 : NonEmpty UsePos)
   (Heqe : ups rd = NE_append l1 l2)
-  (Hu1 : NE_all_true f l1)
-  (Hu2 : ~~ f (NE_head l2)) :
-  { p : (option RangeSig * option RangeSig) | SubRangesOf f r p }.
+  (Hu : NE_last l1 < before <= NE_head l2) :
+  { p : option RangeSig * option RangeSig | SubRangesOf r before p }.
 Proof.
-  destruct rd. simpl in *. subst.
-  eexists (Some ({| rbeg := rbeg0
-                  ; rend := (uloc (NE_last l1)).+1
-                  ; ups  := l1 |}; _),
-           Some ({| rbeg := uloc (NE_head l2)
-                  ; rend := rend0
-                  ; ups  := l2 |}; _)).
-  move: (Range_append_spec r).
-  simpl. constructor; auto.
-
-  Grab Existential Variables.
-  - apply (Range_append_snd r).
-  - apply (Range_append_fst r).
+  destruct rd; simpl in *; subst.
+  exists (Some ({| rbeg := rbeg0
+                 ; rend := before
+                 ; ups  := l1 |}; Range_append_fst r Hu),
+          Some ({| rbeg := uloc (NE_head l2)
+                 ; rend := rend0
+                 ; ups  := l2 |}; Range_append_snd r)).
+  constructor => //=.
+  move/andP: Hu => [*].
+  by apply/andP; split.
 Defined.
 
 Section rangeSpan.
 
-Import EqNotations.
-
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
-Definition rangeSpan (f : UsePos -> bool) `(r : Range rd) :
-  { p : (option RangeSig * option RangeSig) | SubRangesOf f r p } :=
-  match usePosSpan f (ups rd) with
-  | exist (Some l1, Some l2) (And3 Heqe Hu1 Hu2) =>
-      makeDividedRange r Heqe Hu1 Hu2
+Definition rangeSpan (before : nat) `(r : Range rd) :
+  { p : option RangeSig * option RangeSig | SubRangesOf r before p }.
+Proof.
+  case: (usePosSpan before (Range_sorted r)) => [[[o1 |] [o2 |]] [Heqe Hu]] /=.
+  - Case "(Some, Some)".
+    exact: (makeDividedRange r Heqe Hu).
+  - Case "(Some, None)".
+    pose rd' := {| rbeg := rbeg rd
+                 ; rend := minn before (rend rd)
+                 ; ups  := ups rd |}.
+    eexists (Some (exist Range rd' _), None).
+    split => //=.
+      exact/geq_minr.
+    exact/geq_minl.
+  - Case "(None, Some)".
+    pose rd' := {| rbeg := maxn before (rbeg rd)
+                 ; rend := rend rd
+                 ; ups  := ups rd |}.
+    eexists (None, Some (exist Range rd' _)).
+    split => //=.
+      exact/leq_maxr.
+    exact/leq_maxl.
 
-  | exist (Some _, None) (conj Heqe Hu) =>
-      exist (SubRangesOf f r)
-        (Some (exist Range rd r), None)
-        (conj refl_equal (rew <- Heqe in Hu))
-
-  | exist (None, Some _) (conj Heqe Hu) =>
-      exist (SubRangesOf f r)
-        (None, Some (exist Range rd r))
-        (conj refl_equal (eq_rect_r (fun x => ~~ f (NE_head x)) Hu Heqe))
-
-  | exist (None, None) Hu => ex_falso_quodlibet Hu
-  end.
+  Grab Existential Variables.
+  - rewrite -Heqe in Hu.
+    rewrite /rd'.
+    case E: (before <= rbeg rd).
+      rewrite (maxn_idPr E).
+      replace {| rbeg := rbeg rd; rend := rend rd; ups := ups rd |}
+        with rd => //.
+      by destruct rd.
+    have H: rbeg rd <= before.
+      move/negbT in E.
+      rewrite -ltnNge in E.
+      exact/ltnW.
+    rewrite (maxn_idPl H).
+    exact: (Range_change_beg r Hu).
+  - rewrite -Heqe in Hu.
+    rewrite /rd'.
+    case E: (before <= rend rd).
+      rewrite (minn_idPl E).
+      exact: (Range_change_end r Hu).
+    have H: rend rd <= before.
+      move/negbT in E.
+      rewrite -ltnNge in E.
+      exact/ltnW.
+    rewrite (minn_idPr H).
+    replace {| rbeg := rbeg rd; rend := rend rd; ups := ups rd |}
+      with rd => //.
+    by destruct rd.
+Defined.
 
 End rangeSpan.
 
-Lemma rangeSpan_spec (f : UsePos -> bool) `(r : Range rd) :
-  forall res, res = rangeSpan f r -> res.1 <> (None, None).
-Proof. elim: rd r => rbeg rend ups r [[[o| ] [o0| ]] res] Heq //. Qed.
+Lemma rangeSpan_spec (before : nat) `(r : Range rd) :
+  forall res, res = rangeSpan before r -> res.1 <> (None, None).
+Proof. case: rd => _ _ _ _ [[[_| ] [_| ]] _] _ // in r *. Qed.
 
+(*
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
-Definition DefiniteSubRangesOf (f : UsePos -> bool) `(r : Range rd) :=
+Definition DefiniteSubRangesOf (before : nat) `(r : Range rd) :=
   { p : (RangeSig * RangeSig)
-  | let (r1, r2) := p in DividedRange r f r1.2 r2.2 }.
+  | let (r1, r2) := p in DividedRange r before r1.2 r2.2 }.
 
 (** [splitRange] differs from [rangeSpan] in that the first and last elements
     must not be eligible for splitting, and therefore the [Range] will always
     be split into two definite sub-ranges. *)
-Definition splitRange (f : UsePos -> bool) `(r : Range rd)
+Definition splitRange (before : nat) `(r : Range rd)
   (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
   DefiniteSubRangesOf f r.
 Proof.
@@ -427,7 +464,8 @@ Proof.
   - Case "(Some, None)".
     exfalso; destruct s.
     destruct Hl as [H1 H2 H3].
-    rewrite -H in H0.
+    rewrite -H in H0. simpl in *.
+    move: (Range_sorted r).
     move: (NE_Forall_member_spec H0 H2).
     by move: H3 => /negbTE -> /=.
   - Case "(None, Some)".
@@ -461,6 +499,7 @@ Proof.
     by [].
   by move: (Range_bounded r2.2).
 Qed.
+*)
 
 Module RangeTests.
 
@@ -496,8 +535,7 @@ Defined.
 
 Definition testRangeSpan (start finish : nat) (Hodd : odd start)
   (H : start < finish) (before : nat) :=
-  let f u := uloc u < before in
-  let r := (rangeSpan f (generateRange Hodd H).2).1 in
+  let r := (rangeSpan before (generateRange Hodd H).2).1 in
   (option_map (fun x => ups x.1) (fst r),
    option_map (fun x => ups x.1) (snd r)).
 

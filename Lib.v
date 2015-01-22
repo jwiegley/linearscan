@@ -204,6 +204,12 @@ Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
 Definition odd_add_2 {n} : odd n -> odd n.+2.
 Proof. by move=> H; rewrite odd_succ_succ. Defined.
 
+Lemma leq_leq : forall n m o, n <= m <= o -> n <= o.
+Proof.
+  move=> n m o /andP [H1 H2].
+  exact: (leq_trans H1 H2).
+Qed.
+
 Lemma leq_min : forall m n p, n <= p -> minn m n <= p.
 Proof. intros. rewrite geq_min. by elim: (m <= p). Qed.
 

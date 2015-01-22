@@ -18,7 +18,7 @@ Include MBlocks Mach.
     specification the linear register allocation algorithm, but which are not
     directly used in implementing the algorithm. *)
 
-Module SortednessProof.
+Module UnhandledSorted.
 
 (* SSReflect doesn't provide a scheme for determining sortedness, so we
    confine the import of the Sorted library to this section. *)
@@ -93,7 +93,7 @@ Proof.
   by [].
 Qed.
 
-Theorem unhandled_sorted `(st : ScanState sd) :
+Theorem unhandled_sorted `(st : ScanState b sd) :
   StronglySorted (lebf (@snd _ _)) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case.
@@ -102,8 +102,7 @@ Proof.
   - Case "ScanState_newUnhandled".
     exact/StronglySorted_insert_spec/StronglySorted_widen/IHst.
 
-  - Case "ScanState_newInactive".
-    apply: StronglySorted_widen. exact: IHst.
+  - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". inv IHst.
@@ -113,15 +112,60 @@ Proof.
   - Case "ScanState_moveInactiveToHandled".  exact: IHst.
 Qed.
 
-End SortednessProof.
+End UnhandledSorted.
 
-Theorem allocated_regs_are_unique `(st : ScanState sd) :
+(*
+Section WorkRemaining.
+
+Definition ScanStateDesc_leq (sd1 sd2 : ScanStateDesc) : bool :=
+  if unhandled sd1 is x :: xs
+  then if unhandled sd2 is y :: ys
+       then (snd x < snd y) ||
+            ((snd x == snd y) &&
+               (size [seq i <- xs | fst x == fst i] <=
+                size [seq i <- ys | fst y == fst i])
+       else false
+  else true.
+
+Definition ScanStateDesc_ltn (r : rel nat) (dflt : bool)
+  (sd1 sd2 : ScanStateDesc) : bool :=
+  if unhandled sd1 is x :: xs
+  then if unhandled sd2 is y :: ys
+       then (snd x < snd y ||
+            ((snd x == snd y) &&
+               (size [seq i <- xs | fst x == fst i] <
+                size [seq i <- ys | fst y == fst i]))
+       else false
+  else if unhandled sd2 is y :: ys
+       then true
+       else false.
+
+Definition ScanStateDesc_lt : ScanStateDesc -> ScanStateDesc -> Prop :=
+  ScanStateDesc_ltn.
+
+(* Theorem unhandled_uncons `(st : ScanState sd) : *)
+(*   let unh := unhandled sd in *)
+(*   forall x xs, x :: xs = unh -> work_left xs <, work_left (x :: xs). *)
+
+(* Theorem unhandled_insert `(st : ScanState sd) (xid : IntervalId sd) (n : nat) : *)
+(*   let unh := unhandled sd in *)
+(*   forall (beg : nat) (xs : seq (IntervalId sd * nat)), *)
+(*   if unh is (_, beg) :: xs *)
+(*   then beg < n *)
+(*          -> let unh' := insert (lebf (@snd _ _)) (xid, n) unh in *)
+(*             work_left unh' == work_left unh *)
+(*   else True. *)
+
+End WorkRemaining.
+*)
+
+Theorem allocated_regs_are_unique `(st : ScanState b sd) :
   uniq ([ seq snd i | i <- active sd ]).
 Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil".                   by [].
   - Case "ScanState_newUnhandled".          by rewrite -map_comp.
-  - Case "ScanState_newInactive".           by rewrite -map_comp.
+  - Case "ScanState_finalize".                exact: IHst.
   - Case "ScanState_setInterval".           exact: IHst.
   - Case "ScanState_setFixedIntervals".     exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by apply/andP.
@@ -134,7 +178,7 @@ Qed.
 (** The number of active or inactive registers cannot exceed the number of
     registers available (or, if there are more register than intervals to be
     allocated, the number of intervals). *)
-Theorem limit_active_registers `(st : ScanState sd) :
+Theorem limit_active_registers `(st : ScanState b sd) :
   size (active sd) <= minn maxReg (nextInterval sd).
 (* jww (2014-10-31): Implementing this will need supporting evidence from the
    algorithm; I don't think the constructors give us enough detail to
@@ -192,7 +236,7 @@ Proof.
   uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
 Qed.
 
-Theorem lists_are_unique `(st : ScanState sd) : uniq (all_state_lists sd).
+Theorem lists_are_unique `(st : ScanState b sd) : uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists
           /unhandledIds /activeIds /inactiveIds /handledIds /=.
@@ -216,27 +260,7 @@ Proof.
     apply/perm_map.
     by rewrite insert_perm.
 
-  - Case "ScanState_newInactive".
-    rewrite /= /inact.
-    rewrite uniq_catC uniq_catA uniq_catC uniq_catA cat_cons cons_uniq.
-    apply/andP; split.
-      rewrite -!map_comp /funcomp -!map_cat !mem_cat.
-      apply/norP; split.
-        rewrite /= /widen_id.
-        move: (no_ord_max [seq fst i | i <- inactive sd ++ handled sd]).
-        rewrite -!map_comp /funcomp.
-        exact.
-      apply/norP; split.
-        move: (no_ord_max [seq fst i | i <- unhandled sd]).
-        rewrite -!map_comp /funcomp.
-        exact.
-      move: (no_ord_max [seq fst i | i <- active sd]).
-      rewrite -!map_comp /funcomp.
-      exact.
-    rewrite uniq_catC uniq_catA !map_widen_fst -!map_cat map_inj_uniq.
-      by rewrite !map_cat.
-    exact: widen_ord_inj.
-
+  - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive".
@@ -256,7 +280,7 @@ Proof.
     exact: (@move_inactive_to_handled _ x IHst H).
 Qed.
 
-Theorem actives_are_unique `(st : ScanState sd) : uniq (active sd).
+Theorem actives_are_unique `(st : ScanState b sd) : uniq (active sd).
 Proof.
   pose H1 := allocated_regs_are_unique st.
   pose H2 := lists_are_unique st.
@@ -270,7 +294,7 @@ Proof.
   exact: uniq_proj.
 Qed.
 
-Theorem all_intervals_represented `(st : ScanState sd) :
+Theorem all_intervals_represented `(st : ScanState b sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
   rewrite /all_state_lists
@@ -282,9 +306,7 @@ Proof.
   - Case "ScanState_newUnhandled".
     by rewrite /unh insert_size !size_map addSn.
 
-  - Case "ScanState_newInactive".
-    by rewrite !size_map addSn !addnS.
-
+  - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
 
@@ -312,8 +334,9 @@ Proof.
     exact: has_size.
 Qed.
 
-Theorem ScanState_newUnhandled_spec `(st : ScanState sd) : forall d i,
-  unhandledExtent (getScanStateDesc (@ScanState_newUnhandled _ st d i)) ==
+(*
+Theorem ScanState_newUnhandled_spec `(st : ScanState b sd) : forall d i,
+  unhandledExtent (getScanStateDesc (@ScanState_newUnhandled b _ st d i _)) ==
   unhandledExtent sd + intervalExtent i.
 Proof.
   move=> d i /=.
@@ -384,6 +407,7 @@ Proof.
     exact: in_sumlist.
   exact: (in_notin Hin).
 Qed.
+*)
 
 (*
 Lemma in_rem : forall (a : eqType) (y x : a) xs,
@@ -423,7 +447,6 @@ Proof.
     - exact: IHst.
     - exact: widen_fst_inj.
     - exact: widen_fst_inj.
-  - Case "ScanState_newInactive". by [].
   - Case "ScanState_setInterval". by [].
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by [].
@@ -442,5 +465,25 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". by [].
 Qed.
 *)
+
+Lemma beginnings `(st : ScanState b sd) : forall uid beg,
+  (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg.
+Proof.
+  move=> uid beg Hin.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    admit.
+  - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_setInterval".
+    admit.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
+  - Case "ScanState_moveUnhandledToActive".
+    admit.
+  - Case "ScanState_moveActiveToInactive". exact: IHst.
+  - Case "ScanState_moveActiveToHandled". exact: IHst.
+  - Case "ScanState_moveInactiveToActive". exact: IHst.
+  - Case "ScanState_moveInactiveToHandled". exact: IHst.
+Qed.
 
 End MLinearSpec.
