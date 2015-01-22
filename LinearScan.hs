@@ -15,14 +15,14 @@ module LinearScan
       -- * Variables
     , VarInfo(..)
     , VarKind(..)
-    , Allocation(..)
+    , VarAction(..)
     , PhysReg
     ) where
 
 import qualified LinearScan.Main as LS
 import LinearScan.Main
     ( VarKind(..)
-    , Allocation(..)
+    , VarAction(..)
     , OpKind(..)
     , PhysReg
     )
@@ -59,12 +59,15 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo o v = OpInfo
     { opKind      :: o -> OpKind
     , varRefs     :: o -> [v]
-    , applyAllocs :: o -> [(Int, PhysReg)] -> o
+    , applyAllocs :: o -> [(Int, VarAction)] -> o
     , regRefs     :: o -> [PhysReg]
     }
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
+
+deriving instance Eq VarAction
+deriving instance Show VarAction
 
 fromOpInfo :: OpInfo o v -> LS.OpInfo o v
 fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b c d
@@ -109,4 +112,5 @@ allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
                 "Register is already assigned (" ++ show n ++ ")"
             LS.ERegisterAssignmentsOverlap n ->
                 "Register assignments overlap (" ++ show n ++ ")"
+            LS.EFuelExhausted -> "Fuel was exhausted"
         Right z -> Right z

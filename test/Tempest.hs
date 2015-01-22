@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wall -fno-warn-unused-binds -Werror #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
@@ -10,13 +12,11 @@
 module Tempest where
 
 -- import Debug.Trace
-import Compiler.Hoopl
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Free
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.State
 import Data.Foldable
-import Data.Map
+import Data.IntMap
 import Data.Monoid
 import LinearScan hiding (Call)
 import Test.Hspec
@@ -35,13 +35,13 @@ import Test.Hspec
 --     regAlloc :: Procedure a IRVar -> Procedure a Reg
 ------------------------------------------------------------------------------
 
-data AtomicGroup = AtomicGroup deriving Show
+data AtomicGroup = AtomicGroup deriving (Eq, Show)
 type Name = String
 
 newtype Linearity = Linearity { isLinear :: Bool }
   deriving (Eq, Show)
 
-data Test = Test deriving Show
+data Test = Test deriving (Eq, Show)
 
 data CConv
   = CConvC {
@@ -50,9 +50,9 @@ data CConv
       ccIsBrack  :: Bool
     }
   | InlineC
-  deriving Show
+  deriving (Eq, Show)
 
-data Constant = Constant deriving Show
+data Constant = Constant deriving (Eq, Show)
 
 type Src a      = a
 
@@ -68,12 +68,14 @@ type Failure a  = a
 -- | Type synonym for indicating an external name
 type Imported a = a
 
-data Reg = Reg Int deriving Show
+data Reg = Reg Int deriving (Eq, Show)
+
+data Label = TLabel deriving (Eq, Show)
 
 data Instruction reg
   = Add          reg reg reg
-  | Endt
-  deriving (Show, Foldable)
+  | Nop
+  deriving (Eq, Show, Foldable, Functor)
 
 data IRInstr v e x where
   Label         :: Label -> IRInstr v C O
@@ -94,6 +96,8 @@ data IRInstr v e x where
                    Success Label -> Failure Label -> IRInstr v O C
   Strb          :: Src v -> Dst v -> Success Label -> Failure Label -> IRInstr v O C
   ReturnInstr   :: [Reg] -> Instruction v -> IRInstr v O C
+
+deriving instance Eq v => Eq (IRInstr v e x)
 
 showInstr :: (Show v) => Instruction v -> String
 showInstr i = show i ++ foldMap (\r -> " " ++ show r) i
@@ -130,43 +134,62 @@ instance Show v => Show (IRInstr v e x) where
                             ++ " " ++ show f ++ "; @jmp " ++ show t
   show (ReturnInstr liveRegs i)   = "\t@return " ++ show liveRegs ++ " " ++ showInstr i
 
+newtype IRInstrWrap e x v = IRInstrWrap { getIRInstrWrap :: IRInstr v e x }
+
+instance Functor (IRInstrWrap e x) where
+    fmap f (IRInstrWrap m) = IRInstrWrap (go m)
+      where
+        go (Label x)                     = Label x
+        go (Alloc ag msrc dst)           = Alloc ag (f <$> msrc) (f dst)
+        go (Reclaim src)                 = Reclaim (f src)
+        go (Instr i)                     = Instr (fmap f i)
+        go (LoadConst c dst)             = LoadConst c (f dst)
+        go (Move src dst)                = Move (f src) (f dst)
+        go (Copy src dst)                = Copy (f src) (f dst)
+        go (Save lin src x)              = Save lin (f src) x
+        go (Restore x1 x2 dst)           = Restore x1 x2 (f dst)
+        go (SaveOffset lin off src x)    = SaveOffset lin off (f src) x
+        go (RestoreOffset lin off x dst) = RestoreOffset lin off x (f dst)
+        go (Jump x)                      = Jump x
+        go (Branch x1 cond x2 x3)        = Branch x1 (f cond) x2 x3
+        go (Stwb x1 src dst x2 x3)       = Stwb x1 (f src) (f dst) x2 x3
+        go (Strb src dst x2 x3)          = Strb (f src) (f dst) x2 x3
+        go (Call cc i)                   = Call cc (fmap f i)
+        go (ReturnInstr liveInRegs i)    = ReturnInstr liveInRegs (fmap f i)
+
+newtype NodeWrapVar a e x v = NodeWrapVar { getNodeWrapVar :: Node a v e x }
+
+instance Functor (NodeWrapVar v e x) where
+    fmap f (NodeWrapVar (Node instr meta)) =
+        NodeWrapVar (Node (getIRInstrWrap . fmap f . IRInstrWrap $ instr) meta)
+
 data Node a v e x = Node
   { _nodeIRInstr :: IRInstr v e x
   , _nodeMeta    :: a
-  } deriving Show
+  } deriving (Eq, Show)
 
-data PNode v e x a = PNode (Node a v e x)
+data C = C
+data O = O
+
+data PNode v e x a = PNode (Node a v e x) deriving (Eq, Show)
 
 instance Functor (PNode v e x) where
     fmap f (PNode (Node x y)) = PNode (Node x (f y))
+
+data PBlock v e x a = PBlock (Node a v e x) deriving (Eq, Show)
+
+data Block v e x a = Block { getBlock :: [PNode v e x a] } deriving (Eq, Show)
 
 nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
 nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
 
-instance NonLocal (Node a v) where
-  entryLabel (Node (Label l)         _) = l
-  successors (Node (Jump l)          _) = [l]
-  successors (Node (Branch _ _ t f)  _) = [t, f]
-  successors (Node (Stwb _ _ _ s f)  _) = [s, f]
-  successors (Node (Strb _ _ s f)    _) = [s, f]
-  successors (Node (ReturnInstr _ _) _) = []
-
-data Procedure a v = Procedure
-  { procEntry       :: Label,
-    procCConv       :: CConv,
-    procNamedLabels :: Map Label Name,
-    procBody        :: Graph (Node a v) C C
-  }
-
-data Spillability = MaySpill | Unspillable deriving Show
-
-data AtomKind = Atom deriving Show
-data Var = Var deriving Show
+data AtomKind = Atom deriving (Eq, Show)
+data Var = Var deriving (Eq, Show)
 
 data IRVar' = PhysicalIV !Reg
-            | VirtualIV !Int !AtomKind !Spillability
-            deriving Show
+            | VirtualIV !Int !AtomKind
+            deriving (Eq, Show)
 
 -- | Virtual IR variable together with an optional AST variable
 data IRVar =
@@ -175,48 +198,10 @@ data IRVar =
   , _ivSrc :: !(Maybe Var) -- ^ An optional corresponding AST variable for
                        -- informational purposes.
   }
-  deriving Show
+  deriving (Eq, Show)
 
-type Input a  = Procedure a IRVar
-type Output a = Procedure a Reg
-
-lblMapOfCC :: Graph' block n C C -> LabelMap (block n C C)
-lblMapOfCC (GMany NothingO lm NothingO) = lm
-
-asmTest body result = do
-    let entry = runSimpleUniqueMonad freshLabel
-    let p b = Procedure
-            { procEntry = entry
-            , procCConv = InlineC
-            , procNamedLabels = singleton entry "entry"
-            , procBody =
-                blockGraph
-                  (blockJoin
-                    (Node (Label entry) ())
-                    b
-                    (Node (ReturnInstr [] Endt) ()))
-            }
-    let blocks b =
-            postorder_dfs_from (lblMapOfCC (procBody (p b))) entry
-
-    let binfo = BlockInfo
-            { blockOps    = undefined
-            , setBlockOps = undefined
-            }
-    let oinfo = OpInfo
-            { opKind  = const Normal
-            , varRefs = undefined
-            , regRefs = const []
-            }
-    let vinfo = VarInfo
-            { varId       = undefined
-            , varKind     = const Temp
-            , regRequired = const False
-            }
-
-    let body'   = blocks $ compile body
-    let result' = render result
-    case allocate binfo oinfo vinfo body' of
+asmTest (compile -> body) (compile -> result) =
+    case allocate binfo oinfo vinfo [body] of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
             -- print ("----" :: String)
@@ -224,15 +209,59 @@ asmTest body result = do
             -- print ("----" :: String)
             -- print result
             -- print ("----" :: String)
-            -- print result'
-            -- print ("----" :: String)
-            length xs `shouldBe` length result'
+            -- length xs `shouldBe` length result
 
             let test x y = x `shouldBe` y
-            zipWithM_ shouldBe xs result'
+            zipWithM_ shouldBe xs [result]
+  where
+    binfo = BlockInfo
+        { blockOps    = getBlock
+        , setBlockOps = \b new -> b { getBlock = new }
+        }
+    oinfo = OpInfo
+        { opKind      = const Normal
+        , varRefs     = fst . convertNode
+        , applyAllocs = \o m -> conv (fromList m) o
+        , regRefs     = snd . convertNode
+        }
+    vinfo = VarInfo
+        { varId       = \(_, v) -> case v of
+               IRVar (VirtualIV n _) _ -> n
+               _ -> error $ "Unexpected variable: " ++ show v
+        , varKind     = fst
+        , regRequired = const True
+        }
+
+    conv m (PNode (Node i meta)) = PNode $ Node (convInstr m i) meta
+    convInstr m = getIRInstrWrap . fmap (assignVar m) . IRInstrWrap
+
+assignVar :: IntMap VarAction -> IRVar -> IRVar
+assignVar _ v@(IRVar (PhysicalIV _) _) = v
+assignVar m (IRVar (VirtualIV n _) x) = case Data.IntMap.lookup n m of
+    Just (RegLoad r) -> IRVar (PhysicalIV (Reg r)) x
+    a -> error $ "Unexpected allocation " ++ show a
+             ++ " for variable " ++ show n
+
+convertNode :: Show a => PNode IRVar O O a -> ([(VarKind, IRVar)], [PhysReg])
+convertNode (PNode (Node (Instr i) _)) = go i
+  where
+    go :: Instruction IRVar -> ([(VarKind, IRVar)], [PhysReg])
+    go (Add a b c) = mkv Input a <> mkv Input b <> mkv Output c
+    go x = error $ "convertNode.go: Unexpected " ++ show x
+
+    mkv :: VarKind -> IRVar -> ([(VarKind, IRVar)], [PhysReg])
+    mkv _ (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
+    mkv k v = ([(k, v)], [])
+
+convertNode x = error $ "convertNode: Unexpected" ++ show x
 
 var :: Int -> IRVar
-var i = IRVar { _ivVar = VirtualIV i Atom MaySpill
+var i = IRVar { _ivVar = VirtualIV i Atom
+              , _ivSrc = Nothing
+              }
+
+reg :: Int -> IRVar
+reg i = IRVar { _ivVar = PhysicalIV (Reg i)
               , _ivSrc = Nothing
               }
 
@@ -273,153 +302,48 @@ v33 = var 33
 v34 = var 34
 v35 = var 35
 
+r0  = reg 0
+r1  = reg 1
+r2  = reg 2
+r3  = reg 3
+r4  = reg 4
+r5  = reg 5
+r6  = reg 6
+r7  = reg 7
+r8  = reg 8
+r9  = reg 9
+r10 = reg 10
+r11 = reg 11
+r12 = reg 12
+r13 = reg 13
+r14 = reg 14
+r15 = reg 15
+r16 = reg 16
+r17 = reg 17
+r18 = reg 18
+r19 = reg 19
+r20 = reg 20
+r21 = reg 21
+r22 = reg 22
+r23 = reg 23
+r24 = reg 24
+r25 = reg 25
+r26 = reg 26
+r27 = reg 27
+r28 = reg 28
+r29 = reg 29
+r30 = reg 30
+r31 = reg 31
+r32 = reg 32
+r33 = reg 33
+r34 = reg 34
+r35 = reg 35
 
 type Program a = Free (PNode IRVar O O) a
 
-compile :: Program () -> Block (Node () IRVar) O O
-compile (Pure ()) = emptyBlock
-compile (Free (PNode (Node n x))) = blockCons (Node n ()) (compile x)
+compile :: Program () -> Block IRVar O O ()
+compile (Pure ()) = Block []
+compile (Free (PNode (Node n x))) = Block (PNode (Node n ()) : getBlock (compile x))
 
 add :: IRVar -> IRVar -> IRVar -> Program ()
 add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))
-
-
-data VarData = VarData
-    { _varId       :: Int
-    , _varKind     :: VarKind
-    , _varAlloc    :: Allocation
-    , _regRequired :: Bool
-    }
-    deriving (Eq, Show)
-
-data OpData = OpData
-    { _opId    :: Int
-    , _opMeta  :: Int
-    , _opKind  :: OpKind
-    , _varRefs :: [VarData]
-    , _regRefs :: [PhysReg]
-    }
-    deriving (Eq, Show)
-
-data BlockData = BlockData
-    { _blockId  :: Int
-    , _blockOps :: [OpData]
-    }
-    deriving (Eq, Show)
-
-data BlocksF a = BlocksF
-    { wrapBlock :: [BlockData]
-    , wrapVar   :: a
-    }
-    deriving (Eq, Show, Functor)
-
-type Blocks a = StateT Int (Free BlocksF) a
-
-instance Show a => Show (Blocks a) where
-    show x = show (runStateT x 0)
-
-alloc :: Int -> Int -> Blocks ()
-alloc v n = do
-    opid <- get
-    put (succ (succ opid))
-    lift $ Free $ BlocksF
-        [BlockData 0
-         [OpData opid 0 Normal
-          [VarData v Temp (Register n) False] []]]
-        (Pure ())
-
-allocs :: [(Int, Int)] -> Blocks ()
-allocs []         = return ()
-allocs ((v,n):xs) = alloc v n >> allocs xs
-
-op :: Blocks () -> Blocks ()
-op a = do
-    n <- get
-    put (succ (succ n))
-    lift $ Free $ BlocksF
-        [BlockData 0 [OpData
-            { _opKind  = Normal
-            , _varRefs = reduce (runStateT a 0)
-            , _regRefs = []
-            }]] (Pure ())
-  where
-    phi (BlocksF _ x) = x
-
-    reduce (Pure _) = []
-    reduce (Free (BlocksF [BlockData _ as] xs)) =
-        Prelude.concatMap _varRefs as ++ reduce xs
-    reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
-
-block :: Blocks () -> Blocks ()
-block a = do
-    n <- get
-    let m = runStateT a n
-    let ((), n') = iter phi m
-    put n'
-    lift $ Free (BlocksF [BlockData 0 (reduce m)] (Pure ()))
-  where
-    phi (BlocksF _ x) = x
-
-    reduce (Pure _) = []
-    reduce (Free (BlocksF [BlockData _ as] xs)) = as ++ reduce xs
-    reduce (Free (BlocksF _ _xs)) = error "ops: Unexpected"
-
-render :: Blocks () -> [BlockData]
-render blks = go (evalStateT blks 1)
-  where
-    go (Pure ()) = []
-    go (Free (BlocksF as xs)) = as ++ go xs
-
-
-convertBlock :: Block (Node () IRVar) C C -> BlockData
-convertBlock (BlockCC _pre body _post) =
-    BlockData
-        { _blockOps = Prelude.map convertNode (gatherNodes body)
-        }
-  where
-    gatherNodes :: Block (Node () IRVar) O O -> [Node () IRVar O O]
-    gatherNodes BNil              = []
-    gatherNodes (BMiddle node)    = [node]
-    gatherNodes (BCat left right) = gatherNodes left ++ gatherNodes right
-    gatherNodes (BSnoc blk node)  = gatherNodes blk ++ [node]
-    gatherNodes (BCons node blk)  = node : gatherNodes blk
-
-convertNode :: Node () IRVar O O -> OpData
-convertNode (Node instr _meta) =
-    let (vars, regs) = go instr in
-    OpData
-        { _opKind  = Normal
-        , _varRefs = vars
-        , _regRefs = regs
-        }
-  where
-    go :: IRInstr IRVar O O -> ([VarData], [PhysReg])
-    go (Alloc _group _msrc _dst) = undefined
-    go (Reclaim _src) = undefined
-    go (Instr i) = convertInstr i
-    go (Call _conv _i) = undefined
-    go (LoadConst _const _dst) = undefined
-    go (Move _src _dst) = undefined
-    go (Copy _src _dst) = undefined
-    go (Save _lin _src _dst) = undefined
-    go (Restore _lin _src _dst) = undefined
-    go (SaveOffset _lin _off _src _dst) = undefined
-    go (RestoreOffset _lin _off _src _dst) = undefined
-
-convertInstr :: Instruction IRVar -> ([VarData], [PhysReg])
-convertInstr = go
-  where
-    go (Add a b c) = mkv a <> mkv b <> mkv c
-    go Endt = undefined
-
-    mkv :: IRVar -> ([VarData], [PhysReg])
-    mkv (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
-    mkv (IRVar (VirtualIV n _atomkind _spillability) _) = ([conv n], [])
-      where
-        conv :: Int -> VarData
-        conv idx =
-            VarData
-                { _varId       = idx
-                , _varKind     = Temp
-                , _regRequired = False
-                }

@@ -501,6 +501,11 @@ foldOpsRev binfo f z blocks =
     Data.List.foldl' f bacc (Seq.rev (blockOps binfo blk))) z
     (Seq.rev ( blocks))
 
+countOps :: (BlockInfo a1 a2) -> (BlockList
+                       a1) -> Prelude.Int
+countOps binfo =
+  foldOps binfo (\acc x -> (Prelude.succ) acc) 0
+
 mapAccumLOps :: (BlockInfo a1 a2) -> (a3 -> a2 -> (,) 
                            a3 a2) -> a3 -> (BlockList a1) -> (,) 
                            a3 (BlockList a1)
@@ -1681,9 +1686,9 @@ handleInterval pre =
         checkActiveIntervals sd0 position)))
 
 walkIntervals :: ScanStateDesc -> Prelude.Int ->
-                            Prelude.Int -> Prelude.Either SSError
+                            Prelude.Either SSError
                             ScanStateSig
-walkIntervals sd thisPos positions =
+walkIntervals sd positions =
   (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
     (\_ -> Prelude.Left
     EFuelExhausted)
@@ -1694,9 +1699,8 @@ walkIntervals sd thisPos positions =
        (,) x s0 ->
         let {
          go = let {
-               go beg xs ss =
-                 case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce thisPos)
-                        beg of {
+               go curPos beg xs ss =
+                 case Eqtype.eq_op Ssrnat.nat_eqType curPos beg of {
                   Prelude.True ->
                    let {ssinfo = Build_SSInfo sd __} in
                    case IState.runIState (handleInterval sd)
@@ -1708,15 +1712,13 @@ walkIntervals sd thisPos positions =
                        let {ss' = thisDesc sd ssinfo'} in
                        case xs of {
                         [] -> Prelude.Right ss';
-                        (:) y ys -> go (Prelude.snd y) ys ss'}}};
+                        (:) y ys -> go curPos (Prelude.snd y) ys ss'}}};
                   Prelude.False -> Prelude.Right ss}}
               in go}
         in
-        case unsafeCoerce go (Prelude.snd x) s0 sd of {
+        case unsafeCoerce go (Prelude.snd x) (Prelude.snd x) s0 sd of {
          Prelude.Left err -> Prelude.Left err;
-         Prelude.Right ss ->
-          walkIntervals ( ss) ((Prelude.succ) ((Prelude.succ)
-            thisPos)) n}};
+         Prelude.Right ss -> walkIntervals ( ss) n}};
      Prelude.Nothing -> Prelude.Right
       (packScanState InUse sd)})
     positions
@@ -1732,8 +1734,8 @@ mainAlgorithm binfo oinfo vinfo =
         stbind (\x2 ->
           stbind (\ssig ->
             stbind (\blocks ->
-              case walkIntervals ( ssig) ((Prelude.succ) 0)
-                     (Prelude.length blocks) of {
+              case walkIntervals ( ssig) ((Prelude.succ)
+                     (countOps binfo blocks)) of {
                Prelude.Left err -> error_ err;
                Prelude.Right ssig' ->
                 stbind (\x3 ->

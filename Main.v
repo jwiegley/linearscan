@@ -44,7 +44,7 @@ Definition mainAlgorithm {blockType opType varType : Set}
 
   (* allocate registers *)
   blocks <<- iget SSError ;;
-  match walkIntervals ssig.2 1 (NE_length blocks) with
+  match walkIntervals ssig.2 (countOps binfo blocks).+1 with
   | inl err => error_ err
   | inr ssig' =>
       (* jww (2015-01-22): This is a critical piece which is still missing. *)

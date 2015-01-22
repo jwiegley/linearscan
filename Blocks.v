@@ -122,6 +122,8 @@ Definition foldOpsRev {a} (f : a -> opType -> a) (z : a)
   foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
         z (rev blocks).
 
+Definition countOps : BlockList -> nat := foldOps (fun acc _ => acc.+1) 0.
+
 Definition mapAccumLOps {a} (f : a -> opType -> (a * opType)) :
   a -> BlockList -> a * BlockList :=
   NE_mapAccumL (fun z blk =>

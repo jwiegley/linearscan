@@ -389,15 +389,15 @@ Require Import Coq.Program.Wf.
    final result will be a [ScanState] whose [handled] list represents the
    final allocations for each interval. *)
 Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
-  (thisPos positions : nat) : SSError + ScanStateSig InUse :=
+  (positions : nat) : SSError + ScanStateSig InUse :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
   if positions is S n
   then match List.destruct_list (unhandled sd) with
        | inleft (existT x (exist xs H)) =>
-         let fix go beg xs ss :=
-             if thisPos == beg
+         let fix go curPos beg xs ss :=
+             if curPos == beg
              then let ssinfo :=
                       {| thisDesc  := sd
                        ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
@@ -408,7 +408,7 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
                       let ss' := exist _ (thisDesc ssinfo')
                                          (thisState ssinfo') in
                       (* A [ScanState InUse] may not insert new unhandled
-                         intervals at the same position as [thisPos], and so
+                         intervals at the same position as [curPos], and so
                          even though [unhandled sd] may have been changed by
                          the call to [handleInterval], it will not have
                          changed it with respect to subsequent intervals at
@@ -418,13 +418,13 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
                          in [unhandled sd] when [go] is next evaluated. *)
                       match xs with
                       | [::]    => inr ss'
-                      | y :: ys => go (snd y) ys ss'
+                      | y :: ys => go curPos (snd y) ys ss'
                       end
                   end
              else inr ss in
-         match go (snd x) xs (exist _ sd st) with
+         match go (snd x) (snd x) xs (exist _ sd st) with
          | inl err => inl err
-         | inr ss  => walkIntervals ss.2 thisPos.+2 n
+         | inr ss  => walkIntervals ss.2 n
          end
        | inright _ => inr (packScanState st)
        end
