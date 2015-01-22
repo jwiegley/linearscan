@@ -8,3 +8,9 @@ display label k ss@(Build_SSInfo sd _) =
         x@(Prelude.Right (_, Build_SSInfo sd' _)) ->
             trace (label GHC.Base.++ " - sd': "
                          GHC.Base.++ Prelude.show (f sd')) x
+
+disp :: Prelude.Show a => Prelude.String -> a -> a
+disp label x = trace (label GHC.Base.++ ": " GHC.Base.++ Prelude.show x) x
+
+disp :: Prelude.String -> GHC.Base.Int -> GHC.Base.Int
+disp label x = trace (label GHC.Base.++ ": " GHC.Base.++ Prelude.show x) x

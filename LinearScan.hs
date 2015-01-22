@@ -113,4 +113,6 @@ allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
             LS.ERegisterAssignmentsOverlap n ->
                 "Register assignments overlap (" ++ show n ++ ")"
             LS.EFuelExhausted -> "Fuel was exhausted"
+            LS.EUnexpectedNoMoreUnhandled ->
+                "The unexpected happened: no more unhandled intervals"
         Right z -> Right z

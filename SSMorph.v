@@ -147,6 +147,10 @@ Proof.
 Defined.
 
 Definition weakenHasLen {pre} :
+  forall sd, SSMorphHasLen pre sd -> SSMorph pre sd.
+Proof. by move=> ? [[?]]. Defined.
+
+Definition weakenHasLen_ {pre} :
   SState pre SSMorphHasLen SSMorph unit.
 Proof.
   constructor. intros HS.
@@ -157,6 +161,19 @@ Proof.
   - exact: thisDesc0.
   - exact: thisHolds0.
   - by [].
+Defined.
+
+Definition strengthenHasLen {pre} :
+  forall sd, SSMorph pre sd -> option (SSMorphHasLen pre sd).
+Proof.
+  move=> sd H.
+  case E: (unhandled sd).
+    exact: None.
+  apply: Some _.
+  constructor.
+    constructor. exact.
+    rewrite E /=. by [].
+  rewrite E /=. by [].
 Defined.
 
 Definition withCursor {P Q a pre} `{HasWork P}

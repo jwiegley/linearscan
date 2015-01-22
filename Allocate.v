@@ -151,7 +151,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
-      weakenHasLen ;;;
+      weakenHasLen_ ;;;
       return_ None
     else
       (* // spill intervals that currently block reg
@@ -394,40 +394,46 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
   if positions is S n
-  then match List.destruct_list (unhandled sd) with
-       | inleft (existT x (exist xs H)) =>
-         let fix go curPos beg xs ss :=
-             if curPos == beg
-             then let ssinfo :=
-                      {| thisDesc  := sd
-                       ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
-                       ; thisState := st |} in
-                  match IState.runIState SSError handleInterval ssinfo with
-                  | inl err => inl err
-                  | inr (_, ssinfo') =>
-                      let ss' := exist _ (thisDesc ssinfo')
-                                         (thisState ssinfo') in
-                      (* A [ScanState InUse] may not insert new unhandled
-                         intervals at the same position as [curPos], and so
-                         even though [unhandled sd] may have been changed by
-                         the call to [handleInterval], it will not have
-                         changed it with respect to subsequent intervals at
-                         the same position.  Thus, we may safely make the
-                         assumption that if another interval at the same
-                         position exists in [xs], then it will also be there
-                         in [unhandled sd] when [go] is next evaluated. *)
-                      match xs with
-                      | [::]    => inr ss'
-                      | y :: ys => go curPos (snd y) ys ss'
-                      end
-                  end
-             else inr ss in
-         match go (snd x) (snd x) xs (exist _ sd st) with
-         | inl err => inl err
-         | inr ss  => walkIntervals ss.2 n
-         end
-       | inright _ => inr (packScanState st)
-       end
+  then let fix go count ss :=
+    if count is S cnt
+    then
+      match IState.runIState SSError handleInterval ss with
+      | inl err => inl err
+      | inr (_, ss') =>
+        (* A [ScanState InUse] may not insert new unhandled intervals at the
+           same position as [curPos], and so even though [unhandled sd] may
+           have been changed by the call to [handleInterval], it will not
+           have changed it with respect to subsequent intervals at the same
+           position.  Thus, we may safely make the assumption that if
+           another interval at the same position exists in [xs], then it
+           will also be there in [unhandled sd] when [go] is next
+           evaluated. *)
+        match strengthenHasLen (thisHolds ss') with
+        | None => if cnt is S _
+                  then inl EUnexpectedNoMoreUnhandled
+                  else inr ss'
+        | Some holds' =>
+            go cnt {| thisDesc  := thisDesc ss'
+                    ; thisHolds := holds'
+                    ; thisState := thisState ss' |}
+        end
+      end
+    else inr {| thisDesc  := thisDesc ss
+              ; thisHolds := weakenHasLen (thisHolds ss)
+              ; thisState := thisState ss |} in
+
+    match List.destruct_list (unhandled sd) with
+    | inright _ => inr (packScanState st)
+    | inleft (existT (_, pos) (exist _ H)) =>
+        match go (count (fun x => snd x == pos) (unhandled sd))
+                 {| thisDesc  := sd
+                  ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
+                  ; thisState := st |} with
+        | inl err => inl err
+        | inr ss  => walkIntervals (thisState ss) n
+        end
+    end
+
   else (* jww (2015-01-20): It should be possible, by proof, to ensure that
           the following case is impossible. *)
        inl EFuelExhausted.

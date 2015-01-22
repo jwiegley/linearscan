@@ -60,22 +60,24 @@ data SSError =
  | ERegisterAlreadyAssigned Prelude.Int
  | ERegisterAssignmentsOverlap Prelude.Int
  | EFuelExhausted
+ | EUnexpectedNoMoreUnhandled
 
 coq_SSError_rect :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
                                a1 -> (Prelude.Int -> a1) -> (Prelude.Int ->
-                               a1) -> a1 -> SSError -> a1
-coq_SSError_rect f f0 f1 f2 f3 f4 s =
+                               a1) -> a1 -> a1 -> SSError -> a1
+coq_SSError_rect f f0 f1 f2 f3 f4 f5 s =
   case s of {
    ECannotSplitSingleton x -> f x;
    ECannotSplitAssignedSingleton x -> f0 x;
    ENoIntervalsToSplit -> f1;
    ERegisterAlreadyAssigned x -> f2 x;
    ERegisterAssignmentsOverlap x -> f3 x;
-   EFuelExhausted -> f4}
+   EFuelExhausted -> f4;
+   EUnexpectedNoMoreUnhandled -> f5}
 
 coq_SSError_rec :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
                               a1 -> (Prelude.Int -> a1) -> (Prelude.Int ->
-                              a1) -> a1 -> SSError -> a1
+                              a1) -> a1 -> a1 -> SSError -> a1
 coq_SSError_rec =
   coq_SSError_rect
 
@@ -917,13 +919,23 @@ liftLen pre f _top_assumption_ =
   case _top_assumption_ of {
    Build_SSInfo x x0 -> _evar_0_ x}
 
-weakenHasLen :: ScanStateDesc -> SState 
-                           () () ()
-weakenHasLen pre hS =
+weakenHasLen_ :: ScanStateDesc -> SState 
+                            () () ()
+weakenHasLen_ pre hS =
   Prelude.Right ((,) ()
     (case hS of {
       Build_SSInfo thisDesc0 _ -> Build_SSInfo thisDesc0
        __}))
+
+strengthenHasLen :: ScanStateDesc ->
+                               ScanStateDesc -> Prelude.Maybe 
+                               ()
+strengthenHasLen pre sd =
+  let {_evar_0_ = \_ -> Prelude.Nothing} in
+  let {_evar_0_0 = \_a_ _l_ -> Prelude.Just __} in
+  case unhandled sd of {
+   [] -> _evar_0_ __;
+   (:) x x0 -> _evar_0_0 x x0}
 
 withCursor :: ScanStateDesc -> (ScanStateDesc
                          -> () -> SState a1 a2 a3) ->
@@ -1511,7 +1523,7 @@ allocateBlockedReg pre =
           stbind (\mloc ->
             stbind (\x0 ->
               stbind (\x1 -> return_ Prelude.Nothing)
-                (weakenHasLen pre))
+                (weakenHasLen_ pre))
               (case mloc of {
                 Prelude.Just n ->
                  splitCurrentInterval pre (Interval.BeforePos n);
@@ -1693,32 +1705,48 @@ walkIntervals sd positions =
     (\_ -> Prelude.Left
     EFuelExhausted)
     (\n ->
+    let {
+     go = let {
+           go count0 ss =
+             (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+               (\_ -> Prelude.Right (Build_SSInfo
+               (thisDesc sd ss)
+               __))
+               (\cnt ->
+               case IState.runIState (handleInterval sd) ss of {
+                Prelude.Left err -> Prelude.Left err;
+                Prelude.Right p ->
+                 case p of {
+                  (,) o ss' ->
+                   case strengthenHasLen sd
+                          (thisDesc sd ss') of {
+                    Prelude.Just _ ->
+                     go cnt (Build_SSInfo
+                       (thisDesc sd ss') __);
+                    Prelude.Nothing ->
+                     (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+                       (\_ -> Prelude.Right
+                       ss')
+                       (\n0 -> Prelude.Left
+                       EUnexpectedNoMoreUnhandled)
+                       cnt}}})
+               count0}
+          in go}
+    in
     case LinearScan.Utils.uncons (unhandled sd) of {
      Prelude.Just s ->
       case s of {
        (,) x s0 ->
-        let {
-         go = let {
-               go curPos beg xs ss =
-                 case Eqtype.eq_op Ssrnat.nat_eqType curPos beg of {
-                  Prelude.True ->
-                   let {ssinfo = Build_SSInfo sd __} in
-                   case IState.runIState (handleInterval sd)
-                          ssinfo of {
-                    Prelude.Left err -> Prelude.Left err;
-                    Prelude.Right p ->
-                     case p of {
-                      (,) o ssinfo' ->
-                       let {ss' = thisDesc sd ssinfo'} in
-                       case xs of {
-                        [] -> Prelude.Right ss';
-                        (:) y ys -> go curPos (Prelude.snd y) ys ss'}}};
-                  Prelude.False -> Prelude.Right ss}}
-              in go}
-        in
-        case unsafeCoerce go (Prelude.snd x) (Prelude.snd x) s0 sd of {
-         Prelude.Left err -> Prelude.Left err;
-         Prelude.Right ss -> walkIntervals ( ss) n}};
+        case x of {
+         (,) i pos ->
+          case go
+                 (Seq.count (\x0 ->
+                   Eqtype.eq_op Ssrnat.nat_eqType
+                     (Prelude.snd (unsafeCoerce x0)) (unsafeCoerce pos))
+                   (unhandled sd)) (Build_SSInfo sd __) of {
+           Prelude.Left err -> Prelude.Left err;
+           Prelude.Right ss ->
+            walkIntervals (thisDesc sd ss) n}}};
      Prelude.Nothing -> Prelude.Right
       (packScanState InUse sd)})
     positions

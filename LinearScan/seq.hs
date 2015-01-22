@@ -58,6 +58,12 @@ set_nth x0 s n y =
       (set_nth x0 s' n' y))
       n}
 
+count :: (Ssrbool.Coq_pred a1) -> ([] a1) -> Prelude.Int
+count a s =
+  case s of {
+   [] -> 0;
+   (:) x s' -> (Prelude.+) (Ssrnat.nat_of_bool (a x)) (count a s')}
+
 catrev :: ([] a1) -> ([] a1) -> [] a1
 catrev s1 s2 =
   case s1 of {
