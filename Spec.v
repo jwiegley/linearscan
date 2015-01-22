@@ -178,12 +178,11 @@ Qed.
 (** The number of active or inactive registers cannot exceed the number of
     registers available (or, if there are more register than intervals to be
     allocated, the number of intervals). *)
-Theorem limit_active_registers `(st : ScanState b sd) :
-  size (active sd) <= minn maxReg (nextInterval sd).
+(* Theorem limit_active_registers `(st : ScanState b sd) : *)
+(*   size (active sd) <= minn maxReg (nextInterval sd). *)
 (* jww (2014-10-31): Implementing this will need supporting evidence from the
    algorithm; I don't think the constructors give us enough detail to
    determine it here by induction. *)
-Abort.
 
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd;
@@ -466,24 +465,23 @@ Proof.
 Qed.
 *)
 
+(*
 Lemma beginnings `(st : ScanState b sd) : forall uid beg,
   (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg.
 Proof.
   move=> uid beg Hin.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by [].
-  - Case "ScanState_newUnhandled".
-    admit.
+  - Case "ScanState_newUnhandled". ??
   - Case "ScanState_finalize". exact: IHst.
-  - Case "ScanState_setInterval".
-    admit.
+  - Case "ScanState_setInterval". ??
   - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive".
-    admit.
+  - Case "ScanState_moveUnhandledToActive". ??
   - Case "ScanState_moveActiveToInactive". exact: IHst.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.
   - Case "ScanState_moveInactiveToHandled". exact: IHst.
 Qed.
+*)
 
 End MLinearSpec.

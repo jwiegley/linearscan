@@ -79,7 +79,7 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
           then None
           else Some (if intervalEnd current < n
                      then success
-                     else splitCurrentInterval (Some n) ;;;
+                     else splitCurrentInterval (BeforePos n) ;;;
                           moveUnhandledToActive reg ;;;
                           return_ reg)
         end in
@@ -133,7 +133,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
            assign spill slot to current
            split current before its first use position that requires a
              register *)
-      splitCurrentInterval (firstUseReqReg current) ;;;
+      splitCurrentInterval BeforeFirstUsePosReqReg ;;;
 
       (* This scenario can only occur if the beginning of the current interval
          (the current position) is less than its first use position.  Thus,
@@ -148,7 +148,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
            split current before this intersection *)
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc with
-      | Some n => splitCurrentInterval (Some n)
+      | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
       weakenStHasLenToSt ;;;
@@ -171,7 +171,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc
       with
-      | Some n => splitCurrentInterval (Some n) ;;;
+      | Some n => splitCurrentInterval (BeforePos n) ;;;
                   moveUnhandledToActive reg
       | None   => moveUnhandledToActive reg
       end ;;;
@@ -181,7 +181,7 @@ Definition morphlen_transport : forall b b',
   SSMorphLen b b' -> IntervalId b -> IntervalId b'.
 Proof.
   move=> b b'.
-  case. case=> Hdec ? ? /= _.
+  case. case=> Hdec ? (* ? *).
   exact: (widen_ord _).
 Defined.
 
@@ -231,7 +231,7 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ _ _].
+    case=> [Hinc _ (* _ _ *)].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   case: (~~ (ibeg (vnth (intervals z) o).1 <=
@@ -240,13 +240,13 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ _ _].
+    case=> [Hinc _ (* _ _ *)].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ _ _].
+  case=> [Hinc _ (* _ _ *)].
   rewrite map_widen_ord_refl.
   exact: subseq_impl_cons.
 Qed.
@@ -287,7 +287,7 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [Hinc _ _ _].
+  case: sslen'; case=> [Hinc _ (* _ _ *)].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -331,7 +331,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc)
 Obligation 2.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ _ _].
+  case=> [Hinc _ (* _ _ *)].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.

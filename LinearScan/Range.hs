@@ -7,8 +7,6 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
-import qualified LinearScan.Lib as Lib
-
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
@@ -29,20 +27,20 @@ regReq u =
 type UsePosSublistsOf =
   ((,) (Prelude.Maybe ([] UsePos)) (Prelude.Maybe ([] UsePos)))
 
-usePosSpan :: (UsePos -> Prelude.Bool) -> ([] UsePos) -> UsePosSublistsOf
-usePosSpan f l =
+usePosSpan :: Prelude.Int -> ([] UsePos) -> UsePosSublistsOf
+usePosSpan before l =
   (\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)
     (\x ->
-    let {b = f x} in
+    let {b = (Prelude.<=) ((Prelude.succ) (uloc x)) before} in
     case b of {
      Prelude.True -> (,) (Prelude.Just ((:[]) x)) Prelude.Nothing;
      Prelude.False -> (,) Prelude.Nothing (Prelude.Just ((:[]) x))})
     (\x xs ->
-    let {b = f x} in
+    let {b = (Prelude.<=) ((Prelude.succ) (uloc x)) before} in
     case b of {
      Prelude.True ->
-      let {u = usePosSpan f xs} in
-      case u of {
+      let {u = \_ -> usePosSpan before xs} in
+      case u __ of {
        (,) o x0 ->
         case o of {
          Prelude.Just l1 ->
@@ -103,28 +101,54 @@ findRangeUsePos r f =
        xs}
   in go (ups r)
 
-makeDividedRange :: (UsePos -> Prelude.Bool) -> RangeDesc -> ([] UsePos) ->
-                    ([] UsePos) ->
+makeDividedRange :: RangeDesc -> Prelude.Int -> ([] UsePos) -> ([] UsePos) ->
                     ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))
-makeDividedRange f rd l1 l2 =
+makeDividedRange rd before l1 l2 =
   case rd of {
    Build_RangeDesc rbeg0 rend0 ups0 ->
-     (\_ -> (,) (Prelude.Just (Build_RangeDesc rbeg0 ((Prelude.succ)
-      (uloc (Prelude.last l1))) l1)) (Prelude.Just (Build_RangeDesc
-      (uloc (Prelude.head l2)) rend0 l2))) __}
+     (\_ -> (,) (Prelude.Just (Build_RangeDesc rbeg0 before l1))
+      (Prelude.Just (Build_RangeDesc (uloc (Prelude.head l2)) rend0 l2))) __}
 
-rangeSpan :: (UsePos -> Prelude.Bool) -> RangeDesc ->
+rangeSpan :: Prelude.Int -> RangeDesc ->
              ((,) (Prelude.Maybe RangeDesc) (Prelude.Maybe RangeDesc))
-rangeSpan f rd =
-  case usePosSpan f (ups rd) of {
-   (,) o o0 ->
-    case o of {
-     Prelude.Just l1 ->
-      case o0 of {
-       Prelude.Just l2 -> makeDividedRange f rd l1 l2;
-       Prelude.Nothing -> (,) (Prelude.Just rd) Prelude.Nothing};
-     Prelude.Nothing ->
-      case o0 of {
-       Prelude.Just n -> (,) Prelude.Nothing (Prelude.Just rd);
-       Prelude.Nothing -> Lib.ex_falso_quodlibet}}}
+rangeSpan before rd =
+  let {_top_assumption_ = usePosSpan before (ups rd)} in
+  let {
+   _evar_0_ = \_top_assumption_0 ->
+    let {
+     _evar_0_ = \o1 _top_assumption_1 ->
+      let {_evar_0_ = \o2 -> makeDividedRange rd before o1 o2} in
+      let {
+       _evar_0_0 = \_ ->
+        let {
+         rd' = Build_RangeDesc (rbeg rd) (Prelude.min before (rend rd))
+          (ups rd)}
+        in
+        (,) (Prelude.Just rd') Prelude.Nothing}
+      in
+      case _top_assumption_1 of {
+       Prelude.Just x -> (\_ -> _evar_0_ x);
+       Prelude.Nothing -> _evar_0_0}}
+    in
+    let {
+     _evar_0_0 = \_top_assumption_1 ->
+      let {
+       _evar_0_0 = \o2 ->
+        let {
+         rd' = Build_RangeDesc (Prelude.max before (rbeg rd)) (rend rd)
+          (ups rd)}
+        in
+        (,) Prelude.Nothing (Prelude.Just rd')}
+      in
+      let {_evar_0_1 = \_ -> Prelude.error "absurd case"} in
+      case _top_assumption_1 of {
+       Prelude.Just x -> (\_ -> _evar_0_0 x);
+       Prelude.Nothing -> _evar_0_1}}
+    in
+    case _top_assumption_0 of {
+     Prelude.Just x -> _evar_0_ x;
+     Prelude.Nothing -> _evar_0_0}}
+  in
+  case _top_assumption_ of {
+   (,) x x0 -> _evar_0_ x x0 __}
 

@@ -274,59 +274,21 @@ Proof.
     by apply (leq_trans H4).
 Qed.
 
-(*
-(* jww (2014-11-11): Need to implement behavior for
-   [splitBeforeLifetimeHole]. *)
-Program Definition splitPosition `(i : Interval d) (before : option nat)
-  (splitBeforeLifetimeHole : bool) (H : ibeg i < before < iend i) :
-  option { n : nat | ibeg i < n < iend i } :=
-  let initial := firstUsePos i in
-  let final := lastUsePos i in
-  fromMaybe final (option_choose before (firstUseReqReg i)).
-Obligation 1.
-  apply/andP; split.
-    rewrite leq_max.
-    apply/orP; left.
-    exact: (Interval_beg_bounded i).
-  rewrite gtn_max.
-  apply/andP; split.
-    move: (Interval_beg_bounded i) => H1.
-    move: (Interval_end_bounded i) => H1.
-    move: (Interval_rds_bounded i) => H2.
-    apply: (leq_ltn_trans _ H1).
-    apply: (ltn_leq_trans _ H2).
-    simpl.
-    by [].
-  rewrite geq_min.
-  apply/orP; left.
-  move: (Interval_end_bounded i).
-  by move/ltnW.
-Qed.
-*)
+Inductive SplitPosition :=
+  | BeforePos of nat
+  | BeforeFirstUsePosReqReg
+  | EndOfLifetimeHole.
 
-(*
-Definition Interval_rds_size_bounded `(i : Interval d) :
-  ~~ Interval_is_singleton i -> firstUsePos i < lastUsePos i.
-Proof.
-  Interval_cases (inversion i) Case; simpl in *.
-  - Case "I_Sing".
-    rewrite -{}H => /= H.
-    move: (Range_sorted r).
-    case: (ups x) H => //= [u us] H H1.
-    inversion H1; subst.
-    by apply NE_Forall_last in H4.
-  - Case "I_Cons".
-    rewrite -{}H1 => /= H2.
-    move: (Interval_rds_bounded H) => /= {H} H1.
-    move: (Range_ups_bounded r.2) => H3.
-    move: (Range_end_bounded r.2) => H4.
-    move: (Range_beg_bounded (NE_head xs).2) => H5.
-    apply (leq_ltn_trans H3).
-    apply (ltn_trans H4).
-    apply (ltn_leq_trans H0).
-    by apply (leq_trans H5).
-Qed.
-*)
+(* Given an interval, determine its optimal split position.  If no split
+   position can be found, it means the interval may be safely spilled, and all
+   further variable references should be accessed directly from memory. *)
+Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
+  option nat :=
+  match pos with
+  | BeforePos x             => Some x
+  | BeforeFirstUsePosReqReg => firstUseReqReg i
+  | EndOfLifetimeHole       => None (* jww (2015-01-22): NYI *)
+  end.
 
 Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
 Proof.

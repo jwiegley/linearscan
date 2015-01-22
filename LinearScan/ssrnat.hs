@@ -46,6 +46,12 @@ iter n f x =
     f (iter i f x))
     n
 
+nat_of_bool :: Prelude.Bool -> Prelude.Int
+nat_of_bool b =
+  case b of {
+   Prelude.True -> (Prelude.succ) 0;
+   Prelude.False -> 0}
+
 double_rec :: Prelude.Int -> Prelude.Int
 double_rec n =
   (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))

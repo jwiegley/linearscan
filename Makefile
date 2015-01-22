@@ -1,9 +1,9 @@
 COQFLAGS = ""
 MISSING  = \
 	find . -name '*.v' ! -name Notes.v ! -name CpdtTactics.v	\
-                ! -name '*2.v'                             |		\
-		xargs egrep -i -Hn '(admit|undefined)'     |		\
-		      egrep -v 'Definition undefined'      |		\
+                ! -name '*2.v'                                   |	\
+		xargs egrep -i -Hn '(abort|admit|undefined)'     |	\
+		      egrep -v 'Definition undefined'            |	\
 		      egrep -v '(old|new)/'
 
 VFILES = $(wildcard *.v)

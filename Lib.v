@@ -204,6 +204,8 @@ Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
 Definition odd_add_2 {n} : odd n -> odd n.+2.
 Proof. by move=> H; rewrite odd_succ_succ. Defined.
 
+Definition distance (n m : nat) : nat := if n < m then m - n else n - m.
+
 Lemma leq_leq : forall n m o, n <= m <= o -> n <= o.
 Proof.
   move=> n m o /andP [H1 H2].
