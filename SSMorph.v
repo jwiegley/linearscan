@@ -20,43 +20,23 @@ Open Scope nat_scope.
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (sd1 sd2 : ScanStateDesc) : Prop := {
-    next_interval_increases :
-      nextInterval sd1 <= nextInterval sd2
-    (* work_left_decreases : *)
-    (*   work_left_for_sd sd2 <=, work_left_for_sd sd1; *)
-    (* handled_count_increases : *)
-    (*   size (handled sd1) <= size (handled sd2) *)
+    next_interval_increases : nextInterval sd1 <= nextInterval sd2
 }.
 
 Arguments next_interval_increases [sd1 sd2] _.
-(* Arguments work_left_decreases     [sd1 sd2] _. *)
-(* Arguments handled_count_increases [sd1 sd2] _. *)
 
 Program Instance SSMorph_PO : PreOrder SSMorph.
 Obligation 1. constructor; auto. Qed.
 Obligation 2.
   constructor; destruct H; destruct H0.
   - exact: (leq_trans next_interval_increases0).
-  (* - exact: (dist_leq_trans work_left_decreases1). *)
-  (* - exact: (leq_trans handled_count_increases0). *)
 Qed.
-
-Record SSMorphSt (sd1 sd2 : ScanStateDesc) : Prop := {
-    st_is_SSMorph :> SSMorph sd1 sd2(* ; *)
-
-    (* work_left_did_decrease : *)
-    (*   work_left_for_sd sd2 <, work_left_for_sd sd1 *)
-}.
 
 Record SSMorphLen (sd1 sd2 : ScanStateDesc) : Prop := {
     len_is_SSMorph :> SSMorph sd1 sd2;
 
-(*
-    transportation (x : IntervalId sd1) : IntervalId sd2 :=
-      widen_ord (next_interval_increases len_is_SSMorph) x;
-*)
-
-    unhandled_nonempty : size (unhandled sd1) > 0 -> size (unhandled sd2) > 0
+    unhandled_nonempty :
+      size (unhandled sd1) > 0 -> size (unhandled sd2) > 0
 }.
 
 Program Instance SSMorphLen_PO : PreOrder SSMorphLen.
@@ -78,11 +58,6 @@ Class HasBase P := {
 
 Program Instance SSMorphLen_HasWork : HasBase SSMorphLen.
 
-Record SSMorphStLen (sd1 sd2 : ScanStateDesc) : Prop := {
-    stlen_is_SSMorphLen :> SSMorphLen sd1 sd2;
-    stlen_is_SSMorphSt  :> SSMorphSt sd1 sd2
-}.
-
 Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
 
@@ -98,46 +73,6 @@ Class HasWork P := {
 }.
 
 Program Instance SSMorphHasLen_HasWork : HasWork SSMorphHasLen.
-
-Record SSMorphStHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
-    sthaslen_is_SSMorphSt     :> SSMorphSt sd1 sd2;
-    sthaslen_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2
-}.
-
-Program Instance SSMorphStHasLen_HasWork : HasWork SSMorphStHasLen.
-Obligation 1. destruct H. auto. Defined.
-
-(*
-Record SSMorphSplit (sd1 sd2 : ScanStateDesc) : Prop := {
-    split_is_SSMorphHasLen :> SSMorphHasLen sd1 sd2;
-
-    next_unhandled_splittable :
-      ~~ Interval_is_singleton (getInterval
-        (fst (safe_hd _ (first_nonempty split_is_SSMorphHasLen))))
-}.
-
-(* Definition newSSMorphSplit (sd : ScanStateDesc) *)
-(*   (H : size (unhandled sd) > 0) : SSMorphSplit sd sd. *)
-(* Proof. repeat (constructor; auto). Defined. *)
-
-Class IsSplittable P := {
-    ssMorphSplittable : forall sd1 sd2, P sd1 sd2 -> SSMorphSplit sd1 sd2
-}.
-
-(* Program Instance SSMorphSplit_HasWork : HasWork SSMorphSplit | 10. *)
-(* Obligation 1. destruct H. auto. Defined. *)
-Program Instance SSMorphSplit_IsSplittable : IsSplittable SSMorphSplit.
-
-Record SSMorphStSplit (sd1 sd2 : ScanStateDesc) : Prop := {
-    stsplit_is_SSMorphSt       :> SSMorphSt sd1 sd2;
-    stsplit_is_SSMorphSplit    :> SSMorphSplit sd1 sd2
-}.
-
-(* Program Instance SSMorphStSplit_HasWork : HasWork SSMorphStSplit | 10. *)
-(* Obligation 1. destruct H. auto. Defined. *)
-Program Instance SSMorphStSplit_IsSplittable : IsSplittable SSMorphStSplit.
-Obligation 1. destruct H. auto. Defined.
-*)
 
 Record SSInfo (startDesc : ScanStateDesc) P := {
     thisDesc  : ScanStateDesc;
@@ -211,8 +146,8 @@ Proof.
   exact: H.
 Defined.
 
-Definition weakenStHasLenToSt {pre} :
-  SState pre SSMorphStHasLen SSMorphSt unit.
+Definition weakenHasLen {pre} :
+  SState pre SSMorphHasLen SSMorph unit.
 Proof.
   constructor. intros HS.
   apply inr.
@@ -243,42 +178,8 @@ Proof.
   exact: Build_SSInfo.
 Defined.
 
-(*
-Lemma unhandledExtent_cons :
-  forall ni i (unh : list ('I_ni * nat)) ints fixints
-    act act' inact inact' hnd hnd',
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := unh
-     ; active           := act
-     ; inactive         := inact
-     ; handled          := hnd
-     ; intervals        := ints
-     ; fixedIntervals   := fixints
-     |} <
-  unhandledExtent
-    {| nextInterval     := ni
-     ; unhandled        := i :: unh
-     ; active           := act'
-     ; inactive         := inact'
-     ; handled          := hnd'
-     ; intervals        := ints
-     ; fixedIntervals   := fixints
-     |}.
-Proof.
-  intros.
-  induction unh;
-  unfold unhandledExtent;
-  simpl; destruct i as [i beg];
-  pose (Interval_extent_nonzero (vnth ints i).2);
-    first by [].
-  rewrite !sumlist_cons.
-  exact: ltn_plus.
-Qed.
-*)
-
 Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
-  SState pre P SSMorphSt unit.
+  SState pre P SSMorph unit.
 Proof.
   constructor. intros.
   destruct H.
@@ -297,14 +198,7 @@ Proof.
   pose (ScanState_moveUnhandledToActive thisState0 H).
   eapply {| thisState := s |}.
   Grab Existential Variables.
-  (* pose (unhandledExtent_cons (i, n) unhandled0 intervals0 *)
-  (*        fixedIntervals0 *)
-  (*        ((i, reg) :: active0) active0 inactive0 inactive0 handled0 handled0) *)
-  (*     as ue_cons. *)
-  apply Build_SSMorphSt; intuition.
-  (*   apply le_Sn_le in ue_cons; *)
-  (*   exact: (leq_trans ue_cons). *)
-  (* exact: (leq_trans ue_cons). *)
+  apply Build_SSMorph; intuition.
 Defined.
 
 Definition moveActiveToHandled
@@ -472,7 +366,7 @@ Defined.
 (** If [pos] is [None], it means "split before first use pos requiring a
     register". *)
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
-  (pos : SplitPosition) : SState pre P SSMorphStHasLen unit.
+  (pos : SplitPosition) : SState pre P SSMorphHasLen unit.
 Proof.
   apply: mkIState => ssi.
   case: ssi => desc holds.
@@ -489,10 +383,10 @@ Proof.
   - exact: inl (ECannotSplitSingleton uid). (* ERROR *)
   - apply: (inr (tt, _)).
     apply: (Build_SSInfo _ st).
-    apply Build_SSMorphStHasLen;
+    apply Build_SSMorphHasLen;
     try apply Build_SSMorphHasLen;
     try apply Build_SSMorphLen;
-    try apply Build_SSMorphSt;
+    try apply Build_SSMorphLen;
     try apply Build_SSMorph;
     rewrite ?insert_size ?size_map //;
     try move=> Hpre;
@@ -500,115 +394,6 @@ Proof.
     exact: H first_nonempty0.
   - exact: inl err.
 Defined.
-
-(*
-Definition create_ssinfo
-  (ni : nat)
-  (intervals0 : Vec IntervalSig ni)
-  (fixedIntervals0 : fixedIntervalsType)
-  (unh : seq ('I_ni * nat))
-  (active0 inactive0 handled0 : seq ('I_ni * PhysReg))
-
-  (sd := {| nextInterval   := ni
-          ; intervals      := intervals0
-          ; fixedIntervals := fixedIntervals0
-          ; unhandled      := unh
-          ; active         := active0
-          ; inactive       := inactive0
-          ; handled        := handled0
-          |} : ScanStateDesc)
-  (st : ScanState InUse sd)
-
-  (pre : ScanStateDesc)
-  (len_is_SSMorph0    : SSMorph pre sd)
-  (unhandled_nonempty : 0 < size (unhandled pre) -> 0 < size unh)
-  (first_nonempty     : 0 < size unh)
-
-  (aid  : 'I_ni)
-  (int  := vnth intervals0 aid : IntervalSig)
-  (Hlt  : firstUsePos int.2 < lastUsePos int.2)
-  (pos' : nat)
-  (Hmid : firstUsePos int.2 < pos' <= lastUsePos int.2)
-  (id0  : IntervalDesc)
-  (i0   : Interval id0)
-  (id1  : IntervalDesc)
-  (i1   : Interval id1)
-  (H1   : NE_all_true (fun u : UsePos => u < pos')
-                      (ups (NE_head (rds id0)).1))
-  (H2   : ~~ (NE_head (ups (NE_head (rds id1)).1) < pos'))
-  (H4   : iend int.1 = iend id1)
-  (H5   : iend id0 < ibeg id1)
-  (* (Hdim : intervalExtent i0 + intervalExtent i1 < intervalExtent int.2) *)
-  (* (H6   : intervalExtent i0 < intervalExtent int.2) *)
-  (H3   : ibeg id0 == ibeg int.1)
-
-  (unhandled1 : seq ('I_ni.+1 * nat))
-  (active1 inactive1 : seq ('I_ni.+1 * PhysReg))
-  (new_unhandled :=
-     {| nextInterval   := ni.+1
-      ; intervals      := vshiftin (vreplace intervals0 aid (id0; i0))
-                                   (id1; i1)
-      ; fixedIntervals := fixedIntervals0
-      ; unhandled      := unhandled1
-      ; active         := active1
-      ; inactive       := inactive1
-      ; handled        := [seq widen_fst i | i <- handled0]
-      |} : ScanStateDesc)
-
-  (state : ScanState InUse new_unhandled) : SSInfo pre SSMorphHasLen.
-Proof.
-  unfold sd in *. clear sd.
-  apply: (Build_SSInfo _ state).
-
-  case: len_is_SSMorph0
-    => /= next_interval_increases
-          handled_count_increases.
-
-(*
-  have ?: unhandledExtent new_unhandled <= unhandledExtent pre.
-    move: (lists_are_unique st).
-    move: (lists_are_unique state).
-    rewrite /all_state_lists /new_unhandled.
-    rewrite /unhandledIds cat_uniq => /and3P [/= Huniq_state _ _].
-    rewrite /unhandledIds cat_uniq /= => /and3P [Huniq_st _ _].
-    apply: (leq_trans _ total_extent_decreases).
-    rewrite /unhandledExtent /=
-            {state st new_unhandled
-             unhandled_nonempty total_extent_decreases}.
-    elim: unh => // [u us IHus] in first_nonempty Huniq_state Huniq_st *.
-    case: us => /= [|y ys] in IHus first_nonempty Huniq_state Huniq_st *.
-      rewrite /= !sumlist_cons /sumlist !addn0 /=.
-      case H: (aid == fst u).
-        move/eqP in H.
-        move: H6.
-        rewrite H !vnth_vshiftin vnth_vreplace /int H.
-        by move/ltnW.
-      rewrite vnth_vshiftin vnth_vreplace_neq; first by [].
-      by move/negbT in H.
-    rewrite sumlist_cons [sumlist [:: _, _ & _]]sumlist_cons.
-    apply/leq_add.
-      case H: (aid == fst u).
-        move/eqP in H.
-        move: H6.
-        rewrite H !vnth_vshiftin vnth_vreplace /int H /=.
-        by move/ltnW.
-      rewrite vnth_vshiftin vnth_vreplace_neq; first by [].
-      by move/negbT in H.
-    apply IHus; first by [].
-      rewrite !map_widen_fst -cons_uniq -map_cons.
-      rewrite map_inj_uniq; last by exact: widen_ord_inj.
-      move: Huniq_st.
-      by rewrite -cons_uniq -map_cons cons_uniq => /andP [_ ?].
-    move/and3P: Huniq_st => [? ? ?].
-    by apply/andP.
-*)
-
-  apply: Build_SSMorphHasLen;
-  try apply: Build_SSMorphLen;
-  try apply: Build_SSMorph;
-  rewrite ?insert_size ?size_map; auto.
-Defined.
-*)
 
 (** If [pos] is [None], it means "split at the end of its lifetime hole". *)
 Definition splitAssignedIntervalForReg {pre P} `{W : HasWork P}
@@ -651,14 +436,6 @@ Proof.
     (* (* When splitting an active interval, we must move the first half over to *)
     (*    the inactive list, since it no longer intersects with the current *)
     (*    position. *) *)
-    (* case: trueForActives in Hin Hintlist *. *)
-    (*   have /= := ScanState_moveActiveToInactive st. *)
-    (*   (* rewrite -Hintlist. *) *)
-    (*   move=> /(_ _ F) {st}. *)
-    (*   set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _; *)
-    (*   simpl in act_to_inact; *)
-    (*   move=> st *)
-
     (* case: trueForActives in Hin Hintlist *; *)
     (*   first *)
     (*     (have /= := ScanState_moveActiveToInactive st; *)
@@ -667,12 +444,12 @@ Proof.
     (*      set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _; *)
     (*      simpl in act_to_inact; *)
     (*      move=> st); *)
+    (* admit. *)
 
     apply: (Build_SSInfo _ st);
-    apply Build_SSMorphStHasLen;
+    apply Build_SSMorphHasLen;
     try apply Build_SSMorphHasLen;
     try apply Build_SSMorphLen;
-    try apply Build_SSMorphSt;
     try apply Build_SSMorph;
     rewrite ?insert_size ?size_map //;
     try move=> Hpre;

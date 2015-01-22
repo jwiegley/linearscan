@@ -27,7 +27,7 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
 Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
-  SState pre P P (option (SState pre P SSMorphSt PhysReg)) :=
+  SState pre P P (option (SState pre P SSMorph PhysReg)) :=
   withCursor $ fun sd cur =>
     let current := curInterval cur in
 
@@ -89,7 +89,7 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
     that the only outcome was to split one or more intervals.  In either case,
     the change to the [ScanState] must be a productive one. *)
 Definition allocateBlockedReg {pre P} `{HasWork P} :
-  SState pre P SSMorphSt (option PhysReg) :=
+  SState pre P SSMorph (option PhysReg) :=
   withCursor $ fun sd cur =>
     let current := curInterval cur in
     let start   := intervalStart current in
@@ -151,7 +151,7 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
       | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
-      weakenStHasLenToSt ;;;
+      weakenHasLen ;;;
       return_ None
     else
       (* // spill intervals that currently block reg
@@ -361,7 +361,7 @@ Definition checkInactiveIntervals {pre} (pos : nat) :
     end.
 
 Definition handleInterval {pre} :
-  SState pre SSMorphHasLen SSMorphSt (option PhysReg) :=
+  SState pre SSMorphHasLen SSMorph (option PhysReg) :=
   (* position = start position of current *)
   withCursor $ fun _ cur =>
     let position := curPosition cur in

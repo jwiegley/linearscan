@@ -168,9 +168,6 @@ Coercion getRangeDesc : Range >-> RangeDesc.
 Definition packRange `(r : Range d) := exist Range d r.
 Arguments packRange [d] r /.
 
-(* Definition rangeExtent `(Range r) := rend r - rbeg r. *)
-(* Arguments rangeExtent [r] _ /. *)
-
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
@@ -436,70 +433,6 @@ End rangeSpan.
 Lemma rangeSpan_spec (before : nat) `(r : Range rd) :
   forall res, res = rangeSpan before r -> res.1 <> (None, None).
 Proof. case: rd => _ _ _ _ [[[_| ] [_| ]] _] _ // in r *. Qed.
-
-(*
-(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
-    point, the result type must be able to relate the sublists to the original
-    list. *)
-Definition DefiniteSubRangesOf (before : nat) `(r : Range rd) :=
-  { p : (RangeSig * RangeSig)
-  | let (r1, r2) := p in DividedRange r before r1.2 r2.2 }.
-
-(** [splitRange] differs from [rangeSpan] in that the first and last elements
-    must not be eligible for splitting, and therefore the [Range] will always
-    be split into two definite sub-ranges. *)
-Definition splitRange (before : nat) `(r : Range rd)
-  (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
-  DefiniteSubRangesOf f r.
-Proof.
-  destruct rd. simpl in *.
-  pose (rangeSpan f r) as s. destruct s.
-  unfold DefiniteSubRangesOf.
-  destruct x.
-
-  destruct o as [o| ];
-  destruct o0 as [o0| ]; intuition.
-  - Case "(Some, Some)".
-    exists (o, o0); exact: s.
-  - Case "(Some, None)".
-    exfalso; destruct s.
-    destruct Hl as [H1 H2 H3].
-    rewrite -H in H0. simpl in *.
-    move: (Range_sorted r).
-    move: (NE_Forall_member_spec H0 H2).
-    by move: H3 => /negbTE -> /=.
-  - Case "(None, Some)".
-    exfalso; destruct s.
-    by move: H H0 Hf => <- /negbTE /= ->.
-  - Case "(None, None)".
-    destruct s.
-Defined.
-
-Lemma four_points : forall n m o p,
-  (n < m < o) && (o < p) -> (m - n) + (p - o) < p - n.
-Proof.
-  move=> n m o p /andP [/andP [H1 H2] H3].
-  rewrite -ltn_subRL -subnDA.
-  apply ltn_sub2l; rewrite subnKC //;
-    try exact: ltnW.
-  exact: (ltn_trans H2).
-Qed.
-
-Lemma splitRange_spec (f : UsePos -> bool) `(r : Range rd)
-  (Hf : f (NE_head (ups rd))) (Hl : { u | NE_member u (ups rd) & ~~ f u }) :
-  let: exist (r1, r2) Hdr := splitRange r Hf Hl in
-  rangeExtent r1.2 + rangeExtent r2.2 < rangeExtent r.
-Proof.
-  case: (splitRange r Hf Hl) => [[r1 r2] [_ _ _ /eqP H4 /eqP H5 _ _ H8]].
-  rewrite /rangeExtent {}H4 {}H5 {Hf Hl r rd f}.
-  apply four_points.
-  apply/andP; split.
-    apply/andP; split.
-      by move: (Range_bounded r1.2).
-    by [].
-  by move: (Range_bounded r2.2).
-Qed.
-*)
 
 Module RangeTests.
 

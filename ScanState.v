@@ -76,15 +76,6 @@ Arguments handledIds /.
 Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 Arguments getInterval [sd] i /.
 
-(*
-Definition totalExtent `(xs : seq (IntervalId sd)) : nat :=
-  sumlist [seq (intervalExtent (getInterval i)) | i <- xs].
-Arguments totalExtent [sd] _ /.
-
-Definition unhandledExtent (sd : ScanStateDesc) : nat :=
-  totalExtent [seq fst i | i <- unhandled sd].
-*)
-
 (** Given a vector of optional positions associated with a register, return
     the first register (counting upwards) which is either [None], or the
     highest of [Some] value.
@@ -169,7 +160,6 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
   | ScanState_setInterval sd :
     ScanState InUse sd -> forall xid `(i : Interval d),
     let xi := (vnth (intervals sd) xid).2 in
-    (* intervalExtent i < intervalExtent xi -> *)
     intervalStart i == intervalStart xi ->
     ScanState InUse
       {| nextInterval     := nextInterval sd

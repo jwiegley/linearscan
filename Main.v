@@ -32,6 +32,7 @@ Definition mainAlgorithm {blockType opType varType : Set}
   (oinfo : OpInfo opType varType)
   (vinfo : VarInfo varType) :
   IState SSError (BlockList blockType) (BlockList blockType) unit :=
+
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder blockType ;;;
   numberOperations blockType ;;;
@@ -46,6 +47,7 @@ Definition mainAlgorithm {blockType opType varType : Set}
   match walkIntervals ssig.2 1 (NE_length blocks) with
   | inl err => error_ err
   | inr ssig' =>
+      (* jww (2015-01-22): This is a critical piece which is still missing. *)
       resolveDataFlow blockType ;;;
 
       (* replace virtual registers with physical registers *)

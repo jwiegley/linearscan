@@ -778,16 +778,6 @@ coq_SSMorph_rec :: ScanStateDesc ->
 coq_SSMorph_rec sd1 sd2 f =
   coq_SSMorph_rect sd1 sd2 f
 
-coq_SSMorphSt_rect :: ScanStateDesc ->
-                                 ScanStateDesc -> (() -> a1) -> a1
-coq_SSMorphSt_rect sd1 sd2 f =
-  f __
-
-coq_SSMorphSt_rec :: ScanStateDesc ->
-                                ScanStateDesc -> (() -> a1) -> a1
-coq_SSMorphSt_rec sd1 sd2 f =
-  coq_SSMorphSt_rect sd1 sd2 f
-
 coq_SSMorphLen_rect :: ScanStateDesc ->
                                   ScanStateDesc -> (() -> () -> a1)
                                   -> a1
@@ -811,18 +801,6 @@ coq_HasBase_rec :: (() -> a2) -> a2
 coq_HasBase_rec f =
   coq_HasBase_rect f
 
-coq_SSMorphStLen_rect :: ScanStateDesc ->
-                                    ScanStateDesc -> (() -> () ->
-                                    a1) -> a1
-coq_SSMorphStLen_rect sd1 sd2 f =
-  f __ __
-
-coq_SSMorphStLen_rec :: ScanStateDesc ->
-                                   ScanStateDesc -> (() -> () ->
-                                   a1) -> a1
-coq_SSMorphStLen_rec sd1 sd2 f =
-  coq_SSMorphStLen_rect sd1 sd2 f
-
 coq_SSMorphHasLen_rect :: ScanStateDesc ->
                                      ScanStateDesc -> (() -> () ->
                                      a1) -> a1
@@ -845,18 +823,6 @@ coq_HasWork_rect f =
 coq_HasWork_rec :: (() -> a2) -> a2
 coq_HasWork_rec f =
   coq_HasWork_rect f
-
-coq_SSMorphStHasLen_rect :: ScanStateDesc ->
-                                       ScanStateDesc -> (() -> ()
-                                       -> a1) -> a1
-coq_SSMorphStHasLen_rect sd1 sd2 f =
-  f __ __
-
-coq_SSMorphStHasLen_rec :: ScanStateDesc ->
-                                      ScanStateDesc -> (() -> () ->
-                                      a1) -> a1
-coq_SSMorphStHasLen_rec sd1 sd2 f =
-  coq_SSMorphStHasLen_rect sd1 sd2 f
 
 data SSInfo p =
    Build_SSInfo ScanStateDesc p
@@ -946,9 +912,9 @@ liftLen pre f _top_assumption_ =
   case _top_assumption_ of {
    Build_SSInfo x x0 -> _evar_0_ x}
 
-weakenStHasLenToSt :: ScanStateDesc -> SState
-                                 () () ()
-weakenStHasLenToSt pre hS =
+weakenHasLen :: ScanStateDesc -> SState 
+                           () () ()
+weakenHasLen pre hS =
   Prelude.Right ((,) ()
     (case hS of {
       Build_SSInfo thisDesc0 _ -> Build_SSInfo thisDesc0
@@ -1540,7 +1506,7 @@ allocateBlockedReg pre =
           stbind (\mloc ->
             stbind (\x0 ->
               stbind (\x1 -> return_ Prelude.Nothing)
-                (weakenStHasLenToSt pre))
+                (weakenHasLen pre))
               (case mloc of {
                 Prelude.Just n ->
                  splitCurrentInterval pre (Interval.BeforePos n);

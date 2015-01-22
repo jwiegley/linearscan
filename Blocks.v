@@ -272,7 +272,7 @@ Definition assignRegNum `(st : ScanState InUse sd) :
            if (ivar int == vid) &&
               (ibeg int <= n < iend int)
            then (vid, RegLoad reg) :: acc
-                (* jww (2015-01-20): We cannot always so RegLoad here, but
+                (* jww (2015-01-20): We cannot always RegLoad here, but
                    must differentiate based on the circumstance. *)
            else acc) (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in

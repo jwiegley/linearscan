@@ -114,51 +114,6 @@ Qed.
 
 End UnhandledSorted.
 
-(*
-Section WorkRemaining.
-
-Definition ScanStateDesc_leq (sd1 sd2 : ScanStateDesc) : bool :=
-  if unhandled sd1 is x :: xs
-  then if unhandled sd2 is y :: ys
-       then (snd x < snd y) ||
-            ((snd x == snd y) &&
-               (size [seq i <- xs | fst x == fst i] <=
-                size [seq i <- ys | fst y == fst i])
-       else false
-  else true.
-
-Definition ScanStateDesc_ltn (r : rel nat) (dflt : bool)
-  (sd1 sd2 : ScanStateDesc) : bool :=
-  if unhandled sd1 is x :: xs
-  then if unhandled sd2 is y :: ys
-       then (snd x < snd y ||
-            ((snd x == snd y) &&
-               (size [seq i <- xs | fst x == fst i] <
-                size [seq i <- ys | fst y == fst i]))
-       else false
-  else if unhandled sd2 is y :: ys
-       then true
-       else false.
-
-Definition ScanStateDesc_lt : ScanStateDesc -> ScanStateDesc -> Prop :=
-  ScanStateDesc_ltn.
-
-(* Theorem unhandled_uncons `(st : ScanState sd) : *)
-(*   let unh := unhandled sd in *)
-(*   forall x xs, x :: xs = unh -> work_left xs <, work_left (x :: xs). *)
-
-(* Theorem unhandled_insert `(st : ScanState sd) (xid : IntervalId sd) (n : nat) : *)
-(*   let unh := unhandled sd in *)
-(*   forall (beg : nat) (xs : seq (IntervalId sd * nat)), *)
-(*   if unh is (_, beg) :: xs *)
-(*   then beg < n *)
-(*          -> let unh' := insert (lebf (@snd _ _)) (xid, n) unh in *)
-(*             work_left unh' == work_left unh *)
-(*   else True. *)
-
-End WorkRemaining.
-*)
-
 Theorem allocated_regs_are_unique `(st : ScanState b sd) :
   uniq ([ seq snd i | i <- active sd ]).
 Proof.
@@ -332,81 +287,6 @@ Proof.
     rewrite addnS -addSn prednK //.
     exact: has_size.
 Qed.
-
-(*
-Theorem ScanState_newUnhandled_spec `(st : ScanState b sd) : forall d i,
-  unhandledExtent (getScanStateDesc (@ScanState_newUnhandled b _ st d i _)) ==
-  unhandledExtent sd + intervalExtent i.
-Proof.
-  move=> d i /=.
-  rewrite /unhandledExtent /=.
-  case: sd st => ni IntervalId0 ? ? unh /= ? ? ? _ /=.
-  rewrite -!map_comp insert_f_sumlist map_cons -map_comp /funcomp
-          sumlist_cons vnth_last /= addnC.
-  apply/eqP; congr (_ + _).
-  elim: unh => [//|u us IHus] /=.
-  rewrite !sumlist_cons IHus.
-  congr (_ + _).
-  by rewrite vnth_vshiftin.
-Qed.
-
-Theorem ScanState_hasInterval_spec `(st : ScanState sd) : forall xid,
-  let int := vnth (intervals sd) xid in
-  xid \in unhandledIds sd -> intervalExtent int.2 <= unhandledExtent sd.
-Proof.
-  move=> xid /= Hin.
-  rewrite /unhandledExtent /=.
-  set g := (X in sumlist (map X _)).
-  have ->: intervalExtent (vnth (intervals sd) xid).2 = g xid by [].
-  exact: in_sumlist.
-Qed.
-
-Theorem ScanState_setInterval_spec `(st : ScanState sd) : forall xid d i H1 H2,
-  let st'  := @ScanState_setInterval _ st xid d i H1 H2 in
-  let sd'  := getScanStateDesc st' in
-  let diff := intervalExtent (vnth (intervals sd) xid).2 - intervalExtent i in
-  xid \in unhandledIds sd -> unhandledExtent sd' == unhandledExtent sd - diff.
-Proof.
-  move=> xid d i Hlt Heqe /= Hin.
-  move: (lists_are_unique st) => {st}.
-  rewrite /all_state_lists cat_uniq => /and3P [Hlau _ _].
-  case: sd => ni IntervalId0 ints fixints unh /= act inact hnd /=
-    in xid Hlt Heqe Hin Hlau *.
-  rewrite /unhandledExtent /=.
-  rewrite -!map_comp /funcomp => {act inact hnd}.
-  rewrite {}/IntervalId0 in unh Hin Hlau *.
-  set f := (X in sumlist (map X _)).
-  set g := (X in sumlist (map X _) - _).
-  elim: unh => [//|u us IHus] /= in Hin Hlau *.
-  rewrite !sumlist_cons {1}/f {1}/g /=.
-  have Huniq: uniq (fst u :: [seq fst i | i <- us]) by exact: Hlau.
-  move: in_cons Hin => -> /orP [/eqP Heq {IHus}|Hin].
-    rewrite Heq in f Hlt Heqe *.
-    have ->: sumlist (map f us) = sumlist (map g us).
-      rewrite /f /g.
-      elim: us => //= [y ys IHys] in Hlau Huniq *.
-      rewrite !sumlist_cons IHys;
-      move: Hlau => /and3P [H1 _ ?];
-      move: in_cons H1 => -> /norP [? ?];
-        first rewrite vnth_vreplace_neq //=;
-      exact/andP.
-    rewrite vnth_vreplace addsubsubeq; first by [].
-    exact: ltnW.
-  move: cons_uniq Huniq => -> /andP [Huniq1 Huniq2].
-  move: Hlau => /andP [_ Hlau].
-  move: IHus => /(_ Hin Hlau) /= /eqP ->.
-  rewrite vnth_vreplace_neq.
-    rewrite -addnBA; first by [].
-    apply: subn_leq.
-    pose h y := intervalExtent (vnth ints y).2.
-    have ->: [seq g i | i <- us] = [ seq (h \o @fst _ _) x | x <- us ]
-      by exact: eq_map.
-    have ->: intervalExtent (vnth ints xid).2 = h xid by [].
-    rewrite (map_comp _ (@fst _ _)).
-    exact: in_sumlist.
-  exact: (in_notin Hin).
-Qed.
-*)
 
 (*
 Lemma in_rem : forall (a : eqType) (y x : a) xs,

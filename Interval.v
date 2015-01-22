@@ -90,14 +90,6 @@ Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
   intervalStart i <= pos < intervalEnd i.
 Arguments intervalCoversPos [d] i pos /.
 
-(* Definition intervalExtent `(i : Interval d) := intervalEnd i - intervalStart i. *)
-
-(*
-Definition Interval_is_singleton `(i : Interval d) :=
-  (NE_length (rds d) == 1) && (NE_length (ups (NE_head (rds d)).1) == 1).
-Arguments Interval_is_singleton [d] i /.
-*)
-
 (* This lemma proves that if an [Interval] is formed from the list of ranges,
    where that list is at least a cons cell, then the end of the first element
    of the list occurs before the beginning of the head of the rest of the
@@ -130,8 +122,7 @@ Definition intervalUncons
   &    Interval {| ivar := iv
                  ; ibeg := rbeg (NE_head xs).1
                  ; iend := ie
-                 ; rds := xs |}
-  ].
+                 ; rds := xs |} ].
 Proof.
   move: i. invert => //=.
   split; auto. subst.
@@ -198,9 +189,6 @@ Proof.
   move=> H0.
   exact/(ltn_trans H0)/(ltn_trans Hend).
 Qed.
-
-(* Lemma Interval_extent_nonzero : forall `(i : Interval d), intervalExtent i > 0. *)
-(* Proof. move=> d i; move: subn_gt0 (Interval_nonempty i) => -> //. Qed. *)
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
@@ -288,6 +276,7 @@ Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
   | BeforePos x             => Some x
   | BeforeFirstUsePosReqReg => firstUseReqReg i
   | EndOfLifetimeHole       => None (* jww (2015-01-22): NYI *)
+    (* This should be the same thing as splitting at the current position. *)
   end.
 
 Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
@@ -475,96 +464,6 @@ Proof.
   - Case "rs = R_Cons r rs; (o, o0) = (None, None)".
     contradiction.
 Defined.
-
-(*
-Definition DefiniteSubIntervalsOf (before : nat) `(i : Interval d)
-  (p : IntervalSig * IntervalSig) :=
-  let: (i1, i2) := p in DividedInterval i before i1.2 i2.2.
-
-(** Split the current interval before the position [before].  This must
-    succeed, which means there must be use positions within the interval prior
-    to [before].  If [before] is [None], splitting is done before the first
-    use position that does not require a register. *)
-Definition splitInterval (before : nat) `(i : Interval d)
-  (H : ibeg i < before <= iend i) :
-  { p : IntervalSig * IntervalSig | DefiniteSubIntervalsOf before i p }.
-Proof.
-  case: d => iv ib ie rds in i H *.
-  case: (intervalSpan before i) => // [] [[i0| ] [i1| ]].
-  - Case "(Some, Some)".
-    by exists (i0, i1).
-  - Case "(Some, None)".
-    move=> [/= _ _ H3].
-    move: H => /andP [_ /= He].
-    exists (i0, None).
-    move: (Interval_end_of_rds i) => /= /eqP H1.
-    move: (Range_end_bounded (NE_last rds).2) => /= H2.
-    rewrite -{}H1 in H2.
-    move: (leq_ltn_trans He H2) => H3.
-    move: (leq_ltn_trans He H2) => H3.
-    move: He => /negbTE.
-  - Case "(None, Some)".
-    move: H => /andP [Hb He].
-    move=> [<- /= /negbTE H]; exfalso.
-    by rewrite /firstUsePos /= H in Hb.
-  - Case "(None, None)".
-    contradiction.
-Defined.
-*)
-
-(*
-Definition splitInterval_spec (before : nat) `(i : Interval d)
-  (H : firstUsePos i < before <= lastUsePos i) :
-  let: exist (i1, i2) Hdi := splitInterval H in
-  intervalExtent i1.2 + intervalExtent i2.2 < intervalExtent i.
-Proof.
-  case: (splitInterval H) => [[i1 i2] [_ _ /eqP H1 /eqP H2 ?]] /=.
-  rewrite /intervalExtent /=.
-  rewrite {}H1 {}H2 {H i d}.
-  apply four_points.
-  apply/andP; split.
-    apply/andP; split.
-      by move: (Interval_bounded i1.2).
-    by [].
-  by move: (Interval_bounded i2.2).
-Qed.
-*)
-
-(*
-Definition splitInterval_spec (before : nat) `(i : Interval d)
-  (H : firstUsePos i < before <= lastUsePos i) :
-  let: exist (i1, i2) Hdi := splitInterval H in
-  intervalEnd i1.2 <= before <= intervalStart i2.2.
-Proof.
-  case: (splitInterval H) => [[i1 i2] [H1 H2 /eqP _ /eqP _ Hi]] {H} /=.
-  move/NE_Forall_last: H1.
-  replace (NE_last (ups (NE_last (rds i1.2)).1) < before)
-    with (lastUsePos i1.2 < before).
-  move: H2.
-  rewrite -leqNgt.
-  replace (before <= NE_head (ups (NE_head (rds i2.2)).1))
-    with (before <= firstUsePos i2.2).
-  move=> H2 H1.
-  move: (Interval_end_bounded i1.2) => H3.
-  move: (Interval_end_bounded i2.2) => H3'.
-  move: (Interval_beg_bounded i1.2) => H4.
-  move: (Interval_beg_bounded i2.2) => H4'.
-  move: (Interval_bounded i2.2) => H5.
-  move: (Interval_rds_bounded i2.2) => H6.
-  apply/andP; split.
-    apply: (ltn_trans _ H1).
-    apply: (ltn_trans Hi _).
-    rewrite /lastUsePos in H6.
-    apply: (leq_ltn_trans _ H6).
-  rewrite {}H1 {}H2 {H i d}.
-  apply four_points.
-  apply/andP; split.
-    apply/andP; split.
-      by move: (Interval_bounded i1.2).
-    by [].
-  by move: (Interval_bounded i2.2).
-Qed.
-*)
 
 (** * Fixed Intervals *)
 
