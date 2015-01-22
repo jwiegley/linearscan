@@ -446,22 +446,23 @@ Proof.
 
   move: st.
   move/splitInterval/(_ aid pos false).
-  case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
+  case=> [err|[[[sd st] [[/= Hincr H]]] |]]; last first.
   - exact: inl (ECannotSplitSingleton aid). (* ERROR *)
   - apply: (inr (tt, _)).
 
-    (* (* When splitting an active interval, we must move the first half over to *)
-    (*    the inactive list, since it no longer intersects with the current *)
-    (*    position. *) *)
-    (* case: trueForActives in Hin Hintlist *; *)
-    (*   first *)
-    (*     (have /= := ScanState_moveActiveToInactive st; *)
-    (*      rewrite -Hintlist; *)
-    (*      move=> /(_ _ Hin) {st}; *)
-    (*      set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _; *)
-    (*      simpl in act_to_inact; *)
-    (*      move=> st); *)
-    (* admit. *)
+    (* When splitting an active interval, we must move the first half over to
+       the inactive list, since it no longer intersects with the current
+       position.  This is only valid when [trueForActives] is [true], and only
+       if [splitInterval] does not modify the actives list.  It doesn't hurt
+       to always check whether it's a member, though we should prove that
+       [splitInterval] has the right behavior. *)
+    case E: ((widen_ord Hincr aid, reg) \in active sd) => //;
+      first
+        (have /= := ScanState_moveActiveToInactive st E;
+         move=> {st};
+         set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _;
+         simpl in act_to_inact;
+         move=> st);
 
     apply: (Build_SSInfo _ st);
     apply Build_SSMorphHasLen;

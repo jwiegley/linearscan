@@ -186,25 +186,25 @@ main = hspec $ do
             {- 41 -} add v27 v28 v29
             {- 43 -} add v30 v31 v32) $
 
-        do  add r2 r1 r0
-            add r5 r4 r3
-            add r8 r7 r6
-            add r11 r10 r9
-            add r14 r13 r12
-            add r17 r16 r15
-            add r20 r19 r18
-            add r23 r22 r21
-            add r26 r25 r24
-            add r29 r28 r27
-            add r27 r31 r30
-            add r2 r1 r0
-            add r5 r4 r3
-            add r8 r7 r6
-            add r11 r10 r9
-            add r14 r13 r12
-            add r17 r16 r15
-            add r20 r19 r18
-            add r23 r22 r21
-            add r26 r25 r24
-            add r29 r28 r27
-            add r27 r31 r30
+        do  {-  1 -} add r2 r1 r0
+            {-  3 -} add r5 r4 r3
+            {-  5 -} add r8 r7 r6
+            {-  7 -} add r11 r10 r9
+            {-  9 -} add r14 r13 r12
+            {- 11 -} add r17 r16 r15
+            {- 13 -} add r20 r19 r18
+            {- 15 -} add r23 r22 r21
+            {- 17 -} add r26 r25 r24
+            {- 19 -} add r29 r28 r27
+            {- 21 -} add r27 r31 r30
+            {- 23 -} add r2 r1 r0
+            {- 25 -} add r5 r4 r3
+            {- 27 -} add r8 r7 r6
+            {- 29 -} add r11 r10 r9
+            {- 31 -} add r14 r13 r12
+            {- 33 -} add r17 r16 r15
+            {- 35 -} add r20 r19 r18
+            {- 37 -} add r23 r22 r21
+            {- 39 -} add r26 r25 r24
+            {- 41 -} add r29 r28 r27
+            {- 43 -} add r27 r31 r30

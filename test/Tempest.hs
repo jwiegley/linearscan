@@ -99,17 +99,14 @@ data IRInstr v e x where
 
 deriving instance Eq v => Eq (IRInstr v e x)
 
-showInstr :: (Show v) => Instruction v -> String
-showInstr i = show i ++ foldMap (\r -> " " ++ show r) i
-
 instance Show v => Show (IRInstr v e x) where
   show (Label l)        = show l ++ ":"
   show (Alloc g x1 x2)  = "\t@alloc " ++ show g ++
                           (case x1 of Just v -> " " ++ show v ; _ -> " _")
                           ++ " " ++ show x2
   show (Reclaim v)      = "\t@reclaim " ++ show v
-  show (Instr i)        = "\t" ++ showInstr i
-  show (Call c i)       = "\t@call " ++ show c ++ " " ++ showInstr i
+  show (Instr i)        = "\n\t" ++ show i
+  show (Call c i)       = "\t@call " ++ show c ++ " " ++ show i
   show (LoadConst c v)  = "\t@lc " ++ show v ++ " " ++ show c
   show (Move x1 x2)     = "\t@mvrr " ++ show x1 ++ " " ++ show x2
   show (Copy x1 x2)     = "\t@cprr " ++ show x1 ++ " " ++ show x2
@@ -132,7 +129,7 @@ instance Show v => Show (IRInstr v e x) where
                             ++ " " ++ show f ++ "; @jmp " ++ show t
   show (Strb x1 x2 t f) = "\t@strb " ++ show x1 ++ " " ++ show x2
                             ++ " " ++ show f ++ "; @jmp " ++ show t
-  show (ReturnInstr liveRegs i)   = "\t@return " ++ show liveRegs ++ " " ++ showInstr i
+  show (ReturnInstr liveRegs i)   = "\t@return " ++ show liveRegs ++ " " ++ show i
 
 newtype IRInstrWrap e x v = IRInstrWrap { getIRInstrWrap :: IRInstr v e x }
 
@@ -166,12 +163,18 @@ instance Functor (NodeWrapVar v e x) where
 data Node a v e x = Node
   { _nodeIRInstr :: IRInstr v e x
   , _nodeMeta    :: a
-  } deriving (Eq, Show)
+  } deriving Eq
+
+instance Show v => Show (Node a v e x) where
+    show (Node i _) = show i
 
 data C = C
 data O = O
 
-data PNode v e x a = PNode (Node a v e x) deriving (Eq, Show)
+data PNode v e x a = PNode (Node a v e x) deriving Eq
+
+instance (Show a, Show v) => Show (PNode v e x a) where
+    show (PNode n) = show n
 
 instance Functor (PNode v e x) where
     fmap f (PNode (Node x y)) = PNode (Node x (f y))
@@ -189,7 +192,11 @@ data Var = Var deriving (Eq, Show)
 
 data IRVar' = PhysicalIV !Reg
             | VirtualIV !Int !AtomKind
-            deriving (Eq, Show)
+            deriving Eq
+
+instance Show IRVar' where
+    show (PhysicalIV (Reg r)) = "r" ++ show r
+    show (VirtualIV n _) = "v" ++ show n
 
 -- | Virtual IR variable together with an optional AST variable
 data IRVar =
@@ -198,7 +205,10 @@ data IRVar =
   , _ivSrc :: !(Maybe Var) -- ^ An optional corresponding AST variable for
                        -- informational purposes.
   }
-  deriving (Eq, Show)
+  deriving Eq
+
+instance Show IRVar where
+    show (IRVar x _) = show x
 
 asmTest (compile -> body) (compile -> result) =
     case allocate binfo oinfo vinfo [body] of

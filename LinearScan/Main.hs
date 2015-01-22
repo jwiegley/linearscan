@@ -1322,7 +1322,45 @@ splitAssignedIntervalForReg pre reg pos trueForActives ssi =
              _evar_0_1 = \_top_assumption_0 ->
               let {
                _evar_0_1 = \_top_assumption_1 -> Prelude.Right ((,) ()
-                (Build_SSInfo _top_assumption_1 __))}
+                (let {
+                  _evar_0_1 = \_ ->
+                   (Prelude.flip (Prelude.$)) __
+                     (let {
+                       act_to_inact = Build_ScanStateDesc
+                        (nextInterval _top_assumption_1)
+                        (intervals _top_assumption_1)
+                        (fixedIntervals _top_assumption_1)
+                        (unhandled _top_assumption_1)
+                        (unsafeCoerce
+                          (Seq.rem
+                            (Eqtype.prod_eqType
+                              (Fintype.ordinal_eqType
+                                (nextInterval _top_assumption_1))
+                              (Fintype.ordinal_eqType maxReg))
+                            (unsafeCoerce ((,) ( aid) reg))
+                            (unsafeCoerce
+                              (active _top_assumption_1)))) ((:)
+                        ((,) ( aid) reg)
+                        (inactive _top_assumption_1))
+                        (handled _top_assumption_1)}
+                      in
+                      \_ -> Build_SSInfo act_to_inact __)}
+                 in
+                 let {
+                  _evar_0_2 = \_ -> Build_SSInfo _top_assumption_1
+                   __}
+                 in
+                 case Ssrbool.in_mem (unsafeCoerce ((,) ( aid) reg))
+                        (Ssrbool.mem
+                          (Seq.seq_predType
+                            (Eqtype.prod_eqType
+                              (Fintype.ordinal_eqType
+                                (nextInterval _top_assumption_1))
+                              (Fintype.ordinal_eqType maxReg)))
+                          (unsafeCoerce
+                            (active _top_assumption_1))) of {
+                  Prelude.True -> _evar_0_1 __;
+                  Prelude.False -> _evar_0_2 __}))}
               in
               let {
                _evar_0_2 = Prelude.Left (ECannotSplitSingleton
