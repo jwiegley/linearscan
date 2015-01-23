@@ -99,10 +99,7 @@ Proof. by case: (usePosSpan before H) => [[[?| ] [?| ]] ?]. Qed.
 
 (** ** RangeDesc *)
 
-(** The *extent* of a [RangeDesc] is the set of use positions it ranges over,
-    inclusively, plus any extensions that have been applied to the range.
-
-    A [RangeDesc] is built up from a set of use positions, and defines the
+(** A [RangeDesc] is built up from a set of use positions, and defines the
     inclusive range of those positions.  It can be extended, or split, but
     never shrunk.  Also, the non-empty list of use positions is not guaranteed
     to be in any order, and overlapping use positions are accepted, where the
