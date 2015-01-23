@@ -1430,6 +1430,19 @@ intersectsWithFixedInterval pre reg =
             Prelude.Nothing -> Prelude.Nothing})) Prelude.Nothing
         (fixedIntervals sd)))
 
+updateRegisterPos :: Prelude.Int -> ([]
+                                (Prelude.Maybe Prelude.Int)) -> Prelude.Int
+                                -> (Prelude.Maybe Prelude.Int) -> []
+                                (Prelude.Maybe Prelude.Int)
+updateRegisterPos n v r p =
+  case p of {
+   Prelude.Just x ->
+    LinearScan.Utils.set_nth n v r (Prelude.Just
+      (case LinearScan.Utils.nth n v r of {
+        Prelude.Just n0 -> Prelude.min n0 x;
+        Prelude.Nothing -> x}));
+   Prelude.Nothing -> v}
+
 tryAllocateFreeReg :: ScanStateDesc -> SState
                                  a1 a1
                                  (Prelude.Maybe
@@ -1439,12 +1452,7 @@ tryAllocateFreeReg pre =
     let {
      go = \f v p ->
       case p of {
-       (,) i r ->
-        LinearScan.Utils.set_nth maxReg v r
-          (case LinearScan.Utils.nth maxReg v r of {
-            Prelude.Just n -> Prelude.Just
-             (Prelude.min n (Ssrnat.nat_of_bool (Ssrbool.isSome (f i))));
-            Prelude.Nothing -> f i})}}
+       (,) i r -> updateRegisterPos maxReg v r (f i)}}
     in
     let {
      freeUntilPos' = Data.List.foldl' (go (\x -> Prelude.Just 0))
@@ -1527,11 +1535,7 @@ allocateBlockedReg pre =
                       (LinearScan.Utils.nth (nextInterval sd)
                         (intervals sd) i)) start}}
         in
-        LinearScan.Utils.set_nth maxReg v r
-          (case LinearScan.Utils.nth maxReg v r of {
-            Prelude.Just n -> Prelude.Just
-             (Prelude.min n (Ssrnat.nat_of_bool (Ssrbool.isSome pos')));
-            Prelude.Nothing -> pos'})}}
+        updateRegisterPos maxReg v r pos'}}
     in
     let {
      nextUsePos' = Data.List.foldl' go

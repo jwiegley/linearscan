@@ -1,6 +1,10 @@
 module LinearScan.Utils where
 
+import Data.Char
 import Data.List
+import Debug.Trace
+
+trace = Debug.Trace.trace . map chr
 
 boundedTransport' pos n _top_assumption_ = _top_assumption_
 

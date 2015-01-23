@@ -196,6 +196,12 @@ main = hspec $ do
             {- 15 -} add r23 r22 r21
             {- 17 -} add r26 r25 r24
             {- 19 -} add r29 r28 r27
+                     -- When we reach the 32nd variable considered (which
+                     -- happens to be v30), we must spill a register because
+                     -- there are not 32 registers.  So we pick the first
+                     -- register, counting from 0, whose next use position is
+                     -- the furthest from this position.  That happens to be
+                     -- r27, which is next used at position 41.
             {- 21 -} add r27 r31 r30
             {- 23 -} add r2 r1 r0
             {- 25 -} add r5 r4 r3
@@ -206,5 +212,8 @@ main = hspec $ do
             {- 35 -} add r20 r19 r18
             {- 37 -} add r23 r22 r21
             {- 39 -} add r26 r25 r24
-            {- 41 -} add r29 r28 r27
+                     -- When it comes time to reload v29 (which had been
+                     -- allocated to r27), we pick the first available
+                     -- register which happens to be r0 in this case.
+            {- 41 -} add r29 r28 r0
             {- 43 -} add r27 r31 r30

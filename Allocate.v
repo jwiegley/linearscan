@@ -23,6 +23,17 @@ Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
          then intervalIntersectionPoint int.2 i.2
          else None)) None (fixedIntervals sd).
 
+Definition updateRegisterPos {n : nat} (v : Vec (option nat) n)
+  (r : 'I_n) (p : option nat) : Vec (option nat) n :=
+  match p with
+  | None => v
+  | Some x =>
+      vreplace v r (Some (match vnth v r with
+                    | Some n => minn n x
+                    | None => x
+                    end))
+  end.
+
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
@@ -36,12 +47,8 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go f v p :=
-        let: (i, r) := p in
-        vreplace v r (match vnth v r with
-                      | Some n => Some (minn n (f i : option nat))
-                      | None => f i
-                      end) in
+    let go f v p := let: (i, r) := p in
+                    updateRegisterPos v r (f i) in
     let freeUntilPos' := foldl (go (fun _ => Some 0)) (vconst None)
                                (active sd) in
     let intersectingIntervals :=
@@ -104,14 +111,15 @@ Definition allocateBlockedReg {pre P} `{HasWork P} :
         let int := getInterval i in
         let atPos u := pos == uloc u in
         let pos' :=
+            (* In calculating the highest use position of this register, if we
+               know that it is being used at the current position, then it
+               cannot be spilled there, and so we try to take it out of the
+               running by returning zero. *)
             match findIntervalUsePos int atPos with
             | Some _ => Some 0
             | None   => nextUseAfter int start
             end in
-        vreplace v r (match vnth v r with
-                      | Some n => Some (minn n pos')
-                      | None => pos'
-                      end) in
+        updateRegisterPos v r pos' in
     let nextUsePos' := foldl go (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
@@ -383,6 +391,7 @@ Definition handleInterval {pre} :
     end.
 
 Require Import Coq.Program.Wf.
+(* Include Trace. *)
 
 (* Walk through all the intervals which had been defined previously as the
    [unhandled] list, and use those to determine register allocations.  The
@@ -395,8 +404,10 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
        HANDLE_INTERVAL (current) *)
   if positions is S n
   then let fix go count ss :=
+    (* trace "walkIntervals: go" $ *)
     if count is S cnt
     then
+      (* trace "walkIntervals: count > 0" $ *)
       match IState.runIState SSError handleInterval ss with
       | inl err => inl err
       | inr (_, ss') =>
@@ -422,9 +433,11 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
               ; thisHolds := weakenHasLen (thisHolds ss)
               ; thisState := thisState ss |} in
 
+    (* trace "walkIntervals: destructing list" $ *)
     match List.destruct_list (unhandled sd) with
     | inright _ => inr (packScanState st)
     | inleft (existT (_, pos) (exist _ H)) =>
+        (* trace "walkIntervals: found item" $ *)
         match go (count (fun x => snd x == pos) (unhandled sd))
                  {| thisDesc  := sd
                   ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)

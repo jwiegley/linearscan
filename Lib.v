@@ -24,8 +24,7 @@ Definition undefined {a : Type} : a. Admitted.
 
 Definition apply {A B} (f : A -> B) (x : A) := f x.
 
-Infix "$" := apply (at level 60, right associativity, only parsing)
-  : program_scope.
+Infix "$" := apply (at level 60, right associativity, only parsing).
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
 Proof. intros P. contra. Defined.
@@ -65,6 +64,24 @@ Definition maybeLast a (l : seq a) : option a :=
       | cons x xs => go (Some x) xs
       end in
   go None l.
+
+Module Trace.
+
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Strings.String.
+
+Definition trace_helper {a : Type} (msg : seq nat) (x : a) : a := x.
+
+Definition trace {a : Type} (msg : string) (x : a) : a :=
+  let fix go acc x := match x with
+      | EmptyString => acc
+      | String c xs => go (acc ++ [:: nat_of_bin (N_of_ascii c)]) xs
+      end in
+  trace_helper (go [::] msg) x.
+
+Extract Inlined Constant trace_helper => "LinearScan.Utils.trace".
+
+End Trace.
 
 Example maybeLast_ex1 : maybeLast ([::] : seq nat) == None.
 Proof. by []. Qed.
