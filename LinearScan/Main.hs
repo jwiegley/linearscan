@@ -292,33 +292,47 @@ coq_VarKind_rec =
 
 data VarAction =
    RegLoad PhysReg
- | RegRestore Prelude.Int PhysReg
+ | RegLoadAndSpill PhysReg
  | RegUse PhysReg
- | RegUseThenSpill PhysReg Prelude.Int
- | RegDump PhysReg
+ | RegSpill PhysReg
+ | RegRestore PhysReg
+ | RegRestoreAndSpill PhysReg
 
-coq_VarAction_rect :: (PhysReg -> a1) -> (Prelude.Int ->
-                                 PhysReg -> a1) ->
+coq_VarAction_rect :: (PhysReg -> a1) ->
                                  (PhysReg -> a1) ->
-                                 (PhysReg -> Prelude.Int -> a1) ->
+                                 (PhysReg -> a1) ->
+                                 (PhysReg -> a1) ->
+                                 (PhysReg -> a1) ->
                                  (PhysReg -> a1) ->
                                  VarAction -> a1
-coq_VarAction_rect f f0 f1 f2 f3 v =
+coq_VarAction_rect f f0 f1 f2 f3 f4 v =
   case v of {
    RegLoad x -> f x;
-   RegRestore x x0 -> f0 x x0;
+   RegLoadAndSpill x -> f0 x;
    RegUse x -> f1 x;
-   RegUseThenSpill x x0 -> f2 x x0;
-   RegDump x -> f3 x}
+   RegSpill x -> f2 x;
+   RegRestore x -> f3 x;
+   RegRestoreAndSpill x -> f4 x}
 
-coq_VarAction_rec :: (PhysReg -> a1) -> (Prelude.Int ->
-                                PhysReg -> a1) ->
+coq_VarAction_rec :: (PhysReg -> a1) ->
                                 (PhysReg -> a1) ->
-                                (PhysReg -> Prelude.Int -> a1) ->
+                                (PhysReg -> a1) ->
+                                (PhysReg -> a1) ->
+                                (PhysReg -> a1) ->
                                 (PhysReg -> a1) ->
                                 VarAction -> a1
 coq_VarAction_rec =
   coq_VarAction_rect
+
+registerOfAction :: VarAction -> PhysReg
+registerOfAction act =
+  case act of {
+   RegLoad r -> r;
+   RegLoadAndSpill r -> r;
+   RegUse r -> r;
+   RegSpill r -> r;
+   RegRestore r -> r;
+   RegRestoreAndSpill r -> r}
 
 data VarInfo varType =
    Build_VarInfo (varType -> Prelude.Int) (varType ->
@@ -663,7 +677,7 @@ buildIntervals vinfo oinfo binfo =
     case mx of {
      Prelude.Just b ->
       f ss __ (Interval.Build_IntervalDesc vid (Range.rbeg ( b))
-        (Range.rend ( b)) ((:[]) ( b))) __;
+        (Range.rend ( b)) Interval.Whole ((:[]) ( b))) __;
      Prelude.Nothing -> ss}}
   in
   let {
@@ -688,7 +702,8 @@ buildIntervals vinfo oinfo binfo =
               case mr of {
                Prelude.Just y -> Prelude.Just
                 (Interval.packInterval (Interval.Build_IntervalDesc 0
-                  (Range.rbeg ( y)) (Range.rend ( y)) ((:[]) ( y))));
+                  (Range.rbeg ( y)) (Range.rend ( y)) Interval.Whole ((:[])
+                  ( y))));
                Prelude.Nothing -> Prelude.Nothing}) (bsRegs bs)}
     in
     let {
@@ -762,7 +777,52 @@ assignRegNum vinfo oinfo binfo sd =
                    (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
                  ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) n)
                    ((Prelude.<=) ((Prelude.succ) n) (Interval.iend int))) of {
-           Prelude.True -> (:) ((,) vid (RegLoad reg)) acc;
+           Prelude.True -> (:) ((,) vid
+            (case Interval.iknd int of {
+              Interval.Whole ->
+               case Eqtype.eq_op Ssrnat.nat_eqType
+                      (unsafeCoerce (Interval.firstUsePos int))
+                      (unsafeCoerce n) of {
+                Prelude.True -> RegLoad reg;
+                Prelude.False -> RegUse reg};
+              Interval.LeftMost ->
+               case Eqtype.eq_op Ssrnat.nat_eqType
+                      (unsafeCoerce (Interval.firstUsePos int))
+                      (unsafeCoerce n) of {
+                Prelude.True ->
+                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                        (unsafeCoerce (Interval.nextUseAfter int n))
+                        (unsafeCoerce Prelude.Nothing) of {
+                  Prelude.True -> RegLoadAndSpill reg;
+                  Prelude.False -> RegLoad reg};
+                Prelude.False ->
+                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                        (unsafeCoerce (Interval.nextUseAfter int n))
+                        (unsafeCoerce Prelude.Nothing) of {
+                  Prelude.True -> RegSpill reg;
+                  Prelude.False -> RegUse reg}};
+              Interval.Middle ->
+               case Eqtype.eq_op Ssrnat.nat_eqType
+                      (unsafeCoerce (Interval.firstUsePos int))
+                      (unsafeCoerce n) of {
+                Prelude.True ->
+                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                        (unsafeCoerce (Interval.nextUseAfter int n))
+                        (unsafeCoerce Prelude.Nothing) of {
+                  Prelude.True -> RegRestoreAndSpill reg;
+                  Prelude.False -> RegRestore reg};
+                Prelude.False ->
+                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                        (unsafeCoerce (Interval.nextUseAfter int n))
+                        (unsafeCoerce Prelude.Nothing) of {
+                  Prelude.True -> RegSpill reg;
+                  Prelude.False -> RegUse reg}};
+              Interval.RightMost ->
+               case Eqtype.eq_op Ssrnat.nat_eqType
+                      (unsafeCoerce (Interval.firstUsePos int))
+                      (unsafeCoerce n) of {
+                Prelude.True -> RegRestore reg;
+                Prelude.False -> RegUse reg}})) acc;
            Prelude.False -> acc}}}
       in
       Data.List.foldl' h [] ints}
@@ -1056,10 +1116,10 @@ splitInterval sd uid pos forCurrent =
            _evar_0_0 = \_ ->
             (Prelude.flip (Prelude.$)) __ (\_ ->
               let {
-               _evar_0_0 = \iv ib ie rds ->
+               _evar_0_0 = \iv ib ie _iknd_ rds ->
                 let {
                  _top_assumption_0 = Interval.intervalSpan rds splitPos iv ib
-                                       ie}
+                                       ie _iknd_}
                 in
                 let {
                  _evar_0_0 = \_top_assumption_1 ->
@@ -1192,7 +1252,8 @@ splitInterval sd uid pos forCurrent =
                  (,) x x0 -> _evar_0_0 x x0 __}}
               in
               case int of {
-               Interval.Build_IntervalDesc x x0 x1 x2 -> _evar_0_0 x x0 x1 x2})}
+               Interval.Build_IntervalDesc x x0 x1 x2 x3 ->
+                _evar_0_0 x x0 x1 x2 x3})}
           in
           let {
            _evar_0_1 = \_ -> Prelude.Left (ECannotSplitSingleton
@@ -1525,15 +1586,17 @@ allocateBlockedReg pre =
         in
         let {
          pos' = case Interval.findIntervalUsePos
-                       (
-                         (LinearScan.Utils.nth (nextInterval sd)
-                           (intervals sd) i)) atPos of {
+                       (Interval.getIntervalDesc
+                         (
+                           (LinearScan.Utils.nth (nextInterval sd)
+                             (intervals sd) i))) atPos of {
                  Prelude.Just p0 -> Prelude.Just 0;
                  Prelude.Nothing ->
                   Interval.nextUseAfter
-                    (
-                      (LinearScan.Utils.nth (nextInterval sd)
-                        (intervals sd) i)) start}}
+                    (Interval.getIntervalDesc
+                      (
+                        (LinearScan.Utils.nth (nextInterval sd)
+                          (intervals sd) i))) start}}
         in
         updateRegisterPos maxReg v r pos'}}
     in

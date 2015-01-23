@@ -43,17 +43,75 @@ Inductive VarAction :=
   (* Load the variable into a register prior to the current operation.
      This is the first load of the value. *)
   | RegLoad of PhysReg
-  (* Restore from the given memory offset to the specified register before the
-     current operation. *)
-  | RegRestore of nat & PhysReg
+  | RegLoadAndSpill of PhysReg
   (* The value is currently in the given register. *)
   | RegUse of PhysReg
   (* Spill the variable from the register to the specified memory offset,
      after the current operation. *)
-  | RegUseThenSpill of PhysReg & nat
-  (* The value is in the given register, but is not needed beyond this
-     point. *)
-  | RegDump of PhysReg.
+  | RegSpill of PhysReg
+  (* Restore from the given memory offset to the specified register before the
+     current operation. *)
+  | RegRestore of PhysReg
+  | RegRestoreAndSpill of PhysReg.
+
+Definition registerOfAction (act : VarAction) : PhysReg :=
+  match act with
+  | RegLoad r            => r
+  | RegLoadAndSpill r    => r
+  | RegUse r             => r
+  | RegSpill r           => r
+  | RegRestore r         => r
+  | RegRestoreAndSpill r => r
+  end.
+
+(*
+Section EqVarAction.
+
+Definition eqact v1 v2 :=
+  match v1, v2 with
+  | RegLoad r1, RegLoad r2                 => r1 == r2
+  | RegUse r1, RegUse r2                   => r1 == r2
+  | RegSpill r1 off1, RegSpill r2 off2     => (r1 == r2) && (off1 == off2)
+  | RegRestore off1 r1, RegRestore off2 r2 => (r1 == r2) && (off1 == off2)
+  | _, _                                   => false
+  end.
+
+Lemma eqactP : Equality.axiom eqact.
+Proof.
+  move.
+  case=> [r1|r1|r1 off1|off1 r1];
+  case=> [r2|r2|r2 off2|off2 r2];
+  case: (r1 =P r2) => [<-|/eqP /negbTE neqx] //=;
+    do [ rewrite eq_refl;
+         by constructor
+       | rewrite neqx;
+         constructor;
+         move/eqP in neqx;
+         move=> H;
+         contradiction neqx;
+         congruence
+       | constructor;
+         discriminate
+       | idtac ];
+  case: (off1 =P off2) => [<-|/eqP /negbTE neqx] //=;
+    rewrite eq_refl;
+    constructor => //=;
+    move/eqP in neqx;
+    move=> H;
+    contradiction neqx;
+    congruence.
+Qed.
+
+Canonical act_eqMixin := EqMixin eqactP.
+Canonical act_eqType := Eval hnf in EqType VarAction act_eqMixin.
+
+Lemma eqactE : eqact = eq_op. Proof. by []. Qed.
+
+Definition VarAction_eqType (A : eqType) :=
+  Equality.Pack act_eqMixin VarAction.
+
+End EqVarAction.
+*)
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
@@ -228,7 +286,7 @@ Definition buildIntervals :
                    -> ScanStateSig Pending) :=
       let: exist _ st := ss in
       if mx is Some (exist r _)
-      then f _ st _ (I_Sing vid r.2)
+      then f _ st _ (I_Sing vid Whole r.2)
            (* jww (2015-01-20): At the present time there is no use of
               "lifetime holes", and so [I_Cons] is never used here. *)
       else ss in
@@ -241,7 +299,7 @@ Definition buildIntervals :
   (fun bs =>
      let regs := vmap (fun mr =>
            if mr is Some (exist r _)
-           then Some (packInterval (I_Sing 0 r.2))
+           then Some (packInterval (I_Sing 0 Whole r.2))
            else None) (bsRegs bs) in
 
      let s0 := ScanState_nil in
@@ -273,10 +331,25 @@ Definition assignRegNum `(st : ScanState InUse sd) :
         (fun vid int =>
            if (ivar int == vid) &&
               (ibeg int <= n < iend int)
-           then (vid, RegLoad reg) :: acc
-                (* jww (2015-01-20): We cannot always RegLoad here, but
-                   must differentiate based on the circumstance. *)
-           else acc) (varId vinfo v) (getInterval xid) in
+           then (vid, match iknd int,
+                            firstUsePos int == n,
+                            nextUseAfter int n == None with
+                      | LeftMost,  true,  true  => RegLoadAndSpill reg
+                      | Middle,    true,  true  => RegRestoreAndSpill reg
+                      | RightMost, true,  true  => RegRestore reg
+                      | Whole,     true,  true  => RegLoad reg
+                      | LeftMost,  true,  false => RegLoad reg
+                      | Middle,    true,  false => RegRestore reg
+                      | RightMost, true,  false => RegRestore reg
+                      | Whole,     true,  false => RegLoad reg
+                      | LeftMost,  false, true  => RegSpill reg
+                      | Middle,    false, true  => RegSpill reg
+                      | RightMost, false, true  => RegUse reg
+                      | Whole,     false, true  => RegUse reg
+                      | _, _, _ => RegUse reg
+                      end) :: acc
+           else acc)
+        (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in
     (n.+2, applyAllocs oinfo op (flatten (map k (varRefs oinfo op)))) in
   imodify SSError (@snd _ _ \o mapAccumLOps f 1).

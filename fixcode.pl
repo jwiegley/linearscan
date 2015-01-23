@@ -32,5 +32,7 @@ import qualified LinearScan.Utils
 
     s/morphlen_transport b b' =/morphlen_transport b b' = GHC.Base.id/;
 
+    s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
+
     print;
 }

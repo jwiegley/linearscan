@@ -290,7 +290,7 @@ Proof.
 
   have Hset := ScanState_setInterval st.
   case Hint: int => [d i] in Hmid1 Hmid2 *.
-  case: d => iv ib ie rds in i Hint Hmid1 Hmid2 *.
+  case: d => iv ib ie ? rds in i Hint Hmid1 Hmid2 *.
   rewrite /= in Hset.
 
   case: (intervalSpan splitPos i) => /= [[[[id0 i0] |] [[id1 i1] |]]].

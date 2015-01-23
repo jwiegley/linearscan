@@ -16,6 +16,7 @@ module LinearScan
     , VarInfo(..)
     , VarKind(..)
     , VarAction(..)
+    , registerOfAction
     , PhysReg
     ) where
 
@@ -23,6 +24,7 @@ import qualified LinearScan.Main as LS
 import LinearScan.Main
     ( VarKind(..)
     , VarAction(..)
+    , registerOfAction
     , OpKind(..)
     , PhysReg
     )

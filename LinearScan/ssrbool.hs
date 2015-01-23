@@ -25,6 +25,12 @@ unsafeCoerce = IOExts.unsafeCoerce
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
+isSome :: (Prelude.Maybe a1) -> Prelude.Bool
+isSome u =
+  case u of {
+   Prelude.Just t -> Prelude.True;
+   Prelude.Nothing -> Prelude.False}
+
 data Coq_reflect =
    ReflectT
  | ReflectF

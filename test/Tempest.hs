@@ -190,12 +190,17 @@ nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
 data AtomKind = Atom deriving (Eq, Show)
 data Var = Var deriving (Eq, Show)
 
-data IRVar' = PhysicalIV !Reg
+data IRVar' = PhysicalIV !VarAction
             | VirtualIV !Int !AtomKind
             deriving Eq
 
 instance Show IRVar' where
-    show (PhysicalIV (Reg r)) = "r" ++ show r
+    show (PhysicalIV (RegUse r))             = "r" ++ show r
+    show (PhysicalIV (RegLoad r))            = "L" ++ show r
+    show (PhysicalIV (RegLoadAndSpill r))    = "LS" ++ show r
+    show (PhysicalIV (RegSpill r))           = "S" ++ show r
+    show (PhysicalIV (RegRestore r))         = "R" ++ show r
+    show (PhysicalIV (RegRestoreAndSpill r)) = "RS" ++ show r
     show (VirtualIV n _) = "v" ++ show n
 
 -- | Virtual IR variable together with an optional AST variable
@@ -248,7 +253,7 @@ asmTest (compile -> body) (compile -> result) =
 assignVar :: IntMap VarAction -> IRVar -> IRVar
 assignVar _ v@(IRVar (PhysicalIV _) _) = v
 assignVar m (IRVar (VirtualIV n _) x) = case Data.IntMap.lookup n m of
-    Just (RegLoad r) -> IRVar (PhysicalIV (Reg r)) x
+    Just r -> IRVar (PhysicalIV r) x
     a -> error $ "Unexpected allocation " ++ show a
              ++ " for variable " ++ show n
 
@@ -260,7 +265,7 @@ convertNode (PNode (Node (Instr i) _)) = go i
     go x = error $ "convertNode.go: Unexpected " ++ show x
 
     mkv :: VarKind -> IRVar -> ([(VarKind, IRVar)], [PhysReg])
-    mkv _ (IRVar (PhysicalIV (Reg n)) _) = ([], [n])
+    mkv _ (IRVar (PhysicalIV n) _) = ([], [registerOfAction n])
     mkv k v = ([(k, v)], [])
 
 convertNode x = error $ "convertNode: Unexpected" ++ show x
@@ -270,10 +275,17 @@ var i = IRVar { _ivVar = VirtualIV i Atom
               , _ivSrc = Nothing
               }
 
-reg :: Int -> IRVar
-reg i = IRVar { _ivVar = PhysicalIV (Reg i)
+reg :: VarAction -> IRVar
+reg i = IRVar { _ivVar = PhysicalIV i
               , _ivSrc = Nothing
               }
+
+load         = reg . RegLoad
+loadSpill    = reg . RegLoadAndSpill
+use          = reg . RegUse
+spill        = reg . RegSpill
+restore      = reg . RegRestore
+restoreSpill = reg . RegRestoreAndSpill
 
 v0  = var 0
 v1  = var 1
@@ -312,42 +324,153 @@ v33 = var 33
 v34 = var 34
 v35 = var 35
 
-r0  = reg 0
-r1  = reg 1
-r2  = reg 2
-r3  = reg 3
-r4  = reg 4
-r5  = reg 5
-r6  = reg 6
-r7  = reg 7
-r8  = reg 8
-r9  = reg 9
-r10 = reg 10
-r11 = reg 11
-r12 = reg 12
-r13 = reg 13
-r14 = reg 14
-r15 = reg 15
-r16 = reg 16
-r17 = reg 17
-r18 = reg 18
-r19 = reg 19
-r20 = reg 20
-r21 = reg 21
-r22 = reg 22
-r23 = reg 23
-r24 = reg 24
-r25 = reg 25
-r26 = reg 26
-r27 = reg 27
-r28 = reg 28
-r29 = reg 29
-r30 = reg 30
-r31 = reg 31
-r32 = reg 32
-r33 = reg 33
-r34 = reg 34
-r35 = reg 35
+r0  = use 0
+r1  = use 1
+r2  = use 2
+r3  = use 3
+r4  = use 4
+r5  = use 5
+r6  = use 6
+r7  = use 7
+r8  = use 8
+r9  = use 9
+r10 = use 10
+r11 = use 11
+r12 = use 12
+r13 = use 13
+r14 = use 14
+r15 = use 15
+r16 = use 16
+r17 = use 17
+r18 = use 18
+r19 = use 19
+r20 = use 20
+r21 = use 21
+r22 = use 22
+r23 = use 23
+r24 = use 24
+r25 = use 25
+r26 = use 26
+r27 = use 27
+r28 = use 28
+r29 = use 29
+r30 = use 30
+r31 = use 31
+r32 = use 32
+r33 = use 33
+r34 = use 34
+r35 = use 35
+
+l0  = load 0
+l1  = load 1
+l2  = load 2
+l3  = load 3
+l4  = load 4
+l5  = load 5
+l6  = load 6
+l7  = load 7
+l8  = load 8
+l9  = load 9
+l10 = load 10
+l11 = load 11
+l12 = load 12
+l13 = load 13
+l14 = load 14
+l15 = load 15
+l16 = load 16
+l17 = load 17
+l18 = load 18
+l19 = load 19
+l20 = load 20
+l21 = load 21
+l22 = load 22
+l23 = load 23
+l24 = load 24
+l25 = load 25
+l26 = load 26
+l27 = load 27
+l28 = load 28
+l29 = load 29
+l30 = load 30
+l31 = load 31
+l32 = load 32
+l33 = load 33
+l34 = load 34
+l35 = load 35
+
+s0  = spill 0
+s1  = spill 1
+s2  = spill 2
+s3  = spill 3
+s4  = spill 4
+s5  = spill 5
+s6  = spill 6
+s7  = spill 7
+s8  = spill 8
+s9  = spill 9
+s10 = spill 10
+s11 = spill 11
+s12 = spill 12
+s13 = spill 13
+s14 = spill 14
+s15 = spill 15
+s16 = spill 16
+s17 = spill 17
+s18 = spill 18
+s19 = spill 19
+s20 = spill 20
+s21 = spill 21
+s22 = spill 22
+s23 = spill 23
+s24 = spill 24
+s25 = spill 25
+s26 = spill 26
+s27 = spill 27
+s28 = spill 28
+s29 = spill 29
+s30 = spill 30
+s31 = spill 31
+s32 = spill 32
+s33 = spill 33
+s34 = spill 34
+s35 = spill 35
+
+ls0  = loadSpill 0
+ls1  = loadSpill 1
+ls2  = loadSpill 2
+ls3  = loadSpill 3
+ls4  = loadSpill 4
+ls5  = loadSpill 5
+ls6  = loadSpill 6
+ls7  = loadSpill 7
+ls8  = loadSpill 8
+ls9  = loadSpill 9
+ls10 = loadSpill 10
+ls11 = loadSpill 11
+ls12 = loadSpill 12
+ls13 = loadSpill 13
+ls14 = loadSpill 14
+ls15 = loadSpill 15
+ls16 = loadSpill 16
+ls17 = loadSpill 17
+ls18 = loadSpill 18
+ls19 = loadSpill 19
+ls20 = loadSpill 20
+ls21 = loadSpill 21
+ls22 = loadSpill 22
+ls23 = loadSpill 23
+ls24 = loadSpill 24
+ls25 = loadSpill 25
+ls26 = loadSpill 26
+ls27 = loadSpill 27
+ls28 = loadSpill 28
+ls29 = loadSpill 29
+ls30 = loadSpill 30
+ls31 = loadSpill 31
+ls32 = loadSpill 32
+ls33 = loadSpill 33
+ls34 = loadSpill 34
+ls35 = loadSpill 35
 
 type Program a = Free (PNode IRVar O O) a
 
