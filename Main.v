@@ -27,19 +27,20 @@ Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
-Definition mainAlgorithm {blockType opType varType : Set}
-  (binfo : BlockInfo blockType opType)
-  (oinfo : OpInfo opType varType)
+Definition mainAlgorithm
+  {blockType1 blockType2 opType1 opType2 varType : Set}
+  (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
+  (oinfo : OpInfo opType1 opType2 varType)
   (vinfo : VarInfo varType) :
-  IState SSError (BlockList blockType) (BlockList blockType) unit :=
+  BlockState _ (NonEmpty blockType2) :=
 
   (* order blocks and operations (including loop detection) *)
-  computeBlockOrder blockType ;;;
-  numberOperations blockType ;;;
+  computeBlockOrder blockType1 ;;;
+  numberOperations blockType1 ;;;
 
   (* create intervals with live ranges *)
-  computeLocalLiveSets blockType ;;;
-  computeGlobalLiveSets blockType ;;;
+  computeLocalLiveSets blockType1 ;;;
+  computeGlobalLiveSets blockType1 ;;;
   ssig <<- buildIntervals vinfo oinfo binfo ;;
 
   (* allocate registers *)
@@ -48,21 +49,22 @@ Definition mainAlgorithm {blockType opType varType : Set}
   | inl err => error_ err
   | inr ssig' =>
       (* jww (2015-01-22): This is a critical piece which is still missing. *)
-      resolveDataFlow blockType ;;;
+      resolveDataFlow blockType1 ;;;
 
       (* replace virtual registers with physical registers *)
       assignRegNum vinfo oinfo binfo ssig'.2
   end.
 
-Definition linearScan {blockType opType varType : Set}
-  (binfo : BlockInfo blockType opType)
-  (oinfo : OpInfo opType varType)
-  (vinfo : VarInfo varType) (blocks : BlockList blockType) :
-  SSError + BlockList blockType :=
+Definition linearScan
+  {blockType1 blockType2 opType1 opType2 varType : Set}
+  (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
+  (oinfo : OpInfo opType1 opType2 varType)
+  (vinfo : VarInfo varType) (blocks : BlockList blockType1) :
+  SSError + BlockList blockType2 :=
   let main := mainAlgorithm binfo oinfo vinfo in
   match IState.runIState SSError main blocks with
   | inl err      => inl err
-  | inr (_, res) => inr res
+  | inr (res, _) => inr res
   end.
 
 End Main.

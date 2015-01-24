@@ -16,7 +16,11 @@ Section Blocks.
 
 Open Scope program_scope.
 
-Variables blockType opType varType : Set.
+Variables blockType1 : Set.
+Variables blockType2 : Set.
+Variables opType1    : Set.
+Variables opType2    : Set.
+Variables varType    : Set.
 
 (* The simplest way to get information about the IR instructions from the
    caller is to receive the following data:
@@ -61,23 +65,23 @@ Record AllocInfo := {
 (* The [OpInfo] structure is a collection of functions that allow us to
    determine information about each operation coming from the caller's
    side. *)
-Record OpInfo (opType varType : Set) := {
-  opKind      : opType -> OpKind;
-  varRefs     : opType -> seq varType;
-  applyAllocs : opType -> seq (nat * AllocInfo) -> opType;
-  regRefs     : opType -> seq PhysReg
+Record OpInfo (opType1 opType2 varType : Set) := {
+  opKind      : opType1 -> OpKind;
+  varRefs     : opType1 -> seq varType;
+  applyAllocs : opType1 -> seq (nat * AllocInfo) -> opType2;
+  regRefs     : opType1 -> seq PhysReg
 }.
 
-Variable oinfo : OpInfo opType varType.
+Variable oinfo : OpInfo opType1 opType2 varType.
 
-Record BlockInfo (blockType opType : Set) := {
-  blockOps    : blockType -> seq opType;
-  setBlockOps : blockType -> seq opType -> blockType
+Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
+  blockOps    : blockType1 -> seq opType1;
+  setBlockOps : blockType1 -> seq opType2 -> blockType2
 }.
 
-Variable binfo : BlockInfo blockType opType.
+Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 
-Definition BlockList := NonEmpty blockType.
+Definition BlockList := NonEmpty blockType1.
 
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.
@@ -105,18 +109,20 @@ Record BuildState := {
   bsRegs : Vec (option (BoundedRange bsPos.*2.+1)) maxReg
 }.
 
-Definition foldOps {a} (f : a -> opType -> a) (z : a) : BlockList -> a :=
+Definition foldOps {a} (f : a -> opType1 -> a) (z : a) :
+  BlockList -> a :=
   NE_foldl (fun bacc blk => foldl f bacc (blockOps binfo blk)) z.
 
-Definition foldOpsRev {a} (f : a -> opType -> a) (z : a)
+Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a)
   (blocks : BlockList) : a :=
   foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
         z (rev blocks).
 
-Definition countOps : BlockList -> nat := foldOps (fun acc _ => acc.+1) 0.
+Definition countOps : BlockList -> nat :=
+  foldOps (fun acc _ => acc.+1) 0.
 
-Definition mapAccumLOps {a} (f : a -> opType -> (a * opType)) :
-  a -> BlockList -> a * BlockList :=
+Definition mapAccumLOps {a} (f : a -> opType1 -> (a * opType2)) :
+  a -> BlockList -> a * NonEmpty blockType2 :=
   NE_mapAccumL (fun z blk =>
     let: (z', ops) := mapAccumL f z (blockOps binfo blk) in
     (z', setBlockOps binfo blk ops)).
@@ -173,14 +179,15 @@ Definition processOperations (blocks : BlockList) : BuildState.
     exact.
 Defined.
 
+Definition BlockState := IState SSError BlockList BlockList.
+
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
    Wimmer's thesis.  At the moment we're simply accepting whatever block order
    is passed to us by the caller.  However, implementing this function
    properly is a strong means of improving the accuracy and efficiency of this
    algorithm. *)
-Definition computeBlockOrder :
-  IState SSError BlockList BlockList unit := return_ tt.
+Definition computeBlockOrder : BlockState unit := return_ tt.
 
 (* This function not only numbers all operations for us, but adds any extra
    administrative information that we need to process the algorithm on this
@@ -188,8 +195,7 @@ Definition computeBlockOrder :
    the caller.  From this point on, all functions operate on this enriched
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
-Definition numberOperations :
-  IState SSError BlockList BlockList unit := return_ tt.
+Definition numberOperations : BlockState unit := return_ tt.
   (* let f n op := *)
   (*   (n.+2, {| opId    := n *)
   (*           ; opMeta  := opMeta op *)
@@ -197,8 +203,6 @@ Definition numberOperations :
   (*           ; varRefs := varRefs op *)
   (*           ; regRefs := regRefs op |}) in *)
   (* imodify SSError (@snd _ _ \o mapAccumLOps f 1). *)
-
-Definition BlockState := IState SSError BlockList BlockList.
 
 (* jww (2014-12-01): The following two functions are used for computing
    accurate live ranges. they constitute a dataflow analysis which determines
@@ -209,8 +213,7 @@ Definition computeLocalLiveSets : BlockState unit := return_ tt.
 
 Definition computeGlobalLiveSets : BlockState unit := return_ tt.
 
-Definition buildIntervals :
-  IState SSError BlockList BlockList (ScanStateSig InUse) :=
+Definition buildIntervals : BlockState (ScanStateSig InUse) :=
   let mkint (vid : nat)
             (ss : ScanStateSig Pending)
             (pos : nat)
@@ -246,11 +249,11 @@ Definition buildIntervals :
 
 Definition resolveDataFlow : BlockState unit := return_ tt.
 
-Definition mapOps (f : opType -> opType) : BlockList -> BlockList :=
-  NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))).
+(* Definition mapOps (f : opType -> opType) : BlockList -> BlockList := *)
+(*   NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))). *)
 
 Definition assignRegNum `(st : ScanState InUse sd) :
-  IState SSError BlockList BlockList unit :=
+  BlockState (NonEmpty blockType2) :=
   let ints := handled sd ++ active sd ++ inactive sd in
   let f n op :=
     let k v :=
@@ -282,7 +285,8 @@ Definition assignRegNum `(st : ScanState InUse sd) :
         (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in
     (n.+2, applyAllocs oinfo op (flatten (map k (varRefs oinfo op)))) in
-  imodify SSError (@snd _ _ \o mapAccumLOps f 1).
+  blocks <<- iget SSError ;;
+  return_ (snd (mapAccumLOps f 1 blocks)).
 
 End Blocks.
 

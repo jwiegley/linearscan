@@ -385,77 +385,86 @@ allocAction a =
   case a of {
    Build_AllocInfo allocReg0 allocAction0 -> allocAction0}
 
-data OpInfo opType varType =
-   Build_OpInfo (opType -> OpKind) (opType -> [] varType) 
- (opType -> ([] ((,) Prelude.Int AllocInfo)) -> opType) (opType ->
-                                                                  []
-                                                                  PhysReg)
+data OpInfo opType1 opType2 varType =
+   Build_OpInfo (opType1 -> OpKind) (opType1 -> []
+                                                        varType) (opType1 ->
+                                                                 ([]
+                                                                 ((,)
+                                                                 Prelude.Int
+                                                                 AllocInfo))
+                                                                 -> opType2) 
+ (opType1 -> [] PhysReg)
 
 coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> [] 
-                              a2) -> (a1 -> ([]
-                              ((,) Prelude.Int AllocInfo)) -> a1)
-                              -> (a1 -> [] PhysReg) -> a3) ->
-                              (OpInfo a1 a2) -> a3
+                              a3) -> (a1 -> ([]
+                              ((,) Prelude.Int AllocInfo)) -> a2)
+                              -> (a1 -> [] PhysReg) -> a4) ->
+                              (OpInfo a1 a2 a3) -> a4
 coq_OpInfo_rect f o =
   case o of {
    Build_OpInfo x x0 x1 x2 -> f x x0 x1 x2}
 
-coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> [] a2) ->
+coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> [] a3) ->
                              (a1 -> ([]
-                             ((,) Prelude.Int AllocInfo)) -> a1) ->
-                             (a1 -> [] PhysReg) -> a3) ->
-                             (OpInfo a1 a2) -> a3
+                             ((,) Prelude.Int AllocInfo)) -> a2) ->
+                             (a1 -> [] PhysReg) -> a4) ->
+                             (OpInfo a1 a2 a3) -> a4
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
-opKind :: (OpInfo a1 a2) -> a1 -> OpKind
+opKind :: (OpInfo a1 a2 a3) -> a1 -> OpKind
 opKind o =
   case o of {
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> opKind0}
 
-varRefs :: (OpInfo a1 a2) -> a1 -> [] a2
+varRefs :: (OpInfo a1 a2 a3) -> a1 -> [] a3
 varRefs o =
   case o of {
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> varRefs0}
 
-applyAllocs :: (OpInfo a1 a2) -> a1 -> ([]
-                          ((,) Prelude.Int AllocInfo)) -> a1
+applyAllocs :: (OpInfo a1 a2 a3) -> a1 -> ([]
+                          ((,) Prelude.Int AllocInfo)) -> a2
 applyAllocs o =
   case o of {
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 ->
     applyAllocs0}
 
-regRefs :: (OpInfo a1 a2) -> a1 -> [] PhysReg
+regRefs :: (OpInfo a1 a2 a3) -> a1 -> []
+                      PhysReg
 regRefs o =
   case o of {
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> regRefs0}
 
-data BlockInfo blockType opType =
-   Build_BlockInfo (blockType -> [] opType) (blockType -> ([]
-                                                      opType) -> blockType)
+data BlockInfo blockType1 blockType2 opType1 opType2 =
+   Build_BlockInfo (blockType1 -> [] opType1) (blockType1 -> ([]
+                                                        opType2) ->
+                                                        blockType2)
 
-coq_BlockInfo_rect :: ((a1 -> [] a2) -> (a1 -> ([] a2) -> a1) ->
-                                 a3) -> (BlockInfo a1 a2) -> a3
+coq_BlockInfo_rect :: ((a1 -> [] a3) -> (a1 -> ([] a4) -> a2) ->
+                                 a5) -> (BlockInfo a1 a2 a3 
+                                 a4) -> a5
 coq_BlockInfo_rect f b =
   case b of {
    Build_BlockInfo x x0 -> f x x0}
 
-coq_BlockInfo_rec :: ((a1 -> [] a2) -> (a1 -> ([] a2) -> a1) ->
-                                a3) -> (BlockInfo a1 a2) -> a3
+coq_BlockInfo_rec :: ((a1 -> [] a3) -> (a1 -> ([] a4) -> a2) ->
+                                a5) -> (BlockInfo a1 a2 a3 
+                                a4) -> a5
 coq_BlockInfo_rec =
   coq_BlockInfo_rect
 
-blockOps :: (BlockInfo a1 a2) -> a1 -> [] a2
+blockOps :: (BlockInfo a1 a2 a3 a4) -> a1 -> [] a3
 blockOps b =
   case b of {
    Build_BlockInfo blockOps0 setBlockOps0 -> blockOps0}
 
-setBlockOps :: (BlockInfo a1 a2) -> a1 -> ([] a2) -> a1
+setBlockOps :: (BlockInfo a1 a2 a3 a4) -> a1 -> ([] 
+                          a4) -> a2
 setBlockOps b =
   case b of {
    Build_BlockInfo blockOps0 setBlockOps0 -> setBlockOps0}
 
-type BlockList blockType = [] blockType
+type BlockList blockType1 = [] blockType1
 
 type BoundedRange = Range.RangeDesc
 
@@ -504,35 +513,35 @@ bsRegs b =
   case b of {
    Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsRegs0}
 
-foldOps :: (BlockInfo a1 a2) -> (a3 -> a2 -> a3) -> a3
-                      -> (BlockList a1) -> a3
+foldOps :: (BlockInfo a1 a2 a3 a4) -> (a5 -> a3 -> a5)
+                      -> a5 -> (BlockList a1) -> a5
 foldOps binfo f z =
   Data.List.foldl' (\bacc blk ->
     Data.List.foldl' f bacc (blockOps binfo blk)) z
 
-foldOpsRev :: (BlockInfo a1 a2) -> (a3 -> a2 -> a3) ->
-                         a3 -> (BlockList a1) -> a3
+foldOpsRev :: (BlockInfo a1 a2 a3 a4) -> (a5 -> a3 ->
+                         a5) -> a5 -> (BlockList a1) -> a5
 foldOpsRev binfo f z blocks =
   Data.List.foldl' (\bacc blk ->
     Data.List.foldl' f bacc (Seq.rev (blockOps binfo blk))) z
     (Seq.rev ( blocks))
 
-countOps :: (BlockInfo a1 a2) -> (BlockList
-                       a1) -> Prelude.Int
+countOps :: (BlockInfo a1 a2 a3 a4) ->
+                       (BlockList a1) -> Prelude.Int
 countOps binfo =
   foldOps binfo (\acc x -> (Prelude.succ) acc) 0
 
-mapAccumLOps :: (BlockInfo a1 a2) -> (a3 -> a2 -> (,) 
-                           a3 a2) -> a3 -> (BlockList a1) -> (,) 
-                           a3 (BlockList a1)
+mapAccumLOps :: (BlockInfo a1 a2 a3 a4) -> (a5 -> a3 ->
+                           (,) a5 a4) -> a5 -> (BlockList a1) ->
+                           (,) a5 ([] a2)
 mapAccumLOps binfo f =
   NonEmpty0.coq_NE_mapAccumL (\z blk ->
     case Lib.mapAccumL f z (blockOps binfo blk) of {
      (,) z' ops -> (,) z' (setBlockOps binfo blk ops)})
 
-processOperations :: (VarInfo a3) -> (OpInfo
-                                a2 a3) -> (BlockInfo a1 a2) ->
-                                (BlockList a1) ->
+processOperations :: (VarInfo a5) -> (OpInfo
+                                a3 a4 a5) -> (BlockInfo a1 
+                                a2 a3 a4) -> (BlockList a1) ->
                                 BuildState
 processOperations vinfo oinfo binfo blocks =
   (Prelude.flip (Prelude.$))
@@ -642,21 +651,17 @@ processOperations vinfo oinfo binfo blocks =
     case _top_assumption_ of {
      (,) x x0 -> _evar_0_ x x0})
 
-computeBlockOrder :: IState.IState SSError
-                                (BlockList a1)
-                                (BlockList a1) ()
+type BlockState blockType1 a =
+  IState.IState SSError (BlockList blockType1)
+  (BlockList blockType1) a
+
+computeBlockOrder :: BlockState a1 ()
 computeBlockOrder =
   return_ ()
 
-numberOperations :: IState.IState SSError
-                               (BlockList a1)
-                               (BlockList a1) ()
+numberOperations :: BlockState a1 ()
 numberOperations =
   return_ ()
-
-type BlockState blockType a =
-  IState.IState SSError (BlockList blockType)
-  (BlockList blockType) a
 
 computeLocalLiveSets :: BlockState a1 ()
 computeLocalLiveSets =
@@ -666,11 +671,10 @@ computeGlobalLiveSets :: BlockState a1 ()
 computeGlobalLiveSets =
   return_ ()
 
-buildIntervals :: (VarInfo a3) -> (OpInfo 
-                             a2 a3) -> (BlockInfo a1 a2) ->
-                             IState.IState SSError
-                             (BlockList a1)
-                             (BlockList a1) ScanStateSig
+buildIntervals :: (VarInfo a5) -> (OpInfo 
+                             a3 a4 a5) -> (BlockInfo a1 a2 
+                             a3 a4) -> BlockState a1
+                             ScanStateSig
 buildIntervals vinfo oinfo binfo =
   let {
    mkint = \vid ss pos mx f ->
@@ -739,19 +743,10 @@ resolveDataFlow :: BlockState a1 ()
 resolveDataFlow =
   return_ ()
 
-mapOps :: (BlockInfo a1 a2) -> (a2 -> a2) ->
-                     (BlockList a1) -> BlockList 
-                     a1
-mapOps binfo f =
-  Prelude.map (\blk ->
-    setBlockOps binfo blk
-      (Prelude.map f (blockOps binfo blk)))
-
-assignRegNum :: (VarInfo a3) -> (OpInfo 
-                           a2 a3) -> (BlockInfo a1 a2) ->
-                           ScanStateDesc -> IState.IState
-                           SSError (BlockList a1)
-                           (BlockList a1) ()
+assignRegNum :: (VarInfo a5) -> (OpInfo 
+                           a3 a4 a5) -> (BlockInfo a1 a2 a3 
+                           a4) -> ScanStateDesc ->
+                           BlockState a1 ([] a2)
 assignRegNum vinfo oinfo binfo sd =
   let {
    ints = (Prelude.++) (handled sd)
@@ -817,9 +812,11 @@ assignRegNum vinfo oinfo binfo sd =
     (applyAllocs oinfo op
       (Seq.flatten (Prelude.map k (varRefs oinfo op))))}
   in
-  IState.imodify
-    ((Prelude..) Prelude.snd
-      (mapAccumLOps binfo f ((Prelude.succ) 0)))
+  stbind (\blocks ->
+    return_
+      (Prelude.snd
+        (mapAccumLOps binfo f ((Prelude.succ) 0) blocks)))
+    IState.iget
 
 coq_SSMorph_rect :: ScanStateDesc ->
                                ScanStateDesc -> (() -> a1) -> a1
@@ -1842,10 +1839,9 @@ walkIntervals sd positions =
       (packScanState InUse sd)})
     positions
 
-mainAlgorithm :: (BlockInfo a1 a2) -> (OpInfo a2 
-                 a3) -> (VarInfo a3) -> IState.IState
-                 SSError (BlockList a1)
-                 (BlockList a1) ()
+mainAlgorithm :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
+                 a3 a4 a5) -> (VarInfo a5) -> BlockState
+                 a1 ([] a2)
 mainAlgorithm binfo oinfo vinfo =
   stbind (\x ->
     stbind (\x0 ->
@@ -1864,14 +1860,15 @@ mainAlgorithm binfo oinfo vinfo =
           computeGlobalLiveSets) computeLocalLiveSets)
       numberOperations) computeBlockOrder
 
-linearScan :: (BlockInfo a1 a2) -> (OpInfo a2 a3) ->
-              (VarInfo a3) -> (BlockList a1) ->
-              Prelude.Either SSError (BlockList a1)
+linearScan :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
+              a3 a4 a5) -> (VarInfo a5) -> (BlockList 
+              a1) -> Prelude.Either SSError
+              (BlockList a2)
 linearScan binfo oinfo vinfo blocks =
   let {main = mainAlgorithm binfo oinfo vinfo} in
   case IState.runIState main blocks of {
    Prelude.Left err -> Prelude.Left err;
    Prelude.Right p ->
     case p of {
-     (,) u res -> Prelude.Right res}}
+     (,) res b -> Prelude.Right res}}
 

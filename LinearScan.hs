@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -57,11 +58,11 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 --   and restore all registers around a call, but indication of loops is
 --   optional, as it's merely avoids reloading of spilled variables inside
 --   loop bodies.
-data OpInfo o v = OpInfo
-    { opKind      :: o -> OpKind
-    , varRefs     :: o -> [v]
-    , applyAllocs :: o -> [(Int, LS.AllocInfo)] -> o
-    , regRefs     :: o -> [PhysReg]
+data OpInfo o v a b = OpInfo
+    { opKind      :: o a -> OpKind
+    , varRefs     :: o a -> [v]
+    , applyAllocs :: o a -> [(Int, LS.AllocInfo)] -> o b
+    , regRefs     :: o a -> [PhysReg]
     }
 
 deriving instance Eq OpKind
@@ -73,17 +74,17 @@ deriving instance Show VarAction
 deriving instance Eq LS.AllocInfo
 deriving instance Show LS.AllocInfo
 
-fromOpInfo :: OpInfo o v -> LS.OpInfo o v
+fromOpInfo :: OpInfo o v a b -> LS.OpInfo (o a) (o b) v
 fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b c d
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
-data BlockInfo b o = BlockInfo
-    { blockOps    :: b -> [o]
-    , setBlockOps :: b -> [o] -> b
+data BlockInfo blk o a b = BlockInfo
+    { blockOps    :: blk a -> [o a]
+    , setBlockOps :: blk a -> [o b] -> blk b
     }
 
-fromBlockInfo :: BlockInfo b o -> LS.BlockInfo b o
+fromBlockInfo :: BlockInfo blk o a b -> LS.BlockInfo (blk a) (blk b) (o a) (o b)
 fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
 
 -- | Transform a list of basic blocks containing variable references, into an
@@ -99,8 +100,8 @@ fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: BlockInfo b o -> OpInfo o v -> VarInfo v
-         -> [b] -> Either String [b]
+allocate :: BlockInfo blk o a b -> OpInfo o v a b -> VarInfo v
+         -> [blk a] -> Either String [blk b]
 allocate _ _ _ [] = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks =
