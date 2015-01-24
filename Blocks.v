@@ -39,79 +39,7 @@ Variables blockType opType varType : Set.
 Inductive VarKind := Input | Temp | Output.
 
 (* When use of a variable is encountered, one or more actions should be taken: *)
-Inductive VarAction :=
-  (* Load the variable into a register prior to the current operation.
-     This is the first load of the value. *)
-  | RegLoad of PhysReg
-  | RegLoadAndSpill of PhysReg
-  (* The value is currently in the given register. *)
-  | RegUse of PhysReg
-  (* Spill the variable from the register to the specified memory offset,
-     after the current operation. *)
-  | RegSpill of PhysReg
-  (* Restore from the given memory offset to the specified register before the
-     current operation. *)
-  | RegRestore of PhysReg
-  | RegRestoreAndSpill of PhysReg.
-
-Definition registerOfAction (act : VarAction) : PhysReg :=
-  match act with
-  | RegLoad r            => r
-  | RegLoadAndSpill r    => r
-  | RegUse r             => r
-  | RegSpill r           => r
-  | RegRestore r         => r
-  | RegRestoreAndSpill r => r
-  end.
-
-(*
-Section EqVarAction.
-
-Definition eqact v1 v2 :=
-  match v1, v2 with
-  | RegLoad r1, RegLoad r2                 => r1 == r2
-  | RegUse r1, RegUse r2                   => r1 == r2
-  | RegSpill r1 off1, RegSpill r2 off2     => (r1 == r2) && (off1 == off2)
-  | RegRestore off1 r1, RegRestore off2 r2 => (r1 == r2) && (off1 == off2)
-  | _, _                                   => false
-  end.
-
-Lemma eqactP : Equality.axiom eqact.
-Proof.
-  move.
-  case=> [r1|r1|r1 off1|off1 r1];
-  case=> [r2|r2|r2 off2|off2 r2];
-  case: (r1 =P r2) => [<-|/eqP /negbTE neqx] //=;
-    do [ rewrite eq_refl;
-         by constructor
-       | rewrite neqx;
-         constructor;
-         move/eqP in neqx;
-         move=> H;
-         contradiction neqx;
-         congruence
-       | constructor;
-         discriminate
-       | idtac ];
-  case: (off1 =P off2) => [<-|/eqP /negbTE neqx] //=;
-    rewrite eq_refl;
-    constructor => //=;
-    move/eqP in neqx;
-    move=> H;
-    contradiction neqx;
-    congruence.
-Qed.
-
-Canonical act_eqMixin := EqMixin eqactP.
-Canonical act_eqType := Eval hnf in EqType VarAction act_eqMixin.
-
-Lemma eqactE : eqact = eq_op. Proof. by []. Qed.
-
-Definition VarAction_eqType (A : eqType) :=
-  Equality.Pack act_eqMixin VarAction.
-
-End EqVarAction.
-*)
+Inductive VarAction := Spill | Restore | RestoreAndSpill.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
@@ -125,13 +53,18 @@ Variable vinfo : VarInfo varType.
 
 Inductive OpKind := Normal | LoopBegin | LoopEnd | Call.
 
+Record AllocInfo := {
+  allocReg    : PhysReg;
+  allocAction : option VarAction
+}.
+
 (* The [OpInfo] structure is a collection of functions that allow us to
    determine information about each operation coming from the caller's
    side. *)
 Record OpInfo (opType varType : Set) := {
   opKind      : opType -> OpKind;
   varRefs     : opType -> seq varType;
-  applyAllocs : opType -> seq (nat * VarAction) -> opType;
+  applyAllocs : opType -> seq (nat * AllocInfo) -> opType;
   regRefs     : opType -> seq PhysReg
 }.
 
@@ -331,23 +264,20 @@ Definition assignRegNum `(st : ScanState InUse sd) :
         (fun vid int =>
            if (ivar int == vid) &&
               (ibeg int <= n < iend int)
-           then (vid, match iknd int,
-                            firstUsePos int == n,
-                            nextUseAfter int n == None with
-                      | LeftMost,  true,  true  => RegLoadAndSpill reg
-                      | Middle,    true,  true  => RegRestoreAndSpill reg
-                      | RightMost, true,  true  => RegRestore reg
-                      | Whole,     true,  true  => RegLoad reg
-                      | LeftMost,  true,  false => RegLoad reg
-                      | Middle,    true,  false => RegRestore reg
-                      | RightMost, true,  false => RegRestore reg
-                      | Whole,     true,  false => RegLoad reg
-                      | LeftMost,  false, true  => RegSpill reg
-                      | Middle,    false, true  => RegSpill reg
-                      | RightMost, false, true  => RegUse reg
-                      | Whole,     false, true  => RegUse reg
-                      | _, _, _ => RegUse reg
-                      end) :: acc
+           then let isFirst := firstUsePos int == n in
+                let isLast  := nextUseAfter int n == None in
+             (vid,
+              {| allocReg    := reg
+               ; allocAction :=
+                   match iknd int, isFirst, isLast with
+                   | Middle,    true,  true  => Some RestoreAndSpill
+                   | Middle,    false, true  => Some Spill
+                   | Middle,    true,  false => Some Restore
+                   | LeftMost,  _,     true  => Some Spill
+                   | RightMost, true,  _     => Some Restore
+                   | _,         _,     _     => None
+                   end
+               |}) :: acc
            else acc)
         (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in

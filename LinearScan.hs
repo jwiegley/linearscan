@@ -16,7 +16,7 @@ module LinearScan
     , VarInfo(..)
     , VarKind(..)
     , VarAction(..)
-    , registerOfAction
+    , LS.AllocInfo(..)
     , PhysReg
     ) where
 
@@ -24,7 +24,6 @@ import qualified LinearScan.Main as LS
 import LinearScan.Main
     ( VarKind(..)
     , VarAction(..)
-    , registerOfAction
     , OpKind(..)
     , PhysReg
     )
@@ -61,7 +60,7 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo o v = OpInfo
     { opKind      :: o -> OpKind
     , varRefs     :: o -> [v]
-    , applyAllocs :: o -> [(Int, VarAction)] -> o
+    , applyAllocs :: o -> [(Int, LS.AllocInfo)] -> o
     , regRefs     :: o -> [PhysReg]
     }
 
@@ -70,6 +69,9 @@ deriving instance Show OpKind
 
 deriving instance Eq VarAction
 deriving instance Show VarAction
+
+deriving instance Eq LS.AllocInfo
+deriving instance Show LS.AllocInfo
 
 fromOpInfo :: OpInfo o v -> LS.OpInfo o v
 fromOpInfo (OpInfo a b c d) = LS.Build_OpInfo a b c d

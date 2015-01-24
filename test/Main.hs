@@ -20,14 +20,14 @@ main = hspec $ do
     it "Single instruction" $ asmTest
         (add v0 v1 v2) $
 
-        add l2 l1 l0
+        add r2 r1 r0
 
     it "Single, repeated instruction" $ asmTest
         (do add v0 v1 v2
             add v0 v1 v2
             add v0 v1 v2) $
 
-        do add l2 l1 l0
+        do add r2 r1 r0
            add r2 r1 r0
            add r2 r1 r0
 
@@ -36,8 +36,8 @@ main = hspec $ do
             add v0 v1 v3
             add v0 v1 v2) $
 
-        do  add l2 l1 l0
-            add r2 r1 l3
+        do  add r2 r1 r0
+            add r2 r1 r3
             add r2 r1 r0
 
     it "More variables used than registers" $ asmTest
@@ -54,42 +54,42 @@ main = hspec $ do
             add v30 v31 v32
             add v33 v34 v35) $
 
-        do  add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
-            add l2 l1 l0
+        do  add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
 
-    it "Single long-lived variable" $ asmTest
+    it "Single rong-lived variable" $ asmTest
         (do add v0 v1 v2
             add v0 v4 v5
             add v0 v7 v8
             add v0 v10 v11) $
 
-        do  add l2 l1 l0
-            add r2 l1 l0
-            add r2 l1 l0
-            add r2 l1 l0
+        do  add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
 
-    it "Two long-lived variables" $ asmTest
+    it "Two rong-lived variables" $ asmTest
         (do add v0 v1 v2
             add v0 v4 v5
             add v0 v4 v8
             add v0 v4 v11) $
 
-        do  add l2 l1 l0
-            add r2 l1 l0
-            add r2 r1 l0
-            add r2 r1 l0
+        do  add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
+            add r2 r1 r0
 
-    it "One variable with a long interval" $ asmTest
+    it "One variable with a rong interval" $ asmTest
         (do add v0   v1  v2
             add v3   v4  v5
             add v6   v7  v8
@@ -103,20 +103,20 @@ main = hspec $ do
             add v30 v31 v32
             add v0  v34 v35) $
 
-        do  add l2 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add l3 l1 l0
-            add r2 l1 l0
+        do  add r2 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r3 r1 r0
+            add r2 r1 r0
 
-    it "Many variables with long intervals" $ asmTest
+    it "Many variables with rong intervals" $ asmTest
         (do add v0   v1  v2
             add v3   v4  v5
             add v6   v7  v8
@@ -139,16 +139,16 @@ main = hspec $ do
             add v27 v28 v29
         ) $
 
-        do  add l2 l1 l0
-            add l5 l4 l3
-            add l8 l7 l6
-            add l11 l10 l9
-            add l14 l13 l12
-            add l17 l16 l15
-            add l20 l19 l18
-            add l23 l22 l21
-            add l26 l25 l24
-            add l29 l28 l27
+        do  add r2 r1 r0
+            add r5 r4 r3
+            add r8 r7 r6
+            add r11 r10 r9
+            add r14 r13 r12
+            add r17 r16 r15
+            add r20 r19 r18
+            add r23 r22 r21
+            add r26 r25 r24
+            add r29 r28 r27
             add r2 r1 r0
             add r5 r4 r3
             add r8 r7 r6
@@ -184,23 +184,23 @@ main = hspec $ do
             {- 41 -} add v27 v28 v29
             {- 43 -} add v30 v31 v32) $
 
-        do  {-  1 -} add l2 l1 l0
-            {-  3 -} add l5 l4 l3
-            {-  5 -} add l8 l7 l6
-            {-  7 -} add l11 l10 l9
-            {-  9 -} add l14 l13 l12
-            {- 11 -} add l17 l16 l15
-            {- 13 -} add l20 l19 l18
-            {- 15 -} add l23 l22 l21
-            {- 17 -} add l26 l25 l24
-            {- 19 -} add l29 l28 ls27
+        do  {-  1 -} add r2 r1 r0
+            {-  3 -} add r5 r4 r3
+            {-  5 -} add r8 r7 r6
+            {-  7 -} add r11 r10 r9
+            {-  9 -} add r14 r13 r12
+            {- 11 -} add r17 r16 r15
+            {- 13 -} add r20 r19 r18
+            {- 15 -} add r23 r22 r21
+            {- 17 -} add r26 r25 r24
+            {- 19 -} add r29 r28 (spill 27)
                      -- When we reach the 32nd variable considered (which
                      -- happens to be v30), we must spill a register because
                      -- there are not 32 registers.  So we pick the first
                      -- register, counting from 0, whose next use position is
                      -- the furthest from this position.  That happens to be
                      -- r27, which is next used at position 41.
-            {- 21 -} add l27 l31 l30
+            {- 21 -} add r27 r31 r30
             {- 23 -} add r2 r1 r0
             {- 25 -} add r5 r4 r3
             {- 27 -} add r8 r7 r6

@@ -291,48 +291,20 @@ coq_VarKind_rec =
   coq_VarKind_rect
 
 data VarAction =
-   RegLoad PhysReg
- | RegLoadAndSpill PhysReg
- | RegUse PhysReg
- | RegSpill PhysReg
- | RegRestore PhysReg
- | RegRestoreAndSpill PhysReg
+   Spill
+ | Restore
+ | RestoreAndSpill
 
-coq_VarAction_rect :: (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 VarAction -> a1
-coq_VarAction_rect f f0 f1 f2 f3 f4 v =
+coq_VarAction_rect :: a1 -> a1 -> a1 -> VarAction -> a1
+coq_VarAction_rect f f0 f1 v =
   case v of {
-   RegLoad x -> f x;
-   RegLoadAndSpill x -> f0 x;
-   RegUse x -> f1 x;
-   RegSpill x -> f2 x;
-   RegRestore x -> f3 x;
-   RegRestoreAndSpill x -> f4 x}
+   Spill -> f;
+   Restore -> f0;
+   RestoreAndSpill -> f1}
 
-coq_VarAction_rec :: (PhysReg -> a1) ->
-                                (PhysReg -> a1) ->
-                                (PhysReg -> a1) ->
-                                (PhysReg -> a1) ->
-                                (PhysReg -> a1) ->
-                                (PhysReg -> a1) ->
-                                VarAction -> a1
+coq_VarAction_rec :: a1 -> a1 -> a1 -> VarAction -> a1
 coq_VarAction_rec =
   coq_VarAction_rect
-
-registerOfAction :: VarAction -> PhysReg
-registerOfAction act =
-  case act of {
-   RegLoad r -> r;
-   RegLoadAndSpill r -> r;
-   RegUse r -> r;
-   RegSpill r -> r;
-   RegRestore r -> r;
-   RegRestoreAndSpill r -> r}
 
 data VarInfo varType =
    Build_VarInfo (varType -> Prelude.Int) (varType ->
@@ -385,15 +357,43 @@ coq_OpKind_rec :: a1 -> a1 -> a1 -> a1 -> OpKind -> a1
 coq_OpKind_rec =
   coq_OpKind_rect
 
+data AllocInfo =
+   Build_AllocInfo PhysReg (Prelude.Maybe
+                                               VarAction)
+
+coq_AllocInfo_rect :: (PhysReg -> (Prelude.Maybe
+                                 VarAction) -> a1) ->
+                                 AllocInfo -> a1
+coq_AllocInfo_rect f a =
+  case a of {
+   Build_AllocInfo x x0 -> f x x0}
+
+coq_AllocInfo_rec :: (PhysReg -> (Prelude.Maybe
+                                VarAction) -> a1) ->
+                                AllocInfo -> a1
+coq_AllocInfo_rec =
+  coq_AllocInfo_rect
+
+allocReg :: AllocInfo -> PhysReg
+allocReg a =
+  case a of {
+   Build_AllocInfo allocReg0 allocAction0 -> allocReg0}
+
+allocAction :: AllocInfo -> Prelude.Maybe
+                          VarAction
+allocAction a =
+  case a of {
+   Build_AllocInfo allocReg0 allocAction0 -> allocAction0}
+
 data OpInfo opType varType =
    Build_OpInfo (opType -> OpKind) (opType -> [] varType) 
- (opType -> ([] ((,) Prelude.Int VarAction)) -> opType) (opType ->
+ (opType -> ([] ((,) Prelude.Int AllocInfo)) -> opType) (opType ->
                                                                   []
                                                                   PhysReg)
 
 coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> [] 
                               a2) -> (a1 -> ([]
-                              ((,) Prelude.Int VarAction)) -> a1)
+                              ((,) Prelude.Int AllocInfo)) -> a1)
                               -> (a1 -> [] PhysReg) -> a3) ->
                               (OpInfo a1 a2) -> a3
 coq_OpInfo_rect f o =
@@ -402,7 +402,7 @@ coq_OpInfo_rect f o =
 
 coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> [] a2) ->
                              (a1 -> ([]
-                             ((,) Prelude.Int VarAction)) -> a1) ->
+                             ((,) Prelude.Int AllocInfo)) -> a1) ->
                              (a1 -> [] PhysReg) -> a3) ->
                              (OpInfo a1 a2) -> a3
 coq_OpInfo_rec =
@@ -419,7 +419,7 @@ varRefs o =
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> varRefs0}
 
 applyAllocs :: (OpInfo a1 a2) -> a1 -> ([]
-                          ((,) Prelude.Int VarAction)) -> a1
+                          ((,) Prelude.Int AllocInfo)) -> a1
 applyAllocs o =
   case o of {
    Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 ->
@@ -777,52 +777,38 @@ assignRegNum vinfo oinfo binfo sd =
                    (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
                  ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) n)
                    ((Prelude.<=) ((Prelude.succ) n) (Interval.iend int))) of {
-           Prelude.True -> (:) ((,) vid
+           Prelude.True ->
+            let {
+             isFirst = Eqtype.eq_op Ssrnat.nat_eqType
+                         (unsafeCoerce (Interval.firstUsePos int))
+                         (unsafeCoerce n)}
+            in
+            let {
+             isLast = Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                        (unsafeCoerce (Interval.nextUseAfter int n))
+                        (unsafeCoerce Prelude.Nothing)}
+            in
+            (:) ((,) vid (Build_AllocInfo reg
             (case Interval.iknd int of {
-              Interval.Whole ->
-               case Eqtype.eq_op Ssrnat.nat_eqType
-                      (unsafeCoerce (Interval.firstUsePos int))
-                      (unsafeCoerce n) of {
-                Prelude.True -> RegLoad reg;
-                Prelude.False -> RegUse reg};
+              Interval.Whole -> Prelude.Nothing;
               Interval.LeftMost ->
-               case Eqtype.eq_op Ssrnat.nat_eqType
-                      (unsafeCoerce (Interval.firstUsePos int))
-                      (unsafeCoerce n) of {
-                Prelude.True ->
-                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                        (unsafeCoerce (Interval.nextUseAfter int n))
-                        (unsafeCoerce Prelude.Nothing) of {
-                  Prelude.True -> RegLoadAndSpill reg;
-                  Prelude.False -> RegLoad reg};
-                Prelude.False ->
-                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                        (unsafeCoerce (Interval.nextUseAfter int n))
-                        (unsafeCoerce Prelude.Nothing) of {
-                  Prelude.True -> RegSpill reg;
-                  Prelude.False -> RegUse reg}};
+               case isLast of {
+                Prelude.True -> Prelude.Just Spill;
+                Prelude.False -> Prelude.Nothing};
               Interval.Middle ->
-               case Eqtype.eq_op Ssrnat.nat_eqType
-                      (unsafeCoerce (Interval.firstUsePos int))
-                      (unsafeCoerce n) of {
+               case isFirst of {
                 Prelude.True ->
-                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                        (unsafeCoerce (Interval.nextUseAfter int n))
-                        (unsafeCoerce Prelude.Nothing) of {
-                  Prelude.True -> RegRestoreAndSpill reg;
-                  Prelude.False -> RegRestore reg};
+                 case isLast of {
+                  Prelude.True -> Prelude.Just RestoreAndSpill;
+                  Prelude.False -> Prelude.Just Restore};
                 Prelude.False ->
-                 case Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                        (unsafeCoerce (Interval.nextUseAfter int n))
-                        (unsafeCoerce Prelude.Nothing) of {
-                  Prelude.True -> RegSpill reg;
-                  Prelude.False -> RegUse reg}};
+                 case isLast of {
+                  Prelude.True -> Prelude.Just Spill;
+                  Prelude.False -> Prelude.Nothing}};
               Interval.RightMost ->
-               case Eqtype.eq_op Ssrnat.nat_eqType
-                      (unsafeCoerce (Interval.firstUsePos int))
-                      (unsafeCoerce n) of {
-                Prelude.True -> RegRestore reg;
-                Prelude.False -> RegUse reg}})) acc;
+               case isFirst of {
+                Prelude.True -> Prelude.Just Restore;
+                Prelude.False -> Prelude.Nothing}}))) acc;
            Prelude.False -> acc}}}
       in
       Data.List.foldl' h [] ints}
