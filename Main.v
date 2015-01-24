@@ -16,6 +16,9 @@ Module MyMachine <: Machine.
 Definition maxReg := 32.
 Extract Constant maxReg => "32".
 
+Definition regSize := 8.
+Extract Constant regSize => "8".
+
 Lemma registers_exist : (maxReg > 0).
 Proof. unfold maxReg. exact: ltn0Sn. Qed.
 
@@ -31,8 +34,8 @@ Definition mainAlgorithm
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) :
-  BlockState _ (NonEmpty blockType2) :=
+  (vinfo : VarInfo varType) (offset : nat) :
+  BlockState _ (NonEmpty blockType2 * nat) :=
 
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder blockType1 ;;;
@@ -52,16 +55,17 @@ Definition mainAlgorithm
       resolveDataFlow blockType1 ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum vinfo oinfo binfo ssig'.2
+      assignRegNum vinfo oinfo binfo ssig'.2 offset
   end.
 
 Definition linearScan
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) (blocks : BlockList blockType1) :
-  SSError + BlockList blockType2 :=
-  let main := mainAlgorithm binfo oinfo vinfo in
+  (vinfo : VarInfo varType) (blocks : BlockList blockType1)
+  (offset : nat) :
+  SSError + (BlockList blockType2 * nat) :=
+  let main := mainAlgorithm binfo oinfo vinfo offset in
   match IState.runIState SSError main blocks with
   | inl err      => inl err
   | inr (res, _) => inr res

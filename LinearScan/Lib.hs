@@ -26,6 +26,19 @@ option_choose x y =
    Prelude.Just a -> x;
    Prelude.Nothing -> y}
 
+lookup :: Eqtype.Equality__Coq_type -> a1 -> ([]
+          ((,) Eqtype.Equality__Coq_sort a1)) -> Eqtype.Equality__Coq_sort ->
+          a1
+lookup a dflt v x =
+  case v of {
+   [] -> dflt;
+   (:) p xs ->
+    case p of {
+     (,) k v0 ->
+      case Eqtype.eq_op a k x of {
+       Prelude.True -> v0;
+       Prelude.False -> lookup a dflt xs x}}}
+
 foldl_with_index :: (Prelude.Int -> a2 -> a1 -> a2) -> a2 -> ([] a1) -> a2
 foldl_with_index f b v =
   let {

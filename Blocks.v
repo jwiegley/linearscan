@@ -43,7 +43,7 @@ Variables varType    : Set.
 Inductive VarKind := Input | Temp | Output.
 
 (* When use of a variable is encountered, one or more actions should be taken: *)
-Inductive VarAction := Spill | Restore | RestoreAndSpill.
+Inductive VarAction := Spill of nat | Restore of nat | RestoreAndSpill of nat.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
@@ -252,6 +252,13 @@ Definition resolveDataFlow : BlockState unit := return_ tt.
 (* Definition mapOps (f : opType -> opType) : BlockList -> BlockList := *)
 (*   NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))). *)
 
+Record AssignmentState := {
+  assnOpId   : nat;
+  assnOffset : nat;
+  assnSpills : seq (nat * nat)  (* varId -> offset *)
+}.
+
+(*
 Definition assignRegNum `(st : ScanState InUse sd) :
   BlockState (NonEmpty blockType2) :=
   let ints := handled sd ++ active sd ++ inactive sd in
@@ -273,21 +280,88 @@ Definition assignRegNum `(st : ScanState InUse sd) :
               {| allocReg    := reg
                ; allocAction :=
                    match iknd int, isFirst, isLast with
-                   | Middle,    true,  true  => Some RestoreAndSpill
-                   | Middle,    false, true  => Some Spill
-                   | Middle,    true,  false => Some Restore
-                   | LeftMost,  _,     true  => Some Spill
-                   | RightMost, true,  _     => Some Restore
+                   | Middle,    true,  true  => Some (RestoreAndSpill 0)
+                   | Middle,    false, true  => Some (Spill 0)
+                   | Middle,    true,  false => Some (Restore 0)
+                   | LeftMost,  _,     true  => Some (Spill 0)
+                   | RightMost, true,  _     => Some (Restore 0)
                    | _,         _,     _     => None
                    end
                |}) :: acc
            else acc)
         (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in
-    let vars := flatten (map k (fst (opRefs oinfo op))) in
-    (n.+2, applyAllocs oinfo op vars) in
+    (n.+2, applyAllocs oinfo op (flatten (map k (fst (opRefs oinfo op))))) in
   blocks <<- iget SSError ;;
   return_ (snd (mapAccumLOps f 1 blocks)).
+*)
+
+(* jww (2015-01-24): This function needs the State monad, badly. *)
+Definition assignRegNum `(st : ScanState InUse sd) (offset : nat) :
+  BlockState (NonEmpty blockType2 * nat) :=
+  let ints := handled sd ++ active sd ++ inactive sd in
+  let f assn0 op :=
+    let k assn1 v :=
+      let h zz x := let: (assn2, acc) := zz in
+        let: (xid, reg) := x in
+        (fun vid int =>
+           let n := assnOpId assn2 in
+           if (ivar int == vid) &&
+              (ibeg int <= n < iend int)
+           then
+             let isFirst := firstUsePos int == n in
+             let isLast  := nextUseAfter int n == None in
+
+             (* This strange use of a lambda is so that the generated code
+                evaluates [getInterval] only once, and shares the resulting
+                [int] at each use point; otherwise, if we use [let] or
+                [match], Coq's extractor inlines each use of [int], resulting
+                in no sharing of values. *)
+             let mk vid action :=
+                 let voff := lookup (assnOffset assn2)
+                                    (assnSpills assn2) vid in
+                 let assn3 :=
+                     if voff == assnOffset assn2
+                     then {| assnOpId   := assnOpId assn2
+                           ; assnOffset := voff + regSize
+                           ; assnSpills :=
+                               (vid, voff) :: assnSpills assn2 |}
+                     else assn2 in
+                 (assn3, Some (action voff)) in
+
+             let: (assn3, action) :=
+               match iknd int, isFirst, isLast with
+               | Middle,    true,  true  => mk vid RestoreAndSpill
+               | Middle,    false, true  => mk vid Spill
+               | Middle,    true,  false => mk vid Restore
+               | LeftMost,  _,     true  => mk vid Spill
+               | RightMost, true,  _     => mk vid Restore
+               | _,         _,     _     => (assn2, None)
+               end in
+             (assn3,
+              (vid, {| allocReg    := reg
+                     ; allocAction := action |}) :: acc)
+           else (assn2, acc))
+        (varId vinfo v) (getInterval xid) in
+      foldl h (assn1, [::]) ints in
+
+    let: (assn2, vars) :=
+        foldl (fun x var => let: (assn1, acc) := x in
+                 let: (assn2, vars) := k assn1 var in
+                 (assn2, vars ++ acc))
+              (assn0, [::])
+              (fst (opRefs oinfo op)) in
+    ({| assnOpId   := (assnOpId assn2).+2
+      ; assnOffset := assnOffset assn2
+      ; assnSpills := assnSpills assn2 |},
+      applyAllocs oinfo op vars) in
+
+  blocks <<- iget SSError ;;
+  let assn0 := {| assnOpId   := 1
+                ; assnOffset := offset
+                ; assnSpills := [::] |} in
+  let: (assn4, blocks') := mapAccumLOps f assn0 blocks in
+  return_ (blocks', assnOffset assn4).
 
 End Blocks.
 

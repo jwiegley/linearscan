@@ -193,7 +193,7 @@ main = hspec $ do
             {- 13 -} add r20 r19 r18
             {- 15 -} add r23 r22 r21
             {- 17 -} add r26 r25 r24
-            {- 19 -} add r29 r28 (spill 27)
+            {- 19 -} add r29 r28 (spill 0 27)
                      -- When we reach the 32nd variable considered (which
                      -- happens to be v30), we must spill a register because
                      -- there are not 32 registers.  So we pick the first
@@ -213,5 +213,5 @@ main = hspec $ do
                      -- When it comes time to reload v29 (which had been
                      -- allocated to r27), we pick the first available
                      -- register which happens to be r0 in this case.
-            {- 41 -} add r29 r28 (restore 0)
+            {- 41 -} add r29 r28 (restore 0 0)
             {- 43 -} add r27 r31 r30

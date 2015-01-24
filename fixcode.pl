@@ -34,5 +34,8 @@ import qualified LinearScan.Utils
 
     s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
 
+    s/_MyMachine__maxReg = 4/_MyMachine__maxReg = MAX_REG/;
+    s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
+
     print;
 }

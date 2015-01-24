@@ -170,6 +170,13 @@ Definition list_membership {a : eqType} (l : seq a) :
       end in
   go l.
 
+Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=
+  if v is (k, v) :: xs
+  then if k == x
+       then v
+       else lookup dflt xs x
+  else dflt.
+
 Fixpoint apply_nth {a} (def : a) (v : seq a) i (f : a -> a) {struct i} :=
   if v is x :: v'
   then if i is i'.+1

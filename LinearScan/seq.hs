@@ -104,7 +104,3 @@ rem t x s =
      Prelude.True -> t0;
      Prelude.False -> (:) y (rem t x t0)}}
 
-flatten :: ([] ([] a1)) -> [] a1
-flatten =
-  Prelude.foldr (Prelude.++) []
-

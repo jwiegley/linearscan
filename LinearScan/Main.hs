@@ -45,11 +45,18 @@ __ = Prelude.error "Logical or arity value used"
 _MyMachine__maxReg :: Prelude.Int
 _MyMachine__maxReg = 32
 
+_MyMachine__regSize :: Prelude.Int
+_MyMachine__regSize = 8
+
 type MyMachine__PhysReg = Prelude.Int
 
 maxReg :: Prelude.Int
 maxReg =
   _MyMachine__maxReg
+
+regSize :: Prelude.Int
+regSize =
+  _MyMachine__regSize
 
 type PhysReg = Prelude.Int
 
@@ -291,18 +298,22 @@ coq_VarKind_rec =
   coq_VarKind_rect
 
 data VarAction =
-   Spill
- | Restore
- | RestoreAndSpill
+   Spill Prelude.Int
+ | Restore Prelude.Int
+ | RestoreAndSpill Prelude.Int
 
-coq_VarAction_rect :: a1 -> a1 -> a1 -> VarAction -> a1
+coq_VarAction_rect :: (Prelude.Int -> a1) -> (Prelude.Int -> a1)
+                                 -> (Prelude.Int -> a1) ->
+                                 VarAction -> a1
 coq_VarAction_rect f f0 f1 v =
   case v of {
-   Spill -> f;
-   Restore -> f0;
-   RestoreAndSpill -> f1}
+   Spill x -> f x;
+   Restore x -> f0 x;
+   RestoreAndSpill x -> f1 x}
 
-coq_VarAction_rec :: a1 -> a1 -> a1 -> VarAction -> a1
+coq_VarAction_rec :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
+                                (Prelude.Int -> a1) -> VarAction ->
+                                a1
 coq_VarAction_rec =
   coq_VarAction_rect
 
@@ -742,82 +753,156 @@ resolveDataFlow :: BlockState a1 ()
 resolveDataFlow =
   return_ ()
 
+data AssignmentState =
+   Build_AssignmentState Prelude.Int Prelude.Int ([]
+                                                           ((,) Prelude.Int
+                                                           Prelude.Int))
+
+coq_AssignmentState_rect :: (Prelude.Int -> Prelude.Int -> ([]
+                                       ((,) Prelude.Int Prelude.Int)) -> a1)
+                                       -> AssignmentState -> a1
+coq_AssignmentState_rect f a =
+  case a of {
+   Build_AssignmentState x x0 x1 -> f x x0 x1}
+
+coq_AssignmentState_rec :: (Prelude.Int -> Prelude.Int -> ([]
+                                      ((,) Prelude.Int Prelude.Int)) -> a1)
+                                      -> AssignmentState -> a1
+coq_AssignmentState_rec =
+  coq_AssignmentState_rect
+
+assnOpId :: AssignmentState -> Prelude.Int
+assnOpId a =
+  case a of {
+   Build_AssignmentState assnOpId0 assnOffset0 assnSpills0 ->
+    assnOpId0}
+
+assnOffset :: AssignmentState -> Prelude.Int
+assnOffset a =
+  case a of {
+   Build_AssignmentState assnOpId0 assnOffset0 assnSpills0 ->
+    assnOffset0}
+
+assnSpills :: AssignmentState -> []
+                         ((,) Prelude.Int Prelude.Int)
+assnSpills a =
+  case a of {
+   Build_AssignmentState assnOpId0 assnOffset0 assnSpills0 ->
+    assnSpills0}
+
 assignRegNum :: (VarInfo a5) -> (OpInfo 
                            a3 a4 a5) -> (BlockInfo a1 a2 a3 
-                           a4) -> ScanStateDesc ->
-                           BlockState a1 ([] a2)
-assignRegNum vinfo oinfo binfo sd =
+                           a4) -> ScanStateDesc -> Prelude.Int ->
+                           BlockState a1 ((,) ([] a2) Prelude.Int)
+assignRegNum vinfo oinfo binfo sd offset =
   let {
    ints = (Prelude.++) (handled sd)
             ((Prelude.++) (active sd) (inactive sd))}
   in
   let {
-   f = \n op ->
+   f = \assn0 op ->
     let {
-     k = \v ->
+     k = \assn1 v ->
       let {
-       h = \acc x ->
-        case x of {
-         (,) xid reg ->
-          let {vid = varId vinfo v} in
-          let {
-           int = Interval.getIntervalDesc
-                   (
-                     (LinearScan.Utils.nth (nextInterval sd)
-                       (intervals sd) xid))}
-          in
-          case (Prelude.&&)
-                 (Eqtype.eq_op Ssrnat.nat_eqType
-                   (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
-                 ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) n)
-                   ((Prelude.<=) ((Prelude.succ) n) (Interval.iend int))) of {
-           Prelude.True ->
+       h = \zz x ->
+        case zz of {
+         (,) assn2 acc ->
+          case x of {
+           (,) xid reg ->
+            let {vid = varId vinfo v} in
             let {
-             isFirst = Eqtype.eq_op Ssrnat.nat_eqType
-                         (unsafeCoerce (Interval.firstUsePos int))
-                         (unsafeCoerce n)}
+             int = Interval.getIntervalDesc
+                     (
+                       (LinearScan.Utils.nth (nextInterval sd)
+                         (intervals sd) xid))}
             in
-            let {
-             isLast = Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                        (unsafeCoerce (Interval.nextUseAfter int n))
-                        (unsafeCoerce Prelude.Nothing)}
-            in
-            (:) ((,) vid (Build_AllocInfo reg
-            (case Interval.iknd int of {
-              Interval.Whole -> Prelude.Nothing;
-              Interval.LeftMost ->
-               case isLast of {
-                Prelude.True -> Prelude.Just Spill;
-                Prelude.False -> Prelude.Nothing};
-              Interval.Middle ->
-               case isFirst of {
-                Prelude.True ->
-                 case isLast of {
-                  Prelude.True -> Prelude.Just RestoreAndSpill;
-                  Prelude.False -> Prelude.Just Restore};
-                Prelude.False ->
-                 case isLast of {
-                  Prelude.True -> Prelude.Just Spill;
-                  Prelude.False -> Prelude.Nothing}};
-              Interval.RightMost ->
-               case isFirst of {
-                Prelude.True -> Prelude.Just Restore;
-                Prelude.False -> Prelude.Nothing}}))) acc;
-           Prelude.False -> acc}}}
+            let {n = assnOpId assn2} in
+            case (Prelude.&&)
+                   (Eqtype.eq_op Ssrnat.nat_eqType
+                     (unsafeCoerce (Interval.ivar int)) (unsafeCoerce vid))
+                   ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) n)
+                     ((Prelude.<=) ((Prelude.succ) n) (Interval.iend int))) of {
+             Prelude.True ->
+              let {
+               isFirst = Eqtype.eq_op Ssrnat.nat_eqType
+                           (unsafeCoerce (Interval.firstUsePos int))
+                           (unsafeCoerce n)}
+              in
+              let {
+               isLast = Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+                          (unsafeCoerce (Interval.nextUseAfter int n))
+                          (unsafeCoerce Prelude.Nothing)}
+              in
+              let {
+               mk = \vid0 action ->
+                let {
+                 voff = Lib.lookup Ssrnat.nat_eqType
+                          (assnOffset assn2)
+                          (unsafeCoerce (assnSpills assn2)) vid0}
+                in
+                let {
+                 assn3 = case Eqtype.eq_op Ssrnat.nat_eqType
+                                (unsafeCoerce voff)
+                                (unsafeCoerce (assnOffset assn2)) of {
+                          Prelude.True -> Build_AssignmentState
+                           (assnOpId assn2)
+                           ((Prelude.+) voff regSize) ((:) ((,)
+                           (unsafeCoerce vid0) voff)
+                           (assnSpills assn2));
+                          Prelude.False -> assn2}}
+                in
+                (,) assn3 (Prelude.Just (action voff))}
+              in
+              case case Interval.iknd int of {
+                    Interval.Whole -> (,) assn2 Prelude.Nothing;
+                    Interval.LeftMost ->
+                     case isLast of {
+                      Prelude.True ->
+                       unsafeCoerce mk vid (\x0 -> Spill x0);
+                      Prelude.False -> (,) assn2 Prelude.Nothing};
+                    Interval.Middle ->
+                     case isFirst of {
+                      Prelude.True ->
+                       case isLast of {
+                        Prelude.True ->
+                         unsafeCoerce mk vid (\x0 ->
+                           RestoreAndSpill x0);
+                        Prelude.False ->
+                         unsafeCoerce mk vid (\x0 -> Restore x0)};
+                      Prelude.False ->
+                       case isLast of {
+                        Prelude.True ->
+                         unsafeCoerce mk vid (\x0 -> Spill x0);
+                        Prelude.False -> (,) assn2 Prelude.Nothing}};
+                    Interval.RightMost ->
+                     case isFirst of {
+                      Prelude.True ->
+                       unsafeCoerce mk vid (\x0 -> Restore x0);
+                      Prelude.False -> (,) assn2 Prelude.Nothing}} of {
+               (,) assn3 action -> (,) assn3 ((:) ((,) vid
+                (Build_AllocInfo reg action)) acc)};
+             Prelude.False -> (,) assn2 acc}}}}
       in
-      Data.List.foldl' h [] ints}
+      Data.List.foldl' h ((,) assn1 []) ints}
     in
-    let {
-     vars = Seq.flatten
-              (Prelude.map k (Prelude.fst (opRefs oinfo op)))}
-    in
-    (,) ((Prelude.succ) ((Prelude.succ) n))
-    (applyAllocs oinfo op vars)}
+    case Data.List.foldl' (\x var ->
+           case x of {
+            (,) assn1 acc ->
+             case k assn1 var of {
+              (,) assn2 vars -> (,) assn2 ((Prelude.++) vars acc)}}) ((,)
+           assn0 []) (Prelude.fst (opRefs oinfo op)) of {
+     (,) assn2 vars -> (,) (Build_AssignmentState ((Prelude.succ)
+      ((Prelude.succ) (assnOpId assn2)))
+      (assnOffset assn2) (assnSpills assn2))
+      (applyAllocs oinfo op vars)}}
   in
   stbind (\blocks ->
-    return_
-      (Prelude.snd
-        (mapAccumLOps binfo f ((Prelude.succ) 0) blocks)))
+    let {
+     assn0 = Build_AssignmentState ((Prelude.succ) 0) offset []}
+    in
+    case mapAccumLOps binfo f assn0 blocks of {
+     (,) assn4 blocks' ->
+      return_ ((,) blocks' (assnOffset assn4))})
     IState.iget
 
 coq_SSMorph_rect :: ScanStateDesc ->
@@ -1842,9 +1927,9 @@ walkIntervals sd positions =
     positions
 
 mainAlgorithm :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
-                 a3 a4 a5) -> (VarInfo a5) -> BlockState
-                 a1 ([] a2)
-mainAlgorithm binfo oinfo vinfo =
+                 a3 a4 a5) -> (VarInfo a5) -> Prelude.Int ->
+                 BlockState a1 ((,) ([] a2) Prelude.Int)
+mainAlgorithm binfo oinfo vinfo offset =
   stbind (\x ->
     stbind (\x0 ->
       stbind (\x1 ->
@@ -1856,7 +1941,7 @@ mainAlgorithm binfo oinfo vinfo =
                Prelude.Left err -> error_ err;
                Prelude.Right ssig' ->
                 stbind (\x3 ->
-                  assignRegNum vinfo oinfo binfo ( ssig'))
+                  assignRegNum vinfo oinfo binfo ( ssig') offset)
                   resolveDataFlow}) IState.iget)
             (buildIntervals vinfo oinfo binfo))
           computeGlobalLiveSets) computeLocalLiveSets)
@@ -1864,10 +1949,10 @@ mainAlgorithm binfo oinfo vinfo =
 
 linearScan :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
               a3 a4 a5) -> (VarInfo a5) -> (BlockList 
-              a1) -> Prelude.Either SSError
-              (BlockList a2)
-linearScan binfo oinfo vinfo blocks =
-  let {main = mainAlgorithm binfo oinfo vinfo} in
+              a1) -> Prelude.Int -> Prelude.Either SSError
+              ((,) (BlockList a2) Prelude.Int)
+linearScan binfo oinfo vinfo blocks offset =
+  let {main = mainAlgorithm binfo oinfo vinfo offset} in
   case IState.runIState main blocks of {
    Prelude.Left err -> Prelude.Left err;
    Prelude.Right p ->

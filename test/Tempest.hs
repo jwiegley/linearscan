@@ -196,10 +196,13 @@ data IRVar' = PhysicalIV !AllocInfo
             deriving Eq
 
 instance Show IRVar' where
-    show (PhysicalIV (Build_AllocInfo r Nothing))                = "r" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just Spill)))           = "S" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just LS.Restore)))      = "R" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just RestoreAndSpill))) = "RS" ++ show r
+    show (PhysicalIV (Build_AllocInfo r Nothing)) = "r" ++ show r
+    show (PhysicalIV (Build_AllocInfo r (Just (Spill n)))) =
+        "S" ++ show r ++ "[" ++ show n ++ "]"
+    show (PhysicalIV (Build_AllocInfo r (Just (LS.Restore n)))) =
+        "R" ++ show r ++ "[" ++ show n ++ "]"
+    show (PhysicalIV (Build_AllocInfo r (Just (RestoreAndSpill n)))) =
+        "RS" ++ show r ++ "[" ++ show n ++ "]"
     show (VirtualIV n _) = "v" ++ show n
 
 -- | Virtual IR variable together with an optional AST variable
@@ -215,7 +218,7 @@ instance Show IRVar where
     show (IRVar x _) = show x
 
 asmTest (compile -> body) (compile -> result) =
-    case allocate binfo oinfo vinfo [body] of
+    case allocate binfo oinfo vinfo [body] 0 of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
             -- print ("----" :: String)
@@ -224,9 +227,7 @@ asmTest (compile -> body) (compile -> result) =
             -- print result
             -- print ("----" :: String)
             -- length xs `shouldBe` length result
-
-            let test x y = x `shouldBe` y
-            zipWithM_ shouldBe xs [result]
+            zipWithM_ shouldBe (fst xs) [result]
   where
     binfo = BlockInfo
         { blockOps    = getBlock
@@ -278,10 +279,10 @@ reg i = IRVar { _ivVar = PhysicalIV i
               , _ivSrc = Nothing
               }
 
-use     = reg . flip Build_AllocInfo Nothing
-restore = reg . flip Build_AllocInfo (Just LS.Restore)
-spill   = reg . flip Build_AllocInfo (Just Spill)
-restoreAndSpill = reg . flip Build_AllocInfo (Just RestoreAndSpill)
+use               = reg . flip Build_AllocInfo Nothing
+restore n         = reg . flip Build_AllocInfo (Just (LS.Restore n))
+spill n           = reg . flip Build_AllocInfo (Just (Spill n))
+restoreAndSpill n = reg . flip Build_AllocInfo (Just (RestoreAndSpill n))
 
 v0  = var 0
 v1  = var 1
