@@ -234,9 +234,8 @@ asmTest (compile -> body) (compile -> result) =
         }
     oinfo = OpInfo
         { opKind      = const Normal
-        , varRefs     = fst . convertNode
+        , opRefs      = convertNode
         , applyAllocs = \o m -> conv (fromList m) o
-        , regRefs     = snd . convertNode
         }
     vinfo = VarInfo
         { varId       = \(_, v) -> case v of

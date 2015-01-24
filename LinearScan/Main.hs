@@ -386,54 +386,43 @@ allocAction a =
    Build_AllocInfo allocReg0 allocAction0 -> allocAction0}
 
 data OpInfo opType1 opType2 varType =
-   Build_OpInfo (opType1 -> OpKind) (opType1 -> []
-                                                        varType) (opType1 ->
-                                                                 ([]
-                                                                 ((,)
-                                                                 Prelude.Int
-                                                                 AllocInfo))
-                                                                 -> opType2) 
- (opType1 -> [] PhysReg)
+   Build_OpInfo (opType1 -> OpKind) (opType1 -> (,)
+                                                        ([] varType)
+                                                        ([]
+                                                        PhysReg)) 
+ (opType1 -> ([] ((,) Prelude.Int AllocInfo)) -> opType2)
 
-coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> [] 
-                              a3) -> (a1 -> ([]
+coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> (,) 
+                              ([] a3) ([] PhysReg)) -> (a1 -> ([]
                               ((,) Prelude.Int AllocInfo)) -> a2)
-                              -> (a1 -> [] PhysReg) -> a4) ->
-                              (OpInfo a1 a2 a3) -> a4
+                              -> a4) -> (OpInfo a1 a2 a3) -> a4
 coq_OpInfo_rect f o =
   case o of {
-   Build_OpInfo x x0 x1 x2 -> f x x0 x1 x2}
+   Build_OpInfo x x0 x1 -> f x x0 x1}
 
-coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> [] a3) ->
-                             (a1 -> ([]
+coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> (,) 
+                             ([] a3) ([] PhysReg)) -> (a1 -> ([]
                              ((,) Prelude.Int AllocInfo)) -> a2) ->
-                             (a1 -> [] PhysReg) -> a4) ->
-                             (OpInfo a1 a2 a3) -> a4
+                             a4) -> (OpInfo a1 a2 a3) -> a4
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
 opKind :: (OpInfo a1 a2 a3) -> a1 -> OpKind
 opKind o =
   case o of {
-   Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> opKind0}
+   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> opKind0}
 
-varRefs :: (OpInfo a1 a2 a3) -> a1 -> [] a3
-varRefs o =
+opRefs :: (OpInfo a1 a2 a3) -> a1 -> (,) ([] a3)
+                     ([] PhysReg)
+opRefs o =
   case o of {
-   Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> varRefs0}
+   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> opRefs0}
 
 applyAllocs :: (OpInfo a1 a2 a3) -> a1 -> ([]
                           ((,) Prelude.Int AllocInfo)) -> a2
 applyAllocs o =
   case o of {
-   Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 ->
-    applyAllocs0}
-
-regRefs :: (OpInfo a1 a2 a3) -> a1 -> []
-                      PhysReg
-regRefs o =
-  case o of {
-   Build_OpInfo opKind0 varRefs0 applyAllocs0 regRefs0 -> regRefs0}
+   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> applyAllocs0}
 
 data BlockInfo blockType1 blockType2 opType1 opType2 =
    Build_BlockInfo (blockType1 -> [] opType1) (blockType1 -> ([]
@@ -550,7 +539,7 @@ processOperations vinfo oinfo binfo blocks =
        (,) n m -> (,) ((Prelude.succ) n)
         (Data.List.foldl' (\m0 v ->
           Prelude.max m0 (varId vinfo v)) m
-          (varRefs oinfo op))}) ((,) 0 0) blocks)
+          (Prelude.fst (opRefs oinfo op)))}) ((,) 0 0) blocks)
     (\_top_assumption_ ->
     let {
      _evar_0_ = \opCount highestVar ->
@@ -568,75 +557,85 @@ processOperations vinfo oinfo binfo blocks =
               regs0}
             in
             let {
-             _evar_0_0 = \pos0 vars0 regs0 -> Build_BuildState pos0
-              ((Prelude.flip (Prelude.$))
-                ((Prelude.flip (Prelude.$)) vars0 (\vars' ->
-                  let {
-                   vars'0 = Prelude.map
-                              (Lib.option_map
-                                (transportBoundedRange
-                                  ((Prelude.succ) (Ssrnat.double pos0))
-                                  ((Prelude.succ)
-                                  (Ssrnat.double ((Prelude.succ) pos0)))))
-                              vars'}
-                  in
-                  Data.List.foldl' (\vars'1 v ->
+             _evar_0_0 = \pos0 vars0 regs0 ->
+              let {_top_assumption_1 = opRefs oinfo op} in
+              let {
+               _evar_0_0 = \varRefs regRefs -> Build_BuildState
+                pos0
+                ((Prelude.flip (Prelude.$))
+                  ((Prelude.flip (Prelude.$)) vars0 (\vars' ->
                     let {
-                     upos = Range.Build_UsePos ((Prelude.succ)
-                      (Ssrnat.double pos0)) (regRequired vinfo v)}
+                     vars'0 = Prelude.map
+                                (Lib.option_map
+                                  (transportBoundedRange
+                                    ((Prelude.succ) (Ssrnat.double pos0))
+                                    ((Prelude.succ)
+                                    (Ssrnat.double ((Prelude.succ) pos0)))))
+                                vars'}
                     in
-                    (Prelude.flip (Prelude.$)) __ (\_ ->
-                      Seq.set_nth Prelude.Nothing vars'1
-                        (varId vinfo v) (Prelude.Just
-                        (let {
-                          _evar_0_0 = \_top_assumption_1 ->
-                           Range.Build_RangeDesc (Range.uloc upos)
-                           (Range.rend ( _top_assumption_1)) ((:) upos
-                           (Range.ups ( _top_assumption_1)))}
-                         in
-                         let {
-                          _evar_0_1 = Range.Build_RangeDesc (Range.uloc upos)
-                           ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
-                         in
-                         case Seq.nth Prelude.Nothing vars0
-                                (varId vinfo v) of {
-                          Prelude.Just x -> _evar_0_0 x;
-                          Prelude.Nothing -> _evar_0_1})))) vars'0
-                    (varRefs oinfo op))) (\x -> x))
-              ((Prelude.flip (Prelude.$))
-                ((Prelude.flip (Prelude.$)) regs0 (\regs' ->
-                  let {
-                   regs'0 = LinearScan.Utils.vmap maxReg
-                              (Lib.option_map
-                                (transportBoundedRange
-                                  ((Prelude.succ) (Ssrnat.double pos0))
-                                  ((Prelude.succ)
-                                  (Ssrnat.double ((Prelude.succ) pos0)))))
-                              regs'}
-                  in
-                  Data.List.foldl' (\regs'1 reg ->
+                    Data.List.foldl' (\vars'1 v ->
+                      let {
+                       upos = Range.Build_UsePos ((Prelude.succ)
+                        (Ssrnat.double pos0))
+                        (regRequired vinfo v)}
+                      in
+                      (Prelude.flip (Prelude.$)) __ (\_ ->
+                        Seq.set_nth Prelude.Nothing vars'1
+                          (varId vinfo v) (Prelude.Just
+                          (let {
+                            _evar_0_0 = \_top_assumption_2 ->
+                             Range.Build_RangeDesc (Range.uloc upos)
+                             (Range.rend ( _top_assumption_2)) ((:) upos
+                             (Range.ups ( _top_assumption_2)))}
+                           in
+                           let {
+                            _evar_0_1 = Range.Build_RangeDesc
+                             (Range.uloc upos) ((Prelude.succ)
+                             (Range.uloc upos)) ((:[]) upos)}
+                           in
+                           case Seq.nth Prelude.Nothing vars0
+                                  (varId vinfo v) of {
+                            Prelude.Just x -> _evar_0_0 x;
+                            Prelude.Nothing -> _evar_0_1})))) vars'0 varRefs))
+                  (\x -> x))
+                ((Prelude.flip (Prelude.$))
+                  ((Prelude.flip (Prelude.$)) regs0 (\regs' ->
                     let {
-                     upos = Range.Build_UsePos ((Prelude.succ)
-                      (Ssrnat.double pos0)) Prelude.True}
+                     regs'0 = LinearScan.Utils.vmap maxReg
+                                (Lib.option_map
+                                  (transportBoundedRange
+                                    ((Prelude.succ) (Ssrnat.double pos0))
+                                    ((Prelude.succ)
+                                    (Ssrnat.double ((Prelude.succ) pos0)))))
+                                regs'}
                     in
-                    (Prelude.flip (Prelude.$)) __ (\_ ->
-                      LinearScan.Utils.set_nth maxReg regs'1 reg
-                        (Prelude.Just
-                        (let {
-                          _evar_0_0 = \_top_assumption_1 ->
-                           Range.Build_RangeDesc (Range.uloc upos)
-                           (Range.rend ( _top_assumption_1)) ((:) upos
-                           (Range.ups ( _top_assumption_1)))}
-                         in
-                         let {
-                          _evar_0_1 = Range.Build_RangeDesc (Range.uloc upos)
-                           ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
-                         in
-                         case LinearScan.Utils.nth maxReg regs0
-                                reg of {
-                          Prelude.Just x -> _evar_0_0 x;
-                          Prelude.Nothing -> _evar_0_1})))) regs'0
-                    (regRefs oinfo op))) (\x -> x))}
+                    Data.List.foldl' (\regs'1 reg ->
+                      let {
+                       upos = Range.Build_UsePos ((Prelude.succ)
+                        (Ssrnat.double pos0)) Prelude.True}
+                      in
+                      (Prelude.flip (Prelude.$)) __ (\_ ->
+                        LinearScan.Utils.set_nth maxReg regs'1 reg
+                          (Prelude.Just
+                          (let {
+                            _evar_0_0 = \_top_assumption_2 ->
+                             Range.Build_RangeDesc (Range.uloc upos)
+                             (Range.rend ( _top_assumption_2)) ((:) upos
+                             (Range.ups ( _top_assumption_2)))}
+                           in
+                           let {
+                            _evar_0_1 = Range.Build_RangeDesc
+                             (Range.uloc upos) ((Prelude.succ)
+                             (Range.uloc upos)) ((:[]) upos)}
+                           in
+                           case LinearScan.Utils.nth maxReg regs0
+                                  reg of {
+                            Prelude.Just x -> _evar_0_0 x;
+                            Prelude.Nothing -> _evar_0_1})))) regs'0 regRefs))
+                  (\x -> x))}
+              in
+              case _top_assumption_1 of {
+               (,) x x0 -> _evar_0_0 x x0}}
             in
             (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
               (\_ ->
@@ -808,9 +807,12 @@ assignRegNum vinfo oinfo binfo sd =
       in
       Data.List.foldl' h [] ints}
     in
+    let {
+     vars = Seq.flatten
+              (Prelude.map k (Prelude.fst (opRefs oinfo op)))}
+    in
     (,) ((Prelude.succ) ((Prelude.succ) n))
-    (applyAllocs oinfo op
-      (Seq.flatten (Prelude.map k (varRefs oinfo op))))}
+    (applyAllocs oinfo op vars)}
   in
   stbind (\blocks ->
     return_

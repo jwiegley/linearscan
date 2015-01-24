@@ -67,9 +67,8 @@ Record AllocInfo := {
    side. *)
 Record OpInfo (opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
-  varRefs     : opType1 -> seq varType;
-  applyAllocs : opType1 -> seq (nat * AllocInfo) -> opType2;
-  regRefs     : opType1 -> seq PhysReg
+  opRefs      : opType1 -> seq varType * seq PhysReg;
+  applyAllocs : opType1 -> seq (nat * AllocInfo) -> opType2
 }.
 
 Variable oinfo : OpInfo opType1 opType2 varType.
@@ -130,7 +129,7 @@ Definition mapAccumLOps {a} (f : a -> opType1 -> (a * opType2)) :
 Definition processOperations (blocks : BlockList) : BuildState.
   have := foldOps (fun x op => let: (n, m) := x in
     (n.+1, foldl (fun m v => maxn m (varId vinfo v))
-                 m (varRefs oinfo op)))
+                 m (fst (opRefs oinfo op))))
     (0, 0) blocks.
   move=> [opCount highestVar].
   pose z := {| bsPos  := opCount
@@ -144,13 +143,14 @@ Definition processOperations (blocks : BlockList) : BuildState.
     exact {| bsPos  := 0
            ; bsVars := vars
            ; bsRegs := regs |}.
+  move: (opRefs oinfo op) => [varRefs regRefs].
   apply: {| bsPos  := pos
           ; bsVars := _
           ; bsRegs := _ |}.
   - have: seq (option (BoundedRange pos.*2.+1)).
       have vars' := vars.
       move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
-      apply: foldl _ vars' (varRefs oinfo op) => vars' v.
+      apply: foldl _ vars' varRefs => vars' v.
       set upos := {| uloc   := pos.*2.+1
                    ; regReq := regRequired vinfo v |}.
       have Hodd : odd upos by rewrite /= odd_double.
@@ -165,7 +165,7 @@ Definition processOperations (blocks : BlockList) : BuildState.
   - have: Vec (option (BoundedRange pos.*2.+1)) maxReg.
       have regs' := regs.
       move/(vmap (option_map (transportBoundedRange (H pos)))) in regs'.
-      apply: foldl _ regs' (regRefs oinfo op) => regs' reg.
+      apply: foldl _ regs' regRefs => regs' reg.
       set upos := {| uloc   := pos.*2.+1
                    ; regReq := true |}.
       have Hodd : odd upos by rewrite /= odd_double.
@@ -284,7 +284,8 @@ Definition assignRegNum `(st : ScanState InUse sd) :
            else acc)
         (varId vinfo v) (getInterval xid) in
       foldl h [::] ints in
-    (n.+2, applyAllocs oinfo op (flatten (map k (varRefs oinfo op)))) in
+    let vars := flatten (map k (fst (opRefs oinfo op))) in
+    (n.+2, applyAllocs oinfo op vars) in
   blocks <<- iget SSError ;;
   return_ (snd (mapAccumLOps f 1 blocks)).
 
