@@ -97,3 +97,39 @@ Proof.
   rewrite ifun_composition_x.
   f_equal.
 Qed.
+
+Fixpoint mapM {M} `{IMonad M} {I A B}
+  (f : A -> M I I B) (l : list A) : M I I (list B) :=
+  match l with
+  | nil => ipure nil
+  | cons x xs =>
+    x'  <<- f x ;;
+    xs' <<- mapM f xs ;;
+    ipure (cons x' xs')
+  end.
+
+Definition foldM {M} `{IMonad M} {I A B}
+  (f : A -> B -> M I I A) (s : A) (l : list B) : M I I A :=
+  let fix go xs z :=
+      match xs with
+        | nil => ipure z
+        | cons y ys => f z y >>>= go ys
+      end in
+  go l s.
+
+Fixpoint mapAccumM {M} `{IMonad M} {I A X Y : Type}
+  (f : A -> X -> M I I (A * Y)%type) (s : A) (l : list X) :
+  M I I (A * list Y)%type :=
+  match l with
+  | nil => ipure (s, nil)
+  | cons x xs =>
+    x <<- f s x ;;
+    match x with
+      (s', y) =>
+        x' <<- mapAccumM f s' xs ;;
+        match x' with
+          (s'', ys) =>
+            ipure (s'', cons y ys)
+        end
+    end
+  end.
