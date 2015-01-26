@@ -58,10 +58,6 @@ iput :: a3 -> IState a1 a2 a3 ()
 iput x x0 =
   Prelude.Right ((,) () x)
 
-imodify :: (a2 -> a3) -> IState a1 a2 a3 ()
-imodify f i =
-  Prelude.Right ((,) () (f i))
-
 coq_IState_IApplicative :: IApplicative.IApplicative (IState a1 () () ())
 coq_IState_IApplicative =
   IApplicative.Build_IApplicative coq_IState_IFunctor (\_ _ x st ->

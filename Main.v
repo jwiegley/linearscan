@@ -30,12 +30,12 @@ Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
-Definition mainAlgorithm
+Definition mainAlgorithm {accType : Set}
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) (accum : nat) :
-  IState SSError (seq blockType1) (seq blockType2) nat :=
+  (vinfo : VarInfo varType) (accum : accType) :
+  IState SSError (seq blockType1) (seq blockType2) accType :=
 
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder blockType1 ;;;
@@ -58,13 +58,13 @@ Definition mainAlgorithm
       assignRegNum vinfo oinfo binfo ssig'.2 accum
   end.
 
-Definition linearScan
+Definition linearScan {accType : Set}
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
   (vinfo : VarInfo varType) (blocks : seq blockType1)
-  (accum : nat) :
-  SSError + (nat * BlockList blockType2) :=
+  (accum : accType) :
+  SSError + (accType * BlockList blockType2) :=
   let main := mainAlgorithm binfo oinfo vinfo accum in
   IState.runIState SSError main blocks.
 

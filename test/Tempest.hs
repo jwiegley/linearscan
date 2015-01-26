@@ -196,13 +196,11 @@ data IRVar' = PhysicalIV !AllocInfo
             deriving Eq
 
 instance Show IRVar' where
-    show (PhysicalIV (Build_AllocInfo r Nothing)) = "r" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just (Spill n)))) =
-        "S" ++ show r ++ "[" ++ show n ++ "]"
-    show (PhysicalIV (Build_AllocInfo r (Just (LS.Restore n)))) =
-        "R" ++ show r ++ "[" ++ show n ++ "]"
-    show (PhysicalIV (Build_AllocInfo r (Just (RestoreAndSpill n)))) =
-        "RS" ++ show r ++ "[" ++ show n ++ "]"
+    show (PhysicalIV (Build_AllocInfo r Nothing))           = "r" ++ show r
+    show (PhysicalIV (Build_AllocInfo r (Just Spill)))      = "S" ++ show r
+    show (PhysicalIV (Build_AllocInfo r (Just LS.Restore))) = "R" ++ show r
+    show (PhysicalIV (Build_AllocInfo r (Just RestoreAndSpill))) =
+        "RS" ++ show r
     show (VirtualIV n _) = "v" ++ show n
 
 -- | Virtual IR variable together with an optional AST variable
@@ -236,7 +234,7 @@ asmTest (compile -> body) (compile -> result) =
     oinfo = OpInfo
         { opKind      = const Normal
         , opRefs      = convertNode
-        , applyAllocs = \o m -> [conv (fromList m) o]
+        , applyAllocs = \o off m -> (off, [conv (fromList m) o])
         }
     vinfo = VarInfo
         { varId       = \(_, v) -> case v of
@@ -279,10 +277,10 @@ reg i = IRVar { _ivVar = PhysicalIV i
               , _ivSrc = Nothing
               }
 
-use               = reg . flip Build_AllocInfo Nothing
-restore n         = reg . flip Build_AllocInfo (Just (LS.Restore n))
-spill n           = reg . flip Build_AllocInfo (Just (Spill n))
-restoreAndSpill n = reg . flip Build_AllocInfo (Just (RestoreAndSpill n))
+use             = reg . flip Build_AllocInfo Nothing
+restore         = reg . flip Build_AllocInfo (Just LS.Restore)
+spill           = reg . flip Build_AllocInfo (Just Spill)
+restoreAndSpill = reg . flip Build_AllocInfo (Just RestoreAndSpill)
 
 v0  = var 0
 v1  = var 1

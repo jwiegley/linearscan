@@ -25,7 +25,7 @@ Variables varType    : Set.
 Inductive VarKind := Input | Temp | Output.
 
 (* When use of a variable is encountered, one or more actions should be taken: *)
-Inductive VarAction := Spill of nat | Restore of nat | RestoreAndSpill of nat.
+Inductive VarAction := Spill | Restore | RestoreAndSpill.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
@@ -50,7 +50,8 @@ Record AllocInfo := {
 Record OpInfo (opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq varType * seq PhysReg;
-  applyAllocs : opType1 -> seq (nat * AllocInfo) -> seq opType2
+  applyAllocs : forall a, opType1 -> a -> seq (nat * AllocInfo)
+                  -> a * seq opType2
 }.
 
 Variable oinfo : OpInfo opType1 opType2 varType.
@@ -227,39 +228,21 @@ Definition resolveDataFlow : BlockState unit := return_ tt.
 (* Definition mapOps (f : opType -> opType) : BlockList -> BlockList := *)
 (*   NE_map (fun blk => setBlockOps binfo blk (map f (blockOps binfo blk))). *)
 
-Record AssnStateInfo := {
-  assnOpId   : nat;
-  assnOffset : nat;
-  assnSpills : seq (nat * nat)  (* varId * offset *)
-}.
-
 Section Allocation.
 
-Definition AssnState := IState SSError AssnStateInfo AssnStateInfo.
+Variable accType : Set.
 
-Definition mapOpsM (f : opType1 -> AssnState opType2) :=
-  mapM (fun blk => setBlockOps binfo blk <$$> mapM f (blockOps binfo blk)).
+Record AssnStateInfo := {
+  assnOpId : nat;
+  assnAcc  : accType
+}.
+
+Definition AssnState :=
+  IState SSError AssnStateInfo AssnStateInfo.
 
 Definition concatMapOpsM (f : opType1 -> AssnState (seq opType2)) :=
   mapM (fun blk => setBlockOps binfo blk
                      <$$> concatMapM f (blockOps binfo blk)).
-
-Definition withSpillSlot vid (action : nat -> VarAction) :
-  AssnState (option VarAction) :=
-  assn <<- iget SSError ;;
-  (* This strange use of a lambda is so that the generated code evaluates the
-     call to [lookup] only once, and shares the resulting value at each use
-     point; otherwise, if we use [let] or [match], Coq's extractor inlines
-     each use of [voff], resulting in no sharing of values. *)
-  (fun voff =>
-     (if voff == assnOffset assn
-      then iput SSError
-                {| assnOpId   := assnOpId assn
-                 ; assnOffset := voff + regSize
-                 ; assnSpills := (vid, voff) :: assnSpills assn |}
-      else return_ tt) ;;;
-      return_ $ Some (action voff))
-    (lookup (assnOffset assn) (assnSpills assn) vid).
 
 Definition allocVar (vid : nat) (int : IntervalDesc) (reg : PhysReg) :
   AssnState (nat * AllocInfo) :=
@@ -267,15 +250,15 @@ Definition allocVar (vid : nat) (int : IntervalDesc) (reg : PhysReg) :
   let n := assnOpId assn in
   let isFirst := firstUsePos int == n in
   let isLast  := nextUseAfter int n == None in
-  action <<-
+  let action :=
     match iknd int, isFirst, isLast with
-    | Middle,    true,  true  => withSpillSlot vid RestoreAndSpill
-    | Middle,    false, true  => withSpillSlot vid Spill
-    | Middle,    true,  false => withSpillSlot vid Restore
-    | LeftMost,  _,     true  => withSpillSlot vid Spill
-    | RightMost, true,  _     => withSpillSlot vid Restore
-    | _,         _,     _     => return_ None
-    end ;;
+    | Middle,    true,  true  => Some RestoreAndSpill
+    | Middle,    false, true  => Some Spill
+    | Middle,    true,  false => Some Restore
+    | LeftMost,  _,     true  => Some Spill
+    | RightMost, true,  _     => Some Restore
+    | _,         _,     _     => None
+    end in
   return_ (vid, {| allocReg    := reg
                  ; allocAction := action |}).
 
@@ -293,26 +276,25 @@ Definition considerOp (ints : seq (IntervalDesc * PhysReg)) (op : opType1) :
   AssnState (seq opType2) :=
   vars <<- concatMapM (getAllocations ints) (fst (opRefs oinfo op)) ;;
   (* With lenses, this would just be: assnOpId += 2 *)
-  imodify SSError
-          (fun assn =>
-             {| assnOpId   := (assnOpId assn).+2
-              ; assnOffset := assnOffset assn
-              ; assnSpills := assnSpills assn |}) ;;;
-  return_ $ applyAllocs oinfo op vars.
+  assn <<- iget SSError ;;
+  let: (acc', op') := applyAllocs oinfo op (assnAcc assn) vars in
+  iput SSError
+       {| assnOpId := (assnOpId assn).+2
+        ; assnAcc  := acc' |} ;;;
+  return_ op'.
 
-Definition assignRegNum `(st : ScanState InUse sd) (offset : nat) :
-  IState SSError (seq blockType1) (seq blockType2) nat :=
+Definition assignRegNum `(st : ScanState InUse sd) (acc : accType) :
+  IState SSError (seq blockType1) (seq blockType2) accType :=
   let ints := map (fun x => (getIntervalDesc (getInterval (fst x)), snd x))
                   (handled sd ++ active sd ++ inactive sd) in
   blocks <<- iget SSError ;;
   match runIState SSError (concatMapOpsM (considerOp ints) blocks)
-                  {| assnOpId   := 1
-                   ; assnOffset := offset
-                   ; assnSpills := [::] |} with
+                  {| assnOpId  := 1
+                   ; assnAcc := acc |} with
   | inl err => ierr SSError err
   | inr (blocks', assn) =>
       iput SSError blocks' ;;;
-      return_ $ assnOffset assn
+      return_ $ assnAcc assn
   end.
 
 End Allocation.

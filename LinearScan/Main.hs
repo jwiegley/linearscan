@@ -299,22 +299,18 @@ coq_VarKind_rec =
   coq_VarKind_rect
 
 data VarAction =
-   Spill Prelude.Int
- | Restore Prelude.Int
- | RestoreAndSpill Prelude.Int
+   Spill
+ | Restore
+ | RestoreAndSpill
 
-coq_VarAction_rect :: (Prelude.Int -> a1) -> (Prelude.Int -> a1)
-                                 -> (Prelude.Int -> a1) ->
-                                 VarAction -> a1
+coq_VarAction_rect :: a1 -> a1 -> a1 -> VarAction -> a1
 coq_VarAction_rect f f0 f1 v =
   case v of {
-   Spill x -> f x;
-   Restore x -> f0 x;
-   RestoreAndSpill x -> f1 x}
+   Spill -> f;
+   Restore -> f0;
+   RestoreAndSpill -> f1}
 
-coq_VarAction_rec :: (Prelude.Int -> a1) -> (Prelude.Int -> a1) ->
-                                (Prelude.Int -> a1) -> VarAction ->
-                                a1
+coq_VarAction_rec :: a1 -> a1 -> a1 -> VarAction -> a1
 coq_VarAction_rec =
   coq_VarAction_rect
 
@@ -402,20 +398,24 @@ data OpInfo opType1 opType2 varType =
                                                         ([] varType)
                                                         ([]
                                                         PhysReg)) 
- (opType1 -> ([] ((,) Prelude.Int AllocInfo)) -> [] opType2)
+ (() -> opType1 -> () -> ([] ((,) Prelude.Int AllocInfo)) -> (,) 
+ () ([] opType2))
 
 coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> (,) 
-                              ([] a3) ([] PhysReg)) -> (a1 -> ([]
-                              ((,) Prelude.Int AllocInfo)) -> []
-                              a2) -> a4) -> (OpInfo a1 a2 a3) -> a4
+                              ([] a3) ([] PhysReg)) -> (() -> a1 ->
+                              () -> ([]
+                              ((,) Prelude.Int AllocInfo)) -> (,)
+                              () ([] a2)) -> a4) -> (OpInfo 
+                              a1 a2 a3) -> a4
 coq_OpInfo_rect f o =
   case o of {
    Build_OpInfo x x0 x1 -> f x x0 x1}
 
 coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> (,) 
-                             ([] a3) ([] PhysReg)) -> (a1 -> ([]
-                             ((,) Prelude.Int AllocInfo)) -> [] 
-                             a2) -> a4) -> (OpInfo a1 a2 a3) -> a4
+                             ([] a3) ([] PhysReg)) -> (() -> a1 ->
+                             () -> ([] ((,) Prelude.Int AllocInfo))
+                             -> (,) () ([] a2)) -> a4) -> (OpInfo
+                             a1 a2 a3) -> a4
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
@@ -430,12 +430,13 @@ opRefs o =
   case o of {
    Build_OpInfo opKind0 opRefs0 applyAllocs0 -> opRefs0}
 
-applyAllocs :: (OpInfo a1 a2 a3) -> a1 -> ([]
-                          ((,) Prelude.Int AllocInfo)) -> [] 
-                          a2
-applyAllocs o =
+applyAllocs :: (OpInfo a1 a2 a3) -> a1 -> a4 -> ([]
+                          ((,) Prelude.Int AllocInfo)) -> (,) 
+                          a4 ([] a2)
+applyAllocs o x x0 x1 =
   case o of {
-   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> applyAllocs0}
+   Build_OpInfo opKind0 opRefs0 applyAllocs0 ->
+    unsafeCoerce applyAllocs0 __ x x0 x1}
 
 data BlockInfo blockType1 blockType2 opType1 opType2 =
    Build_BlockInfo (blockType1 -> [] opType1) (blockType1 -> ([]
@@ -747,63 +748,39 @@ resolveDataFlow :: BlockState a1 ()
 resolveDataFlow =
   return_ IState.coq_IState_IApplicative ()
 
-data AssnStateInfo =
-   Build_AssnStateInfo Prelude.Int Prelude.Int ([]
-                                                         ((,) Prelude.Int
-                                                         Prelude.Int))
+data AssnStateInfo accType =
+   Build_AssnStateInfo Prelude.Int accType
 
-coq_AssnStateInfo_rect :: (Prelude.Int -> Prelude.Int -> ([]
-                                     ((,) Prelude.Int Prelude.Int)) -> a1) ->
-                                     AssnStateInfo -> a1
+coq_AssnStateInfo_rect :: (Prelude.Int -> a1 -> a2) ->
+                                     (AssnStateInfo a1) -> a2
 coq_AssnStateInfo_rect f a =
   case a of {
-   Build_AssnStateInfo x x0 x1 -> f x x0 x1}
+   Build_AssnStateInfo x x0 -> f x x0}
 
-coq_AssnStateInfo_rec :: (Prelude.Int -> Prelude.Int -> ([]
-                                    ((,) Prelude.Int Prelude.Int)) -> a1) ->
-                                    AssnStateInfo -> a1
+coq_AssnStateInfo_rec :: (Prelude.Int -> a1 -> a2) ->
+                                    (AssnStateInfo a1) -> a2
 coq_AssnStateInfo_rec =
   coq_AssnStateInfo_rect
 
-assnOpId :: AssnStateInfo -> Prelude.Int
+assnOpId :: (AssnStateInfo a1) -> Prelude.Int
 assnOpId a =
   case a of {
-   Build_AssnStateInfo assnOpId0 assnOffset0 assnSpills0 ->
-    assnOpId0}
+   Build_AssnStateInfo assnOpId0 assnAcc0 -> assnOpId0}
 
-assnOffset :: AssnStateInfo -> Prelude.Int
-assnOffset a =
+assnAcc :: (AssnStateInfo a1) -> a1
+assnAcc a =
   case a of {
-   Build_AssnStateInfo assnOpId0 assnOffset0 assnSpills0 ->
-    assnOffset0}
+   Build_AssnStateInfo assnOpId0 assnAcc0 -> assnAcc0}
 
-assnSpills :: AssnStateInfo -> []
-                         ((,) Prelude.Int Prelude.Int)
-assnSpills a =
-  case a of {
-   Build_AssnStateInfo assnOpId0 assnOffset0 assnSpills0 ->
-    assnSpills0}
-
-type AssnState a =
-  IState.IState SSError AssnStateInfo
-  AssnStateInfo a
-
-mapOpsM :: (BlockInfo a1 a2 a3 a4) -> (a3 ->
-                      AssnState a4) -> ([] a1) -> IState.IState
-                      SSError AssnStateInfo
-                      AssnStateInfo ([] a2)
-mapOpsM binfo f =
-  IMonad.mapM (unsafeCoerce IState.coq_IState_IMonad) (\blk ->
-    IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor)
-      (setBlockOps binfo blk)
-      (IMonad.mapM (unsafeCoerce IState.coq_IState_IMonad) (unsafeCoerce f)
-        (blockOps binfo blk)))
+type AssnState accType a =
+  IState.IState SSError (AssnStateInfo accType)
+  (AssnStateInfo accType) a
 
 concatMapOpsM :: (BlockInfo a1 a2 a3 a4) -> (a3 ->
-                            AssnState ([] a4)) -> ([] a1) ->
+                            AssnState a5 ([] a4)) -> ([] a1) ->
                             IState.IState SSError
-                            AssnStateInfo AssnStateInfo
-                            ([] a2)
+                            (AssnStateInfo a5)
+                            (AssnStateInfo a5) ([] a2)
 concatMapOpsM binfo f =
   IMonad.mapM (unsafeCoerce IState.coq_IState_IMonad) (\blk ->
     IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor)
@@ -811,29 +788,8 @@ concatMapOpsM binfo f =
       (IMonad.concatMapM (unsafeCoerce IState.coq_IState_IMonad)
         (unsafeCoerce f) (blockOps binfo blk)))
 
-withSpillSlot :: Prelude.Int -> (Prelude.Int ->
-                            VarAction) -> AssnState
-                            (Prelude.Maybe VarAction)
-withSpillSlot vid action =
-  stbind (\assn ->
-    let {
-     voff = Lib.lookup Ssrnat.nat_eqType (assnOffset assn)
-              (unsafeCoerce (assnSpills assn)) (unsafeCoerce vid)}
-    in
-    stbind (\x ->
-      (Prelude.$) (return_ IState.coq_IState_IApplicative)
-        (Prelude.Just (action voff)))
-      (case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce voff)
-              (unsafeCoerce (assnOffset assn)) of {
-        Prelude.True ->
-         IState.iput (Build_AssnStateInfo
-           (assnOpId assn) ((Prelude.+) voff regSize)
-           ((:) ((,) vid voff) (assnSpills assn)));
-        Prelude.False -> return_ IState.coq_IState_IApplicative ()}))
-    IState.iget
-
 allocVar :: Prelude.Int -> Interval.IntervalDesc ->
-                       PhysReg -> AssnState
+                       PhysReg -> AssnState a1
                        ((,) Prelude.Int AllocInfo)
 allocVar vid int reg =
   stbind (\assn ->
@@ -847,40 +803,30 @@ allocVar vid int reg =
                 (unsafeCoerce (Interval.nextUseAfter int n))
                 (unsafeCoerce Prelude.Nothing)}
     in
-    stbind (\action ->
-      return_ IState.coq_IState_IApplicative ((,) vid
-        (Build_AllocInfo reg action)))
-      (case Interval.iknd int of {
-        Interval.Whole ->
-         return_ IState.coq_IState_IApplicative Prelude.Nothing;
-        Interval.LeftMost ->
-         case isLast of {
-          Prelude.True ->
-           withSpillSlot vid (\x -> Spill x);
-          Prelude.False ->
-           return_ IState.coq_IState_IApplicative Prelude.Nothing};
-        Interval.Middle ->
-         case isFirst of {
-          Prelude.True ->
-           case isLast of {
-            Prelude.True ->
-             withSpillSlot vid (\x -> RestoreAndSpill x);
-            Prelude.False ->
-             withSpillSlot vid (\x -> Restore x)};
-          Prelude.False ->
-           case isLast of {
-            Prelude.True ->
-             withSpillSlot vid (\x -> Spill x);
-            Prelude.False ->
-             return_ IState.coq_IState_IApplicative
-               Prelude.Nothing}};
-        Interval.RightMost ->
-         case isFirst of {
-          Prelude.True ->
-           withSpillSlot vid (\x -> Restore x);
-          Prelude.False ->
-           return_ IState.coq_IState_IApplicative Prelude.Nothing}}))
-    IState.iget
+    let {
+     action = case Interval.iknd int of {
+               Interval.Whole -> Prelude.Nothing;
+               Interval.LeftMost ->
+                case isLast of {
+                 Prelude.True -> Prelude.Just Spill;
+                 Prelude.False -> Prelude.Nothing};
+               Interval.Middle ->
+                case isFirst of {
+                 Prelude.True ->
+                  case isLast of {
+                   Prelude.True -> Prelude.Just RestoreAndSpill;
+                   Prelude.False -> Prelude.Just Restore};
+                 Prelude.False ->
+                  case isLast of {
+                   Prelude.True -> Prelude.Just Spill;
+                   Prelude.False -> Prelude.Nothing}};
+               Interval.RightMost ->
+                case isFirst of {
+                 Prelude.True -> Prelude.Just Restore;
+                 Prelude.False -> Prelude.Nothing}}}
+    in
+    return_ IState.coq_IState_IApplicative ((,) vid
+      (Build_AllocInfo reg action))) IState.iget
 
 isWithin :: Prelude.Int -> Prelude.Int -> Interval.IntervalDesc ->
                        Prelude.Bool
@@ -893,7 +839,7 @@ isWithin vid opid int =
 
 getAllocations :: (VarInfo a1) -> ([]
                              ((,) Interval.IntervalDesc PhysReg))
-                             -> a1 -> AssnState
+                             -> a1 -> AssnState a2
                              ([] ((,) Prelude.Int AllocInfo))
 getAllocations vinfo ints v =
   stbind (\assn ->
@@ -907,25 +853,26 @@ getAllocations vinfo ints v =
 considerOp :: (VarInfo a3) -> (OpInfo 
                          a1 a2 a3) -> ([]
                          ((,) Interval.IntervalDesc PhysReg)) -> a1
-                         -> AssnState ([] a2)
+                         -> AssnState a4 ([] a2)
 considerOp vinfo oinfo ints op =
   stbind (\vars ->
-    stbind (\x ->
-      (Prelude.$) (return_ IState.coq_IState_IApplicative)
-        (applyAllocs oinfo op vars))
-      (IState.imodify (\assn -> Build_AssnStateInfo ((Prelude.succ)
-        ((Prelude.succ) (assnOpId assn)))
-        (assnOffset assn) (assnSpills assn))))
+    stbind (\assn ->
+      case applyAllocs oinfo op (assnAcc assn) vars of {
+       (,) acc' op' ->
+        stbind (\x ->
+          return_ IState.coq_IState_IApplicative op')
+          (IState.iput (Build_AssnStateInfo ((Prelude.succ)
+            ((Prelude.succ) (assnOpId assn))) acc'))}) IState.iget)
     (IMonad.concatMapM (unsafeCoerce IState.coq_IState_IMonad)
       (getAllocations vinfo ints)
       (Prelude.fst (opRefs oinfo op)))
 
 assignRegNum :: (VarInfo a5) -> (OpInfo 
                            a3 a4 a5) -> (BlockInfo a1 a2 a3 
-                           a4) -> ScanStateDesc -> Prelude.Int ->
-                           IState.IState SSError ([] a1) ([] a2)
-                           Prelude.Int
-assignRegNum vinfo oinfo binfo sd offset =
+                           a4) -> ScanStateDesc -> a6 ->
+                           IState.IState SSError ([] a1) ([] a2) 
+                           a6
+assignRegNum vinfo oinfo binfo sd acc =
   let {
    ints = Prelude.map (\x -> (,)
             (Interval.getIntervalDesc
@@ -940,15 +887,14 @@ assignRegNum vinfo oinfo binfo sd offset =
     case IState.runIState
            (concatMapOpsM binfo
              (considerOp vinfo oinfo ints) blocks)
-           (Build_AssnStateInfo ((Prelude.succ) 0) offset []) of {
+           (Build_AssnStateInfo ((Prelude.succ) 0) acc) of {
      Prelude.Left err -> IState.ierr err;
      Prelude.Right p ->
       case p of {
        (,) blocks' assn ->
         stbind (\x ->
           (Prelude.$) (return_ IState.coq_IState_IApplicative)
-            (assnOffset assn)) (IState.iput blocks')}})
-    IState.iget
+            (assnAcc assn)) (IState.iput blocks')}}) IState.iget
 
 coq_SSMorph_rect :: ScanStateDesc ->
                                ScanStateDesc -> (() -> a1) -> a1
@@ -1976,9 +1922,9 @@ walkIntervals sd positions =
       (packScanState InUse sd)})
     positions
 
-mainAlgorithm :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
-                 a3 a4 a5) -> (VarInfo a5) -> Prelude.Int ->
-                 IState.IState SSError ([] a1) ([] a2) Prelude.Int
+mainAlgorithm :: (BlockInfo a2 a3 a4 a5) -> (OpInfo 
+                 a4 a5 a6) -> (VarInfo a6) -> a1 -> IState.IState
+                 SSError ([] a2) ([] a3) a1
 mainAlgorithm binfo oinfo vinfo accum =
   stbind (\x ->
     stbind (\x0 ->
@@ -1997,10 +1943,10 @@ mainAlgorithm binfo oinfo vinfo accum =
           computeGlobalLiveSets) computeLocalLiveSets)
       numberOperations) computeBlockOrder
 
-linearScan :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
-              a3 a4 a5) -> (VarInfo a5) -> ([] a1) -> Prelude.Int
-              -> Prelude.Either SSError
-              ((,) Prelude.Int (BlockList a2))
+linearScan :: (BlockInfo a2 a3 a4 a5) -> (OpInfo 
+              a4 a5 a6) -> (VarInfo a6) -> ([] a2) -> a1 ->
+              Prelude.Either SSError
+              ((,) a1 (BlockList a3))
 linearScan binfo oinfo vinfo blocks accum =
   let {main = mainAlgorithm binfo oinfo vinfo accum} in
   IState.runIState main blocks
