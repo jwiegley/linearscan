@@ -102,10 +102,7 @@ Fixpoint mapM {M} `{IMonad M} {I A B}
   (f : A -> M I I B) (l : list A) : M I I (list B) :=
   match l with
   | nil => ipure nil
-  | cons x xs =>
-    x'  <<- f x ;;
-    xs' <<- mapM f xs ;;
-    ipure (cons x' xs')
+  | cons x xs => liftIA2 M (@cons _) (f x) (mapM f xs)
   end.
 
 Definition foldM {M} `{IMonad M} {I A B}
@@ -117,19 +114,21 @@ Definition foldM {M} `{IMonad M} {I A B}
       end in
   go l s.
 
-Fixpoint mapAccumM {M} `{IMonad M} {I A X Y : Type}
-  (f : A -> X -> M I I (A * Y)%type) (s : A) (l : list X) :
-  M I I (A * list Y)%type :=
+Fixpoint concat {A} (l : list (list A)) : list A :=
   match l with
-  | nil => ipure (s, nil)
-  | cons x xs =>
-    x <<- f s x ;;
-    match x with
-      (s', y) =>
-        x' <<- mapAccumM f s' xs ;;
-        match x' with
-          (s'', ys) =>
-            ipure (s'', cons y ys)
-        end
-    end
+  | nil => nil
+  | cons x xs => app x (concat xs)
   end.
+
+Definition concatMapM {M} `{IMonad M} {I A B}
+  (f : A -> M I I (list B)) (l : list A) : M I I (list B) :=
+  concat <$$> mapM f l.
+
+Definition mapMaybeM {M} `{IMonad M} {I A B}
+  (f : A -> M I I (option B)) : list A -> M I I (list B) :=
+  foldM (fun acc x =>
+           mx' <<- f x ;;
+           ipure (match mx' with
+             | None => acc
+             | Some x' => cons x' acc
+             end)) nil.

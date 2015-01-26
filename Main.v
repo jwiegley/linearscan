@@ -35,7 +35,7 @@ Definition mainAlgorithm
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
   (vinfo : VarInfo varType) (offset : nat) :
-  BlockState _ (NonEmpty blockType2 * nat) :=
+  BlockState _ (seq blockType2 * nat) :=
 
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder blockType1 ;;;

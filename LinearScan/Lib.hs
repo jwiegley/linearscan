@@ -14,6 +14,11 @@ import qualified LinearScan.Eqtype as Eqtype
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
+uncurry :: (a1 -> a2 -> a3) -> ((,) a1 a2) -> a3
+uncurry f p =
+  case p of {
+   (,) x y -> f x y}
+
 option_map :: (a1 -> a2) -> (Prelude.Maybe a1) -> Prelude.Maybe a2
 option_map f x =
   case x of {
@@ -47,16 +52,6 @@ foldl_with_index f b v =
       [] -> z;
       (:) y ys -> go ((Prelude.succ) n) ys (f n z y)}}
   in go 0 v b
-
-mapAccumL :: (a1 -> a2 -> (,) a1 a3) -> a1 -> ([] a2) -> (,) a1 ([] a3)
-mapAccumL f s v =
-  case v of {
-   [] -> (,) s [];
-   (:) x xs ->
-    case f s x of {
-     (,) s' y ->
-      case mapAccumL f s' xs of {
-       (,) s'' ys -> (,) s'' ((:) y ys)}}}
 
 dep_foldl_inv :: (a1 -> Eqtype.Equality__Coq_type) -> a1 -> ([]
                  Eqtype.Equality__Coq_sort) -> Prelude.Int -> (a1 -> []

@@ -61,7 +61,7 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo o v a b = OpInfo
     { opKind      :: o a -> OpKind
     , opRefs      :: o a -> ([v], [PhysReg])
-    , applyAllocs :: o a -> [(Int, LS.AllocInfo)] -> o b
+    , applyAllocs :: o a -> [(Int, LS.AllocInfo)] -> [o b]
     }
 
 deriving instance Eq OpKind

@@ -35,6 +35,9 @@ Notation "p .2" := (proj2_sig p)
   (at level 2, left associativity, format "p .2").
 Notation "( x ; y )" := (exist _ x y).
 
+Definition uncurry {A B C} (f : A -> B -> C) (p : A * B) : C :=
+  match p with (x, y) => f x y end.
+
 Definition uncurry_sig {A C} {B : A -> Prop}
   (f : forall x : A, B x -> C) (p : { x : A | B x }) : C :=
   let (x,H) := p in f x H.

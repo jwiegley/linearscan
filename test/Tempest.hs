@@ -226,7 +226,7 @@ asmTest (compile -> body) (compile -> result) =
             -- print ("----" :: String)
             -- print result
             -- print ("----" :: String)
-            -- length xs `shouldBe` length result
+            length (fst xs) `shouldBe` length [result]
             zipWithM_ shouldBe (fst xs) [result]
   where
     binfo = BlockInfo
@@ -236,7 +236,7 @@ asmTest (compile -> body) (compile -> result) =
     oinfo = OpInfo
         { opKind      = const Normal
         , opRefs      = convertNode
-        , applyAllocs = \o m -> conv (fromList m) o
+        , applyAllocs = \o m -> [conv (fromList m) o]
         }
     vinfo = VarInfo
         { varId       = \(_, v) -> case v of

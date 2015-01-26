@@ -33,8 +33,22 @@ data IApplicative f =
                                                                -> f -> f ->
                                                                f)
 
+is_ifunctor :: (IApplicative a1) -> IEndo.IFunctor a1
+is_ifunctor iApplicative =
+  case iApplicative of {
+   Build_IApplicative is_ifunctor0 ipure0 iap0 -> is_ifunctor0}
+
 ipure :: (IApplicative a1) -> a3 -> a1
 ipure iApplicative x =
   case iApplicative of {
-   Build_IApplicative is_ifunctor ipure0 iap -> unsafeCoerce ipure0 __ __ x}
+   Build_IApplicative is_ifunctor0 ipure0 iap0 -> unsafeCoerce ipure0 __ __ x}
+
+iap :: (IApplicative a1) -> a1 -> a1 -> a1
+iap iApplicative x x0 =
+  case iApplicative of {
+   Build_IApplicative is_ifunctor0 ipure0 iap0 -> iap0 __ __ __ __ __ x x0}
+
+liftIA2 :: (IApplicative a1) -> (a5 -> a6 -> a7) -> a1 -> a1 -> a1
+liftIA2 h f x y =
+  iap h (IEndo.imap (is_ifunctor h) f x) y
 
