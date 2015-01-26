@@ -216,7 +216,7 @@ instance Show IRVar where
     show (IRVar x _) = show x
 
 asmTest (compile -> body) (compile -> result) =
-    case allocate binfo oinfo vinfo [body] 0 of
+    case allocate binfo oinfo vinfo [body] () of
         Left e   -> error $ "Allocation failed: " ++ e
         Right xs -> do
             -- print ("----" :: String)

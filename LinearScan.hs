@@ -100,11 +100,11 @@ fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
 allocate :: BlockInfo blk o a b -> OpInfo o v a b -> VarInfo v
-         -> [blk a] -> Int -> Either String (Int, [blk b])
+         -> [blk a] -> c -> Either String (c, [blk b])
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
-         (fromVarInfo -> vinfo) blocks offset =
-    case LS.linearScan binfo oinfo vinfo blocks offset of
+         (fromVarInfo -> vinfo) blocks acc =
+    case LS.linearScan binfo oinfo vinfo blocks acc of
         Left x -> Left $ case x of
             LS.ECannotSplitSingleton n ->
                 "Current interval is a singleton (" ++ show n ++ ")"
