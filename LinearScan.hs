@@ -28,6 +28,7 @@ import LinearScan.Main
     , OpKind(..)
     , PhysReg
     )
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Each variable has associated allocation details, and a flag to indicate
 --   whether it must be loaded into a register at its point of use.  Variables
@@ -58,10 +59,10 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 --   and restore all registers around a call, but indication of loops is
 --   optional, as it's merely avoids reloading of spilled variables inside
 --   loop bodies.
-data OpInfo o v a b = OpInfo
+data OpInfo accType o v a b = OpInfo
     { opKind      :: o a -> OpKind
     , opRefs      :: o a -> ([v], [PhysReg])
-    , applyAllocs :: forall c. o a -> c -> [(Int, LS.AllocInfo)] -> (c, [o b])
+    , applyAllocs :: o a -> accType -> [(Int, LS.AllocInfo)] -> (accType, [o b])
     }
 
 deriving instance Eq OpKind
@@ -73,8 +74,8 @@ deriving instance Show VarAction
 deriving instance Eq LS.AllocInfo
 deriving instance Show LS.AllocInfo
 
-fromOpInfo :: OpInfo o v a b -> LS.OpInfo (o a) (o b) v
-fromOpInfo (OpInfo a b c) = LS.Build_OpInfo a b (const c)
+fromOpInfo :: OpInfo accType o v a b -> LS.OpInfo (o a) (o b) v
+fromOpInfo (OpInfo a b c) = LS.Build_OpInfo a b (const (unsafeCoerce c))
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -99,8 +100,8 @@ fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: BlockInfo blk o a b -> OpInfo o v a b -> VarInfo v
-         -> [blk a] -> c -> Either String (c, [blk b])
+allocate :: BlockInfo blk o a b -> OpInfo accType o v a b -> VarInfo v
+         -> [blk a] -> accType -> Either String (accType, [blk b])
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks acc =
