@@ -22,24 +22,6 @@ Variables opType1    : Set.
 Variables opType2    : Set.
 Variables varType    : Set.
 
-(* The simplest way to get information about the IR instructions from the
-   caller is to receive the following data:
-
-   NonEmpty (BlockId * NonEmpty (OpId * NonEmpty vars))
-
-   We receive an ordered list of blocks identified by an number pickedq by the
-   caller.  Each block is associated with a sequence of operations (the caller
-   should not inform us of empty blocks), and each operation relates to a
-   nonempty set of variables (the caller should not inform us of instructions
-   without variables).
-
-   In addition to this basic information, a set of functions associated with
-   blocks and operations is necessary in order to determine extra details
-   about those structures, such as the block IDs of all successors of a
-   specific block.  These are the [BlockInfo] and [OpInfo] records,
-   respectively.
-*)
-
 Inductive VarKind := Input | Temp | Output.
 
 (* When use of a variable is encountered, one or more actions should be taken: *)
@@ -319,7 +301,7 @@ Definition considerOp (ints : seq (IntervalDesc * PhysReg)) (op : opType1) :
   return_ $ applyAllocs oinfo op vars.
 
 Definition assignRegNum `(st : ScanState InUse sd) (offset : nat) :
-  BlockState (seq blockType2 * nat) :=
+  IState SSError (seq blockType1) (seq blockType2) nat :=
   let ints := map (fun x => (getIntervalDesc (getInterval (fst x)), snd x))
                   (handled sd ++ active sd ++ inactive sd) in
   blocks <<- iget SSError ;;
@@ -328,7 +310,9 @@ Definition assignRegNum `(st : ScanState InUse sd) (offset : nat) :
                    ; assnOffset := offset
                    ; assnSpills := [::] |} with
   | inl err => ierr SSError err
-  | inr (blocks', assn) => return_ (blocks', assnOffset assn)
+  | inr (blocks', assn) =>
+      iput SSError blocks' ;;;
+      return_ $ assnOffset assn
   end.
 
 End Allocation.

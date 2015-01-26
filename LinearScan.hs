@@ -100,7 +100,7 @@ fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
 allocate :: BlockInfo blk o a b -> OpInfo o v a b -> VarInfo v
-         -> [blk a] -> Int -> Either String ([blk b], Int)
+         -> [blk a] -> Int -> Either String (Int, [blk b])
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks offset =

@@ -226,8 +226,8 @@ asmTest (compile -> body) (compile -> result) =
             -- print ("----" :: String)
             -- print result
             -- print ("----" :: String)
-            length (fst xs) `shouldBe` length [result]
-            zipWithM_ shouldBe (fst xs) [result]
+            length (snd xs) `shouldBe` length [result]
+            zipWithM_ shouldBe (snd xs) [result]
   where
     binfo = BlockInfo
         { blockOps    = getBlock

@@ -34,8 +34,8 @@ Definition mainAlgorithm
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) (offset : nat) :
-  BlockState _ (seq blockType2 * nat) :=
+  (vinfo : VarInfo varType) (accum : nat) :
+  IState SSError (seq blockType1) (seq blockType2) nat :=
 
   (* order blocks and operations (including loop detection) *)
   computeBlockOrder blockType1 ;;;
@@ -55,21 +55,18 @@ Definition mainAlgorithm
       resolveDataFlow blockType1 ;;;
 
       (* replace virtual registers with physical registers *)
-      assignRegNum vinfo oinfo binfo ssig'.2 offset
+      assignRegNum vinfo oinfo binfo ssig'.2 accum
   end.
 
 Definition linearScan
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) (blocks : BlockList blockType1)
-  (offset : nat) :
-  SSError + (BlockList blockType2 * nat) :=
-  let main := mainAlgorithm binfo oinfo vinfo offset in
-  match IState.runIState SSError main blocks with
-  | inl err      => inl err
-  | inr (res, _) => inr res
-  end.
+  (vinfo : VarInfo varType) (blocks : seq blockType1)
+  (accum : nat) :
+  SSError + (nat * BlockList blockType2) :=
+  let main := mainAlgorithm binfo oinfo vinfo accum in
+  IState.runIState SSError main blocks.
 
 End Main.
 

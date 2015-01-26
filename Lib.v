@@ -830,8 +830,8 @@ Qed.
    [ScanState].  See the function [checkActiveIntervals] in Allocate.v, which
    is the only user of this function. *)
 Program Fixpoint dep_foldl_inv
-  {A : Type}                    (* the value being mutated through the fold *)
-  {P : A -> Prop}               (* an inductive predicate to be maintained on A *)
+  {A : Type}                    (* type of the accumulator *)
+  {P : A -> Prop}               (* predicate maintained over the accumulator *)
   {R : A -> A -> Prop}          (* a relation on A that must be preserved *)
   {E : A -> eqType}             (* type of the elements we are folding over *)
   (b : A)                       (* the initial state value *)

@@ -95,13 +95,15 @@ stbind f x =
     (IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor) f (unsafeCoerce x))
 
 error_ :: SSError -> IState.IState SSError 
-                     a1 a1 a2
+                     a1 a2 a3
 error_ err x =
   Prelude.Left err
 
-return_ :: a2 -> IState.IState SSError a1 a1 a2
-return_ =
-  IApplicative.ipure (unsafeCoerce IState.coq_IState_IApplicative)
+return_ :: (IApplicative.IApplicative
+                      (IState.IState SSError () () ())) -> a2 ->
+                      IState.IState SSError a1 a1 a2
+return_ i =
+  IApplicative.ipure (unsafeCoerce i)
 
 type Coq_fixedIntervalsType =
   [] (Prelude.Maybe Interval.IntervalDesc)
@@ -659,19 +661,19 @@ type BlockState blockType1 a =
 
 computeBlockOrder :: BlockState a1 ()
 computeBlockOrder =
-  return_ ()
+  return_ IState.coq_IState_IApplicative ()
 
 numberOperations :: BlockState a1 ()
 numberOperations =
-  return_ ()
+  return_ IState.coq_IState_IApplicative ()
 
 computeLocalLiveSets :: BlockState a1 ()
 computeLocalLiveSets =
-  return_ ()
+  return_ IState.coq_IState_IApplicative ()
 
 computeGlobalLiveSets :: BlockState a1 ()
 computeGlobalLiveSets =
-  return_ ()
+  return_ IState.coq_IState_IApplicative ()
 
 buildIntervals :: (VarInfo a5) -> (OpInfo 
                              a3 a4 a5) -> (BlockInfo a1 a2 
@@ -739,11 +741,11 @@ buildIntervals vinfo oinfo binfo =
             (bsVars bs)}
     in
     let {s5 = packScanState InUse ( s3)} in
-    return_ s5) IState.iget
+    return_ IState.coq_IState_IApplicative s5) IState.iget
 
 resolveDataFlow :: BlockState a1 ()
 resolveDataFlow =
-  return_ ()
+  return_ IState.coq_IState_IApplicative ()
 
 data AssnStateInfo =
    Build_AssnStateInfo Prelude.Int Prelude.Int ([]
@@ -819,14 +821,16 @@ withSpillSlot vid action =
               (unsafeCoerce (assnSpills assn)) (unsafeCoerce vid)}
     in
     stbind (\x ->
-      (Prelude.$) return_ (Prelude.Just (action voff)))
+      (Prelude.$) (return_ IState.coq_IState_IApplicative)
+        (Prelude.Just (action voff)))
       (case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce voff)
               (unsafeCoerce (assnOffset assn)) of {
         Prelude.True ->
          IState.iput (Build_AssnStateInfo
            (assnOpId assn) ((Prelude.+) voff regSize)
            ((:) ((,) vid voff) (assnSpills assn)));
-        Prelude.False -> return_ ()})) IState.iget
+        Prelude.False -> return_ IState.coq_IState_IApplicative ()}))
+    IState.iget
 
 allocVar :: Prelude.Int -> Interval.IntervalDesc ->
                        PhysReg -> AssnState
@@ -844,14 +848,17 @@ allocVar vid int reg =
                 (unsafeCoerce Prelude.Nothing)}
     in
     stbind (\action ->
-      return_ ((,) vid (Build_AllocInfo reg action)))
+      return_ IState.coq_IState_IApplicative ((,) vid
+        (Build_AllocInfo reg action)))
       (case Interval.iknd int of {
-        Interval.Whole -> return_ Prelude.Nothing;
+        Interval.Whole ->
+         return_ IState.coq_IState_IApplicative Prelude.Nothing;
         Interval.LeftMost ->
          case isLast of {
           Prelude.True ->
            withSpillSlot vid (\x -> Spill x);
-          Prelude.False -> return_ Prelude.Nothing};
+          Prelude.False ->
+           return_ IState.coq_IState_IApplicative Prelude.Nothing};
         Interval.Middle ->
          case isFirst of {
           Prelude.True ->
@@ -864,12 +871,16 @@ allocVar vid int reg =
            case isLast of {
             Prelude.True ->
              withSpillSlot vid (\x -> Spill x);
-            Prelude.False -> return_ Prelude.Nothing}};
+            Prelude.False ->
+             return_ IState.coq_IState_IApplicative
+               Prelude.Nothing}};
         Interval.RightMost ->
          case isFirst of {
           Prelude.True ->
            withSpillSlot vid (\x -> Restore x);
-          Prelude.False -> return_ Prelude.Nothing}})) IState.iget
+          Prelude.False ->
+           return_ IState.coq_IState_IApplicative Prelude.Nothing}}))
+    IState.iget
 
 isWithin :: Prelude.Int -> Prelude.Int -> Interval.IntervalDesc ->
                        Prelude.Bool
@@ -900,7 +911,8 @@ considerOp :: (VarInfo a3) -> (OpInfo
 considerOp vinfo oinfo ints op =
   stbind (\vars ->
     stbind (\x ->
-      (Prelude.$) return_ (applyAllocs oinfo op vars))
+      (Prelude.$) (return_ IState.coq_IState_IApplicative)
+        (applyAllocs oinfo op vars))
       (IState.imodify (\assn -> Build_AssnStateInfo ((Prelude.succ)
         ((Prelude.succ) (assnOpId assn)))
         (assnOffset assn) (assnSpills assn))))
@@ -911,7 +923,8 @@ considerOp vinfo oinfo ints op =
 assignRegNum :: (VarInfo a5) -> (OpInfo 
                            a3 a4 a5) -> (BlockInfo a1 a2 a3 
                            a4) -> ScanStateDesc -> Prelude.Int ->
-                           BlockState a1 ((,) ([] a2) Prelude.Int)
+                           IState.IState SSError ([] a1) ([] a2)
+                           Prelude.Int
 assignRegNum vinfo oinfo binfo sd offset =
   let {
    ints = Prelude.map (\x -> (,)
@@ -932,7 +945,9 @@ assignRegNum vinfo oinfo binfo sd offset =
      Prelude.Right p ->
       case p of {
        (,) blocks' assn ->
-        return_ ((,) blocks' (assnOffset assn))}})
+        stbind (\x ->
+          (Prelude.$) (return_ IState.coq_IState_IApplicative)
+            (assnOffset assn)) (IState.iput blocks')}})
     IState.iget
 
 coq_SSMorph_rect :: ScanStateDesc ->
@@ -1583,7 +1598,7 @@ intersectsWithFixedInterval :: ScanStateDesc ->
 intersectsWithFixedInterval pre reg =
   (Prelude.$) (withCursor pre) (\sd _ ->
     let {int = curIntDetails sd} in
-    (Prelude.$) return_
+    (Prelude.$) (return_ IState.coq_IState_IApplicative)
       (LinearScan.Utils.vfoldl' maxReg (\mx v ->
         Lib.option_choose mx
           (case v of {
@@ -1645,7 +1660,8 @@ tryAllocateFreeReg pre =
     case registerWithHighestPos freeUntilPos of {
      (,) reg mres ->
       let {
-       success = stbind (\x -> return_ reg)
+       success = stbind (\x ->
+                   return_ IState.coq_IState_IApplicative reg)
                    (moveUnhandledToActive pre reg)}
       in
       let {
@@ -1661,13 +1677,14 @@ tryAllocateFreeReg pre =
                        Prelude.True -> success;
                        Prelude.False ->
                         stbind (\x ->
-                          stbind (\x0 -> return_ reg)
-                            (moveUnhandledToActive pre reg))
+                          stbind (\x0 ->
+                            return_ IState.coq_IState_IApplicative
+                              reg) (moveUnhandledToActive pre reg))
                           (splitCurrentInterval pre
                             (Interval.BeforePos n))})};
                   Prelude.Nothing -> Prelude.Just success}}
       in
-      return_ maction})
+      return_ IState.coq_IState_IApplicative maction})
 
 allocateBlockedReg :: ScanStateDesc -> SState
                                  a1 () (Prelude.Maybe PhysReg)
@@ -1727,12 +1744,14 @@ allocateBlockedReg pre =
         stbind (\x ->
           stbind (\mloc ->
             stbind (\x0 ->
-              stbind (\x1 -> return_ Prelude.Nothing)
-                (weakenHasLen_ pre))
+              stbind (\x1 ->
+                return_ IState.coq_IState_IApplicative
+                  Prelude.Nothing) (weakenHasLen_ pre))
               (case mloc of {
                 Prelude.Just n ->
                  splitCurrentInterval pre (Interval.BeforePos n);
-                Prelude.Nothing -> return_ ()}))
+                Prelude.Nothing ->
+                 return_ IState.coq_IState_IApplicative ()}))
             (intersectsWithFixedInterval pre reg))
           (splitCurrentInterval pre
             Interval.BeforeFirstUsePosReqReg);
@@ -1741,7 +1760,8 @@ allocateBlockedReg pre =
           stbind (\x0 ->
             stbind (\mloc ->
               stbind (\x1 ->
-                return_ (Prelude.Just reg))
+                return_ IState.coq_IState_IApplicative
+                  (Prelude.Just reg))
                 (case mloc of {
                   Prelude.Just n ->
                    stbind (\x1 ->
@@ -1958,8 +1978,8 @@ walkIntervals sd positions =
 
 mainAlgorithm :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
                  a3 a4 a5) -> (VarInfo a5) -> Prelude.Int ->
-                 BlockState a1 ((,) ([] a2) Prelude.Int)
-mainAlgorithm binfo oinfo vinfo offset =
+                 IState.IState SSError ([] a1) ([] a2) Prelude.Int
+mainAlgorithm binfo oinfo vinfo accum =
   stbind (\x ->
     stbind (\x0 ->
       stbind (\x1 ->
@@ -1971,21 +1991,17 @@ mainAlgorithm binfo oinfo vinfo offset =
                Prelude.Left err -> error_ err;
                Prelude.Right ssig' ->
                 stbind (\x3 ->
-                  assignRegNum vinfo oinfo binfo ( ssig') offset)
+                  assignRegNum vinfo oinfo binfo ( ssig') accum)
                   resolveDataFlow}) IState.iget)
             (buildIntervals vinfo oinfo binfo))
           computeGlobalLiveSets) computeLocalLiveSets)
       numberOperations) computeBlockOrder
 
 linearScan :: (BlockInfo a1 a2 a3 a4) -> (OpInfo 
-              a3 a4 a5) -> (VarInfo a5) -> (BlockList 
-              a1) -> Prelude.Int -> Prelude.Either SSError
-              ((,) (BlockList a2) Prelude.Int)
-linearScan binfo oinfo vinfo blocks offset =
-  let {main = mainAlgorithm binfo oinfo vinfo offset} in
-  case IState.runIState main blocks of {
-   Prelude.Left err -> Prelude.Left err;
-   Prelude.Right p ->
-    case p of {
-     (,) res b -> Prelude.Right res}}
+              a3 a4 a5) -> (VarInfo a5) -> ([] a1) -> Prelude.Int
+              -> Prelude.Either SSError
+              ((,) Prelude.Int (BlockList a2))
+linearScan binfo oinfo vinfo blocks accum =
+  let {main = mainAlgorithm binfo oinfo vinfo accum} in
+  IState.runIState main blocks
 

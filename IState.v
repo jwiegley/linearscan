@@ -55,14 +55,14 @@ Obligation 2.
   by case.
 Qed.
 
-Definition ierr {i a} (err : errType) : IState i i a :=
-  mkIState (fun i => inl err).
+Definition ierr {i o a} (err : errType) : IState i o a :=
+  mkIState (fun _ => inl err).
 
 Definition iget  {i}     : IState i i i := mkIState (fun i => inr (i, i)).
 Definition igets {i a} f : IState i i a := mkIState (fun s => inr (f s, s)).
 
 Definition iput {i o} (x : o) : IState i o unit :=
-  mkIState (fun s => inr (tt, x)).
+  mkIState (fun _ => inr (tt, x)).
 
 Definition imodify {i o} (f : i -> o) : IState i o unit :=
   mkIState (fun i => inr (tt, f i)).
