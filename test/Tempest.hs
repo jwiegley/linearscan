@@ -235,8 +235,8 @@ asmTest (compile -> body) (compile -> result) =
     oinfo = OpInfo
         { opKind      = const IsNormal -- jww (2015-01-27): NYI
         , opRefs      = convertNode
-        , saveOp      = \_off _vid -> error "jww (2015-01-27): NYI: saveOp"
-        , restoreOp   = \_off _vid -> error "jww (2015-01-27): NYI: restoreOp"
+        , saveOp      = \_off _vid _reg -> error "jww (2015-01-27): NYI: saveOp"
+        , restoreOp   = \_off _vid _reg -> error "jww (2015-01-27): NYI: restoreOp"
         , applyAllocs = \o m -> conv (fromList m) o
         }
     vinfo = VarInfo

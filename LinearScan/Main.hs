@@ -250,6 +250,25 @@ lookupInterval sd st vid opid =
   (LinearScan.Utils.vfoldl'_with_index) (nextInterval sd) f
     Prelude.Nothing (intervals sd)
 
+lookupRegister :: ScanStateDesc -> a1 ->
+                             Eqtype.Equality__Coq_sort -> Prelude.Maybe
+                             PhysReg
+lookupRegister sd st intid =
+  Lib.forFold Prelude.Nothing
+    ((Prelude.++) (unsafeCoerce (handled sd))
+      ((Prelude.++) (unsafeCoerce (active sd))
+        (unsafeCoerce (inactive sd)))) (\acc x ->
+    case x of {
+     (,) xid reg ->
+      case acc of {
+       Prelude.Just r -> Prelude.Just r;
+       Prelude.Nothing ->
+        case Eqtype.eq_op
+               (Fintype.ordinal_eqType (nextInterval sd)) xid
+               intid of {
+         Prelude.True -> Prelude.Just reg;
+         Prelude.False -> Prelude.Nothing}}})
+
 data ScanStateStatus =
    Pending
  | InUse
@@ -381,27 +400,30 @@ data OpInfo accType opType1 opType2 varType =
                                                         ([] varType)
                                                         ([]
                                                         PhysReg)) 
- (accType -> VarId -> (,) accType opType2) (accType ->
-                                                     VarId -> (,)
-                                                     accType opType2) 
+ (VarId -> PhysReg -> accType -> (,) opType2 accType) 
+ (VarId -> PhysReg -> accType -> (,) opType2 accType) 
  (opType1 -> ([] ((,) VarId PhysReg)) -> opType2)
 
 coq_OpInfo_rect :: ((a2 -> OpKind) -> (a2 -> (,) 
-                              ([] a4) ([] PhysReg)) -> (a1 ->
-                              VarId -> (,) a1 a3) -> (a1 ->
-                              VarId -> (,) a1 a3) -> (a2 -> ([]
-                              ((,) VarId PhysReg)) -> a3)
-                              -> a5) -> (OpInfo a1 a2 a3 a4) -> a5
+                              ([] a4) ([] PhysReg)) ->
+                              (VarId -> PhysReg -> a1 ->
+                              (,) a3 a1) -> (VarId ->
+                              PhysReg -> a1 -> (,) a3 a1) -> (a2 ->
+                              ([] ((,) VarId PhysReg)) ->
+                              a3) -> a5) -> (OpInfo a1 a2 a3 
+                              a4) -> a5
 coq_OpInfo_rect f o =
   case o of {
    Build_OpInfo x x0 x1 x2 x3 -> f x x0 x1 x2 x3}
 
 coq_OpInfo_rec :: ((a2 -> OpKind) -> (a2 -> (,) 
-                             ([] a4) ([] PhysReg)) -> (a1 ->
-                             VarId -> (,) a1 a3) -> (a1 ->
-                             VarId -> (,) a1 a3) -> (a2 -> ([]
-                             ((,) VarId PhysReg)) -> a3)
-                             -> a5) -> (OpInfo a1 a2 a3 a4) -> a5
+                             ([] a4) ([] PhysReg)) ->
+                             (VarId -> PhysReg -> a1 ->
+                             (,) a3 a1) -> (VarId ->
+                             PhysReg -> a1 -> (,) a3 a1) -> (a2 ->
+                             ([] ((,) VarId PhysReg)) ->
+                             a3) -> a5) -> (OpInfo a1 a2 a3 
+                             a4) -> a5
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
@@ -418,15 +440,15 @@ opRefs o =
    Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
     opRefs0}
 
-saveOp :: (OpInfo a1 a2 a3 a4) -> a1 -> VarId
-                     -> (,) a1 a3
+saveOp :: (OpInfo a1 a2 a3 a4) -> VarId ->
+                     PhysReg -> a1 -> (,) a3 a1
 saveOp o =
   case o of {
    Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
     saveOp0}
 
-restoreOp :: (OpInfo a1 a2 a3 a4) -> a1 ->
-                        VarId -> (,) a1 a3
+restoreOp :: (OpInfo a1 a2 a3 a4) -> VarId ->
+                        PhysReg -> a1 -> (,) a3 a1
 restoreOp o =
   case o of {
    Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
@@ -924,18 +946,20 @@ buildIntervals vinfo oinfo binfo blocks =
   packScanState InUse ( s3)
 
 data InsertPos =
-   AtBegin VarId
- | AtEnd VarId
+   AtBegin VarId PhysReg
+ | AtEnd VarId PhysReg
 
-coq_InsertPos_rect :: (VarId -> a1) -> (VarId
-                                 -> a1) -> InsertPos -> a1
+coq_InsertPos_rect :: (VarId -> PhysReg -> a1)
+                                 -> (VarId -> PhysReg ->
+                                 a1) -> InsertPos -> a1
 coq_InsertPos_rect f f0 i =
   case i of {
-   AtBegin x -> f x;
-   AtEnd x -> f0 x}
+   AtBegin x x0 -> f x x0;
+   AtEnd x x0 -> f0 x x0}
 
-coq_InsertPos_rec :: (VarId -> a1) -> (VarId
-                                -> a1) -> InsertPos -> a1
+coq_InsertPos_rec :: (VarId -> PhysReg -> a1)
+                                -> (VarId -> PhysReg ->
+                                a1) -> InsertPos -> a1
 coq_InsertPos_rec =
   coq_InsertPos_rect
 
@@ -943,82 +967,122 @@ eqact :: InsertPos -> InsertPos ->
                     Prelude.Bool
 eqact v1 v2 =
   case v1 of {
-   AtBegin r1 ->
+   AtBegin v3 r1 ->
     case v2 of {
-     AtBegin r2 ->
-      Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce r1) (unsafeCoerce r2);
-     AtEnd v -> Prelude.False};
-   AtEnd r1 ->
+     AtBegin v4 r2 ->
+      (Prelude.&&)
+        (Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce v3) (unsafeCoerce v4))
+        (Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
+          (unsafeCoerce r1) (unsafeCoerce r2));
+     AtEnd v p -> Prelude.False};
+   AtEnd v3 r1 ->
     case v2 of {
-     AtBegin v -> Prelude.False;
-     AtEnd r2 ->
-      Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce r1) (unsafeCoerce r2)}}
+     AtBegin v p -> Prelude.False;
+     AtEnd v4 r2 ->
+      (Prelude.&&)
+        (Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce v3) (unsafeCoerce v4))
+        (Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
+          (unsafeCoerce r1) (unsafeCoerce r2))}}
 
 eqactP :: Eqtype.Equality__Coq_axiom InsertPos
 eqactP _top_assumption_ =
   let {
-   _evar_0_ = \r1 _top_assumption_0 ->
+   _evar_0_ = \v1 r1 _top_assumption_0 ->
     let {
-     _evar_0_ = \r2 ->
+     _evar_0_ = \v2 r2 ->
       let {
        _evar_0_ = \_ ->
-        let {_evar_0_ = let {_evar_0_ = Ssrbool.ReflectT} in  _evar_0_} in
+        let {
+         _evar_0_ = let {
+                     _evar_0_ = \_ ->
+                      let {
+                       _evar_0_ = let {_evar_0_ = Ssrbool.ReflectT} in
+                                   _evar_0_}
+                      in
+                       _evar_0_}
+                    in
+                    let {
+                     _evar_0_0 = \_ ->
+                      let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
+                    in
+                    case Eqtype.eqP
+                           (Fintype.ordinal_eqType maxReg) r1 r2 of {
+                     Ssrbool.ReflectT -> _evar_0_ __;
+                     Ssrbool.ReflectF -> _evar_0_0 __}}
+        in
          _evar_0_}
       in
       let {
        _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
       in
-      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+      case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
        Ssrbool.ReflectT -> _evar_0_ __;
        Ssrbool.ReflectF -> _evar_0_0 __}}
     in
     let {
-     _evar_0_0 = \r2 ->
+     _evar_0_0 = \v2 r2 ->
       let {
        _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
       in
       let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+      case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
        Ssrbool.ReflectT -> _evar_0_0 __;
        Ssrbool.ReflectF -> _evar_0_1 __}}
     in
     case _top_assumption_0 of {
-     AtBegin x -> unsafeCoerce _evar_0_ x;
-     AtEnd x -> unsafeCoerce _evar_0_0 x}}
+     AtBegin x x0 -> unsafeCoerce _evar_0_ x x0;
+     AtEnd x x0 -> unsafeCoerce _evar_0_0 x x0}}
   in
   let {
-   _evar_0_0 = \r1 _top_assumption_0 ->
+   _evar_0_0 = \v1 r1 _top_assumption_0 ->
     let {
-     _evar_0_0 = \r2 ->
+     _evar_0_0 = \v2 r2 ->
       let {
        _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
       in
       let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+      case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
        Ssrbool.ReflectT -> _evar_0_0 __;
        Ssrbool.ReflectF -> _evar_0_1 __}}
     in
     let {
-     _evar_0_1 = \r2 ->
+     _evar_0_1 = \v2 r2 ->
       let {
        _evar_0_1 = \_ ->
-        let {_evar_0_1 = let {_evar_0_1 = Ssrbool.ReflectT} in  _evar_0_1} in
+        let {
+         _evar_0_1 = let {
+                      _evar_0_1 = \_ ->
+                       let {
+                        _evar_0_1 = let {_evar_0_1 = Ssrbool.ReflectT} in
+                                     _evar_0_1}
+                       in
+                        _evar_0_1}
+                     in
+                     let {
+                      _evar_0_2 = \_ ->
+                       let {_evar_0_2 = Ssrbool.ReflectF} in  _evar_0_2}
+                     in
+                     case Eqtype.eqP
+                            (Fintype.ordinal_eqType maxReg) r1 r2 of {
+                      Ssrbool.ReflectT -> _evar_0_1 __;
+                      Ssrbool.ReflectF -> _evar_0_2 __}}
+        in
          _evar_0_1}
       in
       let {
        _evar_0_2 = \_ -> let {_evar_0_2 = Ssrbool.ReflectF} in  _evar_0_2}
       in
-      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+      case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
        Ssrbool.ReflectT -> _evar_0_1 __;
        Ssrbool.ReflectF -> _evar_0_2 __}}
     in
     case _top_assumption_0 of {
-     AtBegin x -> unsafeCoerce _evar_0_0 x;
-     AtEnd x -> unsafeCoerce _evar_0_1 x}}
+     AtBegin x x0 -> unsafeCoerce _evar_0_0 x x0;
+     AtEnd x x0 -> unsafeCoerce _evar_0_1 x x0}}
   in
   case _top_assumption_ of {
-   AtBegin x -> unsafeCoerce _evar_0_ x;
-   AtEnd x -> unsafeCoerce _evar_0_0 x}
+   AtBegin x x0 -> unsafeCoerce _evar_0_ x x0;
+   AtEnd x x0 -> unsafeCoerce _evar_0_0 x x0}
 
 act_eqMixin :: Eqtype.Equality__Coq_mixin_of InsertPos
 act_eqMixin =
@@ -1065,29 +1129,39 @@ resolveDataFlow binfo sd blocks liveSets =
                                ((Prelude.succ) 0)}
                   in
                   let {
-                   ins = case in_from of {
-                          Prelude.True -> AtEnd vid;
-                          Prelude.False -> AtBegin vid}}
+                   mreg = lookupRegister sd __
+                            (case in_from of {
+                              Prelude.True -> unsafeCoerce from_interval;
+                              Prelude.False -> unsafeCoerce to_interval})}
                   in
-                  let {
-                   f = \mxs ->
-                    case mxs of {
-                     Prelude.Just xs ->
-                      case Prelude.not
-                             (Ssrbool.in_mem (unsafeCoerce ins)
-                               (Ssrbool.mem
-                                 (Seq.seq_predType act_eqType) xs)) of {
-                       Prelude.True -> Prelude.Just ((:) ins
-                        (unsafeCoerce xs));
-                       Prelude.False -> Prelude.Just (unsafeCoerce xs)};
-                     Prelude.Nothing -> Prelude.Just ((:) ins [])}}
-                  in
-                  let {
-                   key = case in_from of {
-                          Prelude.True -> bid;
-                          Prelude.False -> s_bid}}
-                  in
-                  Data.IntMap.alter (unsafeCoerce f) key ms';
+                  case mreg of {
+                   Prelude.Just reg ->
+                    let {
+                     ins = case in_from of {
+                            Prelude.True -> AtEnd vid reg;
+                            Prelude.False -> AtBegin vid reg}}
+                    in
+                    let {
+                     f = \mxs ->
+                      case mxs of {
+                       Prelude.Just xs ->
+                        case Prelude.not
+                               (Ssrbool.in_mem (unsafeCoerce ins)
+                                 (Ssrbool.mem
+                                   (Seq.seq_predType act_eqType)
+                                   xs)) of {
+                         Prelude.True -> Prelude.Just ((:) ins
+                          (unsafeCoerce xs));
+                         Prelude.False -> Prelude.Just (unsafeCoerce xs)};
+                       Prelude.Nothing -> Prelude.Just ((:) ins [])}}
+                    in
+                    let {
+                     key = case in_from of {
+                            Prelude.True -> bid;
+                            Prelude.False -> s_bid}}
+                    in
+                    Data.IntMap.alter (unsafeCoerce f) key ms';
+                   Prelude.Nothing -> ms'};
                  Prelude.False -> ms'};
                Prelude.Nothing -> ms'};
              Prelude.Nothing -> ms'});
@@ -1122,21 +1196,22 @@ type AssnState accType a =
   State.State (AssnStateInfo accType) a
 
 saveOpM :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                      AssnState a1 a3
-saveOpM oinfo vid =
+                      PhysReg -> AssnState a1 a3
+saveOpM oinfo vid reg =
   State.bind (\assn ->
-    case saveOp oinfo (assnAcc assn) vid of {
-     (,) acc' sop ->
+    case saveOp oinfo vid reg (assnAcc assn) of {
+     (,) sop acc' ->
       State.bind (\x -> State.pure sop)
         (State.put (Build_AssnStateInfo (assnOpId assn)
           acc'))}) State.get
 
 restoreOpM :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                         AssnState a1 a3
-restoreOpM oinfo vid =
+                         PhysReg -> AssnState a1 
+                         a3
+restoreOpM oinfo vid reg =
   State.bind (\assn ->
-    case restoreOp oinfo (assnAcc assn) vid of {
-     (,) acc' rop ->
+    case restoreOp oinfo vid reg (assnAcc assn) of {
+     (,) rop acc' ->
       State.bind (\x -> State.pure rop)
         (State.put (Build_AssnStateInfo (assnOpId assn)
           acc'))}) State.get
@@ -1148,9 +1223,10 @@ pairM x y =
 
 savesAndRestores :: (OpInfo a1 a2 a3 a4) ->
                                Eqtype.Equality__Coq_sort -> VarId
-                               -> Interval.IntervalDesc ->
-                               AssnState a1 ((,) ([] a3) ([] a3))
-savesAndRestores oinfo opid vid int =
+                               -> PhysReg -> Interval.IntervalDesc
+                               -> AssnState a1
+                               ((,) ([] a3) ([] a3))
+savesAndRestores oinfo opid vid reg int =
   let {
    isFirst = Eqtype.eq_op Ssrnat.nat_eqType
                (unsafeCoerce (Interval.firstUsePos int)) opid}
@@ -1162,11 +1238,11 @@ savesAndRestores oinfo opid vid int =
   in
   let {
    save = State.bind (\sop -> State.pure ((:) sop []))
-            (saveOpM oinfo vid)}
+            (saveOpM oinfo vid reg)}
   in
   let {
    restore = State.bind (\rop -> State.pure ((:) rop []))
-               (restoreOpM oinfo vid)}
+               (restoreOpM oinfo vid reg)}
   in
   case Interval.iknd int of {
    Interval.Whole -> State.pure ((,) [] []);
@@ -1194,8 +1270,8 @@ collectAllocs :: (VarInfo a4) -> (OpInfo
                             ((,) Interval.IntervalDesc PhysReg)) ->
                             ((,)
                             ((,) ([] ((,) VarId PhysReg))
-                            ([] a3)) ([] a3)) -> a4 -> State.State
-                            (AssnStateInfo a1)
+                            ([] a3)) ([] a3)) -> a4 -> AssnState 
+                            a1
                             ((,)
                             ((,) ([] ((,) VarId PhysReg))
                             ([] a3)) ([] a3))
@@ -1205,19 +1281,22 @@ collectAllocs vinfo oinfo opid ints acc v =
    v_ints = Prelude.filter (\x ->
               isWithin (Prelude.fst x) vid opid) ints}
   in
-  State.forFoldM acc v_ints (\acc' ir ->
-    case ir of {
+  case v_ints of {
+   [] -> State.pure acc;
+   (:) p l ->
+    case p of {
      (,) int reg ->
-      case acc' of {
-       (,) p saves' ->
-        case p of {
+      case acc of {
+       (,) p0 saves' ->
+        case p0 of {
          (,) allocs' restores' ->
           State.bind (\res ->
             case res of {
              (,) ss rs ->
               State.pure ((,) ((,) ((:) ((,) vid reg) allocs')
                 ((Prelude.++) rs restores')) ((Prelude.++) ss saves'))})
-            (savesAndRestores oinfo (unsafeCoerce opid) vid int)}}})
+            (savesAndRestores oinfo (unsafeCoerce opid) vid reg
+              int)}}}}
 
 doAllocations :: (VarInfo a4) -> (OpInfo 
                             a1 a2 a3 a4) -> ([]
@@ -1250,10 +1329,10 @@ resolveMappings oinfo bid ops ops' mappings =
    Prelude.Just inss ->
     State.forFoldM ops' inss (\ops'' ins ->
       case ins of {
-       AtBegin vid ->
+       AtBegin vid reg ->
         State.bind (\rop -> State.pure ((:) rop ops''))
-          (restoreOpM oinfo vid);
-       AtEnd vid ->
+          (restoreOpM oinfo vid reg);
+       AtEnd vid reg ->
         State.bind (\sop ->
           State.pure
             (case ops of {
@@ -1267,7 +1346,7 @@ resolveMappings oinfo bid ops ops' mappings =
                    (Prelude.++) (Seq.belast o'' os'') ((:) sop ((:)
                      (Seq.last o'' os'') []));
                   _ -> (Prelude.++) ops' ((:) sop [])}}}))
-          (saveOpM oinfo vid)});
+          (saveOpM oinfo vid reg)});
    Prelude.Nothing -> State.pure ops'}
 
 considerOps :: (OpInfo a1 a4 a5 a6) ->

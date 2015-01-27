@@ -58,8 +58,8 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo accType o v a b = OpInfo
     { opKind      :: o a -> OpKind
     , opRefs      :: o a -> ([v], [PhysReg])
-    , saveOp      :: accType -> Int -> (accType, o b)
-    , restoreOp   :: accType -> Int -> (accType, o b)
+    , saveOp      :: Int -> PhysReg -> accType -> (o b, accType)
+    , restoreOp   :: Int -> PhysReg -> accType -> (o b, accType)
     , applyAllocs :: o a -> [(Int, PhysReg)] -> o b
     }
 

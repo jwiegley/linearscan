@@ -9,6 +9,7 @@ cabal.mkDerivation (self: {
   buildDepends = [ transformers ];
   testDepends = [ hspec hspecExpectations HUnit transformers free ];
   doCheck = true;
+  #doCheck = false;
   meta = {
     homepage = "http://github.com/jwiegley/linearscan";
     description = "An optimized linear scan register allocator";

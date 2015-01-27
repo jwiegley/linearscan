@@ -46,8 +46,8 @@ Inductive OpKind : Set :=
 Record OpInfo (accType opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq varType * seq PhysReg;
-  saveOp      : accType -> VarId -> accType * opType2;
-  restoreOp   : accType -> VarId -> accType * opType2;
+  saveOp      : VarId -> PhysReg -> accType -> opType2 * accType;
+  restoreOp   : VarId -> PhysReg -> accType -> opType2 * accType;
   applyAllocs : opType1 -> seq (VarId * PhysReg) -> opType2
 }.
 
@@ -213,7 +213,8 @@ Definition relative_complement (a : eqType) (m1 m2 : seq a) : seq a :=
 Arguments emptyIntMap [a].
 Arguments getIntMap [a] _.
 
-Definition computeLocalLiveSets (blocks : seq blockType1) : IntMap BlockLiveSets :=
+Definition computeLocalLiveSets (blocks : seq blockType1) :
+  IntMap BlockLiveSets :=
   (* for each block b in blocks do
        b.live_gen  = { }
        b.live_kill = { }
@@ -236,7 +237,8 @@ Definition computeLocalLiveSets (blocks : seq blockType1) : IntMap BlockLiveSets
        end for
      end for *)
   @snd _ _ $
-  forFold (1, emptyIntMap) blocks $ fun acc b => let: (idx, m) := acc in
+  forFold (1, emptyIntMap) blocks $ fun acc b =>
+    let: (idx, m) := acc in
     let liveSet :=
         {| blockLiveGen   := [::]
          ; blockLiveKill  := [::]
@@ -352,23 +354,25 @@ Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
      packScanState s4)
   (processOperations blocks).
 
-Inductive InsertPos : Set := AtBegin of VarId | AtEnd of VarId.
+Inductive InsertPos : Type :=
+  | AtBegin of VarId & PhysReg
+  | AtEnd of VarId & PhysReg.
 
 Section EqInsertPos.
 
 Definition eqact v1 v2 :=
   match v1, v2 with
-  | AtBegin r1, AtBegin r2 => r1 == r2
-  | AtEnd r1,   AtEnd r2   => r1 == r2
+  | AtBegin v1 r1, AtBegin v2 r2 => (v1 == v2) && (r1 == r2)
+  | AtEnd v1 r1,   AtEnd v2 r2   => (v1 == v2) && (r1 == r2)
   | _, _ => false
   end.
 
 Lemma eqactP : Equality.axiom eqact.
 Proof.
   move.
-  case=> [r1|r1];
-  case=> [r2|r2];
-  case: (r1 =P r2) => [<-|/eqP /negbTE neqx] //=;
+  case=> [v1 r1|v1 r1];
+  case=> [v2 r2|v2 r2];
+  case: (v1 =P v2) => [<-|/eqP /negbTE neqx] //=;
     do [ rewrite eq_refl;
          by constructor
        | rewrite neqx;
@@ -379,7 +383,14 @@ Proof.
          congruence
        | constructor;
          discriminate
-       | idtac ].
+       | idtac ];
+  case: (r1 =P r2) => [<-|/eqP /negbTE neqx] //=;
+    rewrite eq_refl;
+    constructor => //=;
+    move/eqP in neqx;
+    move=> H;
+    contradiction neqx;
+    congruence.
 Qed.
 
 Canonical act_eqMixin := EqMixin eqactP.
@@ -440,18 +451,25 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
                   if from_interval != to_interval
                   then
                     let in_from := size successors <= 1 in
-                    let ins     := if in_from
-                                   then AtEnd vid
-                                   else AtBegin vid in
-                    let f mxs   := if mxs is Some xs
-                                   then if ins \notin xs
-                                        then Some (ins :: xs)
-                                        else Some xs
-                                   else Some [:: ins] in
-                    let key     := if in_from
-                                   then bid
-                                   else s_bid in
-                    IntMap_alter f key ms'
+                    let mreg    := lookupRegister st
+                                     (if in_from
+                                      then from_interval
+                                      else to_interval) in
+                    if mreg is Some reg
+                    then
+                      let ins     := if in_from
+                                     then AtEnd vid reg
+                                     else AtBegin vid reg in
+                      let f mxs   := if mxs is Some xs
+                                     then if ins \notin xs
+                                          then Some (ins :: xs)
+                                          else Some xs
+                                     else Some [:: ins] in
+                      let key     := if in_from
+                                     then bid
+                                     else s_bid in
+                      IntMap_alter f key ms'
+                    else ms'  (* should be impossible *)
                   else ms'    (* should be impossible *)
                 else ms'      (* should be impossible *)
               else ms'        (* should be impossible *)
@@ -470,16 +488,16 @@ Record AssnStateInfo := {
 
 Definition AssnState := State AssnStateInfo.
 
-Definition saveOpM (vid : VarId) : AssnState opType2 :=
+Definition saveOpM vid reg : AssnState opType2 :=
   assn <-- get ;;
-  let: (acc', sop) := saveOp oinfo (assnAcc assn) vid in
+  let: (sop, acc') := saveOp oinfo vid reg (assnAcc assn) in
   put {| assnOpId := assnOpId assn
        ; assnAcc  := acc' |} ;;
   pure sop.
 
-Definition restoreOpM (vid : VarId) : AssnState opType2 :=
+Definition restoreOpM vid reg : AssnState opType2 :=
   assn <-- get ;;
-  let: (acc', rop) := restoreOp oinfo (assnAcc assn) vid in
+  let: (rop, acc') := restoreOp oinfo vid reg (assnAcc assn) in
   put {| assnOpId := assnOpId assn
        ; assnAcc  := acc' |} ;;
   pure rop.
@@ -490,12 +508,12 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
   y' <-- y ;;
   pure (x', y').
 
-Definition savesAndRestores opid vid int :
+Definition savesAndRestores opid vid reg int :
   AssnState (seq opType2 * seq opType2) :=
   let isFirst := firstUsePos int == opid in
   let isLast  := nextUseAfter int opid == None in
-  let save    := sop <-- saveOpM vid ;; pure [:: sop] in
-  let restore := rop <-- restoreOpM vid ;; pure [:: rop] in
+  let save    := sop <-- saveOpM vid reg ;; pure [:: sop] in
+  let restore := rop <-- restoreOpM vid reg ;; pure [:: rop] in
   match iknd int, isFirst, isLast with
     | Middle,    true,  true  => pairM restore save
     | Middle,    false, true  => pairM (pure [::]) save
@@ -508,18 +526,15 @@ Definition savesAndRestores opid vid int :
 Definition collectAllocs opid ints acc v :=
   let vid := varId vinfo v in
   let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
-  forFoldM acc v_ints $ fun acc' ir =>
-    match ir return AssnState (seq (VarId * PhysReg) *
-                               seq opType2 * seq opType2) with
-    | (int, reg) =>
-        match acc' with
-        | (allocs', restores', saves') =>
-          res <-- savesAndRestores opid vid int ;;
-          let: (ss, rs) := res in
-          pure ((vid, reg) :: allocs',
-                   rs ++ restores', ss ++ saves')
-        end
-    end.
+  if v_ints is (int, reg) :: _
+  return AssnState (seq (VarId * PhysReg) *
+                    seq opType2 * seq opType2)
+  then
+    let: (allocs', restores', saves') := acc in
+    res <-- savesAndRestores opid vid reg int ;;
+    let: (ss, rs) := res in
+    pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
+  else pure acc.
 
 Definition doAllocations ints op : AssnState (seq opType2) :=
   assn <-- get ;;
@@ -535,18 +550,18 @@ Definition doAllocations ints op : AssnState (seq opType2) :=
 
 Definition resolveMappings bid ops ops' mappings :=
   if IntMap_lookup bid mappings is Some inss
-  then forFoldM ops' inss (fun ops'' ins =>
+  then forFoldM ops' inss $ fun ops'' ins =>
     (* jww (2015-01-27): NYI: When multiple moves must be inserted at
        one edge, then the order of the moves is important because the
        same register can occur as the source of one move and the
        destination of another move. The moves must be ordered such that
        a register is saved first before it is overwritten. *)
     match ins with
-    | AtBegin vid =>
-        rop <-- restoreOpM vid ;;
+    | AtBegin vid reg =>
+        rop <-- restoreOpM vid reg ;;
         pure $ rop :: ops''
-    | AtEnd   vid =>
-        sop <-- saveOpM vid ;;
+    | AtEnd vid reg =>
+        sop <-- saveOpM vid reg ;;
         pure $
           if ops is o :: os
           then
@@ -557,7 +572,7 @@ Definition resolveMappings bid ops ops' mappings :=
               else ops' ++ [:: sop]
             else [:: sop]
           else [:: sop]
-    end)
+    end
   else pure ops'.
 
 Definition considerOps (f : opType1 -> AssnState (seq opType2))
