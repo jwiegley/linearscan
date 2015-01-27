@@ -5,6 +5,7 @@ module LinearScan.IState where
 
 
 import qualified Prelude
+import qualified Data.IntMap
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
@@ -29,17 +30,11 @@ unsafeCoerce = IOExts.unsafeCoerce
 __ :: any
 __ = Prelude.error "Logical or arity value used"
 
-type IState errType i o a =
-  i -> Prelude.Either errType ((,) a o)
-  -- singleton inductive, whose constructor was mkIState
-  
-runIState :: (IState a1 a2 a3 a4) -> a2 -> Prelude.Either a1 ((,) a4 a3)
-runIState x =
-  x
+type IState errType i o a = i -> Prelude.Either errType ((,) a o)
 
 coq_IState_IFunctor :: IEndo.IFunctor (IState a1 () () ())
 coq_IState_IFunctor _ _ _ _ f x st =
-  let {filtered_var = runIState x st} in
+  let {filtered_var = x st} in
   case filtered_var of {
    Prelude.Left err -> Prelude.Left err;
    Prelude.Right p ->
@@ -62,14 +57,14 @@ coq_IState_IApplicative :: IApplicative.IApplicative (IState a1 () () ())
 coq_IState_IApplicative =
   IApplicative.Build_IApplicative coq_IState_IFunctor (\_ _ x st ->
     Prelude.Right ((,) x st)) (\_ _ _ _ _ f x st ->
-    let {filtered_var = runIState f st} in
+    let {filtered_var = f st} in
     case filtered_var of {
      Prelude.Left err -> Prelude.Left err;
      Prelude.Right p ->
       case p of {
        (,) f' st' ->
         unsafeCoerce (\f'0 st'0 _ ->
-          let {filtered_var0 = runIState x st'0} in
+          let {filtered_var0 = x st'0} in
           case filtered_var0 of {
            Prelude.Left err -> Prelude.Left err;
            Prelude.Right p0 ->
@@ -79,14 +74,14 @@ coq_IState_IApplicative =
 coq_IState_IMonad :: IMonad.IMonad (IState a1 () () ())
 coq_IState_IMonad =
   IMonad.Build_IMonad coq_IState_IApplicative (\_ _ _ _ x st ->
-    let {filtered_var = runIState x st} in
+    let {filtered_var = x st} in
     case filtered_var of {
      Prelude.Left err -> Prelude.Left err;
      Prelude.Right p ->
       case p of {
        (,) y st' ->
         unsafeCoerce (\y0 st'0 _ ->
-          let {filtered_var0 = runIState y0 st'0} in
+          let {filtered_var0 = y0 st'0} in
           case filtered_var0 of {
            Prelude.Left err -> Prelude.Left err;
            Prelude.Right p0 ->

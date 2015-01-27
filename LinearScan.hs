@@ -16,19 +16,15 @@ module LinearScan
       -- * Variables
     , VarInfo(..)
     , VarKind(..)
-    , VarAction(..)
-    , LS.AllocInfo(..)
     , PhysReg
     ) where
 
 import qualified LinearScan.Main as LS
 import LinearScan.Main
     ( VarKind(..)
-    , VarAction(..)
     , OpKind(..)
     , PhysReg
     )
-import Unsafe.Coerce (unsafeCoerce)
 
 -- | Each variable has associated allocation details, and a flag to indicate
 --   whether it must be loaded into a register at its point of use.  Variables
@@ -62,30 +58,28 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo accType o v a b = OpInfo
     { opKind      :: o a -> OpKind
     , opRefs      :: o a -> ([v], [PhysReg])
-    , applyAllocs :: o a -> accType -> [(Int, LS.AllocInfo)] -> (accType, [o b])
+    , saveOp      :: Int -> o b
+    , restoreOp   :: Int -> o b
+    , applyAllocs :: o a -> accType -> [(Int, PhysReg)] -> (accType, o b)
     }
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-deriving instance Eq VarAction
-deriving instance Show VarAction
-
-deriving instance Eq LS.AllocInfo
-deriving instance Show LS.AllocInfo
-
-fromOpInfo :: OpInfo accType o v a b -> LS.OpInfo (o a) (o b) v
-fromOpInfo (OpInfo a b c) = LS.Build_OpInfo a b (const (unsafeCoerce c))
+fromOpInfo :: OpInfo accType o v a b -> LS.OpInfo accType (o a) (o b) v
+fromOpInfo (OpInfo a b c d e) = LS.Build_OpInfo a b c d e
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
 data BlockInfo blk o a b = BlockInfo
-    { blockOps    :: blk a -> [o a]
-    , setBlockOps :: blk a -> [o b] -> blk b
+    { blockId         :: blk a -> Int
+    , blockSuccessors :: blk a -> [Int]
+    , blockOps        :: blk a -> [o a]
+    , setBlockOps     :: blk a -> [o b] -> blk b
     }
 
 fromBlockInfo :: BlockInfo blk o a b -> LS.BlockInfo (blk a) (blk b) (o a) (o b)
-fromBlockInfo (BlockInfo a b) = LS.Build_BlockInfo a b
+fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register
@@ -105,7 +99,7 @@ allocate :: BlockInfo blk o a b -> OpInfo accType o v a b -> VarInfo v
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks acc =
-    case LS.linearScan binfo oinfo vinfo blocks acc of
+    case LS.linearScan binfo oinfo vinfo acc blocks of
         Left x -> Left $ case x of
             LS.ECannotSplitSingleton n ->
                 "Current interval is a singleton (" ++ show n ++ ")"

@@ -18,8 +18,7 @@ import Control.Monad.Free
 import Data.Foldable
 import Data.IntMap
 import Data.Monoid
-import qualified LinearScan as LS
-import LinearScan hiding (Call, Restore)
+import LinearScan
 import Test.Hspec
 
 ------------------------------------------------------------------------------
@@ -182,7 +181,11 @@ instance Functor (PNode v e x) where
 
 data PBlock v e x a = PBlock (Node a v e x) deriving (Eq, Show)
 
-data Block v e x a = Block { getBlock :: [PNode v e x a] } deriving (Eq, Show)
+data Block v e x a = Block
+    { blockNum :: Int
+    , getBlock :: [PNode v e x a]
+    }
+    deriving (Eq, Show)
 
 nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
 nodeToOpList (Node (Instr i) _) = [i]
@@ -191,16 +194,12 @@ nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
 data AtomKind = Atom deriving (Eq, Show)
 data Var = Var deriving (Eq, Show)
 
-data IRVar' = PhysicalIV !AllocInfo
+data IRVar' = PhysicalIV !PhysReg
             | VirtualIV !Int !AtomKind
             deriving Eq
 
 instance Show IRVar' where
-    show (PhysicalIV (Build_AllocInfo r Nothing))           = "r" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just Spill)))      = "S" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just LS.Restore))) = "R" ++ show r
-    show (PhysicalIV (Build_AllocInfo r (Just RestoreAndSpill))) =
-        "RS" ++ show r
+    show (PhysicalIV r)  = "r" ++ show r
     show (VirtualIV n _) = "v" ++ show n
 
 -- | Virtual IR variable together with an optional AST variable
@@ -228,13 +227,17 @@ asmTest (compile -> body) (compile -> result) =
             zipWithM_ shouldBe (snd xs) [result]
   where
     binfo = BlockInfo
-        { blockOps    = getBlock
-        , setBlockOps = \b new -> b { getBlock = new }
+        { blockId         = blockNum
+        , blockSuccessors = const []  -- jww (2015-01-27): NYI
+        , blockOps        = getBlock
+        , setBlockOps     = \b new -> b { getBlock = new }
         }
     oinfo = OpInfo
-        { opKind      = const Normal
+        { opKind      = const IsNormal -- jww (2015-01-27): NYI
         , opRefs      = convertNode
-        , applyAllocs = \o off m -> (off, [conv (fromList m) o])
+        , saveOp      = const undefined  -- jww (2015-01-27): NYI
+        , restoreOp   = const undefined  -- jww (2015-01-27): NYI
+        , applyAllocs = \o off m -> (off, conv (fromList m) o)
         }
     vinfo = VarInfo
         { varId       = \(_, v) -> case v of
@@ -247,7 +250,7 @@ asmTest (compile -> body) (compile -> result) =
     conv m (PNode (Node i meta)) = PNode $ Node (convInstr m i) meta
     convInstr m = getIRInstrWrap . fmap (assignVar m) . IRInstrWrap
 
-assignVar :: IntMap AllocInfo -> IRVar -> IRVar
+assignVar :: IntMap PhysReg -> IRVar -> IRVar
 assignVar _ v@(IRVar (PhysicalIV _) _) = v
 assignVar m (IRVar (VirtualIV n _) x) = case Data.IntMap.lookup n m of
     Just r -> IRVar (PhysicalIV r) x
@@ -262,7 +265,7 @@ convertNode (PNode (Node (Instr i) _)) = go i
     go x = error $ "convertNode.go: Unexpected " ++ show x
 
     mkv :: VarKind -> IRVar -> ([(VarKind, IRVar)], [PhysReg])
-    mkv _ (IRVar (PhysicalIV (Build_AllocInfo n _)) _) = ([], [n])
+    mkv _ (IRVar (PhysicalIV r) _) = ([], [r])
     mkv k v = ([(k, v)], [])
 
 convertNode x = error $ "convertNode: Unexpected" ++ show x
@@ -272,15 +275,10 @@ var i = IRVar { _ivVar = VirtualIV i Atom
               , _ivSrc = Nothing
               }
 
-reg :: AllocInfo -> IRVar
-reg i = IRVar { _ivVar = PhysicalIV i
+reg :: PhysReg -> IRVar
+reg r = IRVar { _ivVar = PhysicalIV r
               , _ivSrc = Nothing
               }
-
-use             = reg . flip Build_AllocInfo Nothing
-restore         = reg . flip Build_AllocInfo (Just LS.Restore)
-spill           = reg . flip Build_AllocInfo (Just Spill)
-restoreAndSpill = reg . flip Build_AllocInfo (Just RestoreAndSpill)
 
 v0  = var 0
 v1  = var 1
@@ -319,48 +317,49 @@ v33 = var 33
 v34 = var 34
 v35 = var 35
 
-r0  = use 0
-r1  = use 1
-r2  = use 2
-r3  = use 3
-r4  = use 4
-r5  = use 5
-r6  = use 6
-r7  = use 7
-r8  = use 8
-r9  = use 9
-r10 = use 10
-r11 = use 11
-r12 = use 12
-r13 = use 13
-r14 = use 14
-r15 = use 15
-r16 = use 16
-r17 = use 17
-r18 = use 18
-r19 = use 19
-r20 = use 20
-r21 = use 21
-r22 = use 22
-r23 = use 23
-r24 = use 24
-r25 = use 25
-r26 = use 26
-r27 = use 27
-r28 = use 28
-r29 = use 29
-r30 = use 30
-r31 = use 31
-r32 = use 32
-r33 = use 33
-r34 = use 34
-r35 = use 35
+r0  = reg 0
+r1  = reg 1
+r2  = reg 2
+r3  = reg 3
+r4  = reg 4
+r5  = reg 5
+r6  = reg 6
+r7  = reg 7
+r8  = reg 8
+r9  = reg 9
+r10 = reg 10
+r11 = reg 11
+r12 = reg 12
+r13 = reg 13
+r14 = reg 14
+r15 = reg 15
+r16 = reg 16
+r17 = reg 17
+r18 = reg 18
+r19 = reg 19
+r20 = reg 20
+r21 = reg 21
+r22 = reg 22
+r23 = reg 23
+r24 = reg 24
+r25 = reg 25
+r26 = reg 26
+r27 = reg 27
+r28 = reg 28
+r29 = reg 29
+r30 = reg 30
+r31 = reg 31
+r32 = reg 32
+r33 = reg 33
+r34 = reg 34
+r35 = reg 35
 
 type Program a = Free (PNode IRVar O O) a
 
 compile :: Program () -> Block IRVar O O ()
-compile (Pure ()) = Block []
-compile (Free (PNode (Node n x))) = Block (PNode (Node n ()) : getBlock (compile x))
+compile (Pure ()) = Block 0 []
+compile (Free (PNode (Node n x))) =
+    Block 0 (PNode (Node n ()) : getBlock (compile x))
 
 add :: IRVar -> IRVar -> IRVar -> Program ()
 add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))

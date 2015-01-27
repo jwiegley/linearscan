@@ -74,6 +74,7 @@ library
   cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
   ghc-options:      -fno-warn-deprecated-flags
   build-depends:    base >=4.7 && <4.8
+                  , containers
                   , transformers
 
 test-suite test

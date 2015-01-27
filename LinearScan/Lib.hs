@@ -2,6 +2,7 @@ module LinearScan.Lib where
 
 
 import qualified Prelude
+import qualified Data.IntMap
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
@@ -13,11 +14,6 @@ import qualified LinearScan.Eqtype as Eqtype
 
 __ :: any
 __ = Prelude.error "Logical or arity value used"
-
-uncurry :: (a1 -> a2 -> a3) -> ((,) a1 a2) -> a3
-uncurry f p =
-  case p of {
-   (,) x y -> f x y}
 
 option_map :: (a1 -> a2) -> (Prelude.Maybe a1) -> Prelude.Maybe a2
 option_map f x =

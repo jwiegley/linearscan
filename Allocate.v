@@ -408,7 +408,7 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
     if count is S cnt
     then
       (* trace "walkIntervals: count > 0" $ *)
-      match IState.runIState SSError handleInterval ss with
+      match handleInterval ss with
       | inl err => inl err
       | inr (_, ss') =>
         (* A [ScanState InUse] may not insert new unhandled intervals at the

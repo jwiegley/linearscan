@@ -22,9 +22,7 @@ Tactic Notation "invert" "as" simple_intropattern(pat) :=
 
 Definition undefined {a : Type} : a. Admitted.
 
-Definition apply {A B} (f : A -> B) (x : A) := f x.
-
-Infix "$" := apply (at level 60, right associativity, only parsing).
+Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
 
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
 Proof. intros P. contra. Defined.

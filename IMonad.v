@@ -105,6 +105,9 @@ Fixpoint mapM {M} `{IMonad M} {I A B}
   | cons x xs => liftIA2 M (@cons _) (f x) (mapM f xs)
   end.
 
+Definition forM {M} `{IMonad M} {I A B}
+  (l : list A) (f : A -> M I I B) : M I I (list B) := mapM f l.
+
 Definition foldM {M} `{IMonad M} {I A B}
   (f : A -> B -> M I I A) (s : A) (l : list B) : M I I A :=
   let fix go xs z :=
@@ -113,6 +116,9 @@ Definition foldM {M} `{IMonad M} {I A B}
         | cons y ys => f z y >>>= go ys
       end in
   go l s.
+
+Definition forFoldM {M} `{IMonad M} {I A B}
+  (s : A) (l : list B) (f : A -> B -> M I I A) : M I I A := foldM f s l.
 
 Fixpoint concat {A} (l : list (list A)) : list A :=
   match l with

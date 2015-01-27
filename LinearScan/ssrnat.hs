@@ -5,6 +5,7 @@ module LinearScan.Ssrnat where
 
 
 import qualified Prelude
+import qualified Data.IntMap
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity

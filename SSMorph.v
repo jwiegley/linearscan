@@ -92,26 +92,25 @@ Definition withScanState {a pre} {P Q}
          -> SState pre P Q a) : SState pre P Q a :=
   iget SSError >>>= fun i => f (thisDesc i) (thisState i).
 
-Arguments withScanState {a pre P Q} f.
+Arguments withScanState {a pre P Q} f _.
 
 Definition withScanStatePO {a pre P} `{PO : PreOrder _ P}
   (f : forall sd : ScanStateDesc, ScanState InUse sd
          -> SState sd P P a) : SState pre P P a.
 Proof.
-  exists. intros i.
+  intros i.
   destruct i.
   specialize (f thisDesc0 thisState0).
-  destruct f.
   assert (SSInfo thisDesc0 P).
     eapply {| thisDesc  := _
             ; thisHolds := _ |}.
-  apply s in X.
+  apply f in X.
   destruct X.
-    apply (inl s0).
+    apply (inl s).
   apply inr.
   destruct p.
   split. apply a0.
-  destruct s0.
+  destruct s.
   eexists.
   apply (transitivity thisHolds0 thisHolds1).
   assumption.
@@ -120,19 +119,19 @@ Proof.
   reflexivity.
 Defined.
 
-Arguments withScanStatePO {a pre P _} f.
+Arguments withScanStatePO {a pre P _} f _.
 
 Definition liftLen {pre a} :
   (forall sd : ScanStateDesc, SState sd SSMorphLen SSMorphLen a)
     -> SState pre SSMorphHasLen SSMorphHasLen a.
 Proof.
   move=> f.
-  exists=> [] [sd [morphlen Hempty] st].
+  move=> [sd [morphlen Hempty] st].
   pose ss := {| thisDesc  := sd
               ; thisHolds := newSSMorphLen sd
               ; thisState := st
               |}.
-  case: (f sd) => /(_ ss) [err|[x [sd' morphlen' st']]].
+  case: (f sd ss) => [err|[x [sd' morphlen' st']]].
     exact: (inl err).
   apply: inr.
   split; first exact: x.
@@ -153,7 +152,7 @@ Proof. by move=> ? [[?]]. Defined.
 Definition weakenHasLen_ {pre} :
   SState pre SSMorphHasLen SSMorph unit.
 Proof.
-  constructor. intros HS.
+  intros HS.
   apply inr.
   split. apply tt.
   destruct HS.
@@ -180,7 +179,6 @@ Definition withCursor {P Q a pre} `{HasWork P}
   (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState pre P Q a) :
   SState pre P Q a.
 Proof.
-  constructor.
   destruct 1.
   destruct H.
   specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
@@ -190,15 +188,15 @@ Proof.
   pose {| curState  := thisState0
         ; curExists := first_nonempty0 |} as p.
   specialize (f thisDesc0 p).
-  destruct f as [res].
-  apply res.
+  apply f.
   exact: Build_SSInfo.
 Defined.
 
 Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
   SState pre P SSMorph unit.
 Proof.
-  constructor. intros.
+  intros.
+  intro X.
   destruct H.
   destruct X.
   specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
@@ -385,7 +383,7 @@ Defined.
 Definition splitCurrentInterval {pre P} `{W : HasWork P}
   (pos : SplitPosition) : SState pre P SSMorphHasLen unit.
 Proof.
-  apply: mkIState => ssi.
+  move=> ssi.
   case: ssi => desc holds.
   case: W => /(_ pre desc holds).
   case=> H. case: H holds => /=; case.
@@ -417,7 +415,7 @@ Definition splitAssignedIntervalForReg {pre P} `{W : HasWork P}
   (reg : PhysReg) (pos : SplitPosition) (trueForActives : bool) :
   SState pre P SSMorphHasLen unit.
 Proof.
-  apply: mkIState => ssi.
+  move=> ssi.
   case: ssi => desc holds.
   case: W => /(_ pre desc holds).
   case=> H. case: H holds => /=; case.
@@ -483,9 +481,9 @@ Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
 Definition splitAnyInactiveIntervalForReg {pre P} `{W : HasWork P}
   (reg : PhysReg) : SState pre P SSMorphHasLen unit.
 Proof.
-  exists=> [] ss.
+  move=> ss.
   have := splitAssignedIntervalForReg reg EndOfLifetimeHole false.
-  move=> /(_ pre P W); case; move=> /(_ ss).
+  move=> /(_ pre P W); move=> /(_ ss).
   case=> [err|[_ ss']]; right; split; try constructor.
     case: W => /(_ pre (thisDesc ss) (thisHolds ss))
             => sshaslen.

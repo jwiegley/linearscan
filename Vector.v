@@ -98,8 +98,7 @@ Proof.
   exact: (f (inord (n - sz.+1)) IHxs x).
 Defined.
 
-Definition vfoldl
-  {B : Type} {n} (f : B -> A -> B) (b : B) (v : Vec n) : B :=
+Definition vfoldl {B : Type} {n} (f : B -> A -> B) (b : B) (v : Vec n) : B :=
   vfoldl_with_index (fun _ => f) b v.
 
 Definition vconst {n} (i : A) : Vec n.

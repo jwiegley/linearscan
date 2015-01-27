@@ -30,20 +30,21 @@ Module Import Allocate := MAllocate MyMachine.
 
 Section Main.
 
-Definition mainAlgorithm {accType : Set}
+Definition linearScan {accType : Set}
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
-  (oinfo : OpInfo opType1 opType2 varType)
+  (oinfo : OpInfo accType opType1 opType2 varType)
   (vinfo : VarInfo varType) (accum : accType) :
   IState SSError (seq blockType1) (seq blockType2) accType :=
 
   (* order blocks and operations (including loop detection) *)
-  computeBlockOrder blockType1 ;;;
-  numberOperations blockType1 ;;;
+  @computeBlockOrder blockType1 ;;;
+  @numberOperations blockType1 ;;;
 
   (* create intervals with live ranges *)
-  computeLocalLiveSets blockType1 ;;;
-  computeGlobalLiveSets blockType1 ;;;
+  blocks <<- iget SSError ;;
+  let liveSets := computeLocalLiveSets vinfo oinfo binfo blocks in
+  let liveSets' := computeGlobalLiveSets binfo blocks liveSets in
   ssig <<- buildIntervals vinfo oinfo binfo ;;
 
   (* allocate registers *)
@@ -51,22 +52,11 @@ Definition mainAlgorithm {accType : Set}
   match walkIntervals ssig.2 (countOps binfo blocks).+1 with
   | inl err => error_ err
   | inr ssig' =>
-      (* jww (2015-01-22): This is a critical piece which is still missing. *)
-      resolveDataFlow blockType1 ;;;
+      let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
 
       (* replace virtual registers with physical registers *)
-      assignRegNum vinfo oinfo binfo ssig'.2 accum
+      assignRegNum vinfo oinfo binfo ssig'.2 mappings accum
   end.
-
-Definition linearScan {accType : Set}
-  {blockType1 blockType2 opType1 opType2 varType : Set}
-  (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
-  (oinfo : OpInfo opType1 opType2 varType)
-  (vinfo : VarInfo varType) (blocks : seq blockType1)
-  (accum : accType) :
-  SSError + (accType * BlockList blockType2) :=
-  let main := mainAlgorithm binfo oinfo vinfo accum in
-  IState.runIState SSError main blocks.
 
 End Main.
 
@@ -85,7 +75,6 @@ Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "(Prelude.succ)"]
 Extract Inductive comparison =>
   "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].
 
-Extract Inlined Constant apply   => "(Prelude.$)".
 Extract Inlined Constant safe_hd => "Prelude.head".
 Extract Inlined Constant sumlist => "Data.List.sum".
 Extract Inlined Constant lebf    => "Data.Ord.comparing".
@@ -100,6 +89,13 @@ Extract Inlined Constant widen_id           => "".
 Extract Inlined Constant widen_fst          => "Prelude.id".
 Extract Inlined Constant List.destruct_list => "LinearScan.Utils.uncons".
 Extract Inlined Constant list_membership    => "Prelude.const".
+
+Extract Inductive IntMap => "Data.IntMap.IntMap"
+  ["Data.IntMap.empty" "Data.IntMap.fromList"] "(\fO fS _ -> fO ())".
+
+Extract Inlined Constant IntMap_lookup => "Data.IntMap.lookup".
+Extract Inlined Constant IntMap_insert => "Data.IntMap.insert".
+Extract Inlined Constant IntMap_alter  => "Data.IntMap.alter".
 
 Extraction Blacklist String List Vector NonEmpty.
 

@@ -5,6 +5,7 @@ module LinearScan.Seq where
 
 
 import qualified Prelude
+import qualified Data.IntMap
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
@@ -33,6 +34,18 @@ ncons n x =
 nseq :: Prelude.Int -> a1 -> [] a1
 nseq n x =
   ncons n x []
+
+last :: a1 -> ([] a1) -> a1
+last x s =
+  case s of {
+   [] -> x;
+   (:) x' s' -> last x' s'}
+
+belast :: a1 -> ([] a1) -> [] a1
+belast x s =
+  case s of {
+   [] -> [];
+   (:) x' s' -> (:) x (belast x' s')}
 
 nth :: a1 -> ([] a1) -> Prelude.Int -> a1
 nth x0 s n =
@@ -93,6 +106,16 @@ seq_predType :: Eqtype.Equality__Coq_type -> Ssrbool.Coq_predType
                 Eqtype.Equality__Coq_sort
 seq_predType t =
   Ssrbool.mkPredType (unsafeCoerce (pred_of_eq_seq t))
+
+undup :: Eqtype.Equality__Coq_type -> ([] Eqtype.Equality__Coq_sort) -> []
+         Eqtype.Equality__Coq_sort
+undup t s =
+  case s of {
+   [] -> [];
+   (:) x s' ->
+    case Ssrbool.in_mem x (Ssrbool.mem (seq_predType t) (unsafeCoerce s')) of {
+     Prelude.True -> undup t s';
+     Prelude.False -> (:) x (undup t s')}}
 
 rem :: Eqtype.Equality__Coq_type -> Eqtype.Equality__Coq_sort -> ([]
        Eqtype.Equality__Coq_sort) -> [] Eqtype.Equality__Coq_sort

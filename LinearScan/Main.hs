@@ -5,6 +5,7 @@ module LinearScan.Main where
 
 
 import qualified Prelude
+import qualified Data.IntMap
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
@@ -229,6 +230,31 @@ registerWithHighestPos =
        Prelude.Nothing -> (,) r Prelude.Nothing}}) ((,) ( 0) (Prelude.Just
     0))
 
+isWithin :: Interval.IntervalDesc -> Prelude.Int -> Prelude.Int ->
+                       Prelude.Bool
+isWithin int vid opid =
+  (Prelude.&&)
+    (Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (Interval.ivar int))
+      (unsafeCoerce vid))
+    ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) opid)
+      ((Prelude.<=) ((Prelude.succ) opid) (Interval.iend int)))
+
+lookupInterval :: ScanStateDesc -> a1 -> Prelude.Int ->
+                             Prelude.Int -> Prelude.Maybe
+                             IntervalId
+lookupInterval sd st vid opid =
+  let {
+   f = \idx acc int ->
+    case acc of {
+     Prelude.Just x -> Prelude.Just x;
+     Prelude.Nothing ->
+      case isWithin ( int) vid opid of {
+       Prelude.True -> Prelude.Just idx;
+       Prelude.False -> Prelude.Nothing}}}
+  in
+  (LinearScan.Utils.vfoldl'_with_index) (nextInterval sd) f
+    Prelude.Nothing (intervals sd)
+
 data ScanStateStatus =
    Pending
  | InUse
@@ -298,41 +324,27 @@ coq_VarKind_rec :: a1 -> a1 -> a1 -> VarKind -> a1
 coq_VarKind_rec =
   coq_VarKind_rect
 
-data VarAction =
-   Spill
- | Restore
- | RestoreAndSpill
-
-coq_VarAction_rect :: a1 -> a1 -> a1 -> VarAction -> a1
-coq_VarAction_rect f f0 f1 v =
-  case v of {
-   Spill -> f;
-   Restore -> f0;
-   RestoreAndSpill -> f1}
-
-coq_VarAction_rec :: a1 -> a1 -> a1 -> VarAction -> a1
-coq_VarAction_rec =
-  coq_VarAction_rect
+type VarId = Prelude.Int
 
 data VarInfo varType =
-   Build_VarInfo (varType -> Prelude.Int) (varType ->
-                                                    VarKind) 
+   Build_VarInfo (varType -> VarId) (varType ->
+                                                        VarKind) 
  (varType -> Prelude.Bool)
 
-coq_VarInfo_rect :: ((a1 -> Prelude.Int) -> (a1 ->
+coq_VarInfo_rect :: ((a1 -> VarId) -> (a1 ->
                                VarKind) -> (a1 -> Prelude.Bool) ->
                                a2) -> (VarInfo a1) -> a2
 coq_VarInfo_rect f v =
   case v of {
    Build_VarInfo x x0 x1 -> f x x0 x1}
 
-coq_VarInfo_rec :: ((a1 -> Prelude.Int) -> (a1 ->
+coq_VarInfo_rec :: ((a1 -> VarId) -> (a1 ->
                               VarKind) -> (a1 -> Prelude.Bool) ->
                               a2) -> (VarInfo a1) -> a2
 coq_VarInfo_rec =
   coq_VarInfo_rect
 
-varId :: (VarInfo a1) -> a1 -> Prelude.Int
+varId :: (VarInfo a1) -> a1 -> VarId
 varId v =
   case v of {
    Build_VarInfo varId0 varKind0 regRequired0 -> varId0}
@@ -348,124 +360,144 @@ regRequired v =
    Build_VarInfo varId0 varKind0 regRequired0 -> regRequired0}
 
 data OpKind =
-   Normal
- | LoopBegin
- | LoopEnd
- | Call
+   IsNormal
+ | IsCall
+ | IsBranch
+ | IsLoopBegin
+ | IsLoopEnd
 
-coq_OpKind_rect :: a1 -> a1 -> a1 -> a1 -> OpKind -> a1
-coq_OpKind_rect f f0 f1 f2 o =
+coq_OpKind_rect :: a1 -> a1 -> a1 -> a1 -> a1 -> OpKind
+                              -> a1
+coq_OpKind_rect f f0 f1 f2 f3 o =
   case o of {
-   Normal -> f;
-   LoopBegin -> f0;
-   LoopEnd -> f1;
-   Call -> f2}
+   IsNormal -> f;
+   IsCall -> f0;
+   IsBranch -> f1;
+   IsLoopBegin -> f2;
+   IsLoopEnd -> f3}
 
-coq_OpKind_rec :: a1 -> a1 -> a1 -> a1 -> OpKind -> a1
+coq_OpKind_rec :: a1 -> a1 -> a1 -> a1 -> a1 -> OpKind
+                             -> a1
 coq_OpKind_rec =
   coq_OpKind_rect
 
-data AllocInfo =
-   Build_AllocInfo PhysReg (Prelude.Maybe
-                                               VarAction)
-
-coq_AllocInfo_rect :: (PhysReg -> (Prelude.Maybe
-                                 VarAction) -> a1) ->
-                                 AllocInfo -> a1
-coq_AllocInfo_rect f a =
-  case a of {
-   Build_AllocInfo x x0 -> f x x0}
-
-coq_AllocInfo_rec :: (PhysReg -> (Prelude.Maybe
-                                VarAction) -> a1) ->
-                                AllocInfo -> a1
-coq_AllocInfo_rec =
-  coq_AllocInfo_rect
-
-allocReg :: AllocInfo -> PhysReg
-allocReg a =
-  case a of {
-   Build_AllocInfo allocReg0 allocAction0 -> allocReg0}
-
-allocAction :: AllocInfo -> Prelude.Maybe
-                          VarAction
-allocAction a =
-  case a of {
-   Build_AllocInfo allocReg0 allocAction0 -> allocAction0}
-
-data OpInfo opType1 opType2 varType =
+data OpInfo accType opType1 opType2 varType =
    Build_OpInfo (opType1 -> OpKind) (opType1 -> (,)
                                                         ([] varType)
                                                         ([]
                                                         PhysReg)) 
- (() -> opType1 -> () -> ([] ((,) Prelude.Int AllocInfo)) -> (,) 
- () ([] opType2))
+ (VarId -> opType2) (VarId -> opType2) (opType1 ->
+                                                           accType -> ([]
+                                                           ((,)
+                                                           VarId
+                                                           PhysReg))
+                                                           -> (,) accType
+                                                           opType2)
 
-coq_OpInfo_rect :: ((a1 -> OpKind) -> (a1 -> (,) 
-                              ([] a3) ([] PhysReg)) -> (() -> a1 ->
-                              () -> ([]
-                              ((,) Prelude.Int AllocInfo)) -> (,)
-                              () ([] a2)) -> a4) -> (OpInfo 
-                              a1 a2 a3) -> a4
+coq_OpInfo_rect :: ((a2 -> OpKind) -> (a2 -> (,) 
+                              ([] a4) ([] PhysReg)) ->
+                              (VarId -> a3) -> (VarId ->
+                              a3) -> (a2 -> a1 -> ([]
+                              ((,) VarId PhysReg)) -> (,)
+                              a1 a3) -> a5) -> (OpInfo a1 a2 
+                              a3 a4) -> a5
 coq_OpInfo_rect f o =
   case o of {
-   Build_OpInfo x x0 x1 -> f x x0 x1}
+   Build_OpInfo x x0 x1 x2 x3 -> f x x0 x1 x2 x3}
 
-coq_OpInfo_rec :: ((a1 -> OpKind) -> (a1 -> (,) 
-                             ([] a3) ([] PhysReg)) -> (() -> a1 ->
-                             () -> ([] ((,) Prelude.Int AllocInfo))
-                             -> (,) () ([] a2)) -> a4) -> (OpInfo
-                             a1 a2 a3) -> a4
+coq_OpInfo_rec :: ((a2 -> OpKind) -> (a2 -> (,) 
+                             ([] a4) ([] PhysReg)) ->
+                             (VarId -> a3) -> (VarId ->
+                             a3) -> (a2 -> a1 -> ([]
+                             ((,) VarId PhysReg)) -> (,)
+                             a1 a3) -> a5) -> (OpInfo a1 a2 
+                             a3 a4) -> a5
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
-opKind :: (OpInfo a1 a2 a3) -> a1 -> OpKind
+opKind :: (OpInfo a1 a2 a3 a4) -> a2 -> OpKind
 opKind o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> opKind0}
+   Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
+    opKind0}
 
-opRefs :: (OpInfo a1 a2 a3) -> a1 -> (,) ([] a3)
+opRefs :: (OpInfo a1 a2 a3 a4) -> a2 -> (,) ([] a4)
                      ([] PhysReg)
 opRefs o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 applyAllocs0 -> opRefs0}
+   Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
+    opRefs0}
 
-applyAllocs :: (OpInfo a1 a2 a3) -> a1 -> a4 -> ([]
-                          ((,) Prelude.Int AllocInfo)) -> (,) 
-                          a4 ([] a2)
-applyAllocs o x x0 x1 =
+saveOp :: (OpInfo a1 a2 a3 a4) -> VarId -> a3
+saveOp o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 applyAllocs0 ->
-    unsafeCoerce applyAllocs0 __ x x0 x1}
+   Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
+    saveOp0}
+
+restoreOp :: (OpInfo a1 a2 a3 a4) -> VarId ->
+                        a3
+restoreOp o =
+  case o of {
+   Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
+    restoreOp0}
+
+applyAllocs :: (OpInfo a1 a2 a3 a4) -> a2 -> a1 -> ([]
+                          ((,) VarId PhysReg)) -> (,) 
+                          a1 a3
+applyAllocs o =
+  case o of {
+   Build_OpInfo opKind0 opRefs0 saveOp0 restoreOp0 applyAllocs0 ->
+    applyAllocs0}
+
+type BlockId = Prelude.Int
 
 data BlockInfo blockType1 blockType2 opType1 opType2 =
-   Build_BlockInfo (blockType1 -> [] opType1) (blockType1 -> ([]
-                                                        opType2) ->
-                                                        blockType2)
+   Build_BlockInfo (blockType1 -> BlockId) (blockType1 ->
+                                                               []
+                                                               BlockId) 
+ (blockType1 -> [] opType1) (blockType1 -> ([] opType2) -> blockType2)
 
-coq_BlockInfo_rect :: ((a1 -> [] a3) -> (a1 -> ([] a4) -> a2) ->
-                                 a5) -> (BlockInfo a1 a2 a3 
-                                 a4) -> a5
+coq_BlockInfo_rect :: ((a1 -> BlockId) -> (a1 -> []
+                                 BlockId) -> (a1 -> [] a3) -> (a1
+                                 -> ([] a4) -> a2) -> a5) ->
+                                 (BlockInfo a1 a2 a3 a4) -> a5
 coq_BlockInfo_rect f b =
   case b of {
-   Build_BlockInfo x x0 -> f x x0}
+   Build_BlockInfo x x0 x1 x2 -> f x x0 x1 x2}
 
-coq_BlockInfo_rec :: ((a1 -> [] a3) -> (a1 -> ([] a4) -> a2) ->
-                                a5) -> (BlockInfo a1 a2 a3 
-                                a4) -> a5
+coq_BlockInfo_rec :: ((a1 -> BlockId) -> (a1 -> []
+                                BlockId) -> (a1 -> [] a3) -> (a1 ->
+                                ([] a4) -> a2) -> a5) -> (BlockInfo
+                                a1 a2 a3 a4) -> a5
 coq_BlockInfo_rec =
   coq_BlockInfo_rect
+
+blockId :: (BlockInfo a1 a2 a3 a4) -> a1 ->
+                      BlockId
+blockId b =
+  case b of {
+   Build_BlockInfo blockId0 blockSuccessors0 blockOps0
+    setBlockOps0 -> blockId0}
+
+blockSuccessors :: (BlockInfo a1 a2 a3 a4) -> a1 -> []
+                              BlockId
+blockSuccessors b =
+  case b of {
+   Build_BlockInfo blockId0 blockSuccessors0 blockOps0
+    setBlockOps0 -> blockSuccessors0}
 
 blockOps :: (BlockInfo a1 a2 a3 a4) -> a1 -> [] a3
 blockOps b =
   case b of {
-   Build_BlockInfo blockOps0 setBlockOps0 -> blockOps0}
+   Build_BlockInfo blockId0 blockSuccessors0 blockOps0
+    setBlockOps0 -> blockOps0}
 
 setBlockOps :: (BlockInfo a1 a2 a3 a4) -> a1 -> ([] 
                           a4) -> a2
 setBlockOps b =
   case b of {
-   Build_BlockInfo blockOps0 setBlockOps0 -> setBlockOps0}
+   Build_BlockInfo blockId0 blockSuccessors0 blockOps0
+    setBlockOps0 -> setBlockOps0}
 
 type BlockList blockType1 = [] blockType1
 
@@ -534,10 +566,10 @@ foldOpsRev binfo f z blocks =
     Data.List.foldl' f bacc (Seq.rev (blockOps binfo blk))) z
     (Seq.rev blocks)
 
-processOperations :: (VarInfo a5) -> (OpInfo
-                                a3 a4 a5) -> (BlockInfo a1 
-                                a2 a3 a4) -> (BlockList a1) ->
-                                BuildState
+processOperations :: (VarInfo a6) -> (OpInfo
+                                a1 a4 a5 a6) -> (BlockInfo 
+                                a2 a3 a4 a5) -> (BlockList 
+                                a2) -> BuildState
 processOperations vinfo oinfo binfo blocks =
   (Prelude.flip (Prelude.$))
     (foldOps binfo (\x op ->
@@ -668,17 +700,189 @@ numberOperations :: BlockState a1 ()
 numberOperations =
   return_ IState.coq_IState_IApplicative ()
 
-computeLocalLiveSets :: BlockState a1 ()
-computeLocalLiveSets =
-  return_ IState.coq_IState_IApplicative ()
+type OpId = Prelude.Int
 
-computeGlobalLiveSets :: BlockState a1 ()
-computeGlobalLiveSets =
-  return_ IState.coq_IState_IApplicative ()
+data BlockLiveSets =
+   Build_BlockLiveSets ([] VarId) ([] VarId) 
+ ([] VarId) ([] VarId) OpId OpId
 
-buildIntervals :: (VarInfo a5) -> (OpInfo 
-                             a3 a4 a5) -> (BlockInfo a1 a2 
-                             a3 a4) -> BlockState a1
+coq_BlockLiveSets_rect :: (([] VarId) -> ([]
+                                     VarId) -> ([] VarId)
+                                     -> ([] VarId) ->
+                                     OpId -> OpId -> a1)
+                                     -> BlockLiveSets -> a1
+coq_BlockLiveSets_rect f b =
+  case b of {
+   Build_BlockLiveSets x x0 x1 x2 x3 x4 -> f x x0 x1 x2 x3 x4}
+
+coq_BlockLiveSets_rec :: (([] VarId) -> ([]
+                                    VarId) -> ([] VarId)
+                                    -> ([] VarId) -> OpId
+                                    -> OpId -> a1) ->
+                                    BlockLiveSets -> a1
+coq_BlockLiveSets_rec =
+  coq_BlockLiveSets_rect
+
+blockLiveGen :: BlockLiveSets -> [] VarId
+blockLiveGen b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockLiveGen0}
+
+blockLiveKill :: BlockLiveSets -> [] VarId
+blockLiveKill b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockLiveKill0}
+
+blockLiveIn :: BlockLiveSets -> [] VarId
+blockLiveIn b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockLiveIn0}
+
+blockLiveOut :: BlockLiveSets -> [] VarId
+blockLiveOut b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockLiveOut0}
+
+blockFirstOpId :: BlockLiveSets -> OpId
+blockFirstOpId b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockFirstOpId0}
+
+blockLastOpId :: BlockLiveSets -> OpId
+blockLastOpId b =
+  case b of {
+   Build_BlockLiveSets blockLiveGen0 blockLiveKill0 blockLiveIn0
+    blockLiveOut0 blockFirstOpId0 blockLastOpId0 -> blockLastOpId0}
+
+coq_IntMap_rect :: a2 -> (([] ((,) Prelude.Int a1)) -> a2) ->
+                              (Data.IntMap.IntMap a1) -> a2
+coq_IntMap_rect f f0 i =
+  (\fO fS _ -> fO ())
+    (\_ ->
+    f)
+    (\x ->
+    f0 x)
+    i
+
+coq_IntMap_rec :: a2 -> (([] ((,) Prelude.Int a1)) -> a2) ->
+                             (Data.IntMap.IntMap a1) -> a2
+coq_IntMap_rec =
+  coq_IntMap_rect
+
+union :: Eqtype.Equality__Coq_type -> ([]
+                    Eqtype.Equality__Coq_sort) -> ([]
+                    Eqtype.Equality__Coq_sort) -> []
+                    Eqtype.Equality__Coq_sort
+union a m1 m2 =
+  Seq.undup a ((Prelude.++) m1 m2)
+
+relative_complement :: Eqtype.Equality__Coq_type -> ([]
+                                  Eqtype.Equality__Coq_sort) -> ([]
+                                  Eqtype.Equality__Coq_sort) -> []
+                                  Eqtype.Equality__Coq_sort
+relative_complement a m1 m2 =
+  Prelude.filter (\i ->
+    Prelude.not
+      (Ssrbool.in_mem i (Ssrbool.mem (Seq.seq_predType a) (unsafeCoerce m2))))
+    m1
+
+forFold :: a2 -> ([] a1) -> (a2 -> a1 -> a2) -> a2
+forFold b v f =
+  Data.List.foldl' f b v
+
+computeLocalLiveSets :: (VarInfo a6) ->
+                                   (OpInfo a1 a4 a5 a6) ->
+                                   (BlockInfo a2 a3 a4 a5) ->
+                                   (BlockList a2) ->
+                                   Data.IntMap.IntMap BlockLiveSets
+computeLocalLiveSets vinfo oinfo binfo blocks =
+  Prelude.snd
+    (forFold ((,) ((Prelude.succ) 0) Data.IntMap.empty) blocks
+      (\acc b ->
+      case acc of {
+       (,) idx m ->
+        let {liveSet = Build_BlockLiveSets [] [] [] [] idx idx} in
+        case forFold ((,) idx liveSet)
+               (blockOps binfo b) (\acc0 o ->
+               case acc0 of {
+                (,) lastIdx liveSet1 -> (,) ((Prelude.succ) ((Prelude.succ)
+                 lastIdx))
+                 (forFold liveSet1
+                   (Prelude.fst (opRefs oinfo o)) (\liveSet2 v ->
+                   let {vid = varId vinfo v} in
+                   case varKind vinfo v of {
+                    Input ->
+                     case Prelude.not
+                            (Ssrbool.in_mem (unsafeCoerce vid)
+                              (Ssrbool.mem
+                                (Seq.seq_predType Ssrnat.nat_eqType)
+                                (unsafeCoerce
+                                  (blockLiveKill liveSet2)))) of {
+                      Prelude.True -> Build_BlockLiveSets ((:) vid
+                       (blockLiveGen liveSet2))
+                       (blockLiveKill liveSet2)
+                       (blockLiveIn liveSet2)
+                       (blockLiveOut liveSet2)
+                       (blockFirstOpId liveSet2) lastIdx;
+                      Prelude.False -> liveSet2};
+                    _ -> Build_BlockLiveSets
+                     (blockLiveGen liveSet2) ((:) vid
+                     (blockLiveKill liveSet2))
+                     (blockLiveIn liveSet2)
+                     (blockLiveOut liveSet2)
+                     (blockFirstOpId liveSet2) lastIdx}))}) of {
+         (,) lastIdx' liveSet3 -> (,) lastIdx'
+          (Data.IntMap.insert (blockId binfo b) liveSet3 m)}}))
+
+computeGlobalLiveSets :: (BlockInfo a1 a2 a3 a4) ->
+                                    (BlockList a1) ->
+                                    (Data.IntMap.IntMap
+                                    BlockLiveSets) ->
+                                    Data.IntMap.IntMap
+                                    BlockLiveSets
+computeGlobalLiveSets binfo blocks liveSets =
+  forFold liveSets (Seq.rev blocks) (\liveSets1 b ->
+    let {bid = blockId binfo b} in
+    case Data.IntMap.lookup bid liveSets1 of {
+     Prelude.Just liveSet ->
+      let {
+       liveSet2 = forFold liveSet
+                    (blockSuccessors binfo b) (\liveSet1 s_bid ->
+                    case Data.IntMap.lookup s_bid liveSets1 of {
+                     Prelude.Just sux -> Build_BlockLiveSets
+                      (blockLiveGen liveSet1)
+                      (blockLiveKill liveSet1)
+                      (blockLiveIn liveSet1)
+                      (unsafeCoerce
+                        (union Ssrnat.nat_eqType
+                          (unsafeCoerce (blockLiveOut liveSet1))
+                          (unsafeCoerce (blockLiveIn sux))))
+                      (blockFirstOpId liveSet1)
+                      (blockLastOpId liveSet1);
+                     Prelude.Nothing -> liveSet1})}
+      in
+      Data.IntMap.insert bid (Build_BlockLiveSets
+        (blockLiveGen liveSet2)
+        (blockLiveKill liveSet2)
+        (unsafeCoerce
+          (union Ssrnat.nat_eqType
+            (relative_complement Ssrnat.nat_eqType
+              (unsafeCoerce (blockLiveOut liveSet2))
+              (unsafeCoerce (blockLiveKill liveSet2)))
+            (unsafeCoerce (blockLiveGen liveSet2))))
+        (blockLiveOut liveSet2)
+        (blockFirstOpId liveSet2)
+        (blockLastOpId liveSet2)) liveSets1;
+     Prelude.Nothing -> liveSets1})
+
+buildIntervals :: (VarInfo a6) -> (OpInfo 
+                             a1 a4 a5 a6) -> (BlockInfo a2 
+                             a3 a4 a5) -> BlockState a2
                              ScanStateSig
 buildIntervals vinfo oinfo binfo =
   let {
@@ -691,7 +895,7 @@ buildIntervals vinfo oinfo binfo =
   in
   let {
    handleVar = \pos vid ss mx ->
-    (Prelude.$) (mkint vid ss pos mx) (\sd _ d _ ->
+    mkint vid ss pos mx (\sd _ d _ ->
       packScanState Pending
         (Build_ScanStateDesc ((Prelude.succ)
         (nextInterval sd))
@@ -744,25 +948,193 @@ buildIntervals vinfo oinfo binfo =
     let {s5 = packScanState InUse ( s3)} in
     return_ IState.coq_IState_IApplicative s5) IState.iget
 
-resolveDataFlow :: BlockState a1 ()
-resolveDataFlow =
-  return_ IState.coq_IState_IApplicative ()
+data InsertPos =
+   AtBegin VarId
+ | AtEnd VarId
+
+coq_InsertPos_rect :: (VarId -> a1) -> (VarId
+                                 -> a1) -> InsertPos -> a1
+coq_InsertPos_rect f f0 i =
+  case i of {
+   AtBegin x -> f x;
+   AtEnd x -> f0 x}
+
+coq_InsertPos_rec :: (VarId -> a1) -> (VarId
+                                -> a1) -> InsertPos -> a1
+coq_InsertPos_rec =
+  coq_InsertPos_rect
+
+eqact :: InsertPos -> InsertPos ->
+                    Prelude.Bool
+eqact v1 v2 =
+  case v1 of {
+   AtBegin r1 ->
+    case v2 of {
+     AtBegin r2 ->
+      Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce r1) (unsafeCoerce r2);
+     AtEnd v -> Prelude.False};
+   AtEnd r1 ->
+    case v2 of {
+     AtBegin v -> Prelude.False;
+     AtEnd r2 ->
+      Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce r1) (unsafeCoerce r2)}}
+
+eqactP :: Eqtype.Equality__Coq_axiom InsertPos
+eqactP _top_assumption_ =
+  let {
+   _evar_0_ = \r1 _top_assumption_0 ->
+    let {
+     _evar_0_ = \r2 ->
+      let {
+       _evar_0_ = \_ ->
+        let {_evar_0_ = let {_evar_0_ = Ssrbool.ReflectT} in  _evar_0_} in
+         _evar_0_}
+      in
+      let {
+       _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
+      in
+      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+       Ssrbool.ReflectT -> _evar_0_ __;
+       Ssrbool.ReflectF -> _evar_0_0 __}}
+    in
+    let {
+     _evar_0_0 = \r2 ->
+      let {
+       _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
+      in
+      let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
+      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+       Ssrbool.ReflectT -> _evar_0_0 __;
+       Ssrbool.ReflectF -> _evar_0_1 __}}
+    in
+    case _top_assumption_0 of {
+     AtBegin x -> unsafeCoerce _evar_0_ x;
+     AtEnd x -> unsafeCoerce _evar_0_0 x}}
+  in
+  let {
+   _evar_0_0 = \r1 _top_assumption_0 ->
+    let {
+     _evar_0_0 = \r2 ->
+      let {
+       _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
+      in
+      let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
+      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+       Ssrbool.ReflectT -> _evar_0_0 __;
+       Ssrbool.ReflectF -> _evar_0_1 __}}
+    in
+    let {
+     _evar_0_1 = \r2 ->
+      let {
+       _evar_0_1 = \_ ->
+        let {_evar_0_1 = let {_evar_0_1 = Ssrbool.ReflectT} in  _evar_0_1} in
+         _evar_0_1}
+      in
+      let {
+       _evar_0_2 = \_ -> let {_evar_0_2 = Ssrbool.ReflectF} in  _evar_0_2}
+      in
+      case Eqtype.eqP Ssrnat.nat_eqType r1 r2 of {
+       Ssrbool.ReflectT -> _evar_0_1 __;
+       Ssrbool.ReflectF -> _evar_0_2 __}}
+    in
+    case _top_assumption_0 of {
+     AtBegin x -> unsafeCoerce _evar_0_0 x;
+     AtEnd x -> unsafeCoerce _evar_0_1 x}}
+  in
+  case _top_assumption_ of {
+   AtBegin x -> unsafeCoerce _evar_0_ x;
+   AtEnd x -> unsafeCoerce _evar_0_0 x}
+
+act_eqMixin :: Eqtype.Equality__Coq_mixin_of InsertPos
+act_eqMixin =
+  Eqtype.Equality__Mixin eqact eqactP
+
+act_eqType :: Eqtype.Equality__Coq_type
+act_eqType =
+  unsafeCoerce act_eqMixin
+
+coq_InsertPos_eqType :: Eqtype.Equality__Coq_type ->
+                                   Eqtype.Equality__Coq_type
+coq_InsertPos_eqType a =
+  unsafeCoerce act_eqMixin
+
+resolveDataFlow :: (BlockInfo a1 a2 a3 a4) ->
+                              ScanStateDesc -> (BlockList
+                              a1) -> (Data.IntMap.IntMap
+                              BlockLiveSets) -> Data.IntMap.IntMap
+                              ([] InsertPos)
+resolveDataFlow binfo sd blocks liveSets =
+  forFold Data.IntMap.empty blocks (\mappings b ->
+    let {bid = blockId binfo b} in
+    case Data.IntMap.lookup bid liveSets of {
+     Prelude.Just from ->
+      let {successors = blockSuccessors binfo b} in
+      forFold mappings successors (\ms s_bid ->
+        case Data.IntMap.lookup s_bid liveSets of {
+         Prelude.Just to ->
+          forFold ms (blockLiveIn to) (\ms' vid ->
+            case lookupInterval sd __ vid
+                   (blockLastOpId from) of {
+             Prelude.Just from_interval ->
+              case lookupInterval sd __ vid
+                     (blockFirstOpId to) of {
+               Prelude.Just to_interval ->
+                case Prelude.not
+                       (Eqtype.eq_op
+                         (Fintype.ordinal_eqType
+                           (nextInterval sd))
+                         (unsafeCoerce from_interval)
+                         (unsafeCoerce to_interval)) of {
+                 Prelude.True ->
+                  let {
+                   in_from = (Prelude.<=) (Data.List.length successors)
+                               ((Prelude.succ) 0)}
+                  in
+                  let {
+                   ins = case in_from of {
+                          Prelude.True -> AtEnd vid;
+                          Prelude.False -> AtBegin vid}}
+                  in
+                  let {
+                   f = \mxs ->
+                    case mxs of {
+                     Prelude.Just xs ->
+                      case Prelude.not
+                             (Ssrbool.in_mem (unsafeCoerce ins)
+                               (Ssrbool.mem
+                                 (Seq.seq_predType act_eqType) xs)) of {
+                       Prelude.True -> Prelude.Just ((:) ins
+                        (unsafeCoerce xs));
+                       Prelude.False -> Prelude.Just (unsafeCoerce xs)};
+                     Prelude.Nothing -> Prelude.Just ((:) ins [])}}
+                  in
+                  let {
+                   key = case in_from of {
+                          Prelude.True -> bid;
+                          Prelude.False -> s_bid}}
+                  in
+                  Data.IntMap.alter (unsafeCoerce f) key ms';
+                 Prelude.False -> ms'};
+               Prelude.Nothing -> ms'};
+             Prelude.Nothing -> ms'});
+         Prelude.Nothing -> ms});
+     Prelude.Nothing -> mappings})
 
 data AssnStateInfo accType =
-   Build_AssnStateInfo Prelude.Int accType
+   Build_AssnStateInfo OpId accType
 
-coq_AssnStateInfo_rect :: (Prelude.Int -> a1 -> a2) ->
+coq_AssnStateInfo_rect :: (OpId -> a1 -> a2) ->
                                      (AssnStateInfo a1) -> a2
 coq_AssnStateInfo_rect f a =
   case a of {
    Build_AssnStateInfo x x0 -> f x x0}
 
-coq_AssnStateInfo_rec :: (Prelude.Int -> a1 -> a2) ->
+coq_AssnStateInfo_rec :: (OpId -> a1 -> a2) ->
                                     (AssnStateInfo a1) -> a2
 coq_AssnStateInfo_rec =
   coq_AssnStateInfo_rect
 
-assnOpId :: (AssnStateInfo a1) -> Prelude.Int
+assnOpId :: (AssnStateInfo a1) -> OpId
 assnOpId a =
   case a of {
    Build_AssnStateInfo assnOpId0 assnAcc0 -> assnOpId0}
@@ -776,103 +1148,124 @@ type AssnState accType a =
   IState.IState SSError (AssnStateInfo accType)
   (AssnStateInfo accType) a
 
-concatMapOpsM :: (BlockInfo a1 a2 a3 a4) -> (a3 ->
-                            AssnState a5 ([] a4)) -> ([] a1) ->
-                            IState.IState SSError
-                            (AssnStateInfo a5)
-                            (AssnStateInfo a5) ([] a2)
-concatMapOpsM binfo f =
+savesAndRestores :: (OpInfo a1 a2 a3 a4) ->
+                               OpId -> VarId ->
+                               Interval.IntervalDesc -> (,) ([] a3) ([] a3)
+savesAndRestores oinfo opid vid int =
+  let {
+   isFirst = Eqtype.eq_op Ssrnat.nat_eqType
+               (unsafeCoerce (Interval.firstUsePos int)) (unsafeCoerce opid)}
+  in
+  let {
+   isLast = Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
+              (unsafeCoerce (Interval.nextUseAfter int opid))
+              (unsafeCoerce Prelude.Nothing)}
+  in
+  let {save = (:) (saveOp oinfo vid) []} in
+  let {restore = (:) (restoreOp oinfo vid) []} in
+  case Interval.iknd int of {
+   Interval.Whole -> (,) [] [];
+   Interval.LeftMost ->
+    case isLast of {
+     Prelude.True -> (,) [] save;
+     Prelude.False -> (,) [] []};
+   Interval.Middle ->
+    case isFirst of {
+     Prelude.True ->
+      case isLast of {
+       Prelude.True -> (,) restore save;
+       Prelude.False -> (,) restore []};
+     Prelude.False ->
+      case isLast of {
+       Prelude.True -> (,) [] save;
+       Prelude.False -> (,) [] []}};
+   Interval.RightMost ->
+    case isFirst of {
+     Prelude.True -> (,) restore [];
+     Prelude.False -> (,) [] []}}
+
+doAllocations :: (VarInfo a4) -> (OpInfo 
+                            a1 a2 a3 a4) -> ([]
+                            ((,) Interval.IntervalDesc PhysReg)) ->
+                            a2 -> AssnState a1 ([] a3)
+doAllocations vinfo oinfo ints op =
+  stbind (\assn ->
+    let {opid = assnOpId assn} in
+    let {vars = Prelude.fst (opRefs oinfo op)} in
+    case forFold ((,) ((,) [] []) []) vars (\acc v ->
+           let {vid = varId vinfo v} in
+           let {
+            v_ints = Prelude.filter (\x ->
+                       isWithin (Prelude.fst x) vid
+                         (assnOpId assn)) ints}
+           in
+           forFold acc v_ints (\acc' ir ->
+             case ir of {
+              (,) int reg ->
+               case acc' of {
+                (,) p saves' ->
+                 case p of {
+                  (,) allocs' restores' ->
+                   case savesAndRestores oinfo opid vid int of {
+                    (,) ss rs -> (,) ((,) ((:) ((,) vid reg) allocs')
+                     ((Prelude.++) rs restores')) ((Prelude.++) ss saves')}}}})) of {
+     (,) p saves ->
+      case p of {
+       (,) allocs restores ->
+        case applyAllocs oinfo op (assnAcc assn) allocs of {
+         (,) acc' op' ->
+          stbind (\x ->
+            return_ IState.coq_IState_IApplicative
+              ((Prelude.++) restores ((:) op' saves)))
+            (IState.iput (Build_AssnStateInfo ((Prelude.succ)
+              ((Prelude.succ) (assnOpId assn))) acc'))}}})
+    IState.iget
+
+considerOps :: (OpInfo a1 a4 a5 a6) ->
+                          (BlockInfo a2 a3 a4 a5) -> (a4 ->
+                          AssnState a1 ([] a5)) ->
+                          (Data.IntMap.IntMap ([] InsertPos)) ->
+                          ([] a2) -> IState.IState SSError
+                          (AssnStateInfo a1)
+                          (AssnStateInfo a1) ([] a3)
+considerOps oinfo binfo f mappings =
   IMonad.mapM (unsafeCoerce IState.coq_IState_IMonad) (\blk ->
-    IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor)
-      (setBlockOps binfo blk)
-      (IMonad.concatMapM (unsafeCoerce IState.coq_IState_IMonad)
-        (unsafeCoerce f) (blockOps binfo blk)))
+    let {ops = blockOps binfo blk} in
+    stbind (\ops' ->
+      let {bid = blockId binfo blk} in
+      let {
+       ops'' = case Data.IntMap.lookup bid mappings of {
+                Prelude.Just inss ->
+                 forFold ops' inss (\ops'' ins ->
+                   case ins of {
+                    AtBegin vid -> (:)
+                     (restoreOp oinfo vid) ops'';
+                    AtEnd vid ->
+                     let {sop = saveOp oinfo vid} in
+                     case ops of {
+                      [] -> (:) sop [];
+                      (:) o os ->
+                       case ops'' of {
+                        [] -> (:) sop [];
+                        (:) o'' os'' ->
+                         case opKind oinfo (Seq.last o os) of {
+                          IsBranch ->
+                           (Prelude.++) (Seq.belast o'' os'') ((:) sop ((:)
+                             (Seq.last o'' os'') []));
+                          _ -> (Prelude.++) ops' ((:) sop [])}}}});
+                Prelude.Nothing -> ops'}}
+      in
+      return_ IState.coq_IState_IApplicative
+        (setBlockOps (unsafeCoerce binfo) blk ops''))
+      (IMonad.concatMapM (unsafeCoerce IState.coq_IState_IMonad) f ops))
 
-allocVar :: Prelude.Int -> Interval.IntervalDesc ->
-                       PhysReg -> AssnState a1
-                       ((,) Prelude.Int AllocInfo)
-allocVar vid int reg =
-  stbind (\assn ->
-    let {n = assnOpId assn} in
-    let {
-     isFirst = Eqtype.eq_op Ssrnat.nat_eqType
-                 (unsafeCoerce (Interval.firstUsePos int)) (unsafeCoerce n)}
-    in
-    let {
-     isLast = Eqtype.eq_op (Eqtype.option_eqType Ssrnat.nat_eqType)
-                (unsafeCoerce (Interval.nextUseAfter int n))
-                (unsafeCoerce Prelude.Nothing)}
-    in
-    let {
-     action = case Interval.iknd int of {
-               Interval.Whole -> Prelude.Nothing;
-               Interval.LeftMost ->
-                case isLast of {
-                 Prelude.True -> Prelude.Just Spill;
-                 Prelude.False -> Prelude.Nothing};
-               Interval.Middle ->
-                case isFirst of {
-                 Prelude.True ->
-                  case isLast of {
-                   Prelude.True -> Prelude.Just RestoreAndSpill;
-                   Prelude.False -> Prelude.Just Restore};
-                 Prelude.False ->
-                  case isLast of {
-                   Prelude.True -> Prelude.Just Spill;
-                   Prelude.False -> Prelude.Nothing}};
-               Interval.RightMost ->
-                case isFirst of {
-                 Prelude.True -> Prelude.Just Restore;
-                 Prelude.False -> Prelude.Nothing}}}
-    in
-    return_ IState.coq_IState_IApplicative ((,) vid
-      (Build_AllocInfo reg action))) IState.iget
-
-isWithin :: Prelude.Int -> Prelude.Int -> Interval.IntervalDesc ->
-                       Prelude.Bool
-isWithin vid opid int =
-  (Prelude.&&)
-    (Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (Interval.ivar int))
-      (unsafeCoerce vid))
-    ((Prelude.&&) ((Prelude.<=) (Interval.ibeg int) opid)
-      ((Prelude.<=) ((Prelude.succ) opid) (Interval.iend int)))
-
-getAllocations :: (VarInfo a1) -> ([]
-                             ((,) Interval.IntervalDesc PhysReg))
-                             -> a1 -> AssnState a2
-                             ([] ((,) Prelude.Int AllocInfo))
-getAllocations vinfo ints v =
-  stbind (\assn ->
-    let {vid = varId vinfo v} in
-    IMonad.mapM (unsafeCoerce IState.coq_IState_IMonad)
-      (Lib.uncurry (unsafeCoerce (allocVar vid)))
-      (Prelude.filter (\x ->
-        isWithin vid (assnOpId assn) (Prelude.fst x))
-        ints)) IState.iget
-
-considerOp :: (VarInfo a3) -> (OpInfo 
-                         a1 a2 a3) -> ([]
-                         ((,) Interval.IntervalDesc PhysReg)) -> a1
-                         -> AssnState a4 ([] a2)
-considerOp vinfo oinfo ints op =
-  stbind (\vars ->
-    stbind (\assn ->
-      case applyAllocs oinfo op (assnAcc assn) vars of {
-       (,) acc' op' ->
-        stbind (\x ->
-          return_ IState.coq_IState_IApplicative op')
-          (IState.iput (Build_AssnStateInfo ((Prelude.succ)
-            ((Prelude.succ) (assnOpId assn))) acc'))}) IState.iget)
-    (IMonad.concatMapM (unsafeCoerce IState.coq_IState_IMonad)
-      (getAllocations vinfo ints)
-      (Prelude.fst (opRefs oinfo op)))
-
-assignRegNum :: (VarInfo a5) -> (OpInfo 
-                           a3 a4 a5) -> (BlockInfo a1 a2 a3 
-                           a4) -> ScanStateDesc -> a6 ->
-                           IState.IState SSError ([] a1) ([] a2) 
-                           a6
-assignRegNum vinfo oinfo binfo sd acc =
+assignRegNum :: (VarInfo a6) -> (OpInfo 
+                           a1 a4 a5 a6) -> (BlockInfo a2 a3 
+                           a4 a5) -> ScanStateDesc ->
+                           (Data.IntMap.IntMap ([] InsertPos)) ->
+                           a1 -> IState.IState SSError ([] a2)
+                           ([] a3) a1
+assignRegNum vinfo oinfo binfo sd mappings acc =
   let {
    ints = Prelude.map (\x -> (,)
             (Interval.getIntervalDesc
@@ -884,16 +1277,15 @@ assignRegNum vinfo oinfo binfo sd acc =
               ((Prelude.++) (active sd) (inactive sd)))}
   in
   stbind (\blocks ->
-    case IState.runIState
-           (concatMapOpsM binfo
-             (considerOp vinfo oinfo ints) blocks)
+    case considerOps oinfo binfo
+           (doAllocations vinfo oinfo ints) mappings blocks
            (Build_AssnStateInfo ((Prelude.succ) 0) acc) of {
      Prelude.Left err -> IState.ierr err;
      Prelude.Right p ->
       case p of {
        (,) blocks' assn ->
         stbind (\x ->
-          (Prelude.$) (return_ IState.coq_IState_IApplicative)
+          return_ IState.coq_IState_IApplicative
             (assnAcc assn)) (IState.iput blocks')}}) IState.iget
 
 coq_SSMorph_rect :: ScanStateDesc ->
@@ -1001,11 +1393,11 @@ withScanStatePO pre f i =
     let {x = Build_SSInfo thisDesc0 __} in
     let {x0 = f0 x} in
     case x0 of {
-     Prelude.Left s0 -> Prelude.Left s0;
+     Prelude.Left s -> Prelude.Left s;
      Prelude.Right p -> Prelude.Right
       (case p of {
-        (,) a0 s0 -> (,) a0
-         (case s0 of {
+        (,) a0 s -> (,) a0
+         (case s of {
            Build_SSInfo thisDesc1 _ -> Build_SSInfo
             thisDesc1 __})})}}
 
@@ -1016,24 +1408,22 @@ liftLen pre f _top_assumption_ =
   let {
    _evar_0_ = \sd ->
     let {ss = Build_SSInfo sd __} in
-    let {_top_assumption_0 = f sd} in
-    let {_top_assumption_1 = _top_assumption_0 ss} in
     let {_evar_0_ = \err -> Prelude.Left err} in
     let {
-     _evar_0_0 = \_top_assumption_2 ->
+     _evar_0_0 = \_top_assumption_0 ->
       let {
-       _evar_0_0 = \x _top_assumption_3 ->
+       _evar_0_0 = \x _top_assumption_1 ->
         let {
          _evar_0_0 = \sd' -> Prelude.Right ((,) x (Build_SSInfo sd'
           __))}
         in
-        case _top_assumption_3 of {
+        case _top_assumption_1 of {
          Build_SSInfo x0 x1 -> _evar_0_0 x0}}
       in
-      case _top_assumption_2 of {
+      case _top_assumption_0 of {
        (,) x x0 -> _evar_0_0 x x0}}
     in
-    case _top_assumption_1 of {
+    case f sd ss of {
      Prelude.Left x -> _evar_0_ x;
      Prelude.Right x -> _evar_0_0 x}}
   in
@@ -1542,9 +1932,9 @@ intersectsWithFixedInterval :: ScanStateDesc ->
                                           SState a1 a1
                                           (Prelude.Maybe Prelude.Int)
 intersectsWithFixedInterval pre reg =
-  (Prelude.$) (withCursor pre) (\sd _ ->
+  withCursor pre (\sd _ ->
     let {int = curIntDetails sd} in
-    (Prelude.$) (return_ IState.coq_IState_IApplicative)
+    return_ IState.coq_IState_IApplicative
       (LinearScan.Utils.vfoldl' maxReg (\mx v ->
         Lib.option_choose mx
           (case v of {
@@ -1570,7 +1960,7 @@ tryAllocateFreeReg :: ScanStateDesc -> SState
                                  (Prelude.Maybe
                                  (SState a1 () PhysReg))
 tryAllocateFreeReg pre =
-  (Prelude.$) (withCursor pre) (\sd _ ->
+  withCursor pre (\sd _ ->
     let {
      go = \f v p ->
       case p of {
@@ -1635,7 +2025,7 @@ tryAllocateFreeReg pre =
 allocateBlockedReg :: ScanStateDesc -> SState
                                  a1 () (Prelude.Maybe PhysReg)
 allocateBlockedReg pre =
-  (Prelude.$) (withCursor pre) (\sd _ ->
+  withCursor pre (\sd _ ->
     let {start = Interval.intervalStart ( (curIntDetails sd))} in
     let {pos = curPosition sd} in
     let {
@@ -1761,7 +2151,7 @@ goActive pos sd z x xs =
 checkActiveIntervals :: ScanStateDesc -> Prelude.Int ->
                                    SState () () ()
 checkActiveIntervals pre pos =
-  (Prelude.$) (withScanStatePO pre) (\sd _ ->
+  withScanStatePO pre (\sd _ ->
     let {
      res = Lib.dep_foldl_inv (\s ->
              Eqtype.prod_eqType
@@ -1831,7 +2221,7 @@ goInactive pos sd z x xs =
 checkInactiveIntervals :: ScanStateDesc -> Prelude.Int
                                      -> SState () () ()
 checkInactiveIntervals pre pos =
-  (Prelude.$) (withScanStatePO pre) (\sd _ ->
+  withScanStatePO pre (\sd _ ->
     let {
      eres = Lib.dep_foldl_invE (\s ->
               Eqtype.prod_eqType
@@ -1851,7 +2241,7 @@ checkInactiveIntervals pre pos =
 handleInterval :: ScanStateDesc -> SState 
                              () () (Prelude.Maybe PhysReg)
 handleInterval pre =
-  (Prelude.$) (unsafeCoerce (withCursor pre)) (\sd _ ->
+  withCursor pre (\sd _ ->
     let {position = curPosition sd} in
     stbind (\x ->
       stbind (\x0 ->
@@ -1859,9 +2249,8 @@ handleInterval pre =
           case mres of {
            Prelude.Just x1 ->
             IEndo.imap (unsafeCoerce IState.coq_IState_IFunctor) (\x2 ->
-              Prelude.Just x2) x1;
-           Prelude.Nothing ->
-            unsafeCoerce (allocateBlockedReg pre)})
+              Prelude.Just x2) (unsafeCoerce x1);
+           Prelude.Nothing -> allocateBlockedReg pre})
           (tryAllocateFreeReg pre))
         (liftLen pre (\sd0 ->
           checkInactiveIntervals sd0 position)))
@@ -1884,7 +2273,7 @@ walkIntervals sd positions =
                (thisDesc sd ss)
                __))
                (\cnt ->
-               case IState.runIState (handleInterval sd) ss of {
+               case handleInterval sd ss of {
                 Prelude.Left err -> Prelude.Left err;
                 Prelude.Right p ->
                  case p of {
@@ -1922,32 +2311,31 @@ walkIntervals sd positions =
       (packScanState InUse sd)})
     positions
 
-mainAlgorithm :: (BlockInfo a2 a3 a4 a5) -> (OpInfo 
-                 a4 a5 a6) -> (VarInfo a6) -> a1 -> IState.IState
-                 SSError ([] a2) ([] a3) a1
-mainAlgorithm binfo oinfo vinfo accum =
+linearScan :: (BlockInfo a2 a3 a4 a5) -> (OpInfo 
+              a1 a4 a5 a6) -> (VarInfo a6) -> a1 -> IState.IState
+              SSError ([] a2) ([] a3) a1
+linearScan binfo oinfo vinfo accum =
   stbind (\x ->
     stbind (\x0 ->
-      stbind (\x1 ->
-        stbind (\x2 ->
-          stbind (\ssig ->
-            stbind (\blocks ->
-              case walkIntervals ( ssig) ((Prelude.succ)
-                     (countOps binfo blocks)) of {
-               Prelude.Left err -> error_ err;
-               Prelude.Right ssig' ->
-                stbind (\x3 ->
-                  assignRegNum vinfo oinfo binfo ( ssig') accum)
-                  resolveDataFlow}) IState.iget)
-            (buildIntervals vinfo oinfo binfo))
-          computeGlobalLiveSets) computeLocalLiveSets)
+      stbind (\blocks ->
+        let {
+         liveSets = computeLocalLiveSets vinfo oinfo binfo blocks}
+        in
+        let {
+         liveSets' = computeGlobalLiveSets binfo blocks liveSets}
+        in
+        stbind (\ssig ->
+          stbind (\blocks0 ->
+            case walkIntervals ( ssig) ((Prelude.succ)
+                   (countOps binfo blocks0)) of {
+             Prelude.Left err -> error_ err;
+             Prelude.Right ssig' ->
+              let {
+               mappings = resolveDataFlow binfo ( ssig') blocks0
+                            liveSets'}
+              in
+              assignRegNum vinfo oinfo binfo ( ssig') mappings
+                accum}) IState.iget)
+          (buildIntervals vinfo oinfo binfo)) IState.iget)
       numberOperations) computeBlockOrder
-
-linearScan :: (BlockInfo a2 a3 a4 a5) -> (OpInfo 
-              a4 a5 a6) -> (VarInfo a6) -> ([] a2) -> a1 ->
-              Prelude.Either SSError
-              ((,) a1 (BlockList a3))
-linearScan binfo oinfo vinfo blocks accum =
-  let {main = mainAlgorithm binfo oinfo vinfo accum} in
-  IState.runIState main blocks
 

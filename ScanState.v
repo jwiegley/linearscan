@@ -34,7 +34,8 @@ Notation "X <<- A ;; B" := (A >>>= (fun X => B))
 Notation "A ;;; B" := (_ <<- A ;; B)
   (right associativity, at level 84, A1 at next level).
 
-Definition error_ {I O X} err := mkIState SSError I O X (fun _ => inl err).
+Definition error_ {I O X} err : IState SSError I O X :=
+  fun (_ : I) => inl err.
 Definition return_ {I O X} := @ipure (IState SSError) I O X.
 
 (** ** ScanStateDesc *)
@@ -93,6 +94,20 @@ Definition registerWithHighestPos :
        | ((r, Some n), Some m) =>
          if n < m then (reg, Some m) else (r, Some n)
        end) (Ordinal registers_exist, Some 0).
+
+Definition isWithin (int : IntervalDesc) (vid : nat) (opid : nat) : bool :=
+  (ivar int == vid) && (ibeg int <= opid < iend int).
+
+Definition lookupInterval `(st : ScanState sd) (vid : nat) (opid : nat) :
+  option (IntervalId sd) :=
+  let f idx acc int := match acc with
+      | Some x => Some x
+      | None =>
+        if isWithin int.1 vid opid
+        then Some idx
+        else None
+      end in
+  vfoldl_with_index f None (intervals sd).
 
 (** ** ScanState *)
 
