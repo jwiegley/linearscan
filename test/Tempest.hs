@@ -217,14 +217,14 @@ instance Show IRVar where
 asmTest (compile -> body) (compile -> result) =
     case allocate binfo oinfo vinfo [body] () of
         Left e   -> error $ "Allocation failed: " ++ e
-        Right xs -> do
-            -- print ("----" :: String)
-            -- print xs
-            -- print ("----" :: String)
-            -- print result
-            -- print ("----" :: String)
-            length (snd xs) `shouldBe` length [result]
-            zipWithM_ shouldBe (snd xs) [result]
+        Right (xs, _) -> do
+            print ("----" :: String)
+            print xs
+            print ("----" :: String)
+            print result
+            print ("----" :: String)
+            length xs `shouldBe` length [result]
+            zipWithM_ shouldBe xs [result]
   where
     binfo = BlockInfo
         { blockId         = blockNum
@@ -235,9 +235,9 @@ asmTest (compile -> body) (compile -> result) =
     oinfo = OpInfo
         { opKind      = const IsNormal -- jww (2015-01-27): NYI
         , opRefs      = convertNode
-        , saveOp      = const undefined  -- jww (2015-01-27): NYI
-        , restoreOp   = const undefined  -- jww (2015-01-27): NYI
-        , applyAllocs = \o off m -> (off, conv (fromList m) o)
+        , saveOp      = \_off _vid -> error "jww (2015-01-27): NYI: saveOp"
+        , restoreOp   = \_off _vid -> error "jww (2015-01-27): NYI: restoreOp"
+        , applyAllocs = \o m -> conv (fromList m) o
         }
     vinfo = VarInfo
         { varId       = \(_, v) -> case v of

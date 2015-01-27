@@ -1,10 +1,8 @@
--R . LinearScan -dont-load-proofs
+-R . LinearScan
 Allocate.v
 Blocks.v
-IApplicative.v
-IEndo.v
-IMonad.v
 IState.v
+State.v
 Interval.v
 Lib.v
 Machine.v

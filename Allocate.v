@@ -1,5 +1,6 @@
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
+Require Import LinearScan.IState.
 
 Require Export LinearScan.SSMorph.
 
@@ -13,8 +14,8 @@ Include MSSMorph Mach.
 
 Open Scope program_scope.
 
-Definition intersectsWithFixedInterval {pre P} `{HasWork P} (reg : PhysReg) :
-  SState pre P P (option nat) :=
+Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
+  SState pre SSMorphHasLen SSMorphHasLen (option nat) :=
   withCursor $ fun sd cur =>
     let int := curIntDetails cur in
     return_ $ vfoldl (fun mx v =>
@@ -37,8 +38,9 @@ Definition updateRegisterPos {n : nat} (v : Vec (option nat) n)
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
-Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
-  SState pre P P (option (SState pre P SSMorph PhysReg)) :=
+Definition tryAllocateFreeReg {pre} :
+  SState pre SSMorphHasLen SSMorphHasLen
+    (option (SState pre SSMorphHasLen SSMorph PhysReg)) :=
   withCursor $ fun sd cur =>
     let current := curInterval cur in
 
@@ -95,8 +97,8 @@ Definition tryAllocateFreeReg {pre P} `{W : HasWork P} :
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
     the change to the [ScanState] must be a productive one. *)
-Definition allocateBlockedReg {pre P} `{HasWork P} :
-  SState pre P SSMorph (option PhysReg) :=
+Definition allocateBlockedReg {pre} :
+  SState pre SSMorphHasLen SSMorph (option PhysReg) :=
   withCursor $ fun sd cur =>
     let current := curInterval cur in
     let start   := intervalStart current in
@@ -386,7 +388,7 @@ Definition handleInterval {pre} :
          add current to active (done by the helper functions) *)
     mres <<- tryAllocateFreeReg ;;
     match mres with
-    | Some x => IEndo.imap (@Some _) x
+    | Some x => imap _ (@Some _) x
     | None   => allocateBlockedReg
     end.
 

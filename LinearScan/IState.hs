@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
-{- For Hugs, use the option -F"cpp -P -traditional" -}
-
 module LinearScan.IState where
 
 
@@ -11,35 +8,8 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
-import qualified LinearScan.IApplicative as IApplicative
-import qualified LinearScan.IEndo as IEndo
-import qualified LinearScan.IMonad as IMonad
-
-
-
---unsafeCoerce :: a -> b
-#ifdef __GLASGOW_HASKELL__
-import qualified GHC.Base as GHC.Base
-unsafeCoerce = GHC.Base.unsafeCoerce#
-#else
--- HUGS
-import qualified LinearScan.IOExts as IOExts
-unsafeCoerce = IOExts.unsafeCoerce
-#endif
-
-__ :: any
-__ = Prelude.error "Logical or arity value used"
 
 type IState errType i o a = i -> Prelude.Either errType ((,) a o)
-
-coq_IState_IFunctor :: IEndo.IFunctor (IState a1 () () ())
-coq_IState_IFunctor _ _ _ _ f x st =
-  let {filtered_var = x st} in
-  case filtered_var of {
-   Prelude.Left err -> Prelude.Left err;
-   Prelude.Right p ->
-    case p of {
-     (,) a st' -> Prelude.Right ((,) (f a) st')}}
 
 ierr :: a1 -> IState a1 a2 a3 a4
 ierr err x =
@@ -53,38 +23,23 @@ iput :: a3 -> IState a1 a2 a3 ()
 iput x x0 =
   Prelude.Right ((,) () x)
 
-coq_IState_IApplicative :: IApplicative.IApplicative (IState a1 () () ())
-coq_IState_IApplicative =
-  IApplicative.Build_IApplicative coq_IState_IFunctor (\_ _ x st ->
-    Prelude.Right ((,) x st)) (\_ _ _ _ _ f x st ->
-    let {filtered_var = f st} in
-    case filtered_var of {
-     Prelude.Left err -> Prelude.Left err;
-     Prelude.Right p ->
-      case p of {
-       (,) f' st' ->
-        unsafeCoerce (\f'0 st'0 _ ->
-          let {filtered_var0 = x st'0} in
-          case filtered_var0 of {
-           Prelude.Left err -> Prelude.Left err;
-           Prelude.Right p0 ->
-            case p0 of {
-             (,) x' st'' -> Prelude.Right ((,) (f'0 x') st'')}}) f' st' __}})
+imap :: (a4 -> a5) -> (IState a1 a2 a3 a4) -> IState a1 a2 a3 a5
+imap f x st =
+  case x st of {
+   Prelude.Left err -> Prelude.Left err;
+   Prelude.Right p ->
+    case p of {
+     (,) a st' -> Prelude.Right ((,) (f a) st')}}
 
-coq_IState_IMonad :: IMonad.IMonad (IState a1 () () ())
-coq_IState_IMonad =
-  IMonad.Build_IMonad coq_IState_IApplicative (\_ _ _ _ x st ->
-    let {filtered_var = x st} in
-    case filtered_var of {
-     Prelude.Left err -> Prelude.Left err;
-     Prelude.Right p ->
-      case p of {
-       (,) y st' ->
-        unsafeCoerce (\y0 st'0 _ ->
-          let {filtered_var0 = y0 st'0} in
-          case filtered_var0 of {
-           Prelude.Left err -> Prelude.Left err;
-           Prelude.Right p0 ->
-            case p0 of {
-             (,) a st'' -> Prelude.Right ((,) a st'')}}) y st' __}})
+ipure :: a3 -> IState a1 a2 a2 a3
+ipure x st =
+  Prelude.Right ((,) x st)
+
+ijoin :: (IState a1 a2 a3 (IState a1 a3 a4 a5)) -> IState a1 a2 a4 a5
+ijoin x st =
+  case x st of {
+   Prelude.Left err -> Prelude.Left err;
+   Prelude.Right p ->
+    case p of {
+     (,) y st' -> y st'}}
 

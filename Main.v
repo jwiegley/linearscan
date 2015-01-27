@@ -34,28 +34,28 @@ Definition linearScan {accType : Set}
   {blockType1 blockType2 opType1 opType2 varType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo accType opType1 opType2 varType)
-  (vinfo : VarInfo varType) (accum : accType) :
-  IState SSError (seq blockType1) (seq blockType2) accType :=
+  (vinfo : VarInfo varType) (blocks : seq blockType1)
+  (accum : accType) : SSError + (seq blockType2 * accType) :=
 
   (* order blocks and operations (including loop detection) *)
-  @computeBlockOrder blockType1 ;;;
-  @numberOperations blockType1 ;;;
+  let blocks' := computeBlockOrder blocks in
+  (* numberOperations blocks' ;;; *)
 
   (* create intervals with live ranges *)
-  blocks <<- iget SSError ;;
-  let liveSets := computeLocalLiveSets vinfo oinfo binfo blocks in
-  let liveSets' := computeGlobalLiveSets binfo blocks liveSets in
-  ssig <<- buildIntervals vinfo oinfo binfo ;;
+  let liveSets  := computeLocalLiveSets vinfo oinfo binfo blocks' in
+  let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
+  (* jww (2015-01-27): NYI: Compute [buildIntervals] per the thesis. *)
+  let ssig      := buildIntervals vinfo oinfo binfo blocks in
 
   (* allocate registers *)
-  blocks <<- iget SSError ;;
-  match walkIntervals ssig.2 (countOps binfo blocks).+1 with
-  | inl err => error_ err
+  match walkIntervals ssig.2 (countOps binfo blocks).+1
+  return SSError + (seq blockType2 * accType) with
+  | inl err => inl err
   | inr ssig' =>
       let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
 
       (* replace virtual registers with physical registers *)
-      assignRegNum vinfo oinfo binfo ssig'.2 mappings accum
+      inr $ assignRegNum vinfo oinfo binfo ssig'.2 mappings blocks accum
   end.
 
 End Main.
@@ -70,7 +70,7 @@ Set Extraction AccessOpaque.
 (** Danger!  Using Int is efficient, but requires we know we won't exceed its
     bounds. *)
 Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "(Prelude.succ)"]
-  "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
+  "(\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))".
 
 Extract Inductive comparison =>
   "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].

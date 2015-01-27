@@ -52,7 +52,7 @@ nth x0 s n =
   case s of {
    [] -> x0;
    (:) x s' ->
-    (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
       (\_ ->
       x)
       (\n' ->
@@ -64,7 +64,7 @@ set_nth x0 s n y =
   case s of {
    [] -> ncons n x0 ((:) y []);
    (:) x s' ->
-    (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+    (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
       (\_ -> (:) y
       s')
       (\n' -> (:) x

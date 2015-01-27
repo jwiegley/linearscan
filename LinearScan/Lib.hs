@@ -27,6 +27,10 @@ option_choose x y =
    Prelude.Just a -> x;
    Prelude.Nothing -> y}
 
+forFold :: a2 -> ([] a1) -> (a2 -> a1 -> a2) -> a2
+forFold b v f =
+  Data.List.foldl' f b v
+
 foldl_with_index :: (Prelude.Int -> a2 -> a1 -> a2) -> a2 -> ([] a1) -> a2
 foldl_with_index f b v =
   let {
@@ -50,7 +54,7 @@ dep_foldl_inv e b v n q f f0 =
     case l of {
      [] -> b;
      (:) y ys ->
-      (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+      (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
         (\_ ->
         b)
         (\n' ->
@@ -73,7 +77,7 @@ dep_foldl_invE e b v n q f f0 =
     case l of {
      [] -> Prelude.Right b;
      (:) y ys ->
-      (\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))
+      (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
         (\_ -> Prelude.Right
         b)
         (\n' ->

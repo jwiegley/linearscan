@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Spec.
+Require Import LinearScan.IState.
 
 Require Export LinearScan.ScanState.
 
@@ -52,12 +53,6 @@ Qed.
 Definition newSSMorphLen (s : ScanStateDesc) : SSMorphLen s s.
 Proof. intros. constructor; auto. constructor; auto. Defined.
 
-Class HasBase P := {
-    ssMorphLen : forall sd1 sd2, P sd1 sd2 -> SSMorphLen sd1 sd2
-}.
-
-Program Instance SSMorphLen_HasWork : HasBase SSMorphLen.
-
 Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
     haslen_is_SSMorphLen :> SSMorphLen sd1 sd2;
 
@@ -67,12 +62,6 @@ Record SSMorphHasLen (sd1 sd2 : ScanStateDesc) : Prop := {
 Definition newSSMorphHasLen (sd : ScanStateDesc)
   (H : size (unhandled sd) > 0) : SSMorphHasLen sd sd.
 Proof. repeat (constructor; auto). Defined.
-
-Class HasWork P := {
-    ssMorphHasLen : forall sd1 sd2, P sd1 sd2 -> SSMorphHasLen sd1 sd2
-}.
-
-Program Instance SSMorphHasLen_HasWork : HasWork SSMorphHasLen.
 
 Record SSInfo (startDesc : ScanStateDesc) P := {
     thisDesc  : ScanStateDesc;
@@ -175,15 +164,13 @@ Proof.
   rewrite E /=. by [].
 Defined.
 
-Definition withCursor {P Q a pre} `{HasWork P}
-  (f : forall sd : ScanStateDesc, ScanStateCursor sd -> SState pre P Q a) :
-  SState pre P Q a.
+Definition withCursor {Q a pre}
+  (f : forall sd : ScanStateDesc, ScanStateCursor sd
+         -> SState pre SSMorphHasLen Q a) :
+  SState pre SSMorphHasLen Q a.
 Proof.
   destruct 1.
-  destruct H.
-  specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
-  pose proof ssMorphHasLen0.
-  destruct ssMorphHasLen0.
+  destruct thisHolds0.
   destruct haslen_is_SSMorphLen0.
   pose {| curState  := thisState0
         ; curExists := first_nonempty0 |} as p.
@@ -192,16 +179,14 @@ Proof.
   exact: Build_SSInfo.
 Defined.
 
-Definition moveUnhandledToActive {pre P} `{HasWork P} (reg : PhysReg) :
-  SState pre P SSMorph unit.
+Definition moveUnhandledToActive {pre} (reg : PhysReg) :
+  SState pre SSMorphHasLen SSMorph unit.
 Proof.
   intros.
   intro X.
-  destruct H.
   destruct X.
-  specialize (ssMorphHasLen0 pre thisDesc0 thisHolds0).
   destruct thisDesc0.
-  destruct ssMorphHasLen0.
+  destruct thisHolds0.
   destruct haslen_is_SSMorphLen0.
   destruct len_is_SSMorph0.
   destruct unhandled0; first by [].
@@ -380,18 +365,17 @@ Defined.
 
 (** If [pos] is [None], it means "split before first use pos requiring a
     register". *)
-Definition splitCurrentInterval {pre P} `{W : HasWork P}
-  (pos : SplitPosition) : SState pre P SSMorphHasLen unit.
+Definition splitCurrentInterval {pre} (pos : SplitPosition) :
+  SState pre SSMorphHasLen SSMorphHasLen unit.
 Proof.
   move=> ssi.
-  case: ssi => desc holds.
-  case: W => /(_ pre desc holds).
-  case=> H. case: H holds => /=; case.
+  case: ssi => desc.
+  case=> H. case: H => /=; case.
   case: desc => /= ? intervals0 ? unhandled0 ? ? ?.
 
   case E: unhandled0 => //= [[uid beg] us].
   set desc := Build_ScanStateDesc _ _ _ _ _ _; simpl in desc.
-  move=> next_interval_increases0 unhandled_nonempty0 ? first_nonempty0.
+  move=> next_interval_increases0 unhandled_nonempty0 first_nonempty0.
 
   move/splitInterval/(_ uid pos true).
   case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
@@ -411,14 +395,13 @@ Proof.
 Defined.
 
 (** If [pos] is [None], it means "split at the end of its lifetime hole". *)
-Definition splitAssignedIntervalForReg {pre P} `{W : HasWork P}
+Definition splitAssignedIntervalForReg {pre}
   (reg : PhysReg) (pos : SplitPosition) (trueForActives : bool) :
-  SState pre P SSMorphHasLen unit.
+  SState pre SSMorphHasLen SSMorphHasLen unit.
 Proof.
   move=> ssi.
-  case: ssi => desc holds.
-  case: W => /(_ pre desc holds).
-  case=> H. case: H holds => /=; case.
+  case: ssi => desc.
+  case=> H. case: H => /=; case.
 
   (* There is an opportunity here for optimization: finding the best inactive
      interval to split, for example one with a large lifetime hole, or one
@@ -436,8 +419,7 @@ Proof.
 
   set desc := Build_ScanStateDesc _ _ _ _ _ _.
   simpl in desc.
-  move=> next_interval_increases0 unhandled_nonempty0 holds
-         first_nonempty0 st.
+  move=> next_interval_increases0 unhandled_nonempty0 first_nonempty0 st.
 
   elim Hintids: intids => /= [|aid aids IHaids] in Hin *.
     exact: inl ENoIntervalsToSplit. (* ERROR *)
@@ -474,22 +456,18 @@ Proof.
   - exact: inl err.
 Defined.
 
-Definition splitActiveIntervalForReg {pre P} `{W : HasWork P}
-  (reg : PhysReg) (pos : nat) : SState pre P SSMorphHasLen unit :=
+Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
+  SState pre SSMorphHasLen SSMorphHasLen unit :=
   splitAssignedIntervalForReg reg (BeforePos pos) true.
 
-Definition splitAnyInactiveIntervalForReg {pre P} `{W : HasWork P}
-  (reg : PhysReg) : SState pre P SSMorphHasLen unit.
+Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) :
+  SState pre SSMorphHasLen SSMorphHasLen unit.
 Proof.
   move=> ss.
   have := splitAssignedIntervalForReg reg EndOfLifetimeHole false.
-  move=> /(_ pre P W); move=> /(_ ss).
+  move=> /(_ pre ss).
   case=> [err|[_ ss']]; right; split; try constructor.
-    case: W => /(_ pre (thisDesc ss) (thisHolds ss))
-            => sshaslen.
-    exact: {| thisDesc  := thisDesc ss
-            ; thisHolds := sshaslen
-            ; thisState := thisState ss |}.
+    exact: ss.
   exact: ss'.
 Defined.
 

@@ -46,10 +46,9 @@ Inductive OpKind : Set :=
 Record OpInfo (accType opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq varType * seq PhysReg;
-  saveOp      : VarId -> opType2;
-  restoreOp   : VarId -> opType2;
-  applyAllocs : opType1 -> accType -> seq (VarId * PhysReg)
-                  -> accType * opType2
+  saveOp      : accType -> VarId -> accType * opType2;
+  restoreOp   : accType -> VarId -> accType * opType2;
+  applyAllocs : opType1 -> seq (VarId * PhysReg) -> opType2
 }.
 
 Variable oinfo : OpInfo accType opType1 opType2 varType.
@@ -64,8 +63,6 @@ Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
 }.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-
-Definition BlockList := seq blockType1.
 
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= NE_head (ups r.1) }.
@@ -94,17 +91,17 @@ Record BuildState := {
 }.
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) :
-  BlockList -> a :=
+  seq blockType1 -> a :=
   foldl (fun bacc blk => foldl f bacc (blockOps binfo blk)) z.
 
-Definition countOps : BlockList -> nat := foldOps (fun acc _ => acc.+1) 0.
+Definition countOps : seq blockType1 -> nat := foldOps (fun acc _ => acc.+1) 0.
 
 Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a)
-  (blocks : BlockList) : a :=
+  (blocks : seq blockType1) : a :=
   foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
         z (rev blocks).
 
-Definition processOperations (blocks : BlockList) : BuildState.
+Definition processOperations (blocks : seq blockType1) : BuildState.
   have := foldOps (fun x op => let: (n, m) := x in
     (n.+1, foldl (fun m v => maxn m (varId vinfo v))
                  m (fst (opRefs oinfo op))))
@@ -157,15 +154,14 @@ Definition processOperations (blocks : BlockList) : BuildState.
     exact.
 Defined.
 
-Definition BlockState := IState SSError BlockList BlockList.
-
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
    Wimmer's thesis.  At the moment we're simply accepting whatever block order
    is passed to us by the caller.  However, implementing this function
    properly is a strong means of improving the accuracy and efficiency of this
    algorithm. *)
-Definition computeBlockOrder : BlockState unit := return_ tt.
+Definition computeBlockOrder (blocks : seq blockType1) : seq blockType1 :=
+  blocks.
 
 (* This function not only numbers all operations for us, but adds any extra
    administrative information that we need to process the algorithm on this
@@ -173,7 +169,8 @@ Definition computeBlockOrder : BlockState unit := return_ tt.
    the caller.  From this point on, all functions operate on this enriched
    data, which ultimately gets reduced back to the caller's version of the
    data at the very end. *)
-Definition numberOperations : BlockState unit := return_ tt.
+Definition numberOperations (blocks : seq blockType1) : seq blockType1 :=
+  blocks.
   (* let f n op := *)
   (*   (n.+2, {| opId    := n *)
   (*           ; opMeta  := opMeta op *)
@@ -193,25 +190,20 @@ Record BlockLiveSets := {
   blockLastOpId  : OpId
 }.
 
-Section IntMap.
-
-Variable a : Type.
-
-Inductive IntMap :=
+Inductive IntMap (a : Type) :=
   | emptyIntMap
   | getIntMap of seq (nat * a).
 
-Definition IntMap_lookup (key : nat) (m : IntMap) : option a.
-Admitted.
-
-Definition IntMap_insert (key : nat) (value : a) (m : IntMap) : IntMap.
-Admitted.
-
-Definition IntMap_alter (f : option a -> option a) (key : nat) (m : IntMap) :
-  IntMap.
-Admitted.
-
-End IntMap.
+(* We needn't bother defining these in Coq, since they only matter to the
+   extracted Haskell code, and there we use the definitions from
+   [Data.IntMap]. *)
+Definition IntMap_lookup : forall a, nat -> IntMap a -> option a :=
+  fun _ _ _ => None.
+Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
+  fun _ _ _ x => x.
+Definition IntMap_alter : forall a,
+  (option a -> option a) -> nat -> IntMap a -> IntMap a :=
+  fun _ _ _ x => x.
 
 Definition union (a : eqType) (m1 m2 : seq a) : seq a := undup (m1 ++ m2).
 
@@ -221,10 +213,7 @@ Definition relative_complement (a : eqType) (m1 m2 : seq a) : seq a :=
 Arguments emptyIntMap [a].
 Arguments getIntMap [a] _.
 
-Definition forFold {A B : Type} (b : B) (v : seq A) (f : B -> A -> B) : B :=
-  foldl f b v.
-
-Definition computeLocalLiveSets (blocks : BlockList) : IntMap BlockLiveSets :=
+Definition computeLocalLiveSets (blocks : seq blockType1) : IntMap BlockLiveSets :=
   (* for each block b in blocks do
        b.live_gen  = { }
        b.live_kill = { }
@@ -284,7 +273,7 @@ Definition computeLocalLiveSets (blocks : BlockList) : IntMap BlockLiveSets :=
       in
     (lastIdx', IntMap_insert (blockId binfo b) liveSet3 m).
 
-Definition computeGlobalLiveSets (blocks : BlockList)
+Definition computeGlobalLiveSets (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
   (* do
        for each block b in blocks in reverse order do
@@ -329,7 +318,7 @@ Definition computeGlobalLiveSets (blocks : BlockList)
          |} liveSets1
     end.
 
-Definition buildIntervals : BlockState (ScanStateSig InUse) :=
+Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
   (* jww (2015-01-27): NYI: Still need to insert length-1 fixed intervals at
      call points. *)
   let mkint (vid : VarId)
@@ -349,7 +338,6 @@ Definition buildIntervals : BlockState (ScanStateSig InUse) :=
       mkint vid ss pos mx $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i I) in
 
-  blocks <<- iget SSError ;;
   (fun bs =>
      let regs := vmap (fun mr =>
            if mr is Some (exist r _)
@@ -361,8 +349,7 @@ Definition buildIntervals : BlockState (ScanStateSig InUse) :=
      let s2 := packScanState s1 in
      let s3 := foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs) in
      let s4 := ScanState_finalize s3.2 in
-     let s5 := packScanState s4 in
-     return_ s5)
+     packScanState s4)
   (processOperations blocks).
 
 Inductive InsertPos : Set := AtBegin of VarId | AtEnd of VarId.
@@ -406,7 +393,7 @@ Definition InsertPos_eqType (A : eqType) :=
 End EqInsertPos.
 
 Definition resolveDataFlow `(st : ScanState InUse sd)
-  (blocks : BlockList) (liveSets : IntMap BlockLiveSets) :
+  (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
   IntMap (seq InsertPos) :=
   (* for each block from in blocks do
        for each successor to of from do
@@ -474,99 +461,129 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
 
 Section Allocation.
 
+Require Import LinearScan.State.
+
 Record AssnStateInfo := {
   assnOpId : OpId;
   assnAcc  : accType
 }.
 
-Definition AssnState :=
-  IState SSError AssnStateInfo AssnStateInfo.
+Definition AssnState := State AssnStateInfo.
 
-Definition savesAndRestores (opid : OpId) (vid : VarId)
-  (int : IntervalDesc) : (seq opType2 * seq opType2) :=
+Definition saveOpM (vid : VarId) : AssnState opType2 :=
+  assn <-- get ;;
+  let: (acc', sop) := saveOp oinfo (assnAcc assn) vid in
+  put {| assnOpId := assnOpId assn
+       ; assnAcc  := acc' |} ;;
+  pure sop.
+
+Definition restoreOpM (vid : VarId) : AssnState opType2 :=
+  assn <-- get ;;
+  let: (acc', rop) := restoreOp oinfo (assnAcc assn) vid in
+  put {| assnOpId := assnOpId assn
+       ; assnAcc  := acc' |} ;;
+  pure rop.
+
+Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
+  AssnState (A * B)%type :=
+  x' <-- x ;;
+  y' <-- y ;;
+  pure (x', y').
+
+Definition savesAndRestores opid vid int :
+  AssnState (seq opType2 * seq opType2) :=
   let isFirst := firstUsePos int == opid in
   let isLast  := nextUseAfter int opid == None in
-  let save := [:: saveOp oinfo vid] in
-  let restore := [:: restoreOp oinfo vid] in
+  let save    := sop <-- saveOpM vid ;; pure [:: sop] in
+  let restore := rop <-- restoreOpM vid ;; pure [:: rop] in
   match iknd int, isFirst, isLast with
-  | Middle,    true,  true  => (restore, save)
-  | Middle,    false, true  => ([::], save)
-  | Middle,    true,  false => (restore, [::])
-  | LeftMost,  _,     true  => ([::], save)
-  | RightMost, true,  _     => (restore, [::])
-  | _,         _,     _     => ([::], [::])
-  end.
+    | Middle,    true,  true  => pairM restore save
+    | Middle,    false, true  => pairM (pure [::]) save
+    | Middle,    true,  false => pairM restore (pure [::])
+    | LeftMost,  _,     true  => pairM (pure [::]) save
+    | RightMost, true,  _     => pairM restore (pure [::])
+    | _,         _,     _     => pure ([::], [::])
+    end.
 
-Definition doAllocations (ints : seq (IntervalDesc * PhysReg))
-  (op : opType1) : AssnState (seq opType2) :=
-  assn <<- iget SSError ;;
+Definition collectAllocs opid ints acc v :=
+  let vid := varId vinfo v in
+  let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
+  forFoldM acc v_ints $ fun acc' ir =>
+    match ir return AssnState (seq (VarId * PhysReg) *
+                               seq opType2 * seq opType2) with
+    | (int, reg) =>
+        match acc' with
+        | (allocs', restores', saves') =>
+          res <-- savesAndRestores opid vid int ;;
+          let: (ss, rs) := res in
+          pure ((vid, reg) :: allocs',
+                   rs ++ restores', ss ++ saves')
+        end
+    end.
+
+Definition doAllocations ints op : AssnState (seq opType2) :=
+  assn <-- get ;;
   let opid := assnOpId assn in
   let vars := fst (opRefs oinfo op) in
-  let: (allocs, restores, saves) :=
-    forFold ([::], [::], [::]) vars $ fun acc v =>
-      let vid := varId vinfo v in
-      let v_ints :=
-          [seq x <- ints | isWithin (fst x) vid (assnOpId assn)] in
-      forFold acc v_ints $ fun acc' ir =>
-        let: (int, reg) := ir in
-        let: (allocs', restores', saves') := acc' in
-        let: (ss, rs) := savesAndRestores opid vid int in
-        ((vid, reg) :: allocs', rs ++ restores', ss ++ saves') in
-  let: (acc', op') := applyAllocs oinfo op (assnAcc assn) allocs in
+  res <-- forFoldM ([::], [::], [::]) vars $ collectAllocs opid ints ;;
+  let: (allocs, restores, saves) := res in
+  let op' := applyAllocs oinfo op allocs in
   (* With lenses, this would just be: assnOpId += 2 *)
-  iput SSError {| assnOpId := (assnOpId assn).+2
-                ; assnAcc  := acc' |} ;;;
-  return_ $ restores ++ op' :: saves.
+  modify (fun assn' => {| assnOpId := opid.+2
+                        ; assnAcc  := assnAcc assn' |}) ;;
+  pure $ restores ++ op' :: saves.
+
+Definition resolveMappings bid ops ops' mappings :=
+  if IntMap_lookup bid mappings is Some inss
+  then forFoldM ops' inss (fun ops'' ins =>
+    (* jww (2015-01-27): NYI: When multiple moves must be inserted at
+       one edge, then the order of the moves is important because the
+       same register can occur as the source of one move and the
+       destination of another move. The moves must be ordered such that
+       a register is saved first before it is overwritten. *)
+    match ins with
+    | AtBegin vid =>
+        rop <-- restoreOpM vid ;;
+        pure $ rop :: ops''
+    | AtEnd   vid =>
+        sop <-- saveOpM vid ;;
+        pure $
+          if ops is o :: os
+          then
+            if ops'' is o'' :: os''
+            then
+              if opKind oinfo (last o os) is IsBranch
+              then belast o'' os'' ++ [:: sop; last o'' os'']
+              else ops' ++ [:: sop]
+            else [:: sop]
+          else [:: sop]
+    end)
+  else pure ops'.
 
 Definition considerOps (f : opType1 -> AssnState (seq opType2))
   (mappings : IntMap (seq InsertPos)) :=
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
-    ops' <<- concatMapM f ops ;;
+    ops' <-- concatMapM f ops ;;
     (* Insert resolving moves based on the mappings *)
     let bid := blockId binfo blk in
-    let ops'' :=
-        if IntMap_lookup bid mappings is Some inss
-        then forFold ops' inss $ fun ops'' ins =>
-          (* jww (2015-01-27): NYI: When multiple moves must be inserted at
-             one edge, then the order of the moves is important because the
-             same register can occur as the source of one move and the
-             destination of another move. The moves must be ordered such that
-             a register is saved first before it is overwritten. *)
-          match ins with
-          | AtBegin vid => restoreOp oinfo vid :: ops''
-          | AtEnd   vid =>
-            (fun sop =>
-              if ops is o :: os
-              then
-                if ops'' is o'' :: os''
-                then
-                  if opKind oinfo (last o os) is IsBranch
-                  then belast o'' os'' ++ [:: sop; last o'' os'']
-                  else ops' ++ [:: sop]
-                else [:: sop]
-              else [:: sop])
-            (saveOp oinfo vid)
-          end
-        else ops' in
-    return_ $ setBlockOps binfo blk ops''.
+    ops'' <-- resolveMappings bid ops ops' mappings ;;
+    pure $ setBlockOps binfo blk ops''.
 
 Definition assignRegNum `(st : ScanState InUse sd)
-  (mappings : IntMap (seq InsertPos)) (acc : accType) :
-  IState SSError (seq blockType1) (seq blockType2) accType :=
-  let ints :=
-      map (fun x => (getIntervalDesc (getInterval (fst x)), snd x))
-          (handled sd ++ active sd ++ inactive sd) in
-  blocks <<- iget SSError ;;
-  match (considerOps (doAllocations ints) mappings blocks)
-        {| assnOpId := 1
-         ; assnAcc := acc |} with
-  | inl err => ierr SSError err
-  | inr (blocks', assn) =>
-      iput SSError blocks' ;;;
-      return_ $ assnAcc assn
-  end.
+  (mappings : IntMap (seq InsertPos)) (blocks : seq blockType1)
+  (acc : accType) : seq blockType2 * accType :=
+  let: (blocks', assn) :=
+    considerOps
+      (doAllocations
+         [seq (getIntervalDesc (getInterval (fst x)), snd x)
+         | x <- handled sd ++ active sd ++ inactive sd])
+      mappings
+      blocks
+      {| assnOpId := 1
+       ; assnAcc := acc |} in
+  (blocks', assnAcc assn).
 
 End Allocation.
 

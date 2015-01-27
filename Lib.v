@@ -1,7 +1,3 @@
-Require Export LinearScan.IApplicative.
-Require Export LinearScan.IEndo.
-Require Export LinearScan.IMonad.
-Require Export LinearScan.IState.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Ssr.
 Require Export LinearScan.Vector.
@@ -305,6 +301,9 @@ Qed.
 Definition mapWithIndex {a b} (f : nat -> a -> b) (l : seq a) : seq b :=
   rev (snd (foldl (fun acc x => let: (n, xs) := acc in
                                 (n.+1, f n x :: xs)) (0, [::]) l)).
+
+Definition forFold {A B : Type} (b : B) (v : seq A) (f : B -> A -> B) : B :=
+  foldl f b v.
 
 Definition foldl_with_index
   {A B : Type} (f : nat -> B -> A -> B) (b : B) (v : seq A) : B :=

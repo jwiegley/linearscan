@@ -58,9 +58,9 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo accType o v a b = OpInfo
     { opKind      :: o a -> OpKind
     , opRefs      :: o a -> ([v], [PhysReg])
-    , saveOp      :: Int -> o b
-    , restoreOp   :: Int -> o b
-    , applyAllocs :: o a -> accType -> [(Int, PhysReg)] -> (accType, o b)
+    , saveOp      :: accType -> Int -> (accType, o b)
+    , restoreOp   :: accType -> Int -> (accType, o b)
+    , applyAllocs :: o a -> [(Int, PhysReg)] -> o b
     }
 
 deriving instance Eq OpKind
@@ -95,11 +95,11 @@ fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
 allocate :: BlockInfo blk o a b -> OpInfo accType o v a b -> VarInfo v
-         -> [blk a] -> accType -> Either String (accType, [blk b])
+         -> [blk a] -> accType -> Either String ([blk b], accType)
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks acc =
-    case LS.linearScan binfo oinfo vinfo acc blocks of
+    case LS.linearScan binfo oinfo vinfo blocks acc of
         Left x -> Left $ case x of
             LS.ECannotSplitSingleton n ->
                 "Current interval is a singleton (" ++ show n ++ ")"

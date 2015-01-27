@@ -49,10 +49,8 @@ library
     LinearScan
   other-modules:
     LinearScan.Datatypes
-    LinearScan.IApplicative
-    LinearScan.IEndo
-    LinearScan.IMonad
     LinearScan.IState
+    LinearScan.State
     LinearScan.Interval
     LinearScan.Lib
     -- LinearScan.List0

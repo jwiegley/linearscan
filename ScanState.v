@@ -1,4 +1,5 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.IState.
 
 Require Export LinearScan.Machine.
 Require Export LinearScan.Interval.
@@ -24,7 +25,7 @@ Inductive SSError : Set :=
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
   IState SSError P R b :=
-  @ijoin (IState SSError) _ P Q R b (@imap _ _ P Q _ _ f x).
+  @ijoin _ P Q R b (@imap _ P Q _ _ f x).
 
 Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
 
@@ -36,7 +37,7 @@ Notation "A ;;; B" := (_ <<- A ;; B)
 
 Definition error_ {I O X} err : IState SSError I O X :=
   fun (_ : I) => inl err.
-Definition return_ {I O X} := @ipure (IState SSError) I O X.
+Definition return_ {I O X} := @ipure I O X.
 
 (** ** ScanStateDesc *)
 

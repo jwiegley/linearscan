@@ -8,6 +8,7 @@ cabal.mkDerivation (self: {
   src = builtins.filterSource (path: type: type != "unknown") ./.;
   buildDepends = [ transformers ];
   testDepends = [ hspec hspecExpectations HUnit transformers free ];
+  doCheck = true;
   meta = {
     homepage = "http://github.com/jwiegley/linearscan";
     description = "An optimized linear scan register allocator";
