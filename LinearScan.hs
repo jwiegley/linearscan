@@ -86,10 +86,8 @@ fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 --   allocation.  Artificial save and restore instructions may also be
 --   inserted into blocks to indicate spilling and reloading of variables.
 --
---   In order to call this function, the caller must transform their own basic
---   block representation into a linear series of 'BlockInfo' structures.
---   Each of these structures may be associated with a unique identifier, to
---   assist with processing allocation info afterward.
+--   In order to call this function, the caller must provide records that
+--   allow viewing and mutating of the original program graph.
 --
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
