@@ -1,25 +1,31 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -Wall -fno-warn-unused-binds -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Tempest where
 
--- import Debug.Trace
-import Control.Applicative
-import Control.Monad
-import Control.Monad.Free
-import Data.Foldable
-import Data.IntMap
-import Data.Monoid
-import LinearScan
-import Test.Hspec
+import           Compiler.Hoopl as Hoopl hiding ((<*>))
+import           Control.Applicative
+import           Control.Exception
+import           Control.Lens
+import           Control.Monad.Free
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.State
+import           Data.Foldable
+import           Data.IntMap
+import qualified Data.Map as M
+import           Data.Maybe (fromMaybe)
+import           Data.Monoid
+import           LinearScan
+import           Test.Hspec
 
 ------------------------------------------------------------------------------
 -- The input from the Tempest compiler has the following shape: 'Procedure a
@@ -68,9 +74,7 @@ type Failure a  = a
 -- | Type synonym for indicating an external name
 type Imported a = a
 
-data Reg = Reg Int deriving (Eq, Show)
-
-data Label = TLabel deriving (Eq, Show)
+type Reg = Int
 
 data Instruction reg
   = Add          reg reg reg
@@ -91,10 +95,12 @@ data IRInstr v e x where
   SaveOffset    :: Linearity -> Int -> Src v -> Dst Int -> IRInstr v O O
   RestoreOffset :: Linearity -> Int -> Src Int -> Dst v -> IRInstr v O O
   Jump          :: Label -> IRInstr v O C
-  Branch        :: Test -> v -> Success Label -> Failure Label -> IRInstr v O C
-  Stwb          :: Linearity -> Src v -> Dst v ->
-                   Success Label -> Failure Label -> IRInstr v O C
-  Strb          :: Src v -> Dst v -> Success Label -> Failure Label -> IRInstr v O C
+  Branch        :: Test -> v -> Success Label -> Failure Label
+                -> IRInstr v O C
+  Stwb          :: Linearity -> Src v -> Dst v
+                -> Success Label -> Failure Label -> IRInstr v O C
+  Strb          :: Src v -> Dst v -> Success Label -> Failure Label
+                -> IRInstr v O C
   ReturnInstr   :: [Reg] -> Instruction v -> IRInstr v O C
 
 deriving instance Eq v => Eq (IRInstr v e x)
@@ -105,7 +111,7 @@ instance Show v => Show (IRInstr v e x) where
                           (case x1 of Just v -> " " ++ show v ; _ -> " _")
                           ++ " " ++ show x2
   show (Reclaim v)      = "\t@reclaim " ++ show v
-  show (Instr i)        = "\n\t" ++ show i
+  show (Instr i)        = "\t" ++ show i
   show (Call c i)       = "\t@call " ++ show c ++ " " ++ show i
   show (LoadConst c v)  = "\t@lc " ++ show v ++ " " ++ show c
   show (Move x1 x2)     = "\t@mvrr " ++ show x1 ++ " " ++ show x2
@@ -131,35 +137,6 @@ instance Show v => Show (IRInstr v e x) where
                             ++ " " ++ show f ++ "; @jmp " ++ show t
   show (ReturnInstr liveRegs i)   = "\t@return " ++ show liveRegs ++ " " ++ show i
 
-newtype IRInstrWrap e x v = IRInstrWrap { getIRInstrWrap :: IRInstr v e x }
-
-instance Functor (IRInstrWrap e x) where
-    fmap f (IRInstrWrap m) = IRInstrWrap (go m)
-      where
-        go (Label x)                     = Label x
-        go (Alloc ag msrc dst)           = Alloc ag (f <$> msrc) (f dst)
-        go (Reclaim src)                 = Reclaim (f src)
-        go (Instr i)                     = Instr (fmap f i)
-        go (LoadConst c dst)             = LoadConst c (f dst)
-        go (Move src dst)                = Move (f src) (f dst)
-        go (Copy src dst)                = Copy (f src) (f dst)
-        go (Save lin src x)              = Save lin (f src) x
-        go (Restore x1 x2 dst)           = Restore x1 x2 (f dst)
-        go (SaveOffset lin off src x)    = SaveOffset lin off (f src) x
-        go (RestoreOffset lin off x dst) = RestoreOffset lin off x (f dst)
-        go (Jump x)                      = Jump x
-        go (Branch x1 cond x2 x3)        = Branch x1 (f cond) x2 x3
-        go (Stwb x1 src dst x2 x3)       = Stwb x1 (f src) (f dst) x2 x3
-        go (Strb src dst x2 x3)          = Strb (f src) (f dst) x2 x3
-        go (Call cc i)                   = Call cc (fmap f i)
-        go (ReturnInstr liveInRegs i)    = ReturnInstr liveInRegs (fmap f i)
-
-newtype NodeWrapVar a e x v = NodeWrapVar { getNodeWrapVar :: Node a v e x }
-
-instance Functor (NodeWrapVar v e x) where
-    fmap f (NodeWrapVar (Node instr meta)) =
-        NodeWrapVar (Node (getIRInstrWrap . fmap f . IRInstrWrap $ instr) meta)
-
 data Node a v e x = Node
   { _nodeIRInstr :: IRInstr v e x
   , _nodeMeta    :: a
@@ -168,28 +145,13 @@ data Node a v e x = Node
 instance Show v => Show (Node a v e x) where
     show (Node i _) = show i
 
-data C = C
-data O = O
-
-data PNode v e x a = PNode (Node a v e x) deriving Eq
-
-instance (Show a, Show v) => Show (PNode v e x a) where
-    show (PNode n) = show n
-
-instance Functor (PNode v e x) where
-    fmap f (PNode (Node x y)) = PNode (Node x (f y))
-
-data PBlock v e x a = PBlock (Node a v e x) deriving (Eq, Show)
-
-data Block v e x a = Block
-    { blockNum :: Int
-    , getBlock :: [PNode v e x a]
-    }
-    deriving (Eq, Show)
-
-nodeToOpList :: (Show a, Show v) => Node a v e x -> [Instruction v]
-nodeToOpList (Node (Instr i) _) = [i]
-nodeToOpList n = error $ "nodeToOpList: NYI for " ++ show n
+instance NonLocal (Node a v) where
+  entryLabel (Node (Label l)         _) = l
+  successors (Node (Jump l)          _) = [l]
+  successors (Node (Branch _ _ t f)  _) = [t, f]
+  successors (Node (Stwb _ _ _ s f)  _) = [s, f]
+  successors (Node (Strb _ _ s f)    _) = [s, f]
+  successors (Node (ReturnInstr _ _) _) = []
 
 data AtomKind = Atom deriving (Eq, Show)
 data Var = Var deriving (Eq, Show)
@@ -214,41 +176,259 @@ data IRVar =
 instance Show IRVar where
     show (IRVar x _) = show x
 
-asmTest (compile -> body) (compile -> result) =
-    case allocate binfo oinfo vinfo [body] () of
-        Left e   -> error $ "Allocation failed: " ++ e
-        Right (xs, _) -> do
-            print ("----" :: String)
-            print xs
-            print ("----" :: String)
-            print result
-            print ("----" :: String)
-            length xs `shouldBe` length [result]
-            zipWithM_ shouldBe xs [result]
+asmTest :: Program IRVar -> Program Reg -> Expectation
+asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
+    go $ M.fromList $ zip (Prelude.map entryLabel blocks) [(1 :: Int)..]
   where
-    binfo = BlockInfo
-        { blockId         = blockNum
-        , blockSuccessors = const []  -- jww (2015-01-27): NYI
-        , blockOps        = getBlock
-        , setBlockOps     = \b new -> b { getBlock = new }
-        }
-    oinfo = OpInfo
-        { opKind      = const IsNormal -- jww (2015-01-27): NYI
-        , opRefs      = convertNode
-        , saveOp      = \_off _vid _reg -> error "jww (2015-01-27): NYI: saveOp"
-        , restoreOp   = \_off _vid _reg -> error "jww (2015-01-27): NYI: restoreOp"
-        , applyAllocs = \o m -> conv (fromList m) o
-        }
-    vinfo = VarInfo
-        { varId       = \(_, v) -> case v of
-               IRVar (VirtualIV n _) _ -> n
-               _ -> error $ "Unexpected variable: " ++ show v
-        , varKind     = fst
-        , regRequired = const True
-        }
+    GMany NothingO body NothingO = prog
+    blocks = postorder_dfs_from body entry
 
-    conv m (PNode (Node i meta)) = PNode $ Node (convInstr m i) meta
-    convInstr m = getIRInstrWrap . fmap (assignVar m) . IRInstrWrap
+    go blockIds =
+        case allocate (blockInfo getBlockId) opInfo varInfo
+                      (Prelude.map BlockWrapVar blocks)
+                      (newSpillStack 0) of
+            Left e -> error $ "Allocation failed: " ++ e
+            Right (blks, _) -> do
+                let graph' = newGraph (Prelude.map getBlockWrapVar blks)
+                catch
+                    (showGraph show graph' `shouldBe` showGraph show result)
+                    (\e -> do
+                          putStrLn "---- Expecting ----"
+                          putStr $ showGraph show result
+                          putStrLn "---- Compiled  ----"
+                          putStr $ showGraph show graph'
+                          putStrLn "-------------------"
+                          throwIO (e :: SomeException))
+      where
+        newBody = Data.Foldable.foldl' (flip addBlock) emptyBody
+        newGraph xs = GMany NothingO (newBody xs) NothingO
+
+        getBlockId :: Hoopl.Label -> Int
+        getBlockId lbl =
+            fromMaybe (error "The impossible happened")
+                      (M.lookup lbl blockIds)
+
+newtype IRInstrWrap e x v = IRInstrWrap { getIRInstrWrap :: IRInstr v e x }
+
+instance Functor (IRInstrWrap e x) where
+    fmap f (IRInstrWrap m) = IRInstrWrap (go m)
+      where
+        go (Label x)                     = Label x
+        go (Alloc ag msrc dst)           = Alloc ag (f <$> msrc) (f dst)
+        go (Reclaim src)                 = Reclaim (f src)
+        go (Instr i)                     = Instr (fmap f i)
+        go (LoadConst c dst)             = LoadConst c (f dst)
+        go (Move src dst)                = Move (f src) (f dst)
+        go (Copy src dst)                = Copy (f src) (f dst)
+        go (Save lin src x)              = Save lin (f src) x
+        go (Restore x1 x2 dst)           = Restore x1 x2 (f dst)
+        go (SaveOffset lin off src x)    = SaveOffset lin off (f src) x
+        go (RestoreOffset lin off x dst) = RestoreOffset lin off x (f dst)
+        go (Jump x)                      = Jump x
+        go (Branch x1 cond x2 x3)        = Branch x1 (f cond) x2 x3
+        go (Stwb x1 src dst x2 x3)       = Stwb x1 (f src) (f dst) x2 x3
+        go (Strb src dst x2 x3)          = Strb (f src) (f dst) x2 x3
+        go (Call cc i)                   = Call cc (fmap f i)
+        go (ReturnInstr liveInRegs i)    = ReturnInstr liveInRegs (fmap f i)
+
+instance Foldable (IRInstrWrap e x) where
+    foldMap f (IRInstrWrap m) = go m
+      where
+        go (Label _x)                       = mempty
+        go (Alloc _ag Nothing dst)          = f dst
+        go (Alloc _ag (Just src) dst)       = f src <> f dst
+        go (Reclaim src)                    = f src
+        go (Instr i)                        = foldMap f i
+        go (LoadConst _c dst)               = f dst
+        go (Move src dst)                   = f src <> f dst
+        go (Copy src dst)                   = f src <> f dst
+        go (Save _lin src _x)               = f src
+        go (Restore _x1 _x2 dst)            = f dst
+        go (SaveOffset _lin _off src _x)    = f src
+        go (RestoreOffset _lin _off _x dst) = f dst
+        go (Jump _x)                        = mempty
+        go (Branch _x1 cond _x2 _x3)        = f cond
+        go (Stwb _x1 src dst _x2 _x3)       = f src <> f dst
+        go (Strb src dst _x2 _x3)           = f src <> f dst
+        go (Call _cc i)                     = foldMap f i
+        go (ReturnInstr _liveInRegs i)      = foldMap f i
+
+newtype NodeWrapVar a e x v = NodeWrapVar { getNodeWrapVar :: Node a v e x }
+
+instance Functor (NodeWrapVar v e x) where
+    fmap f (NodeWrapVar (Node instr meta)) =
+        NodeWrapVar (Node (getIRInstrWrap . fmap f . IRInstrWrap $ instr) meta)
+
+instance Foldable (NodeWrapVar v e x) where
+    foldMap f (NodeWrapVar (Node instr _meta)) = foldMap f . IRInstrWrap $ instr
+
+data NodeV a v = NodeCO { getNodeCO :: NodeWrapVar a C O v }
+               | NodeOO { getNodeOO :: NodeWrapVar a O O v }
+               | NodeOC { getNodeOC :: NodeWrapVar a O C v }
+
+instance Functor (NodeV v) where
+    fmap f (NodeCO n) = NodeCO (fmap f n)
+    fmap f (NodeOO n) = NodeOO (fmap f n)
+    fmap f (NodeOC n) = NodeOC (fmap f n)
+
+instance Foldable (NodeV v) where
+    foldMap f (NodeCO n) = foldMap f n
+    foldMap f (NodeOO n) = foldMap f n
+    foldMap f (NodeOC n) = foldMap f n
+
+newtype BlockWrapVar a e x v =
+    BlockWrapVar { getBlockWrapVar :: Block (Node a v) e x }
+
+instance Functor (BlockWrapVar v e x) where
+    fmap f (BlockWrapVar b) =
+        BlockWrapVar (mapBlock (getNodeWrapVar . fmap f . NodeWrapVar) b)
+
+instance Foldable (BlockWrapVar v C C) where
+    foldMap f (BlockWrapVar b) =
+        foldBlockNodesF3
+            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
+            b mempty
+
+instance Foldable (BlockWrapVar v C O) where
+    foldMap f (BlockWrapVar b) =
+        foldBlockNodesF3
+            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
+            b mempty
+
+instance Foldable (BlockWrapVar v O C) where
+    foldMap f (BlockWrapVar b) =
+        foldBlockNodesF3
+            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
+            b mempty
+
+instance Foldable (BlockWrapVar v O O) where
+    foldMap f (BlockWrapVar b) =
+        foldBlockNodesF3
+            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
+            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
+            b mempty
+
+blockInfo :: (Hoopl.Label -> Int)
+          -> BlockInfo (BlockWrapVar a C C) (NodeV a) IRVar Reg
+blockInfo getBlockId = BlockInfo
+    { blockId = getBlockId . entryLabel . getBlockWrapVar
+
+    , blockSuccessors = Prelude.map getBlockId . successors . getBlockWrapVar
+
+    , blockOps = \(BlockWrapVar (BlockCC a b z)) ->
+        NodeCO (NodeWrapVar a) :
+        NodeOC (NodeWrapVar z) :
+        Prelude.map (NodeOO . NodeWrapVar) (blockToList b)
+
+    , setBlockOps = \_ ops ->
+        BlockWrapVar $ BlockCC
+            (getNodeWrapVar (getNodeCO (head ops)))
+            (blockFromList (Prelude.map (getNodeWrapVar . getNodeOO)
+                                  (tail (tail ops))))
+            (getNodeWrapVar (getNodeOC (ops !! 1)))
+    }
+
+data StackInfo = StackInfo
+    { stackPtr   :: Int
+    , stackSlots :: IntMap Int
+    }
+    deriving (Eq, Show)
+
+newSpillStack :: Int -> StackInfo
+newSpillStack offset = StackInfo
+    { stackPtr   = offset
+    , stackSlots = mempty
+    }
+
+opInfo :: OpInfo StackInfo (NodeV a) (Int, VarKind) IRVar Reg
+opInfo = OpInfo
+    { opKind = \n -> case n of
+           NodeOO (NodeWrapVar (Node i _)) -> case i of
+               Call {} -> IsCall
+               -- jww (2015-01-18): Identification of loop boundaries allows
+               -- the allocator to perform a block ordering optimization to
+               -- avoid excessive saves and restores, but it is optional.
+               -- ?       -> LoopBegin
+               -- ?       -> LoopEnd
+               _ -> IsNormal
+           NodeOC (NodeWrapVar (Node i _)) -> case i of
+               Jump {}   -> IsBranch
+               Branch {} -> IsBranch
+               Strb {}   -> IsBranch
+               Stwb {}   -> IsBranch
+               _ -> IsNormal
+           _ -> IsNormal
+
+    , opRefs = \n ->
+       let f = getReferences . getNodeWrapVar in
+       case n of
+           NodeCO o -> f o
+           NodeOO o -> f o
+           NodeOC o -> f o
+
+    , saveOp = \vid r stack ->
+        let (stack', off') =
+                case Data.IntMap.lookup vid (stackSlots stack) of
+                    Just off -> (stack, off)
+                    Nothing ->
+                        let off = stackPtr stack in
+                        (StackInfo
+                             { stackPtr   = off + 8
+                             , stackSlots =
+                                 Data.IntMap.insert vid off (stackSlots stack)
+                             },
+                         off)
+            sv = Save (Linearity False) r off' in
+        (NodeOO (NodeWrapVar (Node sv (error "no save meta"))), stack')
+
+    , restoreOp = \vid r stack ->
+        let off =
+                fromMaybe (error "Restore requested but not stack allocated")
+                          (Data.IntMap.lookup vid (stackSlots stack))
+            rs = Restore (Linearity False) off r in
+        (NodeOO (NodeWrapVar (Node rs (error "no save meta"))), stack)
+
+      -- Apply allocations, which changes IRVar's into Reg's.
+    , applyAllocs = \node m -> fmap (setRegister (fromList m)) node
+    }
+  where
+    go :: Instruction IRVar -> ([(Int, VarKind)], [PhysReg])
+    go (Add s1 s2 d1) =
+        mkv Input s1 <> mkv Input s2 <> mkv Output d1
+      where
+        mkv :: VarKind -> IRVar -> ([(Int, VarKind)], [PhysReg])
+        mkv _ (IRVar (PhysicalIV n) _)    = ([], [n])
+        mkv k (IRVar (VirtualIV n _) _) = ([(n, k)], [])
+    go Nop = mempty
+
+    getReferences :: Node a IRVar e x -> ([(Int, VarKind)], [PhysReg])
+    getReferences (Node (Label _) _) = mempty
+    getReferences (Node (Instr i) _) = go i
+    getReferences (Node (ReturnInstr _ i) _) = go i
+    getReferences n = error $ "getReferences: unhandled node: " ++ show n
+
+    setRegister :: IntMap PhysReg -> IRVar -> Reg
+    setRegister _ (IRVar (PhysicalIV r) _) = r
+    setRegister m (IRVar (VirtualIV n _) _) =
+        fromMaybe (error $ "Allocation failed for variable " ++ show n)
+                  (Data.IntMap.lookup n m)
+
+varInfo :: VarInfo (Int, VarKind)
+varInfo = VarInfo
+    { varId   = fst
+    , varKind = snd
+
+      -- If there are variables which can be used directly from memory, then
+      -- this can be False, which relaxes some requirements.
+    , regRequired = const True
+    }
 
 assignVar :: IntMap PhysReg -> IRVar -> IRVar
 assignVar _ v@(IRVar (PhysicalIV _) _) = v
@@ -257,8 +437,8 @@ assignVar m (IRVar (VirtualIV n _) x) = case Data.IntMap.lookup n m of
     a -> error $ "Unexpected allocation " ++ show a
              ++ " for variable " ++ show n
 
-convertNode :: Show a => PNode IRVar O O a -> ([(VarKind, IRVar)], [PhysReg])
-convertNode (PNode (Node (Instr i) _)) = go i
+convertNode :: Show a => Node a IRVar O O -> ([(VarKind, IRVar)], [PhysReg])
+convertNode (Node (Instr i) _) = go i
   where
     go :: Instruction IRVar -> ([(VarKind, IRVar)], [PhysReg])
     go (Add a b c) = mkv Input a <> mkv Input b <> mkv Output c
@@ -275,10 +455,8 @@ var i = IRVar { _ivVar = VirtualIV i Atom
               , _ivSrc = Nothing
               }
 
-reg :: PhysReg -> IRVar
-reg r = IRVar { _ivVar = PhysicalIV r
-              , _ivSrc = Nothing
-              }
+reg :: PhysReg -> PhysReg
+reg r = r
 
 v0  = var 0
 v1  = var 1
@@ -354,12 +532,52 @@ r33 = reg 33
 r34 = reg 34
 r35 = reg 35
 
-type Program a = Free (PNode IRVar O O) a
+nodesToList :: Free ((,) (Node () v O O)) () -> [Node () v O O]
+nodesToList (Pure ()) = []
+nodesToList (Free (Node n meta, xs)) = Node n meta : nodesToList xs
 
-compile :: Program () -> Block IRVar O O ()
-compile (Pure ()) = Block 0 []
-compile (Free (PNode (Node n x))) =
-    Block 0 (PNode (Node n ()) : getBlock (compile x))
+data ProgramF v
+    = FreeLabel
+      { labelString :: String
+      , labelBody   :: Free ((,) (Node () v O O)) ()
+      , labelClose  :: Node () v O C
+      }
 
-add :: IRVar -> IRVar -> IRVar -> Program ()
-add x0 x1 x2 = Free (PNode (Node (Instr (Add x0 x1 x2)) (Pure ())))
+type Program v = Free ((,) (ProgramF v)) ()
+
+label :: String -> Free ((,) (Node () v O O)) () -> Node () v O C
+      -> Program v
+label str body close = Free (FreeLabel str body close, Pure ())
+
+compile :: NonLocal (Node () v)
+        => Program v -> (Graph (Node () v) C C, Hoopl.Label)
+compile prog = runSimpleUniqueMonad $
+    flip evalStateT (mempty :: M.Map String Label) $ do
+        body  <- go prog
+        entry <- firstLabel prog
+        return (bodyGraph body, entry)
+  where
+    go (Pure ())        = return emptyBody
+    go (Free (blk, xs)) = addBlock <$> comp blk <*> go xs
+
+    comp (FreeLabel str body close) = do
+        lbl <- lift freshLabel
+        at str .= Just lbl
+        return $ BlockCC (Node (Label lbl) ())
+                         (blockFromList (nodesToList body)) close
+
+    firstLabel (Pure ()) = error "body is empty!"
+    firstLabel (Free (FreeLabel str _ _, _)) =
+        fromMaybe (error "firstLabel failed") <$> use (at str)
+
+add :: v -> v -> v -> Free ((,) (Node () v O O)) ()
+add x0 x1 x2 = Free (Node (Instr (Add x0 x1 x2)) (), Pure ())
+
+return_ :: Node () v O C
+return_ = Node (ReturnInstr [] Nop) ()
+
+save :: PhysReg -> Dst Reg -> Free ((,) (Node () Reg O O)) ()
+save r dst = Free (Node (Save (Linearity False) r dst) (), Pure ())
+
+restore :: PhysReg -> Src Reg -> Free ((,) (Node () Reg O O)) ()
+restore r src = Free (Node (Restore (Linearity False) src r) (), Pure ())

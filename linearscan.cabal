@@ -89,4 +89,6 @@ test-suite test
       , hspec-expectations >= 0.3
       , containers         >= 0.5.5
       , transformers       >= 0.3.0.0
+      , hoopl              >= 3.10.0.1
+      , lens               >= 4.2
       , free

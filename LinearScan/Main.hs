@@ -1292,7 +1292,7 @@ collectAllocs vinfo oinfo opid ints acc v =
          (,) allocs' restores' ->
           State.bind (\res ->
             case res of {
-             (,) ss rs ->
+             (,) rs ss ->
               State.pure ((,) ((,) ((:) ((,) vid reg) allocs')
                 ((Prelude.++) rs restores')) ((Prelude.++) ss saves'))})
             (savesAndRestores oinfo (unsafeCoerce opid) vid reg

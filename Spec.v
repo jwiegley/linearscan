@@ -120,7 +120,7 @@ Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil".                   by [].
   - Case "ScanState_newUnhandled".          by rewrite -map_comp.
-  - Case "ScanState_finalize".                exact: IHst.
+  - Case "ScanState_finalize".              exact: IHst.
   - Case "ScanState_setInterval".           exact: IHst.
   - Case "ScanState_setFixedIntervals".     exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by apply/andP.

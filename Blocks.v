@@ -532,7 +532,7 @@ Definition collectAllocs opid ints acc v :=
   then
     let: (allocs', restores', saves') := acc in
     res <-- savesAndRestores opid vid reg int ;;
-    let: (ss, rs) := res in
+    let: (rs, ss) := res in
     pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
   else pure acc.
 
