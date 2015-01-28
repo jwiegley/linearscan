@@ -373,6 +373,10 @@ opInfo = OpInfo
            NodeOO o -> f o
            NodeOC o -> f o
 
+    , moveOp = \sr dr stack ->
+        let mv = Move sr dr in
+        (NodeOO (NodeWrapVar (Node mv (error "no move meta"))), stack)
+
     , saveOp = \vid r stack ->
         let (stack', off') =
                 case Data.IntMap.lookup vid (stackSlots stack) of
@@ -393,7 +397,7 @@ opInfo = OpInfo
                 fromMaybe (error "Restore requested but not stack allocated")
                           (Data.IntMap.lookup vid (stackSlots stack))
             rs = Restore (Linearity False) off r in
-        (NodeOO (NodeWrapVar (Node rs (error "no save meta"))), stack)
+        (NodeOO (NodeWrapVar (Node rs (error "no restore meta"))), stack)
 
       -- Apply allocations, which changes IRVar's into Reg's.
     , applyAllocs = \node m -> fmap (setRegister (fromList m)) node

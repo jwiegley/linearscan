@@ -6,6 +6,7 @@ while (<>) {
     s{import qualified LinearScan\.Prelude as Prelude}{
 import qualified Prelude
 import qualified Data.IntMap
+import qualified Data.IntSet
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity

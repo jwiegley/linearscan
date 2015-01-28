@@ -96,6 +96,16 @@ Extract Inductive IntMap => "Data.IntMap.IntMap"
 Extract Inlined Constant IntMap_lookup => "Data.IntMap.lookup".
 Extract Inlined Constant IntMap_insert => "Data.IntMap.insert".
 Extract Inlined Constant IntMap_alter  => "Data.IntMap.alter".
+Extract Inlined Constant IntMap_toList => "Data.IntMap.toList".
+
+Extract Inductive IntSet => "Data.IntSet.IntSet"
+  ["Data.IntSet.empty" "Data.IntSet.fromList"] "(\fO fS _ -> fO ())".
+
+Extract Inlined Constant IntSet_member     => "Data.IntSet.member".
+Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
+Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
+Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
+Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
 
 Extraction Blacklist String List Vector NonEmpty.
 

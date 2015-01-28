@@ -6,6 +6,7 @@ module LinearScan.Seq where
 
 import qualified Prelude
 import qualified Data.IntMap
+import qualified Data.IntSet
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
@@ -106,16 +107,6 @@ seq_predType :: Eqtype.Equality__Coq_type -> Ssrbool.Coq_predType
                 Eqtype.Equality__Coq_sort
 seq_predType t =
   Ssrbool.mkPredType (unsafeCoerce (pred_of_eq_seq t))
-
-undup :: Eqtype.Equality__Coq_type -> ([] Eqtype.Equality__Coq_sort) -> []
-         Eqtype.Equality__Coq_sort
-undup t s =
-  case s of {
-   [] -> [];
-   (:) x s' ->
-    case Ssrbool.in_mem x (Ssrbool.mem (seq_predType t) (unsafeCoerce s')) of {
-     Prelude.True -> undup t s';
-     Prelude.False -> (:) x (undup t s')}}
 
 rem :: Eqtype.Equality__Coq_type -> Eqtype.Equality__Coq_sort -> ([]
        Eqtype.Equality__Coq_sort) -> [] Eqtype.Equality__Coq_sort

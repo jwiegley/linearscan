@@ -46,8 +46,10 @@ Inductive OpKind : Set :=
 Record OpInfo (accType opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq varType * seq PhysReg;
-  saveOp      : VarId -> PhysReg -> accType -> opType2 * accType;
-  restoreOp   : VarId -> PhysReg -> accType -> opType2 * accType;
+  moveOp      : PhysReg -> PhysReg -> accType -> opType2 * accType;
+  (* swapOp      : PhysReg -> PhysReg -> accType -> opType2 * accType; *)
+  saveOp      : VarId   -> PhysReg -> accType -> opType2 * accType;
+  restoreOp   : VarId   -> PhysReg -> accType -> opType2 * accType;
   applyAllocs : opType1 -> seq (VarId * PhysReg) -> opType2
 }.
 
@@ -179,20 +181,12 @@ Definition numberOperations (blocks : seq blockType1) : seq blockType1 :=
   (*           ; regRefs := regRefs op |}) in *)
   (* imodify SSError (@snd _ _ \o mapAccumLOps f 1). *)
 
-Definition OpId := nat.
-
-Record BlockLiveSets := {
-  blockLiveGen   : seq VarId;
-  blockLiveKill  : seq VarId;
-  blockLiveIn    : seq VarId;
-  blockLiveOut   : seq VarId;
-  blockFirstOpId : OpId;
-  blockLastOpId  : OpId
-}.
-
 Inductive IntMap (a : Type) :=
   | emptyIntMap
   | getIntMap of seq (nat * a).
+
+Arguments emptyIntMap [a].
+Arguments getIntMap [a] _.
 
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
@@ -205,13 +199,50 @@ Definition IntMap_alter : forall a,
   (option a -> option a) -> nat -> IntMap a -> IntMap a :=
   fun _ _ _ x => x.
 
-Definition union (a : eqType) (m1 m2 : seq a) : seq a := undup (m1 ++ m2).
+Definition IntMap_toList {a} (m : IntMap a) : seq (nat * a) :=
+  match m with
+    | emptyIntMap => nil
+    | getIntMap xs => xs
+  end.
 
-Definition relative_complement (a : eqType) (m1 m2 : seq a) : seq a :=
-  [seq i <- m1 | i \notin m2].
+Definition prepend (a : eqType) (x : a) mxs :=
+  if mxs is Some xs
+  then if x \notin xs
+       then Some (x :: xs)
+       else Some xs
+  else Some [:: x].
 
-Arguments emptyIntMap [a].
-Arguments getIntMap [a] _.
+Inductive IntSet :=
+  | emptyIntSet
+  | getIntSet of seq nat.
+
+Arguments emptyIntSet.
+Arguments getIntSet _.
+
+(* We needn't bother defining these in Coq, since they only matter to the
+   extracted Haskell code, and there we use the definitions from
+   [Data.IntMap]. *)
+Definition IntSet_member     : nat -> IntSet -> bool      := fun _ _ => false.
+Definition IntSet_insert     : nat -> IntSet -> IntSet    := fun _ x => x.
+Definition IntSet_union      : IntSet -> IntSet -> IntSet := fun _ x => x.
+Definition IntSet_difference : IntSet -> IntSet -> IntSet := fun _ x => x.
+
+Definition IntSet_foldl : forall a, (a -> nat -> a) -> a -> IntSet -> a :=
+  fun _ _ z _ => z.
+
+Definition IntSet_forFold {a} (z : a) (m : IntSet) (f: a -> nat -> a) : a :=
+  IntSet_foldl f z m.
+
+Definition OpId := nat.
+
+Record BlockLiveSets := {
+  blockLiveGen   : IntSet;
+  blockLiveKill  : IntSet;
+  blockLiveIn    : IntSet;
+  blockLiveOut   : IntSet;
+  blockFirstOpId : OpId;
+  blockLastOpId  : OpId
+}.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
   IntMap BlockLiveSets :=
@@ -240,10 +271,10 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
   forFold (1, emptyIntMap) blocks $ fun acc b =>
     let: (idx, m) := acc in
     let liveSet :=
-        {| blockLiveGen   := [::]
-         ; blockLiveKill  := [::]
-         ; blockLiveIn    := [::]
-         ; blockLiveOut   := [::]
+        {| blockLiveGen   := emptyIntSet
+         ; blockLiveKill  := emptyIntSet
+         ; blockLiveIn    := emptyIntSet
+         ; blockLiveOut   := emptyIntSet
          ; blockFirstOpId := idx
          ; blockLastOpId  := idx
          |} in
@@ -255,8 +286,8 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
            let vid := varId vinfo v in
            if varKind vinfo v is Input
            then
-             if vid \notin blockLiveKill liveSet2
-             then {| blockLiveGen   := vid :: blockLiveGen liveSet2
+             if ~~ (IntSet_member vid (blockLiveKill liveSet2))
+             then {| blockLiveGen   := IntSet_insert vid (blockLiveGen liveSet2)
                    ; blockLiveKill  := blockLiveKill liveSet2
                    ; blockLiveIn    := blockLiveIn liveSet2
                    ; blockLiveOut   := blockLiveOut liveSet2
@@ -266,7 +297,7 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
              else liveSet2
            else
              {| blockLiveGen   := blockLiveGen liveSet2
-              ; blockLiveKill  := vid :: blockLiveKill liveSet2
+              ; blockLiveKill  := IntSet_insert vid (blockLiveKill liveSet2)
               ; blockLiveIn    := blockLiveIn liveSet2
               ; blockLiveOut   := blockLiveOut liveSet2
               ; blockFirstOpId := blockFirstOpId liveSet2
@@ -300,8 +331,8 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
             {| blockLiveGen   := blockLiveGen liveSet1
              ; blockLiveKill  := blockLiveKill liveSet1
              ; blockLiveIn    := blockLiveIn liveSet1
-             ; blockLiveOut   := union (blockLiveOut liveSet1)
-                                       (blockLiveIn sux)
+             ; blockLiveOut   := IntSet_union (blockLiveOut liveSet1)
+                                              (blockLiveIn sux)
              ; blockFirstOpId := blockFirstOpId liveSet1
              ; blockLastOpId  := blockLastOpId liveSet1
              |}
@@ -311,9 +342,9 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
         {| blockLiveGen   := blockLiveGen liveSet2
          ; blockLiveKill  := blockLiveKill liveSet2
          ; blockLiveIn    :=
-             union (relative_complement (blockLiveOut liveSet2)
-                                        (blockLiveKill liveSet2))
-                   (blockLiveGen liveSet2)
+             IntSet_union (IntSet_difference (blockLiveOut liveSet2)
+                                             (blockLiveKill liveSet2))
+                          (blockLiveGen liveSet2)
          ; blockLiveOut   := blockLiveOut liveSet2
          ; blockFirstOpId := blockFirstOpId liveSet2
          ; blockLastOpId  := blockLastOpId liveSet2
@@ -354,58 +385,142 @@ Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
      packScanState s4)
   (processOperations blocks).
 
-Inductive InsertPos : Type :=
-  | AtBegin of VarId & PhysReg
-  | AtEnd of VarId & PhysReg.
+Inductive InsertPos : Set := AtBegin | AtEnd.
 
-Section EqInsertPos.
+Inductive MoveAction : Type :=
+  | MoveOp of PhysReg & PhysReg
+  | SaveOp of PhysReg
+  | RestoreOp of PhysReg.
 
-Definition eqact v1 v2 :=
+Record Move := {
+  movePos    : InsertPos;
+  moveVarId  : VarId;
+  moveAction : MoveAction
+}.
+
+Section EqMove.
+
+Definition eqipos v1 v2 :=
   match v1, v2 with
-  | AtBegin v1 r1, AtBegin v2 r2 => (v1 == v2) && (r1 == r2)
-  | AtEnd v1 r1,   AtEnd v2 r2   => (v1 == v2) && (r1 == r2)
+  | AtBegin, AtBegin => true
+  | AtEnd,   AtEnd   => true
   | _, _ => false
   end.
 
-Lemma eqactP : Equality.axiom eqact.
-Proof.
-  move.
-  case=> [v1 r1|v1 r1];
-  case=> [v2 r2|v2 r2];
-  case: (v1 =P v2) => [<-|/eqP /negbTE neqx] //=;
-    do [ rewrite eq_refl;
-         by constructor
-       | rewrite neqx;
-         constructor;
-         move/eqP in neqx;
-         move=> H;
-         contradiction neqx;
-         congruence
-       | constructor;
-         discriminate
-       | idtac ];
-  case: (r1 =P r2) => [<-|/eqP /negbTE neqx] //=;
-    rewrite eq_refl;
-    constructor => //=;
-    move/eqP in neqx;
-    move=> H;
-    contradiction neqx;
-    congruence.
-Qed.
+Lemma eqiposP : Equality.axiom eqipos.
+Proof. move; case; case => /=; constructor => //. Qed.
 
-Canonical act_eqMixin := EqMixin eqactP.
-Canonical act_eqType := Eval hnf in EqType InsertPos act_eqMixin.
+Canonical ipos_eqMixin := EqMixin eqiposP.
+Canonical ipos_eqType := Eval hnf in EqType InsertPos ipos_eqMixin.
 
-Lemma eqactE : eqact = eq_op. Proof. by []. Qed.
+Lemma eqiposE : eqipos = eq_op. Proof. by []. Qed.
 
 Definition InsertPos_eqType (A : eqType) :=
-  Equality.Pack act_eqMixin InsertPos.
+  Equality.Pack ipos_eqMixin InsertPos.
 
-End EqInsertPos.
+Definition eqmoveAct m1 m2 :=
+  match m1, m2 with
+  | MoveOp s1 d1, MoveOp s2 d2 => (s1 == s2) && (d1 == d2)
+  | SaveOp r1,    SaveOp r2    => r1 == r2
+  | RestoreOp r1, RestoreOp r2 => r1 == r2
+  | _, _ => false
+  end.
+
+Lemma eqmoveActP : Equality.axiom eqmoveAct.
+Proof.
+  move.
+  case=> [s1 d1|r1|r1];
+  case=> [s2 d2|r2|r2];
+  rewrite /eqmoveAct /=;
+  do ?[ case: (s1 =P s2) => [<- /=|/eqP /negbTE /eqP neqx_s] /=
+      | case: (d1 =P d2) => [<- /=|/eqP /negbTE /eqP neqx_d] /=
+      | case: (r1 =P r2) => [<- /=|/eqP /negbTE /eqP neqx_r] /= ];
+  constructor => //;
+  move=> H;
+  do [ contradiction neqx_s
+     | contradiction neqx_d
+     | contradiction neqx_r ];
+  inversion H; auto.
+Qed.
+
+Canonical moveAct_eqMixin := EqMixin eqmoveActP.
+Canonical moveAct_eqType := Eval hnf in EqType MoveAction moveAct_eqMixin.
+
+Lemma eqmoveActE : eqmoveAct = eq_op. Proof. by []. Qed.
+
+Definition MoveAction_eqType (A : eqType) :=
+  Equality.Pack moveAct_eqMixin MoveAction.
+
+Definition eqmove m1 m2 :=
+  (movePos    m1 == movePos    m2) &&
+  (moveVarId  m1 == moveVarId  m2) &&
+  (moveAction m1 == moveAction m2).
+
+Lemma eqmoveP : Equality.axiom eqmove.
+Proof.
+  move.
+  case=> [p1 v1 m1];
+  case=> [p2 v2 m2];
+  rewrite /eqmove /=;
+  case: (p1 =P p2) => [<- /=|/eqP /negbTE /eqP neqx_p];
+  case: (v1 =P v2) => [<- /=|/eqP /negbTE /eqP neqx_v];
+  case: (m1 =P m2) => [<- /=|/eqP /negbTE /eqP neqx_m];
+  constructor => //;
+  move=> H;
+  do [ contradiction neqx_p
+     | contradiction neqx_v
+     | contradiction neqx_m ];
+  inversion H; auto.
+Qed.
+
+Canonical move_eqMixin := EqMixin eqmoveP.
+Canonical move_eqType := Eval hnf in EqType Move move_eqMixin.
+
+Lemma eqmoveE : eqmove = eq_op. Proof. by []. Qed.
+
+Definition Move_eqType (A : eqType) :=
+  Equality.Pack move_eqMixin Move.
+
+End EqMove.
+
+Definition checkIntervalBoundary `(st : ScanState InUse sd)
+  key in_from from to mappings vid :=
+
+  let mfrom_int := lookupInterval st vid (blockLastOpId from) in
+  if mfrom_int isn't Some from_interval then mappings else
+    (* jww (2015-01-28): the failing case should be provably impossible *)
+
+  let mto_int := lookupInterval st vid (blockFirstOpId to) in
+  if mto_int isn't Some to_interval then mappings else
+    (* jww (2015-01-28): the failing case should be provably impossible *)
+
+  (* If the interval match, no move resolution is necessary. *)
+  if from_interval == to_interval then mappings else
+
+  let msreg := lookupRegister st from_interval in
+  let mdreg := lookupRegister st to_interval in
+
+  let maction := match msreg, mdreg with
+        (* jww (2015-01-28): should be impossible *)
+      | None,      None      => None
+      | Some sreg, None      => Some (SaveOp sreg)
+      | None,      Some dreg => Some (RestoreOp dreg)
+      | Some sreg, Some dreg => Some (MoveOp sreg dreg)
+      end in
+
+  if maction isn't Some action then mappings else
+
+  let mv :=
+      {| movePos    := if in_from then AtEnd else AtBegin
+       ; moveVarId  := vid
+       ; moveAction := action
+       |} in
+
+  IntMap_alter (prepend mv) key mappings.
 
 Definition resolveDataFlow `(st : ScanState InUse sd)
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
-  IntMap (seq InsertPos) :=
+  IntMap (seq Move) :=
   (* for each block from in blocks do
        for each successor to of from do
          // collect all resolving moves necessary between the blocks from
@@ -434,45 +549,17 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
   forFold emptyIntMap blocks $ fun mappings b =>
     let bid := blockId binfo b in
     match IntMap_lookup bid liveSets with
-    | None => mappings
+    | None => mappings          (* jww (2015-01-28): should be impossible *)
     | Some from =>
       (fun successors =>
+        let in_from := size successors <= 1 in
         forFold mappings successors $ fun ms s_bid =>
           match IntMap_lookup s_bid liveSets with
-          | None => ms
+          | None => ms          (* jww (2015-01-28): should be impossible *)
           | Some to =>
-            forFold ms (blockLiveIn to) $ fun ms' vid =>
-              if lookupInterval st vid (blockLastOpId from)
-                 is Some from_interval
-              then
-                if lookupInterval st vid (blockFirstOpId to)
-                   is Some to_interval
-                then
-                  if from_interval != to_interval
-                  then
-                    let in_from := size successors <= 1 in
-                    let mreg    := lookupRegister st
-                                     (if in_from
-                                      then from_interval
-                                      else to_interval) in
-                    if mreg is Some reg
-                    then
-                      let ins     := if in_from
-                                     then AtEnd vid reg
-                                     else AtBegin vid reg in
-                      let f mxs   := if mxs is Some xs
-                                     then if ins \notin xs
-                                          then Some (ins :: xs)
-                                          else Some xs
-                                     else Some [:: ins] in
-                      let key     := if in_from
-                                     then bid
-                                     else s_bid in
-                      IntMap_alter f key ms'
-                    else ms'  (* should be impossible *)
-                  else ms'    (* should be impossible *)
-                else ms'      (* should be impossible *)
-              else ms'        (* should be impossible *)
+              let key := if in_from then bid else s_bid in
+              IntSet_forFold ms (blockLiveIn to) $
+                checkIntervalBoundary st key in_from from to
           end)
       (blockSuccessors binfo b)
     end.
@@ -487,6 +574,13 @@ Record AssnStateInfo := {
 }.
 
 Definition AssnState := State AssnStateInfo.
+
+Definition moveOpM sreg dreg : AssnState opType2 :=
+  assn <-- get ;;
+  let: (mop, acc') := moveOp oinfo sreg dreg (assnAcc assn) in
+  put {| assnOpId := assnOpId assn
+       ; assnAcc  := acc' |} ;;
+  pure mop.
 
 Definition saveOpM vid reg : AssnState opType2 :=
   assn <-- get ;;
@@ -549,34 +643,42 @@ Definition doAllocations ints op : AssnState (seq opType2) :=
   pure $ restores ++ op' :: saves.
 
 Definition resolveMappings bid ops ops' mappings :=
-  if IntMap_lookup bid mappings is Some inss
-  then forFoldM ops' inss $ fun ops'' ins =>
+  (* Check whether any boundary transitions require move resolution at the
+     beginning or end of the block given by [bid]. *)
+  if IntMap_lookup bid mappings isn't Some inss then pure ops' else
+
+  forFoldM ops' inss $ fun ops'' mv =>
+    let: {| movePos    := pos
+          ; moveVarId  := vid
+          ; moveAction := action
+          |} := mv in
+
     (* jww (2015-01-27): NYI: When multiple moves must be inserted at
        one edge, then the order of the moves is important because the
        same register can occur as the source of one move and the
        destination of another move. The moves must be ordered such that
        a register is saved first before it is overwritten. *)
-    match ins with
-    | AtBegin vid reg =>
-        rop <-- restoreOpM vid reg ;;
-        pure $ rop :: ops''
-    | AtEnd vid reg =>
-        sop <-- saveOpM vid reg ;;
-        pure $
-          if ops is o :: os
-          then
-            if ops'' is o'' :: os''
-            then
+    op <--
+       match action with
+       | MoveOp sreg dreg => moveOpM sreg dreg
+       | SaveOp sreg      => saveOpM vid sreg
+       | RestoreOp dreg   => restoreOpM vid dreg
+       end ;;
+
+    pure $ match pos with
+      | AtBegin => op :: ops''
+      | AtEnd =>
+          match ops, ops'' with
+          | o :: os, o'' :: os'' =>
               if opKind oinfo (last o os) is IsBranch
-              then belast o'' os'' ++ [:: sop; last o'' os'']
-              else ops' ++ [:: sop]
-            else [:: sop]
-          else [:: sop]
-    end
-  else pure ops'.
+              then belast o'' os'' ++ [:: op; last o'' os'']
+              else ops' ++ [:: op]
+          | _, _ => [:: op]
+          end
+      end.
 
 Definition considerOps (f : opType1 -> AssnState (seq opType2))
-  (mappings : IntMap (seq InsertPos)) :=
+  (mappings : IntMap (seq Move)) :=
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
@@ -587,7 +689,7 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
     pure $ setBlockOps binfo blk ops''.
 
 Definition assignRegNum `(st : ScanState InUse sd)
-  (mappings : IntMap (seq InsertPos)) (blocks : seq blockType1)
+  (mappings : IntMap (seq Move)) (blocks : seq blockType1)
   (acc : accType) : seq blockType2 * accType :=
   let: (blocks', assn) :=
     considerOps
