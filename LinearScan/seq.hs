@@ -28,6 +28,11 @@ import qualified LinearScan.IOExts as IOExts
 unsafeCoerce = IOExts.unsafeCoerce
 #endif
 
+nilp :: ([] a1) -> Prelude.Bool
+nilp s =
+  Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce (Data.List.length s))
+    (unsafeCoerce 0)
+
 ncons :: Prelude.Int -> a1 -> ([] a1) -> [] a1
 ncons n x =
   Ssrnat.iter n (\x0 -> (:) x x0)

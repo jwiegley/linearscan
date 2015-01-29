@@ -1588,6 +1588,145 @@ doAllocations vinfo oinfo ints op =
       (State.forFoldM ((,) ((,) [] []) []) vars
         (collectAllocs vinfo oinfo opid ints))) State.get
 
+data NatGraph =
+   Build_NatGraph ([] PhysReg) ([]
+                                                   ((,) PhysReg
+                                                   PhysReg))
+
+coq_NatGraph_rect :: (([] PhysReg) -> ([]
+                                ((,) PhysReg PhysReg)) ->
+                                a1) -> NatGraph -> a1
+coq_NatGraph_rect f n =
+  case n of {
+   Build_NatGraph x x0 -> f x x0}
+
+coq_NatGraph_rec :: (([] PhysReg) -> ([]
+                               ((,) PhysReg PhysReg)) ->
+                               a1) -> NatGraph -> a1
+coq_NatGraph_rec =
+  coq_NatGraph_rect
+
+vertices :: NatGraph -> [] PhysReg
+vertices n =
+  case n of {
+   Build_NatGraph vertices0 edges0 -> vertices0}
+
+edges :: NatGraph -> []
+                    ((,) PhysReg PhysReg)
+edges n =
+  case n of {
+   Build_NatGraph vertices0 edges0 -> edges0}
+
+emptyGraph :: NatGraph
+emptyGraph =
+  Build_NatGraph [] []
+
+removeEdge :: ((,) PhysReg PhysReg) ->
+                         NatGraph -> NatGraph
+removeEdge x g =
+  Build_NatGraph (vertices g)
+    (Prelude.filter (\y ->
+      Prelude.not
+        (Eqtype.eq_op
+          (Eqtype.prod_eqType (Fintype.ordinal_eqType maxReg)
+            (Fintype.ordinal_eqType maxReg)) (unsafeCoerce y)
+          (unsafeCoerce x))) (edges g))
+
+connections :: (((,) PhysReg PhysReg) ->
+                          PhysReg) -> PhysReg ->
+                          NatGraph -> []
+                          ((,) PhysReg PhysReg)
+connections f x g =
+  Prelude.filter
+    ((Prelude..) (\y ->
+      Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
+        (unsafeCoerce y) (unsafeCoerce x)) f) (edges g)
+
+outbound :: PhysReg -> NatGraph -> []
+                       ((,) PhysReg PhysReg)
+outbound =
+  connections Prelude.fst
+
+inbound :: PhysReg -> NatGraph -> []
+                      ((,) PhysReg PhysReg)
+inbound =
+  connections Prelude.snd
+
+tsort' :: Prelude.Int -> ([] PhysReg) -> ([]
+                     PhysReg) -> NatGraph ->
+                     Prelude.Either
+                     ([] ((,) PhysReg PhysReg))
+                     ([] PhysReg)
+tsort' fuel l roots g =
+  (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+    (\_ -> Prelude.Right
+    (Seq.rev l))
+    (\fuel0 ->
+    case roots of {
+     [] ->
+      case edges g of {
+       [] -> Prelude.Right (Seq.rev l);
+       (:) p l0 -> Prelude.Left (edges g)};
+     (:) n s ->
+      let {outEdges = outbound n g} in
+      let {g' = Prelude.foldr removeEdge g outEdges} in
+      let {outNodes = Prelude.map Prelude.snd outEdges} in
+      let {
+       s' = (Prelude.++) s
+              (Prelude.filter
+                ((Prelude..) Seq.nilp (\x -> inbound x g'))
+                outNodes)}
+      in
+      tsort' fuel0 ((:) n l) s' g'})
+    fuel
+
+topsort :: NatGraph -> Prelude.Either
+                      ([] ((,) PhysReg PhysReg))
+                      ([] PhysReg)
+topsort g =
+  let {
+   noInbound = let {xs = Prelude.map Prelude.snd (edges g)} in
+               Prelude.filter (\x ->
+                 Prelude.not
+                   (Ssrbool.in_mem (unsafeCoerce x)
+                     (Ssrbool.mem
+                       (Seq.seq_predType
+                         (Fintype.ordinal_eqType maxReg))
+                       (unsafeCoerce xs)))) (vertices g)}
+  in
+  tsort' (Data.List.length (vertices g)) [] noInbound g
+
+addVertex :: PhysReg -> NatGraph ->
+                        NatGraph
+addVertex v g =
+  let {vg = vertices g} in
+  Build_NatGraph
+  (case Ssrbool.in_mem (unsafeCoerce v)
+          (Ssrbool.mem
+            (Seq.seq_predType (Fintype.ordinal_eqType maxReg))
+            (unsafeCoerce vg)) of {
+    Prelude.True -> vg;
+    Prelude.False -> (:) v vg}) (edges g)
+
+addEdge :: ((,) PhysReg PhysReg) ->
+                      NatGraph -> NatGraph
+addEdge e g =
+  let {
+   g' = let {eg = edges g} in
+        Build_NatGraph (vertices g)
+        (case Ssrbool.in_mem (unsafeCoerce e)
+                (Ssrbool.mem
+                  (Seq.seq_predType
+                    (Eqtype.prod_eqType
+                      (Fintype.ordinal_eqType maxReg)
+                      (Fintype.ordinal_eqType maxReg)))
+                  (unsafeCoerce eg)) of {
+          Prelude.True -> eg;
+          Prelude.False -> (:) e eg})}
+  in
+  addVertex (Prelude.fst e)
+    (addVertex (Prelude.snd e) g')
+
 resolveMappings :: (OpInfo a1 a2 a3 a4) -> Prelude.Int
                               -> ([] a2) -> ([] a3) -> (Data.IntMap.IntMap
                               ([] Move)) -> State.State

@@ -642,10 +642,106 @@ Definition doAllocations ints op : AssnState (seq opType2) :=
                         ; assnAcc  := assnAcc assn' |}) ;;
   pure $ restores ++ op' :: saves.
 
+Section Topsort.
+
+Record NatGraph := {
+  vertices : seq PhysReg;
+  edges    : seq (PhysReg * PhysReg)
+}.
+
+Definition emptyGraph :=
+  {| vertices := [::]
+   ; edges    := [::] |}.
+
+Definition removeEdge (x : PhysReg * PhysReg) g :=
+  {| vertices := vertices g
+   ; edges    := filter (fun y => y != x) (edges g) |}.
+
+Definition connections (f : (PhysReg * PhysReg) -> PhysReg) (x : PhysReg) g :=
+  filter ((fun y => y == x) \o f) (edges g).
+
+Definition outbound := connections (@fst _ _).
+Definition inbound  := connections (@snd _ _).
+
+Fixpoint tsort' fuel l roots g :=
+  (* The fuel represents the fact that we must only call tsort' once for
+     each vertex in the graph. *)
+  if fuel isn't S fuel then inr (rev l) else
+  match roots, edges g with
+  | [::],   [::] => inr (rev l)
+  | [::],   _    => inl (edges g)
+  | n :: s, _    =>
+    let outEdges := outbound n g in
+    let g' := foldr removeEdge g outEdges in
+    let outNodes := map (@snd _ _) outEdges in
+    let s' := s ++ filter (@nilp _ \o inbound ^~ g') outNodes in
+    tsort' fuel (n :: l) s' g'
+  end.
+
+Definition topsort g : seq (PhysReg * PhysReg) + seq PhysReg :=
+  let noInbound :=
+      (fun xs => [seq x <- vertices g | x \notin xs])
+      (map (@snd _ _) (edges g)) in
+  tsort' (size (vertices g)) [::] noInbound g.
+
+End Topsort.
+
+(* Compute topsort *)
+(*   {| vertices := *)
+(*        [:: 1; 3; 4; 5; 9; 7; 6; 2] *)
+(*    ; edges := *)
+(*        [:: (1, 3) *)
+(*          ; (4, 5) *)
+(*          ; (9, 7) *)
+(*          ; (7, 1) *)
+(*          ; (6, 2) *)
+(*          ; (2, 4) *)
+(*          ; (5, 6) *)
+(*        ] *)
+(*    |}. *)
+
+Definition addVertex (v : PhysReg) (g : NatGraph) : NatGraph :=
+  (fun vg =>
+    {| vertices := if v \in vg then vg else v :: vg
+     ; edges := edges g
+     |})
+  (vertices g).
+
+Definition addEdge (e : PhysReg * PhysReg) (g : NatGraph) : NatGraph :=
+  let g' :=
+    (fun eg =>
+      {| vertices := vertices g
+       ; edges := if e \in eg then eg else e :: eg
+       |})
+    (edges g) in
+  addVertex (fst e) $ addVertex (snd e) $ g'.
+
 Definition resolveMappings bid ops ops' mappings :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
   if IntMap_lookup bid mappings isn't Some inss then pure ops' else
+
+  let g := forFold emptyGraph inss $ fun g mv =>
+    match moveAction mv with
+    | MoveOp sreg dreg => addEdge (sreg, dreg) g
+    | SaveOp sreg      => addVertex sreg g
+    | RestoreOp dreg   => addVertex dreg g
+    end in
+  let order := topsort g in
+
+  (* Do all saves first.
+
+     Then moves in proper order (degrading them to save/restore to break
+     cycles; or if there is a restore pending, use its register).
+
+     Then all restores.
+
+     This function should break into several parts:
+
+     1. Compute the instructions, producing ordered operations that go to
+        either the beginning or end of the block.
+
+     2. Insert the instruction at the correct place. *)
 
   forFoldM ops' inss $ fun ops'' mv =>
     let: {| movePos    := pos
