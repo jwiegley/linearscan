@@ -55,31 +55,32 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 --   and restore all registers around a call, but indication of loops is
 --   optional, as it's merely avoids reloading of spilled variables inside
 --   loop bodies.
-data OpInfo accType o v a b = OpInfo
-    { opKind      :: o a -> OpKind
-    , opRefs      :: o a -> ([v], [PhysReg])
-    , moveOp      :: PhysReg -> PhysReg -> accType -> (o b, accType)
-    , saveOp      :: Int -> PhysReg -> accType -> (o b, accType)
-    , restoreOp   :: Int -> PhysReg -> accType -> (o b, accType)
-    , applyAllocs :: o a -> [(Int, PhysReg)] -> o b
+data OpInfo accType op1 op2 var = OpInfo
+    { opKind      :: op1 -> OpKind
+    , opRefs      :: op1 -> ([var], [PhysReg])
+    , moveOp      :: PhysReg -> PhysReg -> accType -> (op2, accType)
+    , saveOp      :: Int -> PhysReg -> accType -> (op2, accType)
+    , restoreOp   :: Int -> PhysReg -> accType -> (op2, accType)
+    , applyAllocs :: op1 -> [(Int, PhysReg)] -> op2
     }
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: OpInfo accType o v a b -> LS.OpInfo accType (o a) (o b) v
+fromOpInfo :: OpInfo accType op1 op2 var -> LS.OpInfo accType op1 op2 var
 fromOpInfo (OpInfo a b c d e f) = LS.Build_OpInfo a b c d e f
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
-data BlockInfo blk o a b = BlockInfo
-    { blockId         :: blk a -> Int
-    , blockSuccessors :: blk a -> [Int]
-    , blockOps        :: blk a -> [o a]
-    , setBlockOps     :: blk a -> [o b] -> blk b
+data BlockInfo blk1 blk2 op1 op2 = BlockInfo
+    { blockId         :: blk1 -> Int
+    , blockSuccessors :: blk1 -> [Int]
+    , blockOps        :: blk1 -> [op1]
+    , setBlockOps     :: blk1 -> [op2] -> blk2
     }
 
-fromBlockInfo :: BlockInfo blk o a b -> LS.BlockInfo (blk a) (blk b) (o a) (o b)
+fromBlockInfo :: BlockInfo blk1 blk2 op1 op2
+              -> LS.BlockInfo blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 
 -- | Transform a list of basic blocks containing variable references, into an
@@ -93,8 +94,12 @@ fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: BlockInfo blk o a b -> OpInfo accType o v a b -> VarInfo v
-         -> [blk a] -> accType -> Either String ([blk b], accType)
+allocate :: BlockInfo blk1 blk2 op1 op2
+         -> OpInfo accType op1 op2 var
+         -> VarInfo var
+         -> [blk1]
+         -> accType
+         -> Either String ([blk2], accType)
 allocate _ _ _ [] _ = Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks acc =
