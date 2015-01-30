@@ -1,5 +1,6 @@
 -R . LinearScan
 Allocate.v
+Graph.v
 Blocks.v
 IState.v
 State.v

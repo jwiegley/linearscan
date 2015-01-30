@@ -7,6 +7,6 @@ Variable regSize : nat.         (* size of registers *)
 
 Hypothesis registers_exist : maxReg > 0.
 
-Definition PhysReg := 'I_maxReg.
+Definition PhysReg : predArgType := 'I_maxReg.
 
 End Machine.

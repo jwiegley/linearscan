@@ -2,6 +2,7 @@ Require Import LinearScan.Lib.
 Require Import LinearScan.Machine.
 Require Import LinearScan.Range.
 Require Import LinearScan.ScanState.
+Require Import LinearScan.Graph.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -46,11 +47,11 @@ Inductive OpKind : Set :=
 Record OpInfo (accType opType1 opType2 varType : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq varType * seq PhysReg;
-  moveOp      : PhysReg -> PhysReg -> accType -> opType2 * accType;
-  (* swapOp      : PhysReg -> PhysReg -> accType -> opType2 * accType; *)
-  saveOp      : VarId   -> PhysReg -> accType -> opType2 * accType;
-  restoreOp   : VarId   -> PhysReg -> accType -> opType2 * accType;
-  applyAllocs : opType1 -> seq (VarId * PhysReg) -> opType2
+  moveOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
+  swapOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
+  saveOp      : PhysReg -> option VarId -> accType -> seq opType2 * accType;
+  restoreOp   : option VarId -> PhysReg -> accType -> seq opType2 * accType;
+  applyAllocs : opType1 -> seq (VarId * PhysReg) -> seq opType2
 }.
 
 Variable oinfo : OpInfo accType opType1 opType2 varType.
@@ -385,104 +386,6 @@ Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
      packScanState s4)
   (processOperations blocks).
 
-Inductive InsertPos : Set := AtBegin | AtEnd.
-
-Inductive MoveAction : Type :=
-  | MoveOp of PhysReg & PhysReg
-  | SaveOp of PhysReg
-  | RestoreOp of PhysReg.
-
-Record Move := {
-  movePos    : InsertPos;
-  moveVarId  : VarId;
-  moveAction : MoveAction
-}.
-
-Section EqMove.
-
-Definition eqipos v1 v2 :=
-  match v1, v2 with
-  | AtBegin, AtBegin => true
-  | AtEnd,   AtEnd   => true
-  | _, _ => false
-  end.
-
-Lemma eqiposP : Equality.axiom eqipos.
-Proof. move; case; case => /=; constructor => //. Qed.
-
-Canonical ipos_eqMixin := EqMixin eqiposP.
-Canonical ipos_eqType := Eval hnf in EqType InsertPos ipos_eqMixin.
-
-Lemma eqiposE : eqipos = eq_op. Proof. by []. Qed.
-
-Definition InsertPos_eqType (A : eqType) :=
-  Equality.Pack ipos_eqMixin InsertPos.
-
-Definition eqmoveAct m1 m2 :=
-  match m1, m2 with
-  | MoveOp s1 d1, MoveOp s2 d2 => (s1 == s2) && (d1 == d2)
-  | SaveOp r1,    SaveOp r2    => r1 == r2
-  | RestoreOp r1, RestoreOp r2 => r1 == r2
-  | _, _ => false
-  end.
-
-Lemma eqmoveActP : Equality.axiom eqmoveAct.
-Proof.
-  move.
-  case=> [s1 d1|r1|r1];
-  case=> [s2 d2|r2|r2];
-  rewrite /eqmoveAct /=;
-  do ?[ case: (s1 =P s2) => [<- /=|/eqP /negbTE /eqP neqx_s] /=
-      | case: (d1 =P d2) => [<- /=|/eqP /negbTE /eqP neqx_d] /=
-      | case: (r1 =P r2) => [<- /=|/eqP /negbTE /eqP neqx_r] /= ];
-  constructor => //;
-  move=> H;
-  do [ contradiction neqx_s
-     | contradiction neqx_d
-     | contradiction neqx_r ];
-  inversion H; auto.
-Qed.
-
-Canonical moveAct_eqMixin := EqMixin eqmoveActP.
-Canonical moveAct_eqType := Eval hnf in EqType MoveAction moveAct_eqMixin.
-
-Lemma eqmoveActE : eqmoveAct = eq_op. Proof. by []. Qed.
-
-Definition MoveAction_eqType (A : eqType) :=
-  Equality.Pack moveAct_eqMixin MoveAction.
-
-Definition eqmove m1 m2 :=
-  (movePos    m1 == movePos    m2) &&
-  (moveVarId  m1 == moveVarId  m2) &&
-  (moveAction m1 == moveAction m2).
-
-Lemma eqmoveP : Equality.axiom eqmove.
-Proof.
-  move.
-  case=> [p1 v1 m1];
-  case=> [p2 v2 m2];
-  rewrite /eqmove /=;
-  case: (p1 =P p2) => [<- /=|/eqP /negbTE /eqP neqx_p];
-  case: (v1 =P v2) => [<- /=|/eqP /negbTE /eqP neqx_v];
-  case: (m1 =P m2) => [<- /=|/eqP /negbTE /eqP neqx_m];
-  constructor => //;
-  move=> H;
-  do [ contradiction neqx_p
-     | contradiction neqx_v
-     | contradiction neqx_m ];
-  inversion H; auto.
-Qed.
-
-Canonical move_eqMixin := EqMixin eqmoveP.
-Canonical move_eqType := Eval hnf in EqType Move move_eqMixin.
-
-Lemma eqmoveE : eqmove = eq_op. Proof. by []. Qed.
-
-Definition Move_eqType (A : eqType) :=
-  Equality.Pack move_eqMixin Move.
-
-End EqMove.
-
 Definition checkIntervalBoundary `(st : ScanState InUse sd)
   key in_from from to mappings vid :=
 
@@ -500,27 +403,25 @@ Definition checkIntervalBoundary `(st : ScanState InUse sd)
   let msreg := lookupRegister st from_interval in
   let mdreg := lookupRegister st to_interval in
 
-  let maction := match msreg, mdreg with
-        (* jww (2015-01-28): should be impossible *)
-      | None,      None      => None
-      | Some sreg, None      => Some (SaveOp sreg)
-      | None,      Some dreg => Some (RestoreOp dreg)
-      | Some sreg, Some dreg => Some (MoveOp sreg dreg)
-      end in
+  let addToGraphs e xs :=
+      let: (gbeg, gend) := xs in
+      if in_from
+      then (gbeg, addEdge e gend)
+      else (addEdge e gbeg, gend) in
+  let f mxs :=
+      let e := (msreg, mdreg) in
+      @Some _ $ addToGraphs e
+              $ if mxs is Some xs
+                then xs
+                else (emptyGraph, emptyGraph) in
+  IntMap_alter f key mappings.
 
-  if maction isn't Some action then mappings else
-
-  let mv :=
-      {| movePos    := if in_from then AtEnd else AtBegin
-       ; moveVarId  := vid
-       ; moveAction := action
-       |} in
-
-  IntMap_alter (prepend mv) key mappings.
+Definition BlockMoves :=
+  (Graph (ordinal_eqType maxReg) * Graph (ordinal_eqType maxReg))%type.
 
 Definition resolveDataFlow `(st : ScanState InUse sd)
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
-  IntMap (seq Move) :=
+  IntMap BlockMoves :=
   (* for each block from in blocks do
        for each successor to of from do
          // collect all resolving moves necessary between the blocks from
@@ -575,21 +476,21 @@ Record AssnStateInfo := {
 
 Definition AssnState := State AssnStateInfo.
 
-Definition moveOpM sreg dreg : AssnState opType2 :=
+Definition moveOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- get ;;
   let: (mop, acc') := moveOp oinfo sreg dreg (assnAcc assn) in
   put {| assnOpId := assnOpId assn
        ; assnAcc  := acc' |} ;;
   pure mop.
 
-Definition saveOpM vid reg : AssnState opType2 :=
+Definition saveOpM vid reg : AssnState (seq opType2) :=
   assn <-- get ;;
   let: (sop, acc') := saveOp oinfo vid reg (assnAcc assn) in
   put {| assnOpId := assnOpId assn
        ; assnAcc  := acc' |} ;;
   pure sop.
 
-Definition restoreOpM vid reg : AssnState opType2 :=
+Definition restoreOpM vid reg : AssnState (seq opType2) :=
   assn <-- get ;;
   let: (rop, acc') := restoreOp oinfo vid reg (assnAcc assn) in
   put {| assnOpId := assnOpId assn
@@ -606,8 +507,8 @@ Definition savesAndRestores opid vid reg int :
   AssnState (seq opType2 * seq opType2) :=
   let isFirst := firstUsePos int == opid in
   let isLast  := nextUseAfter int opid == None in
-  let save    := sop <-- saveOpM vid reg ;; pure [:: sop] in
-  let restore := rop <-- restoreOpM vid reg ;; pure [:: rop] in
+  let save    := saveOpM reg (Some vid) in
+  let restore := restoreOpM (Some vid) reg in
   match iknd int, isFirst, isLast with
     | Middle,    true,  true  => pairM restore save
     | Middle,    false, true  => pairM (pure [::]) save
@@ -640,67 +541,39 @@ Definition doAllocations ints op : AssnState (seq opType2) :=
   (* With lenses, this would just be: assnOpId += 2 *)
   modify (fun assn' => {| assnOpId := opid.+2
                         ; assnAcc  := assnAcc assn' |}) ;;
-  pure $ restores ++ op' :: saves.
+  pure $ restores ++ op' ++ saves.
 
-Definition resolveMappings bid ops ops' mappings :=
+Definition generateMoves (moves : seq (option PhysReg * option PhysReg)) :
+  AssnState (seq opType2) :=
+  forFoldM [::] moves $ fun acc mv =>
+    mops <-- match mv with
+      | (Some sreg, Some dreg) => fmap (@Some _) $ moveOpM sreg dreg
+      | (Some sreg, None)      => fmap (@Some _) $ saveOpM sreg None
+      | (None, Some dreg)      => fmap (@Some _) $ restoreOpM None dreg
+      | (None, None)           => pure None
+      end ;;
+    pure $ if mops is Some ops then ops ++ acc else acc.
+
+Definition resolveMappings bid ops ops' mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
-  if IntMap_lookup bid mappings isn't Some inss then pure ops' else
+  if IntMap_lookup bid mappings isn't Some graphs then pure ops' else
 
-  (* let g := forFold emptyGraph inss $ fun g mv => *)
-  (*   match moveAction mv with *)
-  (*   | MoveOp sreg dreg => addEdge (sreg, dreg) g *)
-  (*   | SaveOp sreg      => addVertex sreg g *)
-  (*   | RestoreOp dreg   => addVertex dreg g *)
-  (*   end in *)
-  (* let order := topsort g in *)
+  let: (gbeg, gend) := graphs in
 
-  (* Do all saves first.
+  bmoves <-- generateMoves (topsort gbeg) ;;
+  let ops'' := bmoves ++ ops' in
 
-     Then moves in proper order (degrading them to save/restore to break
-     cycles; or if there is a restore pending, use its register).
+  emoves <-- generateMoves (topsort gend) ;;
+  pure $ match ops, ops'' with
+    | o :: os, o'' :: os'' =>
+        if opKind oinfo (last o os) is IsBranch
+        then belast o'' os'' ++ emoves ++ [:: last o'' os'']
+        else ops'' ++ emoves
+    | _, _ => ops'' ++ emoves
+  end.
 
-     Then all restores.
-
-     This function should break into several parts:
-
-     1. Compute the instructions, producing ordered operations that go to
-        either the beginning or end of the block.
-
-     2. Insert the instruction at the correct place. *)
-
-  forFoldM ops' inss $ fun ops'' mv =>
-    let: {| movePos    := pos
-          ; moveVarId  := vid
-          ; moveAction := action
-          |} := mv in
-
-    (* jww (2015-01-27): NYI: When multiple moves must be inserted at
-       one edge, then the order of the moves is important because the
-       same register can occur as the source of one move and the
-       destination of another move. The moves must be ordered such that
-       a register is saved first before it is overwritten. *)
-    op <--
-       match action with
-       | MoveOp sreg dreg => moveOpM sreg dreg
-       | SaveOp sreg      => saveOpM vid sreg
-       | RestoreOp dreg   => restoreOpM vid dreg
-       end ;;
-
-    pure $ match pos with
-      | AtBegin => op :: ops''
-      | AtEnd =>
-          match ops, ops'' with
-          | o :: os, o'' :: os'' =>
-              if opKind oinfo (last o os) is IsBranch
-              then belast o'' os'' ++ [:: op; last o'' os'']
-              else ops' ++ [:: op]
-          | _, _ => [:: op]
-          end
-      end.
-
-Definition considerOps (f : opType1 -> AssnState (seq opType2))
-  (mappings : IntMap (seq Move)) :=
+Definition considerOps (f : opType1 -> AssnState (seq opType2)) mappings :=
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
@@ -711,7 +584,7 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
     pure $ setBlockOps binfo blk ops''.
 
 Definition assignRegNum `(st : ScanState InUse sd)
-  (mappings : IntMap (seq Move)) (blocks : seq blockType1)
+  (mappings : IntMap BlockMoves) (blocks : seq blockType1)
   (acc : accType) : seq blockType2 * accType :=
   let: (blocks', assn) :=
     considerOps

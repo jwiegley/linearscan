@@ -13,6 +13,7 @@ import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
 import qualified LinearScan.Datatypes as Datatypes
+import qualified LinearScan.Graph as Graph
 import qualified LinearScan.IState as IState
 import qualified LinearScan.Interval as Interval
 import qualified LinearScan.Lib as Lib
@@ -401,75 +402,99 @@ data OpInfo accType opType1 opType2 varType =
                                                         ([] varType)
                                                         ([]
                                                         PhysReg)) 
- (PhysReg -> PhysReg -> accType -> (,) opType2 accType) 
- (VarId -> PhysReg -> accType -> (,) opType2 accType) 
- (VarId -> PhysReg -> accType -> (,) opType2 accType) 
- (opType1 -> ([] ((,) VarId PhysReg)) -> opType2)
+ (PhysReg -> PhysReg -> accType -> (,) ([] opType2)
+ accType) (PhysReg -> PhysReg -> accType -> (,)
+          ([] opType2) accType) (PhysReg -> (Prelude.Maybe
+                                VarId) -> accType -> (,)
+                                ([] opType2) accType) ((Prelude.Maybe
+                                                      VarId) ->
+                                                      PhysReg ->
+                                                      accType -> (,)
+                                                      ([] opType2) accType) 
+ (opType1 -> ([] ((,) VarId PhysReg)) -> [] opType2)
 
 coq_OpInfo_rect :: ((a2 -> OpKind) -> (a2 -> (,) 
                               ([] a4) ([] PhysReg)) ->
                               (PhysReg -> PhysReg -> a1
-                              -> (,) a3 a1) -> (VarId ->
-                              PhysReg -> a1 -> (,) a3 a1) ->
-                              (VarId -> PhysReg -> a1 ->
-                              (,) a3 a1) -> (a2 -> ([]
-                              ((,) VarId PhysReg)) -> a3)
-                              -> a5) -> (OpInfo a1 a2 a3 a4) -> a5
+                              -> (,) ([] a3) a1) -> (PhysReg ->
+                              PhysReg -> a1 -> (,) ([] a3) 
+                              a1) -> (PhysReg -> (Prelude.Maybe
+                              VarId) -> a1 -> (,) ([] a3) a1) ->
+                              ((Prelude.Maybe VarId) ->
+                              PhysReg -> a1 -> (,) ([] a3) 
+                              a1) -> (a2 -> ([]
+                              ((,) VarId PhysReg)) -> []
+                              a3) -> a5) -> (OpInfo a1 a2 a3 
+                              a4) -> a5
 coq_OpInfo_rect f o =
   case o of {
-   Build_OpInfo x x0 x1 x2 x3 x4 -> f x x0 x1 x2 x3 x4}
+   Build_OpInfo x x0 x1 x2 x3 x4 x5 -> f x x0 x1 x2 x3 x4 x5}
 
 coq_OpInfo_rec :: ((a2 -> OpKind) -> (a2 -> (,) 
                              ([] a4) ([] PhysReg)) ->
                              (PhysReg -> PhysReg -> a1 ->
-                             (,) a3 a1) -> (VarId ->
-                             PhysReg -> a1 -> (,) a3 a1) ->
-                             (VarId -> PhysReg -> a1 ->
-                             (,) a3 a1) -> (a2 -> ([]
-                             ((,) VarId PhysReg)) -> a3)
-                             -> a5) -> (OpInfo a1 a2 a3 a4) -> a5
+                             (,) ([] a3) a1) -> (PhysReg ->
+                             PhysReg -> a1 -> (,) ([] a3) a1) ->
+                             (PhysReg -> (Prelude.Maybe
+                             VarId) -> a1 -> (,) ([] a3) a1) ->
+                             ((Prelude.Maybe VarId) ->
+                             PhysReg -> a1 -> (,) ([] a3) a1) ->
+                             (a2 -> ([]
+                             ((,) VarId PhysReg)) -> []
+                             a3) -> a5) -> (OpInfo a1 a2 a3 
+                             a4) -> a5
 coq_OpInfo_rec =
   coq_OpInfo_rect
 
 opKind :: (OpInfo a1 a2 a3 a4) -> a2 -> OpKind
 opKind o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> opKind0}
 
 opRefs :: (OpInfo a1 a2 a3 a4) -> a2 -> (,) ([] a4)
                      ([] PhysReg)
 opRefs o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> opRefs0}
 
 moveOp :: (OpInfo a1 a2 a3 a4) -> PhysReg ->
-                     PhysReg -> a1 -> (,) a3 a1
+                     PhysReg -> a1 -> (,) ([] a3) a1
 moveOp o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> moveOp0}
 
-saveOp :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                     PhysReg -> a1 -> (,) a3 a1
+swapOp :: (OpInfo a1 a2 a3 a4) -> PhysReg ->
+                     PhysReg -> a1 -> (,) ([] a3) a1
+swapOp o =
+  case o of {
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
+    applyAllocs0 -> swapOp0}
+
+saveOp :: (OpInfo a1 a2 a3 a4) -> PhysReg ->
+                     (Prelude.Maybe VarId) -> a1 -> (,) ([] a3) 
+                     a1
 saveOp o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> saveOp0}
 
-restoreOp :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                        PhysReg -> a1 -> (,) a3 a1
+restoreOp :: (OpInfo a1 a2 a3 a4) -> (Prelude.Maybe
+                        VarId) -> PhysReg -> a1 -> (,)
+                        ([] a3) a1
 restoreOp o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> restoreOp0}
 
 applyAllocs :: (OpInfo a1 a2 a3 a4) -> a2 -> ([]
-                          ((,) VarId PhysReg)) -> a3
+                          ((,) VarId PhysReg)) -> [] 
+                          a3
 applyAllocs o =
   case o of {
-   Build_OpInfo opKind0 opRefs0 moveOp0 saveOp0 restoreOp0
+   Build_OpInfo opKind0 opRefs0 moveOp0 swapOp0 saveOp0 restoreOp0
     applyAllocs0 -> applyAllocs0}
 
 type BlockId = Prelude.Int
@@ -969,383 +994,13 @@ buildIntervals vinfo oinfo binfo blocks =
   in
   packScanState InUse ( s3)
 
-data InsertPos =
-   AtBegin
- | AtEnd
-
-coq_InsertPos_rect :: a1 -> a1 -> InsertPos -> a1
-coq_InsertPos_rect f f0 i =
-  case i of {
-   AtBegin -> f;
-   AtEnd -> f0}
-
-coq_InsertPos_rec :: a1 -> a1 -> InsertPos -> a1
-coq_InsertPos_rec =
-  coq_InsertPos_rect
-
-data MoveAction =
-   MoveOp PhysReg PhysReg
- | SaveOp PhysReg
- | RestoreOp PhysReg
-
-coq_MoveAction_rect :: (PhysReg -> PhysReg ->
-                                  a1) -> (PhysReg -> a1) ->
-                                  (PhysReg -> a1) ->
-                                  MoveAction -> a1
-coq_MoveAction_rect f f0 f1 m =
-  case m of {
-   MoveOp x x0 -> f x x0;
-   SaveOp x -> f0 x;
-   RestoreOp x -> f1 x}
-
-coq_MoveAction_rec :: (PhysReg -> PhysReg ->
-                                 a1) -> (PhysReg -> a1) ->
-                                 (PhysReg -> a1) ->
-                                 MoveAction -> a1
-coq_MoveAction_rec =
-  coq_MoveAction_rect
-
-data Move =
-   Build_Move InsertPos VarId MoveAction
-
-coq_Move_rect :: (InsertPos -> VarId ->
-                            MoveAction -> a1) -> Move ->
-                            a1
-coq_Move_rect f m =
-  case m of {
-   Build_Move x x0 x1 -> f x x0 x1}
-
-coq_Move_rec :: (InsertPos -> VarId ->
-                           MoveAction -> a1) -> Move ->
-                           a1
-coq_Move_rec =
-  coq_Move_rect
-
-movePos :: Move -> InsertPos
-movePos m =
-  case m of {
-   Build_Move movePos0 moveVarId0 moveAction0 -> movePos0}
-
-moveVarId :: Move -> VarId
-moveVarId m =
-  case m of {
-   Build_Move movePos0 moveVarId0 moveAction0 -> moveVarId0}
-
-moveAction :: Move -> MoveAction
-moveAction m =
-  case m of {
-   Build_Move movePos0 moveVarId0 moveAction0 -> moveAction0}
-
-eqipos :: InsertPos -> InsertPos ->
-                     Prelude.Bool
-eqipos v1 v2 =
-  case v1 of {
-   AtBegin ->
-    case v2 of {
-     AtBegin -> Prelude.True;
-     AtEnd -> Prelude.False};
-   AtEnd ->
-    case v2 of {
-     AtBegin -> Prelude.False;
-     AtEnd -> Prelude.True}}
-
-eqiposP :: Eqtype.Equality__Coq_axiom InsertPos
-eqiposP _top_assumption_ =
-  let {
-   _evar_0_ = \_top_assumption_0 ->
-    let {_evar_0_ = Ssrbool.ReflectT} in
-    let {_evar_0_0 = Ssrbool.ReflectF} in
-    case _top_assumption_0 of {
-     AtBegin -> _evar_0_;
-     AtEnd -> _evar_0_0}}
-  in
-  let {
-   _evar_0_0 = \_top_assumption_0 ->
-    let {_evar_0_0 = Ssrbool.ReflectF} in
-    let {_evar_0_1 = Ssrbool.ReflectT} in
-    case _top_assumption_0 of {
-     AtBegin -> _evar_0_0;
-     AtEnd -> _evar_0_1}}
-  in
-  case _top_assumption_ of {
-   AtBegin -> _evar_0_;
-   AtEnd -> _evar_0_0}
-
-ipos_eqMixin :: Eqtype.Equality__Coq_mixin_of InsertPos
-ipos_eqMixin =
-  Eqtype.Equality__Mixin eqipos eqiposP
-
-ipos_eqType :: Eqtype.Equality__Coq_type
-ipos_eqType =
-  unsafeCoerce ipos_eqMixin
-
-coq_InsertPos_eqType :: Eqtype.Equality__Coq_type ->
-                                   Eqtype.Equality__Coq_type
-coq_InsertPos_eqType a =
-  unsafeCoerce ipos_eqMixin
-
-eqmoveAct :: MoveAction -> MoveAction ->
-                        Prelude.Bool
-eqmoveAct m1 m2 =
-  case m1 of {
-   MoveOp s1 d1 ->
-    case m2 of {
-     MoveOp s2 d2 ->
-      (Prelude.&&)
-        (Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
-          (unsafeCoerce s1) (unsafeCoerce s2))
-        (Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
-          (unsafeCoerce d1) (unsafeCoerce d2));
-     _ -> Prelude.False};
-   SaveOp r1 ->
-    case m2 of {
-     SaveOp r2 ->
-      Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
-        (unsafeCoerce r1) (unsafeCoerce r2);
-     _ -> Prelude.False};
-   RestoreOp r1 ->
-    case m2 of {
-     RestoreOp r2 ->
-      Eqtype.eq_op (Fintype.ordinal_eqType maxReg)
-        (unsafeCoerce r1) (unsafeCoerce r2);
-     _ -> Prelude.False}}
-
-eqmoveActP :: Eqtype.Equality__Coq_axiom MoveAction
-eqmoveActP _top_assumption_ =
-  let {
-   _evar_0_ = \s1 d1 _top_assumption_0 ->
-    let {
-     _evar_0_ = \s2 d2 ->
-      let {
-       _evar_0_ = \_ ->
-        let {
-         _evar_0_ = let {
-                     _evar_0_ = \_ ->
-                      let {_evar_0_ = Ssrbool.ReflectT} in  _evar_0_}
-                    in
-                    let {_evar_0_0 = \_ -> Ssrbool.ReflectF} in
-                    case Eqtype.eqP
-                           (Fintype.ordinal_eqType maxReg) d1 d2 of {
-                     Ssrbool.ReflectT -> _evar_0_ __;
-                     Ssrbool.ReflectF -> _evar_0_0 __}}
-        in
-         _evar_0_}
-      in
-      let {
-       _evar_0_0 = \_ ->
-        let {
-         _evar_0_0 = \_ -> let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
-        in
-        let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
-        case Eqtype.eqP (Fintype.ordinal_eqType maxReg) d1 d2 of {
-         Ssrbool.ReflectT -> _evar_0_0 __;
-         Ssrbool.ReflectF -> _evar_0_1 __}}
-      in
-      case Eqtype.eqP (Fintype.ordinal_eqType maxReg) s1 s2 of {
-       Ssrbool.ReflectT -> _evar_0_ __;
-       Ssrbool.ReflectF -> _evar_0_0 __}}
-    in
-    let {_evar_0_0 = \r2 -> Ssrbool.ReflectF} in
-    let {_evar_0_1 = \r2 -> Ssrbool.ReflectF} in
-    case _top_assumption_0 of {
-     MoveOp x x0 -> unsafeCoerce _evar_0_ x x0;
-     SaveOp x -> _evar_0_0 x;
-     RestoreOp x -> _evar_0_1 x}}
-  in
-  let {
-   _evar_0_0 = \r1 _top_assumption_0 ->
-    let {_evar_0_0 = \s2 d2 -> Ssrbool.ReflectF} in
-    let {
-     _evar_0_1 = \r2 ->
-      let {
-       _evar_0_1 = \_ -> let {_evar_0_1 = Ssrbool.ReflectT} in  _evar_0_1}
-      in
-      let {_evar_0_2 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP (Fintype.ordinal_eqType maxReg) r1 r2 of {
-       Ssrbool.ReflectT -> _evar_0_1 __;
-       Ssrbool.ReflectF -> _evar_0_2 __}}
-    in
-    let {
-     _evar_0_2 = \r2 ->
-      let {
-       _evar_0_2 = \_ -> let {_evar_0_2 = Ssrbool.ReflectF} in  _evar_0_2}
-      in
-      let {_evar_0_3 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP (Fintype.ordinal_eqType maxReg) r1 r2 of {
-       Ssrbool.ReflectT -> _evar_0_2 __;
-       Ssrbool.ReflectF -> _evar_0_3 __}}
-    in
-    case _top_assumption_0 of {
-     MoveOp x x0 -> _evar_0_0 x x0;
-     SaveOp x -> unsafeCoerce _evar_0_1 x;
-     RestoreOp x -> unsafeCoerce _evar_0_2 x}}
-  in
-  let {
-   _evar_0_1 = \r1 _top_assumption_0 ->
-    let {_evar_0_1 = \s2 d2 -> Ssrbool.ReflectF} in
-    let {
-     _evar_0_2 = \r2 ->
-      let {
-       _evar_0_2 = \_ -> let {_evar_0_2 = Ssrbool.ReflectF} in  _evar_0_2}
-      in
-      let {_evar_0_3 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP (Fintype.ordinal_eqType maxReg) r1 r2 of {
-       Ssrbool.ReflectT -> _evar_0_2 __;
-       Ssrbool.ReflectF -> _evar_0_3 __}}
-    in
-    let {
-     _evar_0_3 = \r2 ->
-      let {
-       _evar_0_3 = \_ -> let {_evar_0_3 = Ssrbool.ReflectT} in  _evar_0_3}
-      in
-      let {_evar_0_4 = \_ -> Ssrbool.ReflectF} in
-      case Eqtype.eqP (Fintype.ordinal_eqType maxReg) r1 r2 of {
-       Ssrbool.ReflectT -> _evar_0_3 __;
-       Ssrbool.ReflectF -> _evar_0_4 __}}
-    in
-    case _top_assumption_0 of {
-     MoveOp x x0 -> _evar_0_1 x x0;
-     SaveOp x -> unsafeCoerce _evar_0_2 x;
-     RestoreOp x -> unsafeCoerce _evar_0_3 x}}
-  in
-  case _top_assumption_ of {
-   MoveOp x x0 -> unsafeCoerce _evar_0_ x x0;
-   SaveOp x -> unsafeCoerce _evar_0_0 x;
-   RestoreOp x -> unsafeCoerce _evar_0_1 x}
-
-moveAct_eqMixin :: Eqtype.Equality__Coq_mixin_of
-                              MoveAction
-moveAct_eqMixin =
-  Eqtype.Equality__Mixin eqmoveAct eqmoveActP
-
-moveAct_eqType :: Eqtype.Equality__Coq_type
-moveAct_eqType =
-  unsafeCoerce moveAct_eqMixin
-
-coq_MoveAction_eqType :: Eqtype.Equality__Coq_type ->
-                                    Eqtype.Equality__Coq_type
-coq_MoveAction_eqType a =
-  unsafeCoerce moveAct_eqMixin
-
-eqmove :: Move -> Move -> Prelude.Bool
-eqmove m1 m2 =
-  (Prelude.&&)
-    ((Prelude.&&)
-      (Eqtype.eq_op ipos_eqType
-        (unsafeCoerce (movePos m1))
-        (unsafeCoerce (movePos m2)))
-      (Eqtype.eq_op Ssrnat.nat_eqType
-        (unsafeCoerce (moveVarId m1))
-        (unsafeCoerce (moveVarId m2))))
-    (Eqtype.eq_op moveAct_eqType
-      (unsafeCoerce (moveAction m1))
-      (unsafeCoerce (moveAction m2)))
-
-eqmoveP :: Eqtype.Equality__Coq_axiom Move
-eqmoveP _top_assumption_ =
-  let {
-   _evar_0_ = \p1 v1 m1 _top_assumption_0 ->
-    let {
-     _evar_0_ = \p2 v2 m2 ->
-      let {
-       _evar_0_ = \_ ->
-        let {
-         _evar_0_ = let {
-                     _evar_0_ = \_ ->
-                      let {
-                       _evar_0_ = let {
-                                   _evar_0_ = \_ ->
-                                    let {_evar_0_ = Ssrbool.ReflectT} in
-                                     _evar_0_}
-                                  in
-                                  let {_evar_0_0 = \_ -> Ssrbool.ReflectF} in
-                                  case Eqtype.eqP moveAct_eqType
-                                         m1 m2 of {
-                                   Ssrbool.ReflectT -> _evar_0_ __;
-                                   Ssrbool.ReflectF -> _evar_0_0 __}}
-                      in
-                       _evar_0_}
-                    in
-                    let {
-                     _evar_0_0 = \_ ->
-                      let {
-                       _evar_0_0 = \_ ->
-                        let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
-                      in
-                      let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
-                      case Eqtype.eqP moveAct_eqType m1 m2 of {
-                       Ssrbool.ReflectT -> _evar_0_0 __;
-                       Ssrbool.ReflectF -> _evar_0_1 __}}
-                    in
-                    case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
-                     Ssrbool.ReflectT -> _evar_0_ __;
-                     Ssrbool.ReflectF -> _evar_0_0 __}}
-        in
-         _evar_0_}
-      in
-      let {
-       _evar_0_0 = \_ ->
-        let {
-         _evar_0_0 = \_ ->
-          let {
-           _evar_0_0 = let {
-                        _evar_0_0 = \_ ->
-                         let {_evar_0_0 = Ssrbool.ReflectF} in  _evar_0_0}
-                       in
-                       let {_evar_0_1 = \_ -> Ssrbool.ReflectF} in
-                       case Eqtype.eqP moveAct_eqType m1 m2 of {
-                        Ssrbool.ReflectT -> _evar_0_0 __;
-                        Ssrbool.ReflectF -> _evar_0_1 __}}
-          in
-           _evar_0_0}
-        in
-        let {
-         _evar_0_1 = \_ ->
-          let {
-           _evar_0_1 = \_ ->
-            let {_evar_0_1 = Ssrbool.ReflectF} in  _evar_0_1}
-          in
-          let {_evar_0_2 = \_ -> Ssrbool.ReflectF} in
-          case Eqtype.eqP moveAct_eqType m1 m2 of {
-           Ssrbool.ReflectT -> _evar_0_1 __;
-           Ssrbool.ReflectF -> _evar_0_2 __}}
-        in
-        case Eqtype.eqP Ssrnat.nat_eqType v1 v2 of {
-         Ssrbool.ReflectT -> _evar_0_0 __;
-         Ssrbool.ReflectF -> _evar_0_1 __}}
-      in
-      case Eqtype.eqP ipos_eqType p1 p2 of {
-       Ssrbool.ReflectT -> _evar_0_ __;
-       Ssrbool.ReflectF -> _evar_0_0 __}}
-    in
-    case _top_assumption_0 of {
-     Build_Move x x0 x1 -> unsafeCoerce _evar_0_ x x0 x1}}
-  in
-  case _top_assumption_ of {
-   Build_Move x x0 x1 -> unsafeCoerce _evar_0_ x x0 x1}
-
-move_eqMixin :: Eqtype.Equality__Coq_mixin_of Move
-move_eqMixin =
-  Eqtype.Equality__Mixin eqmove eqmoveP
-
-move_eqType :: Eqtype.Equality__Coq_type
-move_eqType =
-  unsafeCoerce move_eqMixin
-
-coq_Move_eqType :: Eqtype.Equality__Coq_type ->
-                              Eqtype.Equality__Coq_type
-coq_Move_eqType a =
-  unsafeCoerce move_eqMixin
-
 checkIntervalBoundary :: ScanStateDesc -> Prelude.Int ->
                                     Prelude.Bool -> BlockLiveSets
                                     -> BlockLiveSets ->
                                     (Data.IntMap.IntMap
-                                    (Ssrbool.Coq_pred_sort
-                                    Eqtype.Equality__Coq_sort)) ->
+                                    ((,) Graph.Graph Graph.Graph)) ->
                                     Prelude.Int -> Data.IntMap.IntMap
-                                    (Ssrbool.Coq_pred_sort
-                                    Eqtype.Equality__Coq_sort)
+                                    ((,) Graph.Graph Graph.Graph)
 checkIntervalBoundary sd key in_from from to mappings vid =
   let {
    mfrom_int = lookupInterval sd __ vid
@@ -1370,38 +1025,38 @@ checkIntervalBoundary sd key in_from from to mappings vid =
          mdreg = lookupRegister sd __ (unsafeCoerce to_interval)}
         in
         let {
-         maction = case msreg of {
-                    Prelude.Just sreg ->
-                     case mdreg of {
-                      Prelude.Just dreg -> Prelude.Just (MoveOp
-                       sreg dreg);
-                      Prelude.Nothing -> Prelude.Just (SaveOp sreg)};
-                    Prelude.Nothing ->
-                     case mdreg of {
-                      Prelude.Just dreg -> Prelude.Just (RestoreOp
-                       dreg);
-                      Prelude.Nothing -> Prelude.Nothing}}}
+         addToGraphs = \e xs ->
+          case xs of {
+           (,) gbeg gend ->
+            case in_from of {
+             Prelude.True -> (,) gbeg
+              (Graph.addEdge (Fintype.ordinal_eqType maxReg) e
+                gend);
+             Prelude.False -> (,)
+              (Graph.addEdge (Fintype.ordinal_eqType maxReg) e
+                gbeg) gend}}}
         in
-        case maction of {
-         Prelude.Just action ->
-          let {
-           mv = Build_Move
-            (case in_from of {
-              Prelude.True -> AtEnd;
-              Prelude.False -> AtBegin}) vid action}
-          in
-          Data.IntMap.alter
-            (unsafeCoerce
-              (prepend move_eqType (unsafeCoerce mv)))
-            key mappings;
-         Prelude.Nothing -> mappings}};
+        let {
+         f = \mxs ->
+          let {e = (,) msreg mdreg} in
+          Prelude.Just
+          (unsafeCoerce addToGraphs e
+            (case mxs of {
+              Prelude.Just xs -> xs;
+              Prelude.Nothing -> (,)
+               (Graph.emptyGraph (Fintype.ordinal_eqType maxReg))
+               (Graph.emptyGraph (Fintype.ordinal_eqType maxReg))}))}
+        in
+        Data.IntMap.alter f key mappings};
      Prelude.Nothing -> mappings};
    Prelude.Nothing -> mappings}
+
+type BlockMoves = (,) Graph.Graph Graph.Graph
 
 resolveDataFlow :: (BlockInfo a1 a2 a3 a4) ->
                               ScanStateDesc -> ([] a1) ->
                               (Data.IntMap.IntMap BlockLiveSets) ->
-                              Data.IntMap.IntMap ([] Move)
+                              Data.IntMap.IntMap BlockMoves
 resolveDataFlow binfo sd blocks liveSets =
   Lib.forFold Data.IntMap.empty blocks (\mappings b ->
     let {bid = blockId binfo b} in
@@ -1421,8 +1076,7 @@ resolveDataFlow binfo sd blocks liveSets =
                   Prelude.False -> s_bid}}
           in
           coq_IntSet_forFold ms (blockLiveIn to)
-            (unsafeCoerce
-              (checkIntervalBoundary sd key in_from from to));
+            (checkIntervalBoundary sd key in_from from to);
          Prelude.Nothing -> ms});
      Prelude.Nothing -> mappings})
 
@@ -1454,7 +1108,7 @@ type AssnState accType a =
   State.State (AssnStateInfo accType) a
 
 moveOpM :: (OpInfo a1 a2 a3 a4) -> PhysReg ->
-                      PhysReg -> AssnState a1 a3
+                      PhysReg -> AssnState a1 ([] a3)
 moveOpM oinfo sreg dreg =
   State.bind (\assn ->
     case moveOp oinfo sreg dreg (assnAcc assn) of {
@@ -1463,8 +1117,9 @@ moveOpM oinfo sreg dreg =
         (State.put (Build_AssnStateInfo (assnOpId assn)
           acc'))}) State.get
 
-saveOpM :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                      PhysReg -> AssnState a1 a3
+saveOpM :: (OpInfo a1 a2 a3 a4) -> PhysReg ->
+                      (Prelude.Maybe VarId) -> AssnState
+                      a1 ([] a3)
 saveOpM oinfo vid reg =
   State.bind (\assn ->
     case saveOp oinfo vid reg (assnAcc assn) of {
@@ -1473,9 +1128,9 @@ saveOpM oinfo vid reg =
         (State.put (Build_AssnStateInfo (assnOpId assn)
           acc'))}) State.get
 
-restoreOpM :: (OpInfo a1 a2 a3 a4) -> VarId ->
-                         PhysReg -> AssnState a1 
-                         a3
+restoreOpM :: (OpInfo a1 a2 a3 a4) -> (Prelude.Maybe
+                         VarId) -> PhysReg ->
+                         AssnState a1 ([] a3)
 restoreOpM oinfo vid reg =
   State.bind (\assn ->
     case restoreOp oinfo vid reg (assnAcc assn) of {
@@ -1504,14 +1159,8 @@ savesAndRestores oinfo opid vid reg int =
               (unsafeCoerce (Interval.nextUseAfter int (unsafeCoerce opid)))
               (unsafeCoerce Prelude.Nothing)}
   in
-  let {
-   save = State.bind (\sop -> State.pure ((:) sop []))
-            (saveOpM oinfo vid reg)}
-  in
-  let {
-   restore = State.bind (\rop -> State.pure ((:) rop []))
-               (restoreOpM oinfo vid reg)}
-  in
+  let {save = saveOpM oinfo reg (Prelude.Just vid)} in
+  let {restore = restoreOpM oinfo (Prelude.Just vid) reg} in
   case Interval.iknd int of {
    Interval.Whole -> State.pure ((,) [] []);
    Interval.LeftMost ->
@@ -1581,51 +1230,80 @@ doAllocations vinfo oinfo ints op =
          (,) allocs restores ->
           let {op' = applyAllocs oinfo op allocs} in
           State.bind (\x ->
-            State.pure ((Prelude.++) restores ((:) op' saves)))
+            State.pure ((Prelude.++) restores ((Prelude.++) op' saves)))
             (State.modify (\assn' -> Build_AssnStateInfo
               ((Prelude.succ) ((Prelude.succ) opid))
               (assnAcc assn')))}})
       (State.forFoldM ((,) ((,) [] []) []) vars
         (collectAllocs vinfo oinfo opid ints))) State.get
 
+generateMoves :: (OpInfo a1 a2 a3 a4) -> ([]
+                            ((,) (Prelude.Maybe PhysReg)
+                            (Prelude.Maybe PhysReg))) ->
+                            AssnState a1 ([] a3)
+generateMoves oinfo moves =
+  State.forFoldM [] moves (\acc mv ->
+    State.bind (\mops ->
+      State.pure
+        (case mops of {
+          Prelude.Just ops -> (Prelude.++) ops acc;
+          Prelude.Nothing -> acc}))
+      (case mv of {
+        (,) o o0 ->
+         case o of {
+          Prelude.Just sreg ->
+           case o0 of {
+            Prelude.Just dreg ->
+             State.fmap (\x -> Prelude.Just x)
+               (moveOpM oinfo sreg dreg);
+            Prelude.Nothing ->
+             State.fmap (\x -> Prelude.Just x)
+               (saveOpM oinfo sreg Prelude.Nothing)};
+          Prelude.Nothing ->
+           case o0 of {
+            Prelude.Just dreg ->
+             State.fmap (\x -> Prelude.Just x)
+               (restoreOpM oinfo Prelude.Nothing dreg);
+            Prelude.Nothing -> State.pure Prelude.Nothing}}}))
+
 resolveMappings :: (OpInfo a1 a2 a3 a4) -> Prelude.Int
                               -> ([] a2) -> ([] a3) -> (Data.IntMap.IntMap
-                              ([] Move)) -> State.State
-                              (AssnStateInfo a1) ([] a3)
+                              ((,) Graph.Graph Graph.Graph)) ->
+                              AssnState a1 ([] a3)
 resolveMappings oinfo bid ops ops' mappings =
   case Data.IntMap.lookup bid mappings of {
-   Prelude.Just inss ->
-    State.forFoldM ops' inss (\ops'' mv ->
-      case mv of {
-       Build_Move pos vid action ->
-        State.bind (\op ->
+   Prelude.Just graphs ->
+    case graphs of {
+     (,) gbeg gend ->
+      State.bind (\bmoves ->
+        let {ops'' = (Prelude.++) bmoves ops'} in
+        State.bind (\emoves ->
           State.pure
-            (case pos of {
-              AtBegin -> (:) op ops'';
-              AtEnd ->
-               case ops of {
-                [] -> (:) op [];
-                (:) o os ->
-                 case ops'' of {
-                  [] -> (:) op [];
-                  (:) o'' os'' ->
-                   case opKind oinfo (Seq.last o os) of {
-                    IsBranch ->
-                     (Prelude.++) (Seq.belast o'' os'') ((:) op ((:)
-                       (Seq.last o'' os'') []));
-                    _ -> (Prelude.++) ops' ((:) op [])}}}}))
-          (case action of {
-            MoveOp sreg dreg -> moveOpM oinfo sreg dreg;
-            SaveOp sreg -> saveOpM oinfo vid sreg;
-            RestoreOp dreg -> restoreOpM oinfo vid dreg})});
+            (case ops of {
+              [] -> (Prelude.++) ops'' emoves;
+              (:) o os ->
+               case ops'' of {
+                [] -> (Prelude.++) ops'' emoves;
+                (:) o'' os'' ->
+                 case opKind oinfo (Seq.last o os) of {
+                  IsBranch ->
+                   (Prelude.++) (Seq.belast o'' os'')
+                     ((Prelude.++) emoves ((:) (Seq.last o'' os'') []));
+                  _ -> (Prelude.++) ops'' emoves}}}))
+          (generateMoves oinfo
+            (unsafeCoerce
+              (Graph.topsort (Fintype.ordinal_eqType maxReg) gend))))
+        (generateMoves oinfo
+          (unsafeCoerce
+            (Graph.topsort (Fintype.ordinal_eqType maxReg) gbeg)))};
    Prelude.Nothing -> State.pure ops'}
 
 considerOps :: (OpInfo a1 a4 a5 a6) ->
                           (BlockInfo a2 a3 a4 a5) -> (a4 ->
                           AssnState a1 ([] a5)) ->
-                          (Data.IntMap.IntMap ([] Move)) -> ([] 
-                          a2) -> State.State (AssnStateInfo a1)
-                          ([] a3)
+                          (Data.IntMap.IntMap ((,) Graph.Graph Graph.Graph))
+                          -> ([] a2) -> State.State
+                          (AssnStateInfo a1) ([] a3)
 considerOps oinfo binfo f mappings =
   State.mapM (\blk ->
     let {ops = blockOps binfo blk} in
@@ -1639,7 +1317,7 @@ considerOps oinfo binfo f mappings =
 assignRegNum :: (VarInfo a6) -> (OpInfo 
                            a1 a4 a5 a6) -> (BlockInfo a2 a3 
                            a4 a5) -> ScanStateDesc ->
-                           (Data.IntMap.IntMap ([] Move)) -> ([]
+                           (Data.IntMap.IntMap BlockMoves) -> ([]
                            a2) -> a1 -> (,) ([] a3) a1
 assignRegNum vinfo oinfo binfo sd mappings blocks acc =
   case considerOps oinfo binfo

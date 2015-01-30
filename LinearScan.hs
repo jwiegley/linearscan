@@ -58,17 +58,18 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo accType op1 op2 var = OpInfo
     { opKind      :: op1 -> OpKind
     , opRefs      :: op1 -> ([var], [PhysReg])
-    , moveOp      :: PhysReg -> PhysReg -> accType -> (op2, accType)
-    , saveOp      :: Int -> PhysReg -> accType -> (op2, accType)
-    , restoreOp   :: Int -> PhysReg -> accType -> (op2, accType)
-    , applyAllocs :: op1 -> [(Int, PhysReg)] -> op2
+    , moveOp      :: PhysReg -> PhysReg -> accType -> ([op2], accType)
+    , swapOp      :: PhysReg -> PhysReg -> accType -> ([op2], accType)
+    , saveOp      :: PhysReg -> Maybe Int -> accType -> ([op2], accType)
+    , restoreOp   :: Maybe Int -> PhysReg -> accType -> ([op2], accType)
+    , applyAllocs :: op1 -> [(Int, PhysReg)] -> [op2]
     }
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
 fromOpInfo :: OpInfo accType op1 op2 var -> LS.OpInfo accType op1 op2 var
-fromOpInfo (OpInfo a b c d e f) = LS.Build_OpInfo a b c d e f
+fromOpInfo (OpInfo a b c d e f g) = LS.Build_OpInfo a b c d e f g
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.

@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -79,7 +80,7 @@ type Reg = Int
 data Instruction reg
   = Add          reg reg reg
   | Nop
-  deriving (Eq, Show, Foldable, Functor)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data IRInstr v e x where
   Label         :: Label -> IRInstr v C O
@@ -185,11 +186,10 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
 
     go blockIds =
         case allocate (blockInfo getBlockId) opInfo varInfo
-                      (Prelude.map BlockWrapVar blocks)
-                      (newSpillStack 0) of
+                      blocks (newSpillStack 0) of
             Left e -> error $ "Allocation failed: " ++ e
             Right (blks, _) -> do
-                let graph' = newGraph (Prelude.map getBlockWrapVar blks)
+                let graph' = newGraph blks
                 catch
                     (showGraph show graph' `shouldBe` showGraph show result)
                     (\e -> do
@@ -208,136 +208,71 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
             fromMaybe (error "The impossible happened")
                       (M.lookup lbl blockIds)
 
-newtype IRInstrWrap e x v = IRInstrWrap { getIRInstrWrap :: IRInstr v e x }
+variables :: Traversal (IRInstr v1 e x) (IRInstr v2 e x) v1 v2
+variables f = go
+  where
+    go (Alloc ag msrc dst)           = Alloc ag <$> traverse f msrc <*> f dst
+    go (Reclaim src)                 = Reclaim <$> f src
+    go (Instr i)                     = Instr <$> traverse f i
+    go (LoadConst c dst)             = LoadConst c <$> f dst
+    go (Move src dst)                = Move <$> f src <*> f dst
+    go (Copy src dst)                = Copy <$> f src <*> f dst
+    go (Save lin src x)              = Save lin <$> f src <*> pure x
+    go (Restore x1 x2 dst)           = Restore x1 x2 <$> f dst
+    go (SaveOffset lin off src x)    = SaveOffset lin off <$> f src <*> pure x
+    go (RestoreOffset lin off x dst) = RestoreOffset lin off x <$> f dst
+    go (Branch x1 cond x2 x3)        = Branch x1 <$> f cond
+                                                 <*> pure x2 <*> pure x3
+    go (Stwb x1 src dst x2 x3)       = Stwb x1 <$> f src <*> f dst
+                                               <*> pure x2 <*> pure x3
+    go (Strb src dst x2 x3)          = Strb <$> f src <*> f dst
+                                            <*> pure x2 <*> pure x3
+    go (Call cc i)                   = Call cc <$> traverse f i
+    go (ReturnInstr liveInRegs i)    = ReturnInstr liveInRegs <$> traverse f i
+    go (Label x)                     = pure $ Label x
+    go (Jump x)                      = pure $ Jump x
 
-instance Functor (IRInstrWrap e x) where
-    fmap f (IRInstrWrap m) = IRInstrWrap (go m)
-      where
-        go (Label x)                     = Label x
-        go (Alloc ag msrc dst)           = Alloc ag (f <$> msrc) (f dst)
-        go (Reclaim src)                 = Reclaim (f src)
-        go (Instr i)                     = Instr (fmap f i)
-        go (LoadConst c dst)             = LoadConst c (f dst)
-        go (Move src dst)                = Move (f src) (f dst)
-        go (Copy src dst)                = Copy (f src) (f dst)
-        go (Save lin src x)              = Save lin (f src) x
-        go (Restore x1 x2 dst)           = Restore x1 x2 (f dst)
-        go (SaveOffset lin off src x)    = SaveOffset lin off (f src) x
-        go (RestoreOffset lin off x dst) = RestoreOffset lin off x (f dst)
-        go (Jump x)                      = Jump x
-        go (Branch x1 cond x2 x3)        = Branch x1 (f cond) x2 x3
-        go (Stwb x1 src dst x2 x3)       = Stwb x1 (f src) (f dst) x2 x3
-        go (Strb src dst x2 x3)          = Strb (f src) (f dst) x2 x3
-        go (Call cc i)                   = Call cc (fmap f i)
-        go (ReturnInstr liveInRegs i)    = ReturnInstr liveInRegs (fmap f i)
+metadata :: Lens (Node a1 v e x) (Node a2 v e x) a1 a2
+metadata f (Node instr meta) = Node instr <$> f meta
 
-instance Foldable (IRInstrWrap e x) where
-    foldMap f (IRInstrWrap m) = go m
-      where
-        go (Label _x)                       = mempty
-        go (Alloc _ag Nothing dst)          = f dst
-        go (Alloc _ag (Just src) dst)       = f src <> f dst
-        go (Reclaim src)                    = f src
-        go (Instr i)                        = foldMap f i
-        go (LoadConst _c dst)               = f dst
-        go (Move src dst)                   = f src <> f dst
-        go (Copy src dst)                   = f src <> f dst
-        go (Save _lin src _x)               = f src
-        go (Restore _x1 _x2 dst)            = f dst
-        go (SaveOffset _lin _off src _x)    = f src
-        go (RestoreOffset _lin _off _x dst) = f dst
-        go (Jump _x)                        = mempty
-        go (Branch _x1 cond _x2 _x3)        = f cond
-        go (Stwb _x1 src dst _x2 _x3)       = f src <> f dst
-        go (Strb src dst _x2 _x3)           = f src <> f dst
-        go (Call _cc i)                     = foldMap f i
-        go (ReturnInstr _liveInRegs i)      = foldMap f i
+irinstr :: Traversal (Node a v1 e x) (Node a v2 e x)
+                  (IRInstr v1 e x) (IRInstr v2 e x)
+irinstr f (Node instr meta) = Node <$> f instr <*> pure meta
 
-newtype NodeWrapVar a e x v = NodeWrapVar { getNodeWrapVar :: Node a v e x }
-
-instance Functor (NodeWrapVar v e x) where
-    fmap f (NodeWrapVar (Node instr meta)) =
-        NodeWrapVar (Node (getIRInstrWrap . fmap f . IRInstrWrap $ instr) meta)
-
-instance Foldable (NodeWrapVar v e x) where
-    foldMap f (NodeWrapVar (Node instr _meta)) = foldMap f . IRInstrWrap $ instr
-
-data NodeV a v = NodeCO { getNodeCO :: NodeWrapVar a C O v }
-               | NodeOO { getNodeOO :: NodeWrapVar a O O v }
-               | NodeOC { getNodeOC :: NodeWrapVar a O C v }
+data NodeV a v = NodeCO { getNodeCO :: Node a v C O }
+               | NodeOO { getNodeOO :: Node a v O O }
+               | NodeOC { getNodeOC :: Node a v O C }
 
 instance Functor (NodeV v) where
-    fmap f (NodeCO n) = NodeCO (fmap f n)
-    fmap f (NodeOO n) = NodeOO (fmap f n)
-    fmap f (NodeOC n) = NodeOC (fmap f n)
-
-instance Foldable (NodeV v) where
-    foldMap f (NodeCO n) = foldMap f n
-    foldMap f (NodeOO n) = foldMap f n
-    foldMap f (NodeOC n) = foldMap f n
-
-newtype BlockWrapVar a e x v =
-    BlockWrapVar { getBlockWrapVar :: Block (Node a v) e x }
-
-instance Functor (BlockWrapVar v e x) where
-    fmap f (BlockWrapVar b) =
-        BlockWrapVar (mapBlock (getNodeWrapVar . fmap f . NodeWrapVar) b)
-
-instance Foldable (BlockWrapVar v C C) where
-    foldMap f (BlockWrapVar b) =
-        foldBlockNodesF3
-            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
-            b mempty
-
-instance Foldable (BlockWrapVar v C O) where
-    foldMap f (BlockWrapVar b) =
-        foldBlockNodesF3
-            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
-            b mempty
-
-instance Foldable (BlockWrapVar v O C) where
-    foldMap f (BlockWrapVar b) =
-        foldBlockNodesF3
-            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
-            b mempty
-
-instance Foldable (BlockWrapVar v O O) where
-    foldMap f (BlockWrapVar b) =
-        foldBlockNodesF3
-            ( (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest)
-            , (\node rest -> foldMap f (NodeWrapVar node) <> rest) )
-            b mempty
+    fmap f (NodeCO n) = NodeCO (over (irinstr.variables) f n)
+    fmap f (NodeOO n) = NodeOO (over (irinstr.variables) f n)
+    fmap f (NodeOC n) = NodeOC (over (irinstr.variables) f n)
 
 blockInfo :: (Hoopl.Label -> Int)
-          -> BlockInfo (BlockWrapVar a C C) (NodeV a) IRVar Reg
+          -> BlockInfo (Block (Node a IRVar) C C)
+                      (Block (Node a Reg) C C)
+                      (NodeV a IRVar)
+                      (NodeV a Reg)
 blockInfo getBlockId = BlockInfo
-    { blockId = getBlockId . entryLabel . getBlockWrapVar
+    { blockId = getBlockId . entryLabel
 
-    , blockSuccessors = Prelude.map getBlockId . successors . getBlockWrapVar
+    , blockSuccessors = Prelude.map getBlockId . successors
 
-    , blockOps = \(BlockWrapVar (BlockCC a b z)) ->
-        NodeCO (NodeWrapVar a) :
-        NodeOC (NodeWrapVar z) :
-        Prelude.map (NodeOO . NodeWrapVar) (blockToList b)
+    , blockOps = \(BlockCC a b z) ->
+        NodeCO a :
+        NodeOC z :
+        Prelude.map NodeOO (blockToList b)
 
     , setBlockOps = \_ ops ->
-        BlockWrapVar $ BlockCC
-            (getNodeWrapVar (getNodeCO (head ops)))
-            (blockFromList (Prelude.map (getNodeWrapVar . getNodeOO)
-                                  (tail (tail ops))))
-            (getNodeWrapVar (getNodeOC (ops !! 1)))
+        BlockCC
+            (getNodeCO (head ops))
+            (blockFromList (Prelude.map getNodeOO (tail (tail ops))))
+            (getNodeOC (ops !! 1))
     }
 
 data StackInfo = StackInfo
     { stackPtr   :: Int
-    , stackSlots :: IntMap Int
+    , stackSlots :: M.Map (Maybe Int) Int
     }
     deriving (Eq, Show)
 
@@ -347,10 +282,10 @@ newSpillStack offset = StackInfo
     , stackSlots = mempty
     }
 
-opInfo :: OpInfo StackInfo (NodeV a) (Int, VarKind) IRVar Reg
+opInfo :: OpInfo StackInfo (NodeV a IRVar) (NodeV a Reg) (Int, VarKind)
 opInfo = OpInfo
     { opKind = \n -> case n of
-           NodeOO (NodeWrapVar (Node i _)) -> case i of
+           NodeOO (Node i _) -> case i of
                Call {} -> IsCall
                -- jww (2015-01-18): Identification of loop boundaries allows
                -- the allocator to perform a block ordering optimization to
@@ -358,7 +293,7 @@ opInfo = OpInfo
                -- ?       -> LoopBegin
                -- ?       -> LoopEnd
                _ -> IsNormal
-           NodeOC (NodeWrapVar (Node i _)) -> case i of
+           NodeOC (Node i _) -> case i of
                Jump {}   -> IsBranch
                Branch {} -> IsBranch
                Strb {}   -> IsBranch
@@ -366,41 +301,25 @@ opInfo = OpInfo
                _ -> IsNormal
            _ -> IsNormal
 
-    , opRefs = \n ->
-       let f = getReferences . getNodeWrapVar in
-       case n of
+    , opRefs = \n -> let f = getReferences in case n of
            NodeCO o -> f o
            NodeOO o -> f o
            NodeOC o -> f o
 
     , moveOp = \sr dr stack ->
         let mv = Move sr dr in
-        (NodeOO (NodeWrapVar (Node mv (error "no move meta"))), stack)
+        ([NodeOO (Node mv (error "no move meta"))], stack)
 
-    , saveOp = \vid r stack ->
-        let (stack', off') =
-                case Data.IntMap.lookup vid (stackSlots stack) of
-                    Just off -> (stack, off)
-                    Nothing ->
-                        let off = stackPtr stack in
-                        (StackInfo
-                             { stackPtr   = off + 8
-                             , stackSlots =
-                                 Data.IntMap.insert vid off (stackSlots stack)
-                             },
-                         off)
-            sv = Save (Linearity False) r off' in
-        (NodeOO (NodeWrapVar (Node sv (error "no save meta"))), stack')
+    , swapOp = \sr dr stack ->
+       let (sops, _) = mkSaveOp sr Nothing stack in
+       let (rops, stack') = mkRestoreOp Nothing dr stack in
+       (sops ++ rops, stack')
 
-    , restoreOp = \vid r stack ->
-        let off =
-                fromMaybe (error "Restore requested but not stack allocated")
-                          (Data.IntMap.lookup vid (stackSlots stack))
-            rs = Restore (Linearity False) off r in
-        (NodeOO (NodeWrapVar (Node rs (error "no restore meta"))), stack)
+    , saveOp = mkSaveOp
+    , restoreOp = mkRestoreOp
 
       -- Apply allocations, which changes IRVar's into Reg's.
-    , applyAllocs = \node m -> fmap (setRegister (fromList m)) node
+    , applyAllocs = \node m -> [fmap (setRegister (fromList m)) node]
     }
   where
     go :: Instruction IRVar -> ([(Int, VarKind)], [PhysReg])
@@ -423,6 +342,28 @@ opInfo = OpInfo
     setRegister m (IRVar (VirtualIV n _) _) =
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
                   (Data.IntMap.lookup n m)
+
+mkSaveOp r vid stack =
+    let (stack', off') =
+            case M.lookup vid (stackSlots stack) of
+                Just off -> (stack, off)
+                Nothing ->
+                    let off = stackPtr stack in
+                    (StackInfo
+                         { stackPtr   = off + 8
+                         , stackSlots =
+                             M.insert vid off (stackSlots stack)
+                         },
+                     off)
+        sv = Save (Linearity False) r off' in
+    ([NodeOO (Node sv (error "no save meta"))], stack')
+
+mkRestoreOp vid r stack =
+    let off =
+            fromMaybe (error "Restore requested but not stack allocated")
+                      (M.lookup vid (stackSlots stack))
+        rs = Restore (Linearity False) off r in
+    ([NodeOO (Node rs (error "no restore meta"))], stack)
 
 varInfo :: VarInfo (Int, VarKind)
 varInfo = VarInfo

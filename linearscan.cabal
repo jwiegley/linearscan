@@ -48,27 +48,28 @@ library
   exposed-modules:
     LinearScan
   other-modules:
+    -- LinearScan.List0
+    -- LinearScan.Peano
+    -- LinearScan.Ssreflect
     LinearScan.Datatypes
+    LinearScan.Eqtype
+    LinearScan.Fintype
+    LinearScan.Graph
     LinearScan.IState
-    LinearScan.State
     LinearScan.Interval
     LinearScan.Lib
-    -- LinearScan.List0
     LinearScan.Logic
     LinearScan.Main
     LinearScan.NonEmpty0
-    -- LinearScan.Peano
     LinearScan.Range
-    LinearScan.Specif
-    LinearScan.Utils
-    LinearScan.Vector0
-    LinearScan.Eqtype
-    LinearScan.Fintype
     LinearScan.Seq
+    LinearScan.Specif
     LinearScan.Ssrbool
-    -- LinearScan.Ssreflect
     LinearScan.Ssrfun
     LinearScan.Ssrnat
+    LinearScan.State
+    LinearScan.Utils
+    LinearScan.Vector0
   cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
   ghc-options:      -fno-warn-deprecated-flags
   build-depends:    base >=4.7 && <4.8
