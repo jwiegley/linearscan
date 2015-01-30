@@ -171,8 +171,8 @@ Definition allocateBlockedReg {pre} :
       splitAnyInactiveIntervalForReg reg ;;;
       splitActiveIntervalForReg reg pos ;;;
 
-      (* The remainder of these active and inactive intervals goes back onto
-         the unhandled list. *)
+      (* The remaining part of these active and inactive intervals go back
+         onto the unhandled list; the former part goes onto the inact list. *)
 
       (* // make sure that current does not intersect with
          // the fixed interval for reg
@@ -181,16 +181,17 @@ Definition allocateBlockedReg {pre} :
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc
       with
-      | Some n => splitCurrentInterval (BeforePos n) ;;;
-                  moveUnhandledToActive reg
-      | None   => moveUnhandledToActive reg
+      | Some n => splitCurrentInterval (BeforePos n)
+      | None   => return_ tt
       end ;;;
+      (* jww (2015-01-30): What if the fixed interval begins at the current
+         position? *)
+      moveUnhandledToActive reg ;;;
       return_ (Some reg).
 
-Definition morphlen_transport : forall b b',
+Definition morphlen_transport {b b'} :
   SSMorphLen b b' -> IntervalId b -> IntervalId b'.
 Proof.
-  move=> b b'.
   case. case=> Hdec ? (* ? *).
   exact: (widen_ord _).
 Defined.
@@ -201,7 +202,7 @@ Definition mt_fst b b' (sslen : SSMorphLen b b')
   | (xid, reg) => (morphlen_transport b b' sslen xid, reg)
   end.
 
-Notation int_reg sd       := (IntervalId sd * PhysReg)%type.
+Notation int_reg sd := (IntervalId sd * PhysReg)%type.
 Definition int_reg_seq sd := seq (int_reg sd).
 
 Definition intermediate_result (sd z : ScanStateDesc) (xs : int_reg_seq z)

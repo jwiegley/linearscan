@@ -125,6 +125,13 @@ Definition processOperations (blocks : seq blockType1) : BuildState.
   apply: {| bsPos  := pos
           ; bsVars := _
           ; bsRegs := _ |}.
+
+  (* For each virtual variable references, add a use position to a [Range]
+     corresponding to that variable.  These ranges are concatenated together
+     and will form a single [Interval] at the end.  This is different from how
+     Wimmer builds them up, and is more simplistic, but is sufficient for now.
+     The more efficient solution would be to implement the algorithm from his
+     paper. *)
   - have: seq (option (BoundedRange pos.*2.+1)).
       have vars' := vars.
       move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
@@ -140,6 +147,15 @@ Definition processOperations (blocks : seq blockType1) : BuildState.
         exact/ltnW.
       + by exists (exist _ _ (R_Sing Hodd)) => //.
     exact.
+
+  (* For each register that is explicitly referenced by the operation, build
+     up a [Range] which excludes this register from use, as this [Range] will
+     be used to build a fixed [Interval] that blocks out use of the register
+     during allocation.
+
+     jww (2015-01-30): This has the danger of very easily blocking out all
+     registers; proper solution to this flaw will require the use of multiple
+     ranges, as specified by Wimmer. *)
   - have: Vec (option (BoundedRange pos.*2.+1)) maxReg.
       have regs' := regs.
       move/(vmap (option_map (transportBoundedRange (H pos)))) in regs'.
