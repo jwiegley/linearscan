@@ -52,7 +52,15 @@ Fixpoint tsort' fuel l roots g :=
   let: next :=
     if roots is n :: s
     then (n :: s, g)
-    else ([:: de], addEdge (se, None) $
+    else
+      (* Wimmer: You can break cycles of arbitrary depth with a swap. When you
+         see the moves as edges in a directed graph, then the swap of two
+         registers reverses the direction of the edge between these registers.
+         This breaks the cycle and makes the new graph acyclic.
+
+         jww (2015-01-30): This means I need a way to indicate swaps here,
+         since effectively what I am doing now is swapping through memory. *)
+      ([:: de], addEdge (se, None) $
                    removeEdge (se, de) $ g) in
   if next isn't (n :: s, g') then [::] else
 
