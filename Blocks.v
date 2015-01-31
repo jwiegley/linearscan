@@ -132,17 +132,20 @@ Proof.
   move/(map (option_map (transportBoundedRange
                            (inner_addn1 pos)))) in vars'.
   apply: foldl _ vars' varRefs => vars' v.
+
   (* jww (2015-01-30): The [regReq] field is presently not being used. *)
   set upos := {| uloc   := pos.*2.+1
                ; regReq := regRequired vinfo v |}.
   have Hodd : odd upos by rewrite /= odd_double.
+
   apply: (set_nth None vars' (varId vinfo v) _).
   apply: Some _.
-  case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|].
-  + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
-    rewrite doubleS in Hlt.
-    exact/ltnW.
-  + exact: exist _ (exist _ _ (R_Sing Hodd)) _.
+  case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|];
+    last exact: exist _ (exist _ _ (R_Sing Hodd)) _.
+
+  apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
+  rewrite doubleS in Hlt.
+  exact/ltnW.
 Defined.
 
 (* For each register that is explicitly referenced by the operation, build up
@@ -157,23 +160,26 @@ Proof.
   move/(vmap (option_map (transportBoundedInterval
                             (inner_addn1 pos)))) in regs'.
   apply: foldl _ regs' regRefs => regs' reg.
+
   set upos := {| uloc   := pos.*2.+1
                ; regReq := true |}.
   have Hodd : odd upos by rewrite /= odd_double.
+
   set r := exist _ _ (R_Sing Hodd).
   apply: (vreplace regs' reg _).
   apply: Some _.
-  case: (vnth regs reg) => [[[d i] /= Hlt]|].
-  + case: d => [iv ib ie ik rds] in i Hlt *.
-    rewrite /= in Hlt.
-    have Hrds: rend r.1 < rbeg (NE_head rds).1.
-      rewrite /r /=.
-      by rewrite doubleS in Hlt.
-    move: (Interval_exact_beg i)
-          (Interval_exact_end i) => /= Hbeg Hend.
-    move: Hbeg Hend i => -> -> i.
-    exact: exist _ (exist _ _ (I_Cons i Hrds)) _ => //=.
-  + exact: exist _ (exist _ _ (I_Sing 0 Whole r.2)) _.
+  case: (vnth regs reg) => [[[d i] /= Hlt]|];
+    last exact: exist _ (exist _ _ (I_Sing 0 Whole r.2)) _.
+
+  case: d => [iv ib ie ik rds] in i Hlt *.
+  rewrite /= in Hlt.
+  have Hrds: rend r.1 < rbeg (NE_head rds).1.
+    rewrite /r /=.
+    by rewrite doubleS in Hlt.
+  move: (Interval_exact_beg i)
+        (Interval_exact_end i) => /= Hbeg Hend.
+  move: Hbeg Hend i => -> -> i.
+  exact: exist _ (exist _ _ (I_Cons i Hrds)) _ => //=.
 Defined.
 
 Definition processOperations (blocks : seq blockType1) : BuildState.
