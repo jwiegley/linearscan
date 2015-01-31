@@ -741,7 +741,16 @@ processOperations vinfo oinfo binfo blocks =
             let {
              _evar_0_0 = \varRefs regRefs -> Build_BuildState pos0
               (createRangeForVars vinfo pos0 vars0 varRefs)
-              (createIntervalForRegs pos0 regs0 regRefs)}
+              ((Prelude.flip (Prelude.$))
+                (case opKind oinfo op of {
+                  IsCall ->
+                   unsafeCoerce
+                     (Fintype.enum_mem
+                       (Fintype.ordinal_finType maxReg)
+                       (Ssrbool.mem Ssrbool.predPredType
+                         (Ssrbool.sort_of_simpl_pred Ssrbool.pred_of_argType)));
+                  _ -> regRefs}) (\regRefs' ->
+                createIntervalForRegs pos0 regs0 regRefs'))}
             in
             case _top_assumption_1 of {
              (,) x x0 -> _evar_0_0 x x0}}

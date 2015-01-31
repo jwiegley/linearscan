@@ -12,6 +12,7 @@ import qualified Data.Ord
 import qualified Data.Functor.Identity
 import qualified LinearScan.Utils
 
+import qualified LinearScan.Specif as Specif
 import qualified LinearScan.Ssrbool as Ssrbool
 import qualified LinearScan.Ssrfun as Ssrfun
 
@@ -101,10 +102,37 @@ val p s =
   case s of {
    SubType val0 sub x -> val0}
 
+coq_Sub :: (Ssrbool.Coq_pred a1) -> (Coq_subType a1) -> a1 -> Coq_sub_sort a1
+coq_Sub p s x =
+  case s of {
+   SubType val0 sub x0 -> sub x __}
+
+insub :: (Ssrbool.Coq_pred a1) -> (Coq_subType a1) -> a1 -> Prelude.Maybe
+         (Coq_sub_sort a1)
+insub p sT x =
+  case Ssrbool.idP (p x) of {
+   Ssrbool.ReflectT -> Prelude.Just (coq_Sub p sT x);
+   Ssrbool.ReflectF -> Prelude.Nothing}
+
+s2val :: (Specif.Coq_sig2 a1) -> a1
+s2val u =
+  u
+
 inj_eqAxiom :: Equality__Coq_type -> (a1 -> Equality__Coq_sort) ->
                Equality__Coq_axiom a1
 inj_eqAxiom eT f x y =
   Ssrbool.iffP (eq_op eT (f x) (f y)) (eqP eT (f x) (f y))
+
+coq_InjEqMixin :: Equality__Coq_type -> (a1 -> Equality__Coq_sort) ->
+                  Equality__Coq_mixin_of a1
+coq_InjEqMixin eT f =
+  Equality__Mixin (\x y -> eq_op eT (f x) (f y)) (inj_eqAxiom eT f)
+
+coq_PcanEqMixin :: Equality__Coq_type -> (a1 -> Equality__Coq_sort) ->
+                   (Equality__Coq_sort -> Prelude.Maybe a1) ->
+                   Equality__Coq_mixin_of a1
+coq_PcanEqMixin eT f g =
+  coq_InjEqMixin eT f
 
 val_eqP :: Equality__Coq_type -> (Ssrbool.Coq_pred Equality__Coq_sort) ->
            (Coq_subType Equality__Coq_sort) -> Equality__Coq_axiom

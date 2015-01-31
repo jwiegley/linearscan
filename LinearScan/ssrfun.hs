@@ -29,3 +29,8 @@ _Option__map :: (a1 -> a2) -> (Prelude.Maybe a1) -> Prelude.Maybe a2
 _Option__map f =
   _Option__bind (\x -> Prelude.Just (f x))
 
+pcomp :: (a2 -> Prelude.Maybe a1) -> (a3 -> Prelude.Maybe a2) -> a3 ->
+         Prelude.Maybe a1
+pcomp f g x =
+  _Option__bind f (g x)
+

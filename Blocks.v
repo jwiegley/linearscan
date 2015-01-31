@@ -194,6 +194,13 @@ Definition processOperations (blocks : seq blockType1) : BuildState.
   move: (opRefs oinfo op) => [varRefs regRefs].
   apply: {| bsPos  := pos |}.
     exact: createRangeForVars.
+
+  (* If the operation is a function call, assuming it makes use of every
+     register.  jww (2015-01-30): This needs to be improved to consider the
+     calling convention of the operation. *)
+  have regRefs' := if opKind oinfo op is IsCall
+                   then enum 'I_maxReg else regRefs.
+  clear regRefs.
   exact: createIntervalForRegs.
 Defined.
 

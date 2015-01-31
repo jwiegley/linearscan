@@ -64,6 +64,20 @@ type Coq_pred t = t -> Prelude.Bool
 
 type Coq_rel t = t -> Coq_pred t
 
+type Coq_simpl_pred t = (->) t Prelude.Bool
+
+coq_SimplPred :: (Coq_pred a1) -> Coq_simpl_pred a1
+coq_SimplPred p =
+   p
+
+pred_of_simpl :: (Coq_simpl_pred a1) -> Coq_pred a1
+pred_of_simpl p =
+  (Prelude.$) p
+
+predT :: Coq_simpl_pred a1
+predT =
+  coq_SimplPred (\x -> Prelude.True)
+
 type Coq_simpl_rel t = (->) t (Coq_pred t)
 
 rel_of_simpl_rel :: (Coq_simpl_rel a1) -> Coq_rel a1
@@ -82,10 +96,22 @@ mkPredType :: (a2 -> a1 -> Prelude.Bool) -> Coq_predType a1
 mkPredType toP =
   PredType (unsafeCoerce toP) (\p -> Mem (\x -> unsafeCoerce toP p x))
 
+predPredType :: Coq_predType a1
+predPredType =
+  PredType (\x -> unsafeCoerce x) (\p -> Mem (\x -> unsafeCoerce p x))
+
 pred_of_mem :: (Coq_mem_pred a1) -> Coq_pred_sort a1
 pred_of_mem mp =
   case mp of {
    Mem p -> unsafeCoerce (\x -> p x)}
+
+sort_of_simpl_pred :: (Coq_simpl_pred a1) -> Coq_pred_sort a1
+sort_of_simpl_pred p =
+  unsafeCoerce (pred_of_simpl p)
+
+pred_of_argType :: Coq_simpl_pred a1
+pred_of_argType =
+  predT
 
 mem :: (Coq_predType a1) -> (Coq_pred_sort a1) -> Coq_mem_pred a1
 mem pT =
@@ -95,4 +121,8 @@ mem pT =
 in_mem :: a1 -> (Coq_mem_pred a1) -> Prelude.Bool
 in_mem x mp =
   unsafeCoerce (\_ -> pred_of_mem) __ mp x
+
+pred_of_mem_pred :: (Coq_mem_pred a1) -> Coq_simpl_pred a1
+pred_of_mem_pred mp =
+  coq_SimplPred (\x -> in_mem x mp)
 

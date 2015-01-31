@@ -14,6 +14,7 @@ import qualified LinearScan.Utils
 
 import qualified LinearScan.Eqtype as Eqtype
 import qualified LinearScan.Ssrbool as Ssrbool
+import qualified LinearScan.Ssrfun as Ssrfun
 import qualified LinearScan.Ssrnat as Ssrnat
 
 
@@ -122,4 +123,20 @@ rem t x s =
     case Eqtype.eq_op t y x of {
      Prelude.True -> t0;
      Prelude.False -> (:) y (rem t x t0)}}
+
+pmap :: (a1 -> Prelude.Maybe a2) -> ([] a1) -> [] a2
+pmap f s =
+  case s of {
+   [] -> [];
+   (:) x s' ->
+    let {r = pmap f s'} in Ssrfun._Option__apply (\x0 -> (:) x0 r) r (f x)}
+
+iota :: Prelude.Int -> Prelude.Int -> [] Prelude.Int
+iota m n =
+  (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+    (\_ ->
+    [])
+    (\n' -> (:) m
+    (iota ((Prelude.succ) m) n'))
+    n
 
