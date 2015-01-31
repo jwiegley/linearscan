@@ -2,10 +2,6 @@ Require Import LinearScan.Lib.
 
 Section Topsort.
 
-(* jww (2015-01-29): This behavior of this Graph depends on our knowing that a
-   register can only appear once as the source and once as the target of any
-   edge.  This needs to be verified. *)
-
 Variable a : eqType.
 
 Record Graph := {

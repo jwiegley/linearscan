@@ -130,15 +130,6 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". by [].
 Qed.
 
-(** The number of active or inactive registers cannot exceed the number of
-    registers available (or, if there are more register than intervals to be
-    allocated, the number of intervals). *)
-(* Theorem limit_active_registers `(st : ScanState b sd) : *)
-(*   size (active sd) <= minn maxReg (nextInterval sd). *)
-(* jww (2014-10-31): Implementing this will need supporting evidence from the
-   algorithm; I don't think the constructors give us enough detail to
-   determine it here by induction. *)
-
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd;
   rewrite (@perm_eq_uniq _ _ s2); first exact: Huniq; H;

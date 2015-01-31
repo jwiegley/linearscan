@@ -450,8 +450,7 @@ Fixpoint walkIntervals {sd : ScanStateDesc} (st : ScanState InUse sd)
         end
     end
 
-  else (* jww (2015-01-20): It should be possible, by proof, to ensure that
-          the following case is impossible. *)
+  else (* jww (2015-01-20): Should be provably impossible *)
        inl EFuelExhausted.
 
 End MAllocate.

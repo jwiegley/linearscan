@@ -44,7 +44,6 @@ Definition linearScan {accType : Set}
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets vinfo oinfo binfo blocks' in
   let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
-  (* jww (2015-01-27): NYI: Compute [buildIntervals] per the thesis. *)
   let ssig      := buildIntervals vinfo oinfo binfo blocks in
 
   (* allocate registers *)

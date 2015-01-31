@@ -256,8 +256,8 @@ Proof.
   case: sd => /= ? ints ? unh ? ? ? in st uid *.
   set int := vnth ints uid.
 
-  (* Splitting is not possible if we have nothing to process.  jww
-     (2015-01-22): This should be provably unreachable code. *)
+  (* Splitting is not possible if we have nothing to process.
+     jww (2015-01-22): This should be provably unreachable code. *)
   case: unh => [|[u beg] us] in st *.
     exact: inl (ECannotSplitSingleton uid). (* ERROR *)
 
@@ -265,8 +265,8 @@ Proof.
     exact: inr None.            (* could not split, but benign *)
 
   (* Ensure that the [splitPos] falls within the interval, otherwise our
-     action can have no effect.  jww (2015-01-22): This should be proven
-     impossible, or differentiated somehow. *)
+     action can have no effect.
+     jww (2015-01-22): This should be provably impossible. *)
   case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
     exact: inl (ECannotSplitSingleton uid). (* ERROR *)
   move/andP: Hmid => [Hmid1 Hmid2].
@@ -285,7 +285,8 @@ Proof.
 
     case Hincr: (beg < ibeg id1); last first.
       (* It is not allowable to inject new unhandled intervals for the current
-         position.  jww (2015-01-22): This should be provably impossible. *)
+         position.
+         jww (2015-01-22): This should be provably impossible. *)
       exact: inl (ECannotSplitSingleton uid). (* ERROR *)
 
     rewrite eq_sym in H2.
@@ -344,7 +345,8 @@ Proof.
 
     case Hincr: (beg < ibeg id1); last first.
       (* It is not allowable to inject new unhandled intervals for the current
-         position.  jww (2015-01-22): This should be provably impossible. *)
+         position.
+         jww (2015-01-22): This should be provably impossible. *)
       exact: inl (ECannotSplitSingleton uid). (* ERROR *)
 
     have := ScanState_newUnhandled st i1.

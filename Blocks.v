@@ -94,8 +94,6 @@ Defined.
 
    - Loop handling (reordering blocks to optimize allocation)
    - Extending of ranges for input/output variables
-   - Purging registers at call sites
-   - Exception handling optimization
 *)
 
 Record BuildState := {
@@ -122,8 +120,9 @@ Proof. by move=> n; rewrite doubleS. Qed.
    corresponding to that variable.  These ranges are concatenated together and
    will form a single [Interval] at the end.  This is different from how
    Wimmer builds them up, and is more simplistic, but is sufficient for now.
-   The more efficient solution would be to implement the algorithm from his
-   paper. *)
+
+   jww (2015-01-30): The more efficient solution would be to implement the
+   algorithm from his paper. *)
 Definition createRangeForVars (pos : nat)
   (vars : seq (option (BoundedRange (pos.+1).*2.+1)))
   (varRefs : seq varType) : seq (option (BoundedRange pos.*2.+1)).
@@ -202,8 +201,10 @@ Definition processOperations (blocks : seq blockType1) : BuildState.
     exact: createRangeForVars.
 
   (* If the operation is a function call, assuming it makes use of every
-     register.  jww (2015-01-30): This needs to be improved to consider the
-     calling convention of the operation. *)
+     register.
+
+     jww (2015-01-30): This needs to be improved to consider the calling
+     convention of the operation. *)
   have regRefs' := if opKind oinfo op is IsCall
                    then enum 'I_maxReg else regRefs.
   clear regRefs.
@@ -406,8 +407,6 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
     end.
 
 Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
-  (* jww (2015-01-27): NYI: Still need to insert length-1 fixed intervals at
-     call points. *)
   let mkint (vid : VarId)
             (ss : ScanStateSig Pending)
             (pos : nat)
@@ -441,11 +440,11 @@ Definition checkIntervalBoundary `(st : ScanState InUse sd)
 
   let mfrom_int := lookupInterval st vid (blockLastOpId from) in
   if mfrom_int isn't Some from_interval then mappings else
-    (* jww (2015-01-28): the failing case should be provably impossible *)
+    (* jww (2015-01-28): Failing case should be provably impossible *)
 
   let mto_int := lookupInterval st vid (blockFirstOpId to) in
   if mto_int isn't Some to_interval then mappings else
-    (* jww (2015-01-28): the failing case should be provably impossible *)
+    (* jww (2015-01-28): Failing case should be provably impossible *)
 
   (* If the interval match, no move resolution is necessary. *)
   if from_interval == to_interval then mappings else
@@ -500,13 +499,13 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
   forFold emptyIntMap blocks $ fun mappings b =>
     let bid := blockId binfo b in
     match IntMap_lookup bid liveSets with
-    | None => mappings          (* jww (2015-01-28): should be impossible *)
+    | None => mappings          (* jww (2015-01-28): Should be impossible *)
     | Some from =>
       (fun successors =>
         let in_from := size successors <= 1 in
         forFold mappings successors $ fun ms s_bid =>
           match IntMap_lookup s_bid liveSets with
-          | None => ms          (* jww (2015-01-28): should be impossible *)
+          | None => ms          (* jww (2015-01-28): Should be impossible *)
           | Some to =>
               let key := if in_from then bid else s_bid in
               IntSet_forFold ms (blockLiveIn to) $
