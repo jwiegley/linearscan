@@ -78,6 +78,17 @@ Definition transportBoundedRange {base : nat} `(Hlt : base < prev)
   exact/(leq_trans _ H)/ltnW.
 Defined.
 
+Definition BoundedInterval (pos : nat) :=
+  { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }.
+
+Definition transportBoundedInterval {base : nat} `(Hlt : base < prev)
+  (x : BoundedInterval prev) : BoundedInterval base.
+  case: x => [i H].
+  apply: exist.
+  apply: i.
+  exact/(leq_trans _ H)/ltnW.
+Defined.
+
 (* jww (2015-01-12): Some of the things described by Wimmer in the section on
    dealing with computing of intervals have yet to be done:
 
@@ -90,7 +101,7 @@ Defined.
 Record BuildState := {
   bsPos  : nat;
   bsVars : seq (option (BoundedRange bsPos.*2.+1));
-  bsRegs : Vec (option (BoundedRange bsPos.*2.+1)) maxReg
+  bsRegs : Vec (option (BoundedInterval bsPos.*2.+1)) maxReg
 }.
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) :
@@ -104,6 +115,67 @@ Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a)
   foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
         z (rev blocks).
 
+Lemma inner_addn1: forall n, n.*2.+1 < (n.+1).*2.+1.
+Proof. by move=> n; rewrite doubleS. Qed.
+
+(* For each virtual variable references, add a use position to a [Range]
+   corresponding to that variable.  These ranges are concatenated together and
+   will form a single [Interval] at the end.  This is different from how
+   Wimmer builds them up, and is more simplistic, but is sufficient for now.
+   The more efficient solution would be to implement the algorithm from his
+   paper. *)
+Definition createRangeForVars (pos : nat)
+  (vars : seq (option (BoundedRange (pos.+1).*2.+1)))
+  (varRefs : seq varType) : seq (option (BoundedRange pos.*2.+1)).
+Proof.
+  have vars' := vars.
+  move/(map (option_map (transportBoundedRange
+                           (inner_addn1 pos)))) in vars'.
+  apply: foldl _ vars' varRefs => vars' v.
+  (* jww (2015-01-30): The [regReq] field is presently not being used. *)
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := regRequired vinfo v |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+  apply: (set_nth None vars' (varId vinfo v) _).
+  apply: Some _.
+  case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|].
+  + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
+    rewrite doubleS in Hlt.
+    exact/ltnW.
+  + exact: exist _ (exist _ _ (R_Sing Hodd)) _.
+Defined.
+
+(* For each register that is explicitly referenced by the operation, build up
+   a [Interval] which excludes this register from use, but only at specific
+   one-position wide ranges. *)
+Definition createIntervalForRegs (pos : nat)
+  (regs : Vec (option (BoundedInterval (pos.+1).*2.+1)) maxReg)
+  (regRefs : seq PhysReg) :
+  Vec (option (BoundedInterval pos.*2.+1)) maxReg.
+Proof.
+  have regs' := regs.
+  move/(vmap (option_map (transportBoundedInterval
+                            (inner_addn1 pos)))) in regs'.
+  apply: foldl _ regs' regRefs => regs' reg.
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := true |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+  set r := exist _ _ (R_Sing Hodd).
+  apply: (vreplace regs' reg _).
+  apply: Some _.
+  case: (vnth regs reg) => [[[d i] /= Hlt]|].
+  + case: d => [iv ib ie ik rds] in i Hlt *.
+    rewrite /= in Hlt.
+    have Hrds: rend r.1 < rbeg (NE_head rds).1.
+      rewrite /r /=.
+      by rewrite doubleS in Hlt.
+    move: (Interval_exact_beg i)
+          (Interval_exact_end i) => /= Hbeg Hend.
+    move: Hbeg Hend i => -> -> i.
+    exact: exist _ (exist _ _ (I_Cons i Hrds)) _ => //=.
+  + exact: exist _ (exist _ _ (I_Sing 0 Whole r.2)) _.
+Defined.
+
 Definition processOperations (blocks : seq blockType1) : BuildState.
   have := foldOps (fun x op => let: (n, m) := x in
     (n.+1, foldl (fun m v => maxn m (varId vinfo v))
@@ -115,62 +187,14 @@ Definition processOperations (blocks : seq blockType1) : BuildState.
              ; bsRegs := vconst None |}.
   apply: (foldOpsRev _ z blocks).
   case=> [pos vars regs] op.
-  have H: forall n, n.*2.+1 < (n.+1).*2.+1
-    by move=> n; rewrite doubleS.
   case: pos => [|pos] in vars regs *.
     exact {| bsPos  := 0
            ; bsVars := vars
            ; bsRegs := regs |}.
   move: (opRefs oinfo op) => [varRefs regRefs].
-  apply: {| bsPos  := pos
-          ; bsVars := _
-          ; bsRegs := _ |}.
-
-  (* For each virtual variable references, add a use position to a [Range]
-     corresponding to that variable.  These ranges are concatenated together
-     and will form a single [Interval] at the end.  This is different from how
-     Wimmer builds them up, and is more simplistic, but is sufficient for now.
-     The more efficient solution would be to implement the algorithm from his
-     paper. *)
-  - have: seq (option (BoundedRange pos.*2.+1)).
-      have vars' := vars.
-      move/(map (option_map (transportBoundedRange (H pos)))) in vars'.
-      apply: foldl _ vars' varRefs => vars' v.
-      set upos := {| uloc   := pos.*2.+1
-                   ; regReq := regRequired vinfo v |}.
-      have Hodd : odd upos by rewrite /= odd_double.
-      apply: (set_nth None vars' (varId vinfo v) _).
-      apply: Some _.
-      case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|].
-      + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
-        rewrite doubleS in Hlt.
-        exact/ltnW.
-      + by exists (exist _ _ (R_Sing Hodd)) => //.
-    exact.
-
-  (* For each register that is explicitly referenced by the operation, build
-     up a [Range] which excludes this register from use, as this [Range] will
-     be used to build a fixed [Interval] that blocks out use of the register
-     during allocation.
-
-     jww (2015-01-30): This has the danger of very easily blocking out all
-     registers; proper solution to this flaw will require the use of multiple
-     ranges, as specified by Wimmer. *)
-  - have: Vec (option (BoundedRange pos.*2.+1)) maxReg.
-      have regs' := regs.
-      move/(vmap (option_map (transportBoundedRange (H pos)))) in regs'.
-      apply: foldl _ regs' regRefs => regs' reg.
-      set upos := {| uloc   := pos.*2.+1
-                   ; regReq := true |}.
-      have Hodd : odd upos by rewrite /= odd_double.
-      apply: (vreplace regs' reg _).
-      apply: Some _.
-      case: (vnth regs reg) => [[r /= Hlt]|].
-      + apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
-        rewrite doubleS in Hlt.
-        exact/ltnW.
-      + by exists (exist _ _ (R_Sing Hodd)) => //.
-    exact.
+  apply: {| bsPos  := pos |}.
+    exact: createRangeForVars.
+  exact: createIntervalForRegs.
 Defined.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
@@ -389,12 +413,8 @@ Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
         packScanState (ScanState_newUnhandled st i I) in
 
   (fun bs =>
-     let regs := vmap (fun mr =>
-           if mr is Some (exist r _)
-           then Some (packInterval (I_Sing 0 Whole r.2))
-           else None) (bsRegs bs) in
-
      let s0 := ScanState_nil in
+     let regs := vmap (option_map (@proj1_sig _ _)) (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
      let s3 := foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs) in

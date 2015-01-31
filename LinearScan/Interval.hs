@@ -64,10 +64,6 @@ getIntervalDesc :: IntervalDesc -> IntervalDesc
 getIntervalDesc d =
   d
 
-packInterval :: IntervalDesc -> IntervalDesc
-packInterval d =
-  d
-
 intervalStart :: IntervalDesc -> Prelude.Int
 intervalStart i =
   ibeg i

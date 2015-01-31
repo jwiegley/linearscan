@@ -199,7 +199,7 @@ Defined.
 Definition mt_fst b b' (sslen : SSMorphLen b b')
   (x : IntervalId b * PhysReg) :=
   match x with
-  | (xid, reg) => (morphlen_transport b b' sslen xid, reg)
+  | (xid, reg) => (morphlen_transport sslen xid, reg)
   end.
 
 Notation int_reg sd := (IntervalId sd * PhysReg)%type.
