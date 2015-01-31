@@ -51,6 +51,7 @@ library
     -- LinearScan.List0
     -- LinearScan.Peano
     -- LinearScan.Ssreflect
+    LinearScan.Choice
     LinearScan.Datatypes
     LinearScan.Eqtype
     LinearScan.Fintype

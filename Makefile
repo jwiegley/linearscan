@@ -11,6 +11,7 @@ VOFILES = $(patsubst %.v,%.vo,$(VFILES))
 
 all: $(VOFILES)	LinearScan/Main.hs		\
      LinearScan/Eqtype.hs			\
+     LinearScan/Choice.hs			\
      LinearScan/Fintype.hs			\
      LinearScan/Seq.hs				\
      LinearScan/Ssrbool.hs			\
@@ -29,6 +30,9 @@ LinearScan/Main.hs: Main.vo
 	@perl -i fixcode.pl LinearScan/*.hs
 
 LinearScan/Eqtype.hs: LinearScan/eqtype.hs
+	@mv $< $@
+
+LinearScan/Choice.hs: LinearScan/choice.hs
 	@mv $< $@
 
 LinearScan/Fintype.hs: LinearScan/fintype.hs

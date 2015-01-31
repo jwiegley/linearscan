@@ -992,8 +992,13 @@ buildIntervals vinfo oinfo binfo blocks =
   in
   let {bs = processOperations vinfo oinfo binfo blocks} in
   let {
-   regs = LinearScan.Utils.vmap maxReg (Lib.option_map )
-            (bsRegs bs)}
+   f = \mx ->
+    case mx of {
+     Prelude.Just x -> Prelude.Just ( x);
+     Prelude.Nothing -> Prelude.Nothing}}
+  in
+  let {
+   regs = LinearScan.Utils.vmap maxReg f (bsRegs bs)}
   in
   let {
    s2 = packScanState Pending

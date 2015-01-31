@@ -427,7 +427,8 @@ Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
 
   (fun bs =>
      let s0 := ScanState_nil in
-     let regs := vmap (option_map (@proj1_sig _ _)) (bsRegs bs) in
+     let f mx := if mx is Some x then Some x.1 else None in
+     let regs := vmap f (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
      let s3 := foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs) in
