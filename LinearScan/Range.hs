@@ -74,6 +74,15 @@ ups r =
   case r of {
    Build_RangeDesc rbeg0 rend0 ups0 -> ups0}
 
+type BoundedRange = RangeDesc
+
+transportBoundedRange :: Prelude.Int -> Prelude.Int -> BoundedRange ->
+                         BoundedRange
+transportBoundedRange base prev x =
+  x
+
+type SortedBoundedRanges = ([] BoundedRange)
+
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
   case (Prelude.<=) ((Prelude.succ) (rbeg x)) (rbeg y) of {

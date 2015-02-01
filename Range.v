@@ -167,6 +167,50 @@ Arguments packRange [d] r /.
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
+Definition BoundedRange (pos : nat) :=
+  { r : RangeSig | pos <= NE_head (ups r.1) }.
+
+Definition transportBoundedRange `(Hlt : base < prev)
+  (x : BoundedRange prev) : BoundedRange base.
+  case: x => [r H].
+  apply: exist.
+  apply: r.
+  exact/(leq_trans _ H)/ltnW.
+Defined.
+
+Definition range_lt {pos} (x y : BoundedRange pos) : Prop :=
+  rend x.1.1 < rbeg y.1.1.
+
+Lemma range_lt_transport {base prev} : forall x y (Hlt : base < prev),
+  range_lt x y
+    -> range_lt (transportBoundedRange Hlt x)
+                (transportBoundedRange Hlt y).
+Proof.
+  move=> [x Hx] [y Hy] Hlt /=.
+  by rewrite /range_lt.
+Qed.
+
+Lemma NE_Forall_transport {base prev} : forall r rs (Hlt : base < prev),
+  NE_Forall (range_lt r) rs
+    -> NE_Forall (range_lt (transportBoundedRange Hlt r))
+                 (NE_map (transportBoundedRange Hlt) rs).
+Proof.
+  move=> [r Hr] rs Hlt.
+  elim: rs => [x|x xs IHxs] H.
+    constructor.
+    move/NE_Forall_head in H.
+    exact: range_lt_transport.
+  constructor.
+    move/NE_Forall_head in H.
+    exact: range_lt_transport.
+  rewrite -/NE_map.
+  apply: IHxs.
+  by inversion H.
+Qed.
+
+Definition SortedBoundedRanges (pos : nat) :=
+  { rs : NonEmpty (BoundedRange pos) | NE_StronglySorted range_lt rs }.
+
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
 Proof. induction r; auto. simpl. apply leq_min. by []. Qed.
 
@@ -259,6 +303,73 @@ Proof.
   move: (R_Extend (rbeg r) e r) => /=.
   move: (Range_beg_bounded r) => /= Hlt.
   by rewrite (minn_idPl Hlt) (maxn_idPl Hgt).
+Defined.
+
+Lemma NE_StronglySorted_UsePos_cons : forall u us,
+  NE_StronglySorted upos_lt (NE_Cons u us) -> u < NE_head us.
+Proof.
+  move=> u us.
+  invert; subst.
+  by move/NE_Forall_head in H2.
+Qed.
+
+Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
+  rend r1 == rbeg r2
+    -> Range {| rbeg := rbeg rd1
+              ; rend := rend rd2
+              ; ups  := NE_append (ups rd1) (ups rd2) |}.
+Proof.
+  move=> /eqP Heqe.
+
+  move: (Range_all_odd r1).
+  move: (Range_sorted r1).
+  move: (Range_bounded r1).
+  move: (Range_beg_bounded r1).
+  move: (Range_end_bounded r1).
+  move: (Range_beg_bounded r2).
+  move: (Range_end_bounded r2).
+
+  elim: (ups rd1) => [u|u us IHus] /= H1 H2 H3 H4 H5 Hsort Hodd.
+    have Hlt': upos_lt u (NE_head (ups rd2)).
+      rewrite {}Heqe in H3.
+      exact: ltn_leq_trans H3 _.
+    move/NE_Forall_head: Hodd => /= Hodd.
+    have r := (R_Cons Hodd r2 Hlt').
+    move: (R_Extend (rbeg rd1) (rend rd2) r) => /=.
+    by rewrite (minn_idPl H4) (maxn_idPl H1).
+
+  have Hlt: rbeg rd1 <= NE_head us.
+    apply: (leq_trans H4 _).
+    inversion Hsort; subst.
+    move/NE_Forall_head in H7.
+    exact/ltnW.
+  have Hsort': NE_StronglySorted (fun x y : UsePos => upos_lt x y) us
+    by inversion Hsort.
+  have Hodd': NE_Forall (fun x : UsePos => (odd \o uloc) x) us
+    by inversion Hodd.
+
+  specialize (IHus H1 H2 H3 Hlt H5 Hsort' Hodd').
+
+  have Hlt': upos_lt u (NE_head (NE_append us (ups rd2))).
+    rewrite NE_head_append_spec.
+    inversion Hsort; subst.
+    by move/NE_Forall_head in H7.
+
+  move/NE_Forall_head=> /= in Hodd.
+  move: (R_Extend (rbeg rd1) (rend rd2)
+                  (R_Cons Hodd IHus Hlt')) => /=.
+  by rewrite NE_last_append_spec (minn_idPl H4) (maxn_idPl _).
+Defined.
+
+Definition RangeSigs_cons `(r : Range rd) (rs : NonEmpty RangeSig) :
+  NonEmpty RangeSig.
+Proof.
+  case E: (rend rd == rbeg (NE_head rs).1);
+    last exact: (NE_Cons (packRange r) rs).
+  case: rs => [x|x xs] in E *;
+  have r' := packRange (@Range_cat _ r _ x.2 E).
+    exact: (NE_Sing r').
+  exact: (NE_Cons r' xs).
 Defined.
 
 Definition Range_append_fst

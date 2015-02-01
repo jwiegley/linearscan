@@ -185,10 +185,11 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
     blocks = postorder_dfs_from body entry
 
     go blockIds =
-        case allocate (blockInfo getBlockId) opInfo varInfo
-                      blocks (newSpillStack 0) of
+        case evalState
+                 (allocate (blockInfo getBlockId) opInfo varInfo blocks)
+                 (newSpillStack 0) of
             Left e -> error $ "Allocation failed: " ++ e
-            Right (blks, _) -> do
+            Right blks -> do
                 let graph' = newGraph blks
                 catch
                     (showGraph show graph' `shouldBe` showGraph show result)
@@ -306,14 +307,13 @@ opInfo = OpInfo
            NodeOO o -> f o
            NodeOC o -> f o
 
-    , moveOp = \sr dr stack ->
-        let mv = Move sr dr in
-        ([NodeOO (Node mv (error "no move meta"))], stack)
+    , moveOp = \sr dr -> do
+        let mv = Move sr dr
+        return [NodeOO (Node mv (error "no move meta"))]
 
-    , swapOp = \sr dr stack ->
-       let (sops, _) = mkSaveOp sr Nothing stack in
-       let (rops, stack') = mkRestoreOp Nothing dr stack in
-       (sops ++ rops, stack')
+    , swapOp = \sr dr ->
+        liftA2 (++) (mkRestoreOp Nothing dr)
+                    (mkSaveOp sr Nothing)
 
     , saveOp = mkSaveOp
     , restoreOp = mkRestoreOp
@@ -343,27 +343,28 @@ opInfo = OpInfo
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
                   (Data.IntMap.lookup n m)
 
-mkSaveOp r vid stack =
-    let (stack', off') =
-            case M.lookup vid (stackSlots stack) of
-                Just off -> (stack, off)
-                Nothing ->
-                    let off = stackPtr stack in
-                    (StackInfo
-                         { stackPtr   = off + 8
-                         , stackSlots =
-                             M.insert vid off (stackSlots stack)
-                         },
-                     off)
-        sv = Save (Linearity False) r off' in
-    ([NodeOO (Node sv (error "no save meta"))], stack')
+mkSaveOp r vid = do
+    stack <- get
+    off' <- case M.lookup vid (stackSlots stack) of
+        Just off -> return off
+        Nothing -> do
+            let off = stackPtr stack
+            put StackInfo
+                 { stackPtr   = off + 8
+                 , stackSlots =
+                     M.insert vid off (stackSlots stack)
+                 }
+            return off
+    let sv = Save (Linearity False) r off'
+    return [NodeOO (Node sv (error "no save meta"))]
 
-mkRestoreOp vid r stack =
+mkRestoreOp vid r = do
+    stack <- get
     let off =
             fromMaybe (error "Restore requested but not stack allocated")
                       (M.lookup vid (stackSlots stack))
-        rs = Restore (Linearity False) off r in
-    ([NodeOO (Node rs (error "no restore meta"))], stack)
+        rs = Restore (Linearity False) off r
+    return [NodeOO (Node rs (error "no restore meta"))]
 
 varInfo :: VarInfo (Int, VarKind)
 varInfo = VarInfo

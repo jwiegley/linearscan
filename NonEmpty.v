@@ -58,6 +58,14 @@ Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
     | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
   end.
 
+Lemma NE_map_head : forall a b (f : a -> b) xs,
+  NE_head (NE_map f xs) = f (NE_head xs).
+Proof. by move=> a b f; elim=> [x|x xs IHxs] //=. Qed.
+
+Lemma NE_map_last : forall a b (f : a -> b) xs,
+  NE_last (NE_map f xs) = f (NE_last xs).
+Proof. by move=> a b f; elim=> [x|x xs IHxs] //=. Qed.
+
 Definition NE_foldl {a b : Type} (f : a -> b -> a) (z : a) (ne : NonEmpty b) : a :=
   foldl f z ne.
 
@@ -133,6 +141,13 @@ Proof.
   induction H1; firstorder.
 Qed.
 
+Lemma NE_Forall_inv : forall (P : A -> Prop) x l,
+  NE_Forall P (NE_Cons x l) -> P x /\ NE_Forall P l.
+Proof.
+  move=> P x l Hall.
+  by inversion Hall.
+Qed.
+
 Section Membership.
 
 Fixpoint NE_member (z : A) (ne : NonEmpty A) : Prop :=
@@ -160,10 +175,10 @@ Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
                             -> NE_StronglySorted (NE_Cons a l).
 
-(* Lemma NE_StronglySorted_inv : forall a l, *)
-(*   NE_StronglySorted (NE_Cons a l) *)
-(*     -> NE_StronglySorted l /\ NE_Forall (R a) l. *)
-(* Proof. intros; inversion H0; auto. Qed. *)
+Lemma NE_StronglySorted_inv : forall a l,
+  NE_StronglySorted (NE_Cons a l)
+    -> NE_StronglySorted l /\ NE_Forall (R a) l.
+Proof. intros; inversion H0; auto. Qed.
 
 Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A),
   NE_StronglySorted (NE_append l1 l2)
@@ -180,8 +195,7 @@ Proof.
 Qed.
 
 Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A),
-  NE_StronglySorted (NE_append l1 l2)
-    -> R (NE_last l1) (NE_head l2).
+  NE_StronglySorted (NE_append l1 l2) -> R (NE_last l1) (NE_head l2).
 Proof.
   intros.
   induction l1; simpl in *.

@@ -39,5 +39,7 @@ import qualified LinearScan.Utils
     s/_MyMachine__maxReg = 4/_MyMachine__maxReg = MAX_REG/;
     s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
 
+    s/\(Prelude\.map  \( rs\)\)/rs/;
+
     print;
 }

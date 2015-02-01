@@ -64,6 +64,10 @@ getIntervalDesc :: IntervalDesc -> IntervalDesc
 getIntervalDesc d =
   d
 
+packInterval :: IntervalDesc -> IntervalDesc
+packInterval d =
+  d
+
 intervalStart :: IntervalDesc -> Prelude.Int
 intervalStart i =
   ibeg i
@@ -128,6 +132,13 @@ firstUseReqReg :: IntervalDesc -> Prelude.Maybe Prelude.Int
 firstUseReqReg d =
   Lib.option_map ((Prelude..) Range.uloc Prelude.snd)
     (findIntervalUsePos d Range.regReq)
+
+type BoundedInterval = IntervalDesc
+
+transportBoundedInterval :: Prelude.Int -> Prelude.Int -> BoundedInterval ->
+                            BoundedInterval
+transportBoundedInterval base prev x =
+  x
 
 data SplitPosition =
    BeforePos Prelude.Int

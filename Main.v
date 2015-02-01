@@ -44,7 +44,7 @@ Definition linearScan {accType : Set}
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets vinfo oinfo binfo blocks' in
   let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
-  let ssig      := buildIntervals vinfo oinfo binfo blocks in
+  let ssig      := buildIntervals vinfo oinfo binfo blocks liveSets' in
 
   (* allocate registers *)
   match walkIntervals ssig.2 (countOps binfo blocks).+1
@@ -105,6 +105,8 @@ Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
 Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
 Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
 Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
+
+Extract Inductive NonEmpty => "[]" ["(:[])" "(:)"].
 
 Extraction Blacklist String List Vector NonEmpty.
 

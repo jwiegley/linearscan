@@ -547,63 +547,6 @@ setBlockOps b =
    Build_BlockInfo blockId0 blockSuccessors0 blockOps0
     setBlockOps0 -> setBlockOps0}
 
-type BoundedRange = Range.RangeDesc
-
-transportBoundedRange :: Prelude.Int -> Prelude.Int ->
-                                    BoundedRange ->
-                                    BoundedRange
-transportBoundedRange base prev x =
-  x
-
-type BoundedInterval = Interval.IntervalDesc
-
-transportBoundedInterval :: Prelude.Int -> Prelude.Int ->
-                                       BoundedInterval ->
-                                       BoundedInterval
-transportBoundedInterval base prev x =
-  x
-
-data BuildState =
-   Build_BuildState Prelude.Int ([]
-                                          (Prelude.Maybe
-                                          BoundedRange)) ([]
-                                                                   (Prelude.Maybe
-                                                                   BoundedInterval))
-
-coq_BuildState_rect :: (Prelude.Int -> ([]
-                                  (Prelude.Maybe BoundedRange)) ->
-                                  ([]
-                                  (Prelude.Maybe BoundedInterval))
-                                  -> a1) -> BuildState -> a1
-coq_BuildState_rect f b =
-  case b of {
-   Build_BuildState x x0 x1 -> f x x0 x1}
-
-coq_BuildState_rec :: (Prelude.Int -> ([]
-                                 (Prelude.Maybe BoundedRange)) ->
-                                 ([]
-                                 (Prelude.Maybe BoundedInterval))
-                                 -> a1) -> BuildState -> a1
-coq_BuildState_rec =
-  coq_BuildState_rect
-
-bsPos :: BuildState -> Prelude.Int
-bsPos b =
-  case b of {
-   Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsPos0}
-
-bsVars :: BuildState -> []
-                     (Prelude.Maybe BoundedRange)
-bsVars b =
-  case b of {
-   Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsVars0}
-
-bsRegs :: BuildState -> []
-                     (Prelude.Maybe BoundedInterval)
-bsRegs b =
-  case b of {
-   Build_BuildState bsPos0 bsVars0 bsRegs0 -> bsRegs0}
-
 foldOps :: (BlockInfo a1 a2 a3 a4) -> (a5 -> a3 -> a5)
                       -> a5 -> ([] a1) -> a5
 foldOps binfo f z =
@@ -621,152 +564,6 @@ foldOpsRev binfo f z blocks =
   Data.List.foldl' (\bacc blk ->
     Data.List.foldl' f bacc (Seq.rev (blockOps binfo blk))) z
     (Seq.rev blocks)
-
-createRangeForVars :: (VarInfo a1) -> Prelude.Int -> ([]
-                                 (Prelude.Maybe BoundedRange)) ->
-                                 ([] a1) -> []
-                                 (Prelude.Maybe BoundedRange)
-createRangeForVars vinfo pos vars varRefs =
-  (Prelude.flip (Prelude.$)) vars (\vars' ->
-    let {
-     vars'0 = Prelude.map
-                (Lib.option_map
-                  (transportBoundedRange ((Prelude.succ)
-                    (Ssrnat.double pos)) ((Prelude.succ)
-                    (Ssrnat.double ((Prelude.succ) pos))))) vars'}
-    in
-    Data.List.foldl' (\vars'1 v ->
-      let {
-       upos = Range.Build_UsePos ((Prelude.succ) (Ssrnat.double pos))
-        (regRequired vinfo v)}
-      in
-      (Prelude.flip (Prelude.$)) __ (\_ ->
-        Seq.set_nth Prelude.Nothing vars'1 (varId vinfo v)
-          (Prelude.Just
-          (let {
-            _evar_0_ = \_top_assumption_ -> Range.Build_RangeDesc
-             (Range.uloc upos) (Range.rend ( _top_assumption_)) ((:) upos
-             (Range.ups ( _top_assumption_)))}
-           in
-           let {
-            _evar_0_0 = Range.Build_RangeDesc (Range.uloc upos)
-             ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
-           in
-           case Seq.nth Prelude.Nothing vars (varId vinfo v) of {
-            Prelude.Just x -> _evar_0_ x;
-            Prelude.Nothing -> _evar_0_0})))) vars'0 varRefs)
-
-createIntervalForRegs :: Prelude.Int -> ([]
-                                    (Prelude.Maybe BoundedInterval))
-                                    -> ([] PhysReg) -> []
-                                    (Prelude.Maybe BoundedInterval)
-createIntervalForRegs pos regs regRefs =
-  (Prelude.flip (Prelude.$)) regs (\regs' ->
-    let {
-     regs'0 = LinearScan.Utils.vmap maxReg
-                (Lib.option_map
-                  (transportBoundedInterval ((Prelude.succ)
-                    (Ssrnat.double pos)) ((Prelude.succ)
-                    (Ssrnat.double ((Prelude.succ) pos))))) regs'}
-    in
-    Data.List.foldl' (\regs'1 reg ->
-      let {
-       upos = Range.Build_UsePos ((Prelude.succ) (Ssrnat.double pos))
-        Prelude.True}
-      in
-      (Prelude.flip (Prelude.$)) __ (\_ ->
-        let {
-         r = Range.Build_RangeDesc (Range.uloc upos) ((Prelude.succ)
-          (Range.uloc upos)) ((:[]) upos)}
-        in
-        LinearScan.Utils.set_nth maxReg regs'1 reg (Prelude.Just
-          (let {
-            _evar_0_ = \_top_assumption_ ->
-             let {
-              _evar_0_ = \iv ib ie ik rds ->
-               (Prelude.flip (Prelude.$)) __ (\_ ->
-                 let {
-                  _evar_0_ = \_ ->
-                   let {
-                    _evar_0_ = \_ -> Interval.Build_IntervalDesc iv
-                     (Range.rbeg ( r)) (Range.rend ( (Prelude.last rds))) ik
-                     ((:) r rds)}
-                   in
-                    _evar_0_}
-                 in
-                  _evar_0_ __ __)}
-             in
-             case _top_assumption_ of {
-              Interval.Build_IntervalDesc x x0 x1 x2 x3 ->
-               _evar_0_ x x0 x1 x2 x3}}
-           in
-           let {
-            _evar_0_0 = Interval.Build_IntervalDesc 0 (Range.rbeg ( r))
-             (Range.rend ( r)) Interval.Whole ((:[]) ( r))}
-           in
-           case LinearScan.Utils.nth maxReg regs reg of {
-            Prelude.Just x -> _evar_0_ x;
-            Prelude.Nothing -> _evar_0_0})))) regs'0 regRefs)
-
-processOperations :: (VarInfo a6) -> (OpInfo
-                                a1 a4 a5 a6) -> (BlockInfo 
-                                a2 a3 a4 a5) -> ([] a2) ->
-                                BuildState
-processOperations vinfo oinfo binfo blocks =
-  (Prelude.flip (Prelude.$))
-    (foldOps binfo (\x op ->
-      case x of {
-       (,) n m -> (,) ((Prelude.succ) n)
-        (Data.List.foldl' (\m0 v ->
-          Prelude.max m0 (varId vinfo v)) m
-          (Prelude.fst (opRefs oinfo op)))}) ((,) 0 0) blocks)
-    (\_top_assumption_ ->
-    let {
-     _evar_0_ = \opCount highestVar ->
-      let {
-       z = Build_BuildState opCount
-        (Seq.nseq ((Prelude.succ) highestVar) Prelude.Nothing)
-        (Data.List.replicate maxReg Prelude.Nothing)}
-      in
-      foldOpsRev binfo (\_top_assumption_0 ->
-        let {
-         _evar_0_ = \pos vars regs op ->
-          let {
-           _evar_0_ = \vars0 regs0 -> Build_BuildState 0 vars0
-            regs0}
-          in
-          let {
-           _evar_0_0 = \pos0 vars0 regs0 ->
-            let {_top_assumption_1 = opRefs oinfo op} in
-            let {
-             _evar_0_0 = \varRefs regRefs -> Build_BuildState pos0
-              (createRangeForVars vinfo pos0 vars0 varRefs)
-              ((Prelude.flip (Prelude.$))
-                (case opKind oinfo op of {
-                  IsCall ->
-                   unsafeCoerce
-                     (Fintype.enum_mem
-                       (Fintype.ordinal_finType maxReg)
-                       (Ssrbool.mem Ssrbool.predPredType
-                         (Ssrbool.sort_of_simpl_pred Ssrbool.pred_of_argType)));
-                  _ -> regRefs}) (\regRefs' ->
-                createIntervalForRegs pos0 regs0 regRefs'))}
-            in
-            case _top_assumption_1 of {
-             (,) x x0 -> _evar_0_0 x x0}}
-          in
-          (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
-            (\_ ->
-            _evar_0_ vars regs)
-            (\x ->
-            _evar_0_0 x vars regs)
-            pos}
-        in
-        case _top_assumption_0 of {
-         Build_BuildState x x0 x1 -> _evar_0_ x x0 x1}) z blocks}
-    in
-    case _top_assumption_ of {
-     (,) x x0 -> _evar_0_ x x0})
 
 computeBlockOrder :: ([] a1) -> [] a1
 computeBlockOrder blocks =
@@ -963,21 +760,251 @@ computeGlobalLiveSets binfo blocks liveSets =
         (blockLastOpId liveSet2)) liveSets1;
      Prelude.Nothing -> liveSets1})
 
+createRangeForVars :: (VarInfo a1) -> Prelude.Int -> ([]
+                                 (Prelude.Maybe Range.BoundedRange)) -> ([]
+                                 a1) -> [] (Prelude.Maybe Range.BoundedRange)
+createRangeForVars vinfo pos vars varRefs =
+  (Prelude.flip (Prelude.$)) vars (\vars' ->
+    let {
+     vars'0 = Prelude.map
+                (Lib.option_map
+                  (Range.transportBoundedRange ((Prelude.succ)
+                    (Ssrnat.double pos)) ((Prelude.succ)
+                    (Ssrnat.double ((Prelude.succ) pos))))) vars'}
+    in
+    Data.List.foldl' (\vars'1 v ->
+      let {
+       upos = Range.Build_UsePos ((Prelude.succ) (Ssrnat.double pos))
+        (regRequired vinfo v)}
+      in
+      (Prelude.flip (Prelude.$)) __ (\_ ->
+        Seq.set_nth Prelude.Nothing vars'1 (varId vinfo v)
+          (Prelude.Just
+          (let {
+            _evar_0_ = \_top_assumption_ -> Range.Build_RangeDesc
+             (Range.uloc upos) (Range.rend ( _top_assumption_)) ((:) upos
+             (Range.ups ( _top_assumption_)))}
+           in
+           let {
+            _evar_0_0 = Range.Build_RangeDesc (Range.uloc upos)
+             ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
+           in
+           case Seq.nth Prelude.Nothing vars (varId vinfo v) of {
+            Prelude.Just x -> _evar_0_ x;
+            Prelude.Nothing -> _evar_0_0})))) vars'0 varRefs)
+
+setIntervalsForRegs :: Prelude.Int -> ([]
+                                  (Prelude.Maybe Interval.BoundedInterval))
+                                  -> ([] PhysReg) -> []
+                                  (Prelude.Maybe Interval.BoundedInterval)
+setIntervalsForRegs pos regs regRefs =
+  (Prelude.flip (Prelude.$)) regs (\regs' ->
+    let {
+     regs'0 = LinearScan.Utils.vmap maxReg
+                (Lib.option_map
+                  (Interval.transportBoundedInterval ((Prelude.succ)
+                    (Ssrnat.double pos)) ((Prelude.succ)
+                    (Ssrnat.double ((Prelude.succ) pos))))) regs'}
+    in
+    Data.List.foldl' (\regs'1 reg ->
+      let {
+       upos = Range.Build_UsePos ((Prelude.succ) (Ssrnat.double pos))
+        Prelude.True}
+      in
+      (Prelude.flip (Prelude.$)) __ (\_ ->
+        let {
+         r = Range.Build_RangeDesc (Range.uloc upos) ((Prelude.succ)
+          (Range.uloc upos)) ((:[]) upos)}
+        in
+        LinearScan.Utils.set_nth maxReg regs'1 reg (Prelude.Just
+          (let {
+            _evar_0_ = \_top_assumption_ ->
+             let {
+              _evar_0_ = \iv ib ie ik rds ->
+               (Prelude.flip (Prelude.$)) __ (\_ ->
+                 let {
+                  _evar_0_ = \_ ->
+                   let {
+                    _evar_0_ = \_ -> Interval.Build_IntervalDesc iv
+                     (Range.rbeg ( r)) (Range.rend ( (Prelude.last rds))) ik
+                     ((:) r rds)}
+                   in
+                    _evar_0_}
+                 in
+                  _evar_0_ __ __)}
+             in
+             case _top_assumption_ of {
+              Interval.Build_IntervalDesc x x0 x1 x2 x3 ->
+               _evar_0_ x x0 x1 x2 x3}}
+           in
+           let {
+            _evar_0_0 = Interval.Build_IntervalDesc 0 (Range.rbeg ( r))
+             (Range.rend ( r)) Interval.Whole ((:[]) ( r))}
+           in
+           case LinearScan.Utils.nth maxReg regs reg of {
+            Prelude.Just x -> _evar_0_ x;
+            Prelude.Nothing -> _evar_0_0})))) regs'0 regRefs)
+
+data BuildState =
+   Build_BuildState ([] (Prelude.Maybe Range.SortedBoundedRanges)) 
+ ([] (Prelude.Maybe Interval.BoundedInterval))
+
+coq_BuildState_rect :: Prelude.Int -> (([]
+                                  (Prelude.Maybe Range.SortedBoundedRanges))
+                                  -> ([]
+                                  (Prelude.Maybe Interval.BoundedInterval))
+                                  -> a1) -> BuildState -> a1
+coq_BuildState_rect pos f b =
+  case b of {
+   Build_BuildState x x0 -> f x x0}
+
+coq_BuildState_rec :: Prelude.Int -> (([]
+                                 (Prelude.Maybe Range.SortedBoundedRanges))
+                                 -> ([]
+                                 (Prelude.Maybe Interval.BoundedInterval)) ->
+                                 a1) -> BuildState -> a1
+coq_BuildState_rec pos =
+  coq_BuildState_rect pos
+
+bsVars :: Prelude.Int -> BuildState -> []
+                     (Prelude.Maybe Range.SortedBoundedRanges)
+bsVars pos b =
+  case b of {
+   Build_BuildState bsVars0 bsRegs0 -> bsVars0}
+
+bsRegs :: Prelude.Int -> BuildState -> []
+                     (Prelude.Maybe Interval.BoundedInterval)
+bsRegs pos b =
+  case b of {
+   Build_BuildState bsVars0 bsRegs0 -> bsRegs0}
+
+transportSortedBoundedRanges :: Prelude.Int -> Prelude.Int ->
+                                           Range.SortedBoundedRanges ->
+                                           Range.SortedBoundedRanges
+transportSortedBoundedRanges base prev sr =
+  Prelude.map (Range.transportBoundedRange base prev) sr
+
+reduceOp :: (OpInfo a1 a3 a4 a5) -> Prelude.Int -> a3 ->
+                       a2 -> BuildState -> BuildState
+reduceOp oinfo pos op block bs =
+  case opRefs oinfo op of {
+   (,) varRefs regRefs ->
+    let {
+     regRefs' = case opKind oinfo op of {
+                 IsCall ->
+                  unsafeCoerce
+                    (Fintype.enum_mem
+                      (Fintype.ordinal_finType maxReg)
+                      (Ssrbool.mem Ssrbool.predPredType
+                        (Ssrbool.sort_of_simpl_pred Ssrbool.pred_of_argType)));
+                 _ -> regRefs}}
+    in
+    Build_BuildState
+    (Prelude.map
+      (Lib.option_map
+        (transportSortedBoundedRanges ((Prelude.succ)
+          (let {
+            double_rec n =
+              (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+                (\_ ->
+                0)
+                (\n' -> (Prelude.succ) ((Prelude.succ)
+                (double_rec n')))
+                n}
+           in double_rec pos)) ((Prelude.succ) ((Prelude.succ)
+          ((Prelude.succ)
+          (let {
+            double_rec n =
+              (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+                (\_ ->
+                0)
+                (\n' -> (Prelude.succ) ((Prelude.succ)
+                (double_rec n')))
+                n}
+           in double_rec pos))))))
+      (bsVars ((Prelude.succ) pos) bs))
+    (setIntervalsForRegs pos
+      (bsRegs ((Prelude.succ) pos) bs) regRefs')}
+
+reduceBlock :: (OpInfo a1 a4 a5 a6) ->
+                          (BlockInfo a2 a3 a4 a5) -> Prelude.Int ->
+                          a2 -> Data.IntSet.IntSet -> BuildState ->
+                          BuildState
+reduceBlock oinfo binfo pos block liveOut bs =
+  let {_evar_0_ = \bs0 -> let {_evar_0_ = \bs1 -> bs1} in  _evar_0_ bs0} in
+  let {
+   _evar_0_0 = \o os iHos bs0 ->
+    let {
+     _evar_0_0 = \bs1 ->
+      iHos
+        (reduceOp oinfo ((Prelude.+) pos (Data.List.length os)) o
+          block bs1)}
+    in
+     _evar_0_0 bs0}
+  in
+  Datatypes.list_rect _evar_0_ _evar_0_0 (blockOps binfo block) bs
+
+reduceBlocks :: (VarInfo a6) -> (OpInfo 
+                           a1 a4 a5 a6) -> (BlockInfo a2 a3 
+                           a4 a5) -> ([] a2) -> (Data.IntMap.IntMap
+                           BlockLiveSets) -> BuildState
+reduceBlocks vinfo oinfo binfo blocks liveSets =
+  let {
+   go = let {
+         go b bs pos =
+           let {bid = blockId binfo b} in
+           let {
+            outs = case Data.IntMap.lookup bid liveSets of {
+                    Prelude.Just ls -> blockLiveOut ls;
+                    Prelude.Nothing -> Data.IntSet.empty}}
+           in
+           reduceBlock oinfo binfo pos b outs
+             (case bs of {
+               [] -> Build_BuildState
+                (Seq.nseq ((Prelude.succ)
+                  (foldOps binfo (\n op ->
+                    Data.List.foldl' (\m v ->
+                      Prelude.max m (varId vinfo v)) n
+                      (Prelude.fst (opRefs oinfo op))) 0 blocks))
+                  Prelude.Nothing)
+                (Data.List.replicate maxReg Prelude.Nothing);
+               (:) b' bs' ->
+                go b' bs'
+                  ((Prelude.+) pos
+                    (Data.List.length (blockOps binfo b)))})}
+        in go}
+  in
+  case blocks of {
+   [] -> Build_BuildState
+    (Seq.nseq ((Prelude.succ)
+      (foldOps binfo (\n op ->
+        Data.List.foldl' (\m v -> Prelude.max m (varId vinfo v)) n
+          (Prelude.fst (opRefs oinfo op))) 0 blocks))
+      Prelude.Nothing)
+    (Data.List.replicate maxReg Prelude.Nothing);
+   (:) x xs -> go x xs 0}
+
 buildIntervals :: (VarInfo a6) -> (OpInfo 
                              a1 a4 a5 a6) -> (BlockInfo a2 
-                             a3 a4 a5) -> ([] a2) -> ScanStateSig
-buildIntervals vinfo oinfo binfo blocks =
+                             a3 a4 a5) -> ([] a2) -> (Data.IntMap.IntMap
+                             BlockLiveSets) ->
+                             ScanStateSig
+buildIntervals vinfo oinfo binfo blocks liveSets =
   let {
-   mkint = \vid ss pos mx f ->
-    case mx of {
-     Prelude.Just b ->
-      f ss __ (Interval.Build_IntervalDesc vid (Range.rbeg ( b))
-        (Range.rend ( b)) Interval.Whole ((:[]) ( b))) __;
+   mkint = \vid ss pos mrs f ->
+    case mrs of {
+     Prelude.Just rs ->
+      f ( ss) __
+        (
+          (Interval.packInterval (Interval.Build_IntervalDesc vid
+            (Range.rbeg ( ( (Prelude.head ( rs)))))
+            (Range.rend ( ( (Prelude.last ( rs))))) Interval.Whole
+            rs))) __;
      Prelude.Nothing -> ss}}
   in
   let {
-   handleVar = \pos vid ss mx ->
-    mkint vid ss pos mx (\sd _ d _ ->
+   handleVar = \pos vid ss mrs ->
+    mkint vid ss pos mrs (\sd _ d _ ->
       packScanState Pending
         (Build_ScanStateDesc ((Prelude.succ)
         (nextInterval sd))
@@ -990,7 +1017,7 @@ buildIntervals vinfo oinfo binfo blocks =
         (Prelude.map Prelude.id (inactive sd))
         (Prelude.map Prelude.id (handled sd))))}
   in
-  let {bs = processOperations vinfo oinfo binfo blocks} in
+  let {bs = reduceBlocks vinfo oinfo binfo blocks liveSets} in
   let {
    f = \mx ->
     case mx of {
@@ -998,7 +1025,7 @@ buildIntervals vinfo oinfo binfo blocks =
      Prelude.Nothing -> Prelude.Nothing}}
   in
   let {
-   regs = LinearScan.Utils.vmap maxReg f (bsRegs bs)}
+   regs = LinearScan.Utils.vmap maxReg f (bsRegs 0 bs)}
   in
   let {
    s2 = packScanState Pending
@@ -1022,9 +1049,7 @@ buildIntervals vinfo oinfo binfo blocks =
             (Data.List.replicate maxReg Prelude.Nothing) [] [] []
             [])))}
   in
-  let {
-   s3 = Lib.foldl_with_index (handleVar (bsPos bs)) s2
-          (bsVars bs)}
+  let {s3 = Lib.foldl_with_index (handleVar 0) s2 (bsVars 0 bs)}
   in
   packScanState InUse ( s3)
 
@@ -2366,7 +2391,8 @@ linearScan binfo oinfo vinfo blocks accum =
   in
   let {liveSets' = computeGlobalLiveSets binfo blocks' liveSets}
   in
-  let {ssig = buildIntervals vinfo oinfo binfo blocks} in
+  let {ssig = buildIntervals vinfo oinfo binfo blocks liveSets'}
+  in
   case walkIntervals ( ssig) ((Prelude.succ)
          (countOps binfo blocks)) of {
    Prelude.Left err -> Prelude.Left err;

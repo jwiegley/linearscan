@@ -237,6 +237,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc)
   go (getInterval (fst x)).
 Obligation 2.
   move: Heq_ss.
+
   case: (iend (vnth (intervals z) o).1 < pos).
     rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
@@ -245,6 +246,7 @@ Obligation 2.
     case=> [Hinc _ (* _ _ *)].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
+
   case: (~~ (ibeg (vnth (intervals z) o).1 <=
              pos < iend (vnth (intervals z) o).1)).
     rewrite /moveActiveToInactive /=.
@@ -254,6 +256,7 @@ Obligation 2.
     case=> [Hinc _ (* _ _ *)].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
+
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.

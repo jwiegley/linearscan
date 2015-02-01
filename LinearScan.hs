@@ -19,6 +19,7 @@ module LinearScan
     , PhysReg
     ) where
 
+import Control.Monad.Trans.State
 import qualified LinearScan.Main as LS
 import LinearScan.Main
     ( VarKind(..)
@@ -58,10 +59,10 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo accType op1 op2 var = OpInfo
     { opKind      :: op1 -> OpKind
     , opRefs      :: op1 -> ([var], [PhysReg])
-    , moveOp      :: PhysReg -> PhysReg -> accType -> ([op2], accType)
-    , swapOp      :: PhysReg -> PhysReg -> accType -> ([op2], accType)
-    , saveOp      :: PhysReg -> Maybe Int -> accType -> ([op2], accType)
-    , restoreOp   :: Maybe Int -> PhysReg -> accType -> ([op2], accType)
+    , moveOp      :: PhysReg   -> PhysReg   -> State accType [op2]
+    , swapOp      :: PhysReg   -> PhysReg   -> State accType [op2]
+    , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
+    , restoreOp   :: Maybe Int -> PhysReg   -> State accType [op2]
     , applyAllocs :: op1 -> [(Int, PhysReg)] -> [op2]
     }
 
@@ -69,7 +70,12 @@ deriving instance Eq OpKind
 deriving instance Show OpKind
 
 fromOpInfo :: OpInfo accType op1 op2 var -> LS.OpInfo accType op1 op2 var
-fromOpInfo (OpInfo a b c d e f g) = LS.Build_OpInfo a b c d e f g
+fromOpInfo (OpInfo a b c d e f g) =
+    LS.Build_OpInfo a b
+        ((runState .) . c)
+        ((runState .) . d)
+        ((runState .) . e)
+        ((runState .) . f) g
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -99,13 +105,13 @@ allocate :: BlockInfo blk1 blk2 op1 op2
          -> OpInfo accType op1 op2 var
          -> VarInfo var
          -> [blk1]
-         -> accType
-         -> Either String ([blk2], accType)
-allocate _ _ _ [] _ = Left "No basic blocks were provided"
+         -> State accType (Either String [blk2])
+allocate _ _ _ [] = return $ Left "No basic blocks were provided"
 allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
-         (fromVarInfo -> vinfo) blocks acc =
-    case LS.linearScan binfo oinfo vinfo blocks acc of
-        Left x -> Left $ case x of
+         (fromVarInfo -> vinfo) blocks = do
+    eres <- gets (LS.linearScan binfo oinfo vinfo blocks)
+    case eres of
+        Left x -> return $ Left $ case x of
             LS.ECannotSplitSingleton n ->
                 "Current interval is a singleton (" ++ show n ++ ")"
             LS.ECannotSplitAssignedSingleton n ->
@@ -119,4 +125,4 @@ allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
             LS.EFuelExhausted -> "Fuel was exhausted"
             LS.EUnexpectedNoMoreUnhandled ->
                 "The unexpected happened: no more unhandled intervals"
-        Right z -> Right z
+        Right (z, acc) -> put acc >> return (Right z)

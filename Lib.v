@@ -198,6 +198,9 @@ Proof.
   by auto.
 Qed.
 
+Lemma inner_addn1: forall n, n.*2.+1 < (n.+1).*2.+1.
+Proof. by move=> n; rewrite doubleS. Qed.
+
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
 Definition odd_1 : odd 1. done. Qed.
@@ -502,7 +505,7 @@ Definition map_fst_filter_snd :
 Proof.
   move=> a b i xs.
   apply/allP => x /mapP[[x1 y1]].
-  by rewrite mem_filter => /andP[/eqP/=-> pIxs ->].
+  by rewrite mem_filter => /= /andP [/eqP/=-> pIxs ->].
 Qed.
 
 Definition widen_id {n} := widen_ord (leqnSn n).
