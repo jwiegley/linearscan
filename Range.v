@@ -211,6 +211,18 @@ Qed.
 Definition SortedBoundedRanges (pos : nat) :=
   { rs : NonEmpty (BoundedRange pos) | NE_StronglySorted range_lt rs }.
 
+Definition transportSortedBoundedRanges {base : nat} `(Hlt : base < prev)
+  (sr : SortedBoundedRanges prev) : SortedBoundedRanges base.
+Proof.
+  case: sr => [rs Hsort].
+  exists (NE_map (transportBoundedRange Hlt) rs).
+  elim: rs => [r|r rs IHrs] /= in Hsort *.
+    by constructor.
+  constructor; inversion Hsort; subst.
+    exact: IHrs.
+  exact: NE_Forall_transport.
+Defined.
+
 Lemma Range_beg_bounded `(r : Range rd) : rbeg rd <= uloc (NE_head (ups rd)).
 Proof. induction r; auto. simpl. apply leq_min. by []. Qed.
 

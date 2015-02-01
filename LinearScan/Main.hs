@@ -760,39 +760,6 @@ computeGlobalLiveSets binfo blocks liveSets =
         (blockLastOpId liveSet2)) liveSets1;
      Prelude.Nothing -> liveSets1})
 
-createRangeForVars :: (VarInfo a1) -> Prelude.Int -> ([]
-                                 (Prelude.Maybe Range.BoundedRange)) -> ([]
-                                 a1) -> [] (Prelude.Maybe Range.BoundedRange)
-createRangeForVars vinfo pos vars varRefs =
-  (Prelude.flip (Prelude.$)) vars (\vars' ->
-    let {
-     vars'0 = Prelude.map
-                (Lib.option_map
-                  (Range.transportBoundedRange ((Prelude.succ)
-                    (Ssrnat.double pos)) ((Prelude.succ)
-                    (Ssrnat.double ((Prelude.succ) pos))))) vars'}
-    in
-    Data.List.foldl' (\vars'1 v ->
-      let {
-       upos = Range.Build_UsePos ((Prelude.succ) (Ssrnat.double pos))
-        (regRequired vinfo v)}
-      in
-      (Prelude.flip (Prelude.$)) __ (\_ ->
-        Seq.set_nth Prelude.Nothing vars'1 (varId vinfo v)
-          (Prelude.Just
-          (let {
-            _evar_0_ = \_top_assumption_ -> Range.Build_RangeDesc
-             (Range.uloc upos) (Range.rend ( _top_assumption_)) ((:) upos
-             (Range.ups ( _top_assumption_)))}
-           in
-           let {
-            _evar_0_0 = Range.Build_RangeDesc (Range.uloc upos)
-             ((Prelude.succ) (Range.uloc upos)) ((:[]) upos)}
-           in
-           case Seq.nth Prelude.Nothing vars (varId vinfo v) of {
-            Prelude.Just x -> _evar_0_ x;
-            Prelude.Nothing -> _evar_0_0})))) vars'0 varRefs)
-
 setIntervalsForRegs :: Prelude.Int -> ([]
                                   (Prelude.Maybe Interval.BoundedInterval))
                                   -> ([] PhysReg) -> []
@@ -878,12 +845,6 @@ bsRegs pos b =
   case b of {
    Build_BuildState bsVars0 bsRegs0 -> bsRegs0}
 
-transportSortedBoundedRanges :: Prelude.Int -> Prelude.Int ->
-                                           Range.SortedBoundedRanges ->
-                                           Range.SortedBoundedRanges
-transportSortedBoundedRanges base prev sr =
-  Prelude.map (Range.transportBoundedRange base prev) sr
-
 reduceOp :: (OpInfo a1 a3 a4 a5) -> Prelude.Int -> a3 ->
                        a2 -> BuildState -> BuildState
 reduceOp oinfo pos op block bs =
@@ -902,7 +863,7 @@ reduceOp oinfo pos op block bs =
     Build_BuildState
     (Prelude.map
       (Lib.option_map
-        (transportSortedBoundedRanges ((Prelude.succ)
+        (Range.transportSortedBoundedRanges ((Prelude.succ)
           (let {
             double_rec n =
               (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))

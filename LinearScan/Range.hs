@@ -83,6 +83,11 @@ transportBoundedRange base prev x =
 
 type SortedBoundedRanges = ([] BoundedRange)
 
+transportSortedBoundedRanges :: Prelude.Int -> Prelude.Int ->
+                                SortedBoundedRanges -> SortedBoundedRanges
+transportSortedBoundedRanges base prev sr =
+  Prelude.map (transportBoundedRange base prev) sr
+
 rangesIntersect :: RangeDesc -> RangeDesc -> Prelude.Bool
 rangesIntersect x y =
   case (Prelude.<=) ((Prelude.succ) (rbeg x)) (rbeg y) of {

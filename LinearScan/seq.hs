@@ -54,30 +54,6 @@ belast x s =
    [] -> [];
    (:) x' s' -> (:) x (belast x' s')}
 
-nth :: a1 -> ([] a1) -> Prelude.Int -> a1
-nth x0 s n =
-  case s of {
-   [] -> x0;
-   (:) x s' ->
-    (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
-      (\_ ->
-      x)
-      (\n' ->
-      nth x0 s' n')
-      n}
-
-set_nth :: a1 -> ([] a1) -> Prelude.Int -> a1 -> [] a1
-set_nth x0 s n y =
-  case s of {
-   [] -> ncons n x0 ((:) y []);
-   (:) x s' ->
-    (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
-      (\_ -> (:) y
-      s')
-      (\n' -> (:) x
-      (set_nth x0 s' n' y))
-      n}
-
 count :: (Ssrbool.Coq_pred a1) -> ([] a1) -> Prelude.Int
 count a s =
   case s of {

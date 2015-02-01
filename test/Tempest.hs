@@ -22,6 +22,7 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
 import           Data.Foldable
 import           Data.IntMap
+import qualified Data.List
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid
@@ -319,7 +320,7 @@ opInfo = OpInfo
     , restoreOp = mkRestoreOp
 
       -- Apply allocations, which changes IRVar's into Reg's.
-    , applyAllocs = \node m -> [fmap (setRegister (fromList m)) node]
+    , applyAllocs = \node m -> [fmap (setRegister m) node]
     }
   where
     go :: Instruction IRVar -> ([(Int, VarKind)], [PhysReg])
@@ -341,7 +342,7 @@ opInfo = OpInfo
     setRegister _ (IRVar (PhysicalIV r) _) = r
     setRegister m (IRVar (VirtualIV n _) _) =
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
-                  (Data.IntMap.lookup n m)
+                  (Data.List.lookup n m)
 
 mkSaveOp r vid = do
     stack <- get

@@ -273,37 +273,6 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
          |} liveSets1
     end.
 
-(* For each virtual variable references, add a use position to a [Range]
-   corresponding to that variable.  These ranges are concatenated together and
-   will form a single [Interval] at the end.  This is different from how
-   Wimmer builds them up, and is more simplistic, but is sufficient for now.
-
-   jww (2015-01-30): The more efficient solution would be to implement the
-   algorithm from his paper. *)
-Definition createRangeForVars (pos : nat)
-  (vars : seq (option (BoundedRange (pos.+1).*2.+1)))
-  (varRefs : seq varType) : seq (option (BoundedRange pos.*2.+1)).
-Proof.
-  have vars' := vars.
-  move/(map (option_map (transportBoundedRange
-                           (inner_addn1 pos)))) in vars'.
-  apply: foldl _ vars' varRefs => vars' v.
-
-  (* jww (2015-01-30): The [regReq] field is presently not being used. *)
-  set upos := {| uloc   := pos.*2.+1
-               ; regReq := regRequired vinfo v |}.
-  have Hodd : odd upos by rewrite /= odd_double.
-
-  apply: (set_nth None vars' (varId vinfo v) _).
-  apply: Some _.
-  case: (nth None vars (varId vinfo v)) => [[r /= Hlt]|];
-    last exact: exist _ (exist _ _ (R_Sing Hodd)) _.
-
-  apply: exist _ (exist _ _ (R_Cons Hodd r.2 _)) _ => //=.
-  rewrite doubleS in Hlt.
-  exact/ltnW.
-Defined.
-
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
    one-position wide ranges. *)
@@ -342,18 +311,6 @@ Record BuildState (pos : nat) := {
   bsVars : seq (option (SortedBoundedRanges pos.*2.+1));
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
-
-Definition transportSortedBoundedRanges {base : nat} `(Hlt : base < prev)
-  (sr : SortedBoundedRanges prev) : SortedBoundedRanges base.
-Proof.
-  case: sr => [rs Hsort].
-  exists (NE_map (transportBoundedRange Hlt) rs).
-  elim: rs => [r|r rs IHrs] /= in Hsort *.
-    by constructor.
-  constructor; inversion Hsort; subst.
-    exact: IHrs.
-  exact: NE_Forall_transport.
-Defined.
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=
@@ -461,123 +418,6 @@ Definition buildIntervals (blocks : seq blockType1)
      let s4 := ScanState_finalize s3.2 in
      packScanState s4)
   (reduceBlocks blocks liveSets).
-
-(*
-  have [opCount highestVar] :=
-      foldOps (fun x op => let: (n, m) := x in
-        (n.+1, foldl (fun m v => maxn m (varId vinfo v))
-                     m (fst (opRefs oinfo op))))
-        (0, 0) blocks.
-  have :=
-      {| bsPos  := opCount
-       ; bsVars := nseq highestVar.+1 [::]
-       ; bsRegs := vconst None |}.
-  case=> [pos vars regs].
-  case: pos => [|pos] in vars regs *.
-    exact {| bsPos  := 0
-           ; bsVars := vars
-           ; bsRegs := regs |}.
-
-  apply: {| bsPos := pos |}.
-  move: (opRefs oinfo op) => [varRefs regRefs].
-    exact: createRangeForVars.
-
-  (* If the operation is a function call, assuming it makes use of every
-     register.
-
-     jww (2015-01-30): This needs to be improved to consider the calling
-     convention of the operation. *)
-  have regRefs' := if opKind oinfo op is IsCall
-                   then enum 'I_maxReg else regRefs.
-  clear regRefs.
-  exact: createIntervalForRegs.
-Defined.
-
-  let fix go pos (bst : BuildState pos) bs :=
-    if bs isn't b :: bs then bst else
-    let bid  := blockId binfo b in
-    let outs := if IntMap_lookup bid liveSets isn't Some ls
-                then emptyIntSet
-                else blockLiveOut ls in
-    match pos with
-    | 0 => bst
-    | S pos' =>
-      let Heqe : pos'.+1 = pos := undefined in
-      let bst' :=
-        forFold bst (rev (blockOps binfo b)) $ fun bst' op =>
-          let: (varRefs, regRefs) := opRefs oinfo op in
-
-          (* If the operation is a function call, assuming it makes use of every
-             register.
-             jww (2015-01-30): This needs to be improved to consider the calling
-             convention of the operation. *)
-          let regRefs' := if opKind oinfo op is IsCall
-                          then enum 'I_maxReg
-                          else regRefs in
-          let bsRegs' := @setIntervalsForRegs pos' (bsRegs bst') regRefs' in
-          {| bsVars := map (map (transportBoundedRange _)) (bsVars bst')
-           ; bsRegs := bsRegs' |} in
-      bst'
-    end in
-  go bst0 opCount (rev blocks).
-
-  forFold bst0 (rev blocks) $ fun bst1 b => match bsPos bst1 with
-    | 0 =>
-        {| bsPos  := 0
-         ; bsVars := map (map (transportBoundedRange _)) (bsVars bst1)
-         ; bsRegs := vmap (option_map (transportBoundedInterval _))
-                          (bsRegs bst1)
-         |}
-    | S pos =>
-      let bid  := blockId binfo b in
-      let outs := if IntMap_lookup bid liveSets isn't Some ls
-                  then emptyIntSet
-                  else blockLiveOut ls in
-      let bst4 :=
-        forFold bst1 (rev (blockOps binfo b)) $ fun bst2 op =>
-          let: (varRefs, regRefs) := opRefs oinfo op in
-
-          (* If the operation is a function call, assuming it makes use of every
-             register.
-             jww (2015-01-30): This needs to be improved to consider the calling
-             convention of the operation. *)
-          let regRefs' := if opKind oinfo op is IsCall
-                          then enum 'I_maxReg
-                          else regRefs in
-          let bst3 := @setIntervalsForRegs pos (bsRegs bst2) regRefs' in
-          bst3 in
-      bst4
-    end.
-
-Definition buildIntervals (blocks : seq blockType1) : ScanStateSig InUse :=
-  let mkint (vid : VarId)
-            (ss : ScanStateSig Pending)
-            (pos : nat)
-            (mx : option (BoundedRange pos.*2.+1))
-            (f : forall sd, ScanState Pending sd -> forall d, Interval d
-                   -> ScanStateSig Pending) :=
-      let: exist _ st := ss in
-      if mx is Some (exist r _)
-      then f _ st _ (I_Sing vid Whole r.2)
-           (* jww (2015-01-20): At the present time there is no use of
-              "lifetime holes", and so [I_Cons] is never used here. *)
-      else ss in
-
-  let handleVar pos vid ss mx :=
-      mkint vid ss pos mx $ fun _ st _ i =>
-        packScanState (ScanState_newUnhandled st i I) in
-
-  (fun bs =>
-     let s0 := ScanState_nil in
-     let f mx := if mx is Some x then Some x.1 else None in
-     let regs := vmap f (bsRegs bs) in
-     let s1 := ScanState_setFixedIntervals s0 regs in
-     let s2 := packScanState s1 in
-     let s3 := foldl_with_index (handleVar (bsPos bs)) s2 (bsVars bs) in
-     let s4 := ScanState_finalize s3.2 in
-     packScanState s4)
-  (processOperations blocks).
-*)
 
 Definition checkIntervalBoundary `(st : ScanState InUse sd)
   key in_from from to mappings vid :=
