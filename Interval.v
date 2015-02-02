@@ -291,29 +291,6 @@ Definition transportBoundedInterval {base : nat} `(Hlt : base < prev)
   exact/(leq_trans _ H)/ltnW.
 Defined.
 
-Definition Interval_fromRanges {pos} (vid : nat)
-  (sr : SortedBoundedRanges pos) :
-  Interval {| ivar := vid
-            ; ibeg := rbeg (NE_head sr.1).1.1
-            ; iend := rend (NE_last sr.1).1.1
-            ; iknd := Whole
-            ; rds  := NE_map sval sr.1 |}.
-Proof.
-  move: sr => [rs Hsort].
-  elim: rs => [r|r rs /= IHrs] /= in Hsort *.
-    move: (I_Sing vid Whole r.1.2) => {Hsort}.
-    by move: r => [[rd r] ?].
-  apply NE_StronglySorted_inv in Hsort.
-  move: Hsort => [Hsort Hall].
-  move/IHrs: Hsort => {IHrs} IHrs.
-  have Hlt: rend r.1.1 < rbeg (NE_head (NE_map sval rs)).1.
-    move/NE_Forall_head in Hall.
-    by rewrite NE_map_head.
-  rewrite -NE_map_head -NE_map_last in IHrs.
-  move: (I_Cons (i:=vid) (knd:=Whole) IHrs Hlt).
-  by rewrite NE_map_last.
-Defined.
-
 Inductive SplitPosition :=
   | BeforePos of nat
   | BeforeFirstUsePosReqReg

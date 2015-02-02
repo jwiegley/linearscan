@@ -131,3 +131,30 @@ Proof.
     exact: IHrs.
   exact: NE_Forall_transport.
 Defined.
+
+Require Import LinearScan.Interval.
+
+Definition Interval_fromSortedProtoRanges {pos} (vid : nat)
+  (sr : SortedProtoRanges pos) :
+  (* Interval {| ivar := vid *)
+  (*           ; ibeg := prBeg (NE_head sr.1) *)
+  (*           ; iend := prEnd (NE_last sr.1) *)
+  (*           ; iknd := Whole *)
+  (*           ; rds  := NE_map sval sr.1 |} *)
+  IntervalSig.
+Proof.
+Admitted.
+  (* move: sr => [rs Hsort]. *)
+  (* elim: rs => [r|r rs /= IHrs] /= in Hsort *. *)
+  (*   move: (I_Sing vid Whole r.1.2) => {Hsort}. *)
+  (*   by move: r => [[rd r] ?]. *)
+  (* apply NE_StronglySorted_inv in Hsort. *)
+  (* move: Hsort => [Hsort Hall]. *)
+  (* move/IHrs: Hsort => {IHrs} IHrs. *)
+  (* have Hlt: rend r.1.1 < rbeg (NE_head (NE_map sval rs)).1. *)
+  (*   move/NE_Forall_head in Hall. *)
+  (*   by rewrite NE_map_head. *)
+  (* rewrite -NE_map_head -NE_map_last in IHrs. *)
+  (* move: (I_Cons (i:=vid) (knd:=Whole) IHrs Hlt). *)
+  (* by rewrite NE_map_last. *)
+(* Defined. *)

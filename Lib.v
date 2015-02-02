@@ -279,11 +279,22 @@ Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
 Definition odd_1 : odd 1. done. Qed.
 
-Lemma leqW_double : forall n, n <= n.*2.
+Lemma leqnn_double : forall n, n <= n.*2.
 Proof.
   elim=> //= [n IHn].
   rewrite doubleS.
   exact/leqW/IHn.
+Qed.
+
+Lemma leq_doubleW : forall m n, m <= n -> m <= n.*2.
+Proof.
+  move=> m n H.
+  elim: n => //= [n IHn] in H *.
+  apply: (leq_trans H _).
+  rewrite doubleS.
+  apply/leqW.
+  rewrite ltnS.
+  exact: leqnn_double.
 Qed.
 
 Lemma odd_double_plus (n : nat) : odd n.*2.+1.
