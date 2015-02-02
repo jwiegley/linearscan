@@ -62,6 +62,13 @@ Definition maybeLast a (l : seq a) : option a :=
       end in
   go None l.
 
+Definition prepend (a : eqType) (x : a) mxs :=
+  if mxs is Some xs
+  then if x \notin xs
+       then Some (x :: xs)
+       else Some xs
+  else Some [:: x].
+
 Module Trace.
 
 Require Import Coq.Strings.Ascii.
@@ -167,6 +174,73 @@ Definition list_membership {a : eqType} (l : seq a) :
       end in
   go l.
 
+Lemma Forall_append : forall A (P : A -> Prop) xs ys,
+   List.Forall P xs /\ List.Forall P ys <-> List.Forall P (xs ++ ys).
+Proof.
+  move=> A P.
+  elim=> [|x xs IHxs] /= ys.
+    split.
+      by move=> [H1 H2] //=.
+    move=> H.
+    split=> //.
+  split.
+    move=> [H1 H2] //=.
+    constructor.
+      by inversion H1.
+    apply/IHxs.
+    split=> //.
+    by inversion H1.
+  move=> H.
+  split=> //.
+    constructor.
+      by inversion H.
+    inversion H; subst.
+    by move/IHxs: H3 => [? ?].
+  inversion H; subst.
+  by move/IHxs: H3 => [? ?].
+Qed.
+
+Require Import Coq.Sorting.Sorted.
+
+Lemma StronglySorted_inv_app : forall a R (l1 l2 : seq a),
+  StronglySorted R (l1 ++ l2)
+    -> StronglySorted R l1 /\ StronglySorted R l2.
+Proof.
+  move=> a R.
+  elim=> [|x xs IHxs] /= l2 H.
+    split=> //.
+    constructor.
+  inversion H.
+  specialize (IHxs l2 H2).
+  inversion IHxs; subst.
+  split=> //.
+  constructor=> //.
+  by move/Forall_append: H3 => [? ?].
+Qed.
+
+Lemma Forall_all : forall (T : Type) (a : pred T) (s : seq T),
+  reflect (List.Forall a s) (all a s).
+Proof.
+  move=> T a.
+  elim=> [|x xs IHxs] //=.
+    by constructor; constructor.
+  case E: (a x) => /=.
+    case A: (all a xs).
+      constructor.
+      constructor.
+        by rewrite E.
+      exact/IHxs.
+    constructor.
+    move=> Hcontra.
+    inversion Hcontra; subst.
+    rewrite A in IHxs.
+    by move/IHxs in H2.
+  constructor.
+  move=> Hcontra.
+  inversion Hcontra; subst.
+  by rewrite E in H1.
+Qed.
+
 Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=
   if v is (k, v) :: xs
   then if k == x
@@ -205,6 +279,13 @@ Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
 Definition odd_1 : odd 1. done. Qed.
 
+Lemma leqW_double : forall n, n <= n.*2.
+Proof.
+  elim=> //= [n IHn].
+  rewrite doubleS.
+  exact/leqW/IHn.
+Qed.
+
 Lemma odd_double_plus (n : nat) : odd n.*2.+1.
 Proof.
   elim: n => [|n IHn] //=.
@@ -217,6 +298,16 @@ Proof.
   move/andP=> [nodd modd] Hlt.
   rewrite -subn_gt0 odd_gt0 // odd_sub // modd /=.
   exact/negPn.
+Qed.
+
+Lemma ltn_even n m : ~~ odd n && ~~ odd m -> n < m -> n.+1 < m.
+Proof.
+  move/andP=> [nodd modd] Hlt.
+  rewrite -subn_gt0 odd_gt0 // odd_sub //.
+  apply/addbP=> /=.
+  move/eqP/eqP in nodd.
+  move/eqP/eqP in modd.
+  by rewrite nodd modd.
 Qed.
 
 Lemma even_odd_plus n : ~~ odd n -> odd n.+1.
@@ -929,8 +1020,7 @@ Program Fixpoint dep_foldl_invE
 Obligation 2.
   inversion Heq_anonymous.
   clear Heq_anonymous0.
-  rewrite -H1 in Hn.
-  rewrite -H0 in Hn.
+  rewrite -H1 -H0 in Hn.
   simpl in Hn.
   move: eqSS Hn => /= -> /eqP ->.
   by rewrite size_map.

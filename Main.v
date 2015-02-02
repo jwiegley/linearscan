@@ -7,8 +7,15 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
 Require Import LinearScan.Allocate.
+Require Import LinearScan.Assign.
 Require Import LinearScan.Blocks.
+Require Import LinearScan.Build.
 Require Import LinearScan.Lib.
+Require Import LinearScan.LiveSets.
+Require Import LinearScan.Order.
+Require Import LinearScan.Resolve.
+Require Import LinearScan.ScanState.
+Require Import LinearScan.Morph.
 Require Import LinearScan.Machine.
 
 Module MyMachine <: Machine.
@@ -26,25 +33,33 @@ Definition PhysReg := 'I_maxReg.
 
 End MyMachine.
 
-Module Import Allocate := MAllocate MyMachine.
+Module Allocate  := MAllocate MyMachine.
+Module Assign    := MAssign MyMachine.
+Module Blocks    := MBlocks MyMachine.
+Module Build     := MBuild MyMachine.
+Module LiveSets  := MLiveSets MyMachine.
+Module Morph     := MMorph MyMachine.
+Module Order     := MOrder MyMachine.
+Module Resolve   := MResolve MyMachine.
+Module ScanState := MScanState MyMachine.
 
-Section Main.
+Include MAssign MyMachine.
 
-Definition linearScan {accType : Set}
-  {blockType1 blockType2 opType1 opType2 varType : Set}
+Definition linearScan
+  {blockType1 blockType2 opType1 opType2 varType accType : Set}
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo accType opType1 opType2 varType)
-  (vinfo : VarInfo varType) (blocks : seq blockType1)
-  (accum : accType) : SSError + (seq blockType2 * accType) :=
-
+  (vinfo : VarInfo varType)
+  (blocks : seq blockType1) (accum : accType) :
+  SSError + (seq blockType2 * accType) :=
   (* order blocks and operations (including loop detection) *)
   let blocks' := computeBlockOrder blocks in
   (* numberOperations blocks' ;;; *)
 
   (* create intervals with live ranges *)
-  let liveSets  := computeLocalLiveSets vinfo oinfo binfo blocks' in
+  let liveSets  := computeLocalLiveSets binfo oinfo vinfo blocks' in
   let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
-  let ssig      := buildIntervals vinfo oinfo binfo blocks liveSets' in
+  let ssig      := buildIntervals binfo oinfo vinfo blocks liveSets' in
 
   (* allocate registers *)
   match walkIntervals ssig.2 (countOps binfo blocks).+1
@@ -54,10 +69,8 @@ Definition linearScan {accType : Set}
       let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
 
       (* replace virtual registers with physical registers *)
-      inr $ assignRegNum vinfo oinfo binfo ssig'.2 mappings blocks accum
+      inr $ assignRegNum binfo oinfo vinfo ssig'.2 mappings blocks accum
   end.
-
-End Main.
 
 Extraction Language Haskell.
 
@@ -88,23 +101,6 @@ Extract Inlined Constant widen_id           => "".
 Extract Inlined Constant widen_fst          => "Prelude.id".
 Extract Inlined Constant List.destruct_list => "LinearScan.Utils.uncons".
 Extract Inlined Constant list_membership    => "Prelude.const".
-
-Extract Inductive IntMap => "Data.IntMap.IntMap"
-  ["Data.IntMap.empty" "Data.IntMap.fromList"] "(\fO fS _ -> fO ())".
-
-Extract Inlined Constant IntMap_lookup => "Data.IntMap.lookup".
-Extract Inlined Constant IntMap_insert => "Data.IntMap.insert".
-Extract Inlined Constant IntMap_alter  => "Data.IntMap.alter".
-Extract Inlined Constant IntMap_toList => "Data.IntMap.toList".
-
-Extract Inductive IntSet => "Data.IntSet.IntSet"
-  ["Data.IntSet.empty" "Data.IntSet.fromList"] "(\fO fS _ -> fO ())".
-
-Extract Inlined Constant IntSet_member     => "Data.IntSet.member".
-Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
-Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
-Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
-Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
 
 Extract Inductive NonEmpty => "[]" ["(:[])" "(:)"].
 

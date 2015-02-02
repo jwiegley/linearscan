@@ -30,6 +30,42 @@ Arguments upos_lt x y /.
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
+Lemma all_leq : forall x y xs,
+  all (fun u : UsePos => y <= u) xs -> x <= y
+    -> all (fun u : UsePos => x <= u) xs.
+Proof.
+  move=> x y.
+  elim=> [|z zs IHzs] //=.
+  move/andP => [H1 H2] H3.
+  apply/andP; split.
+    exact: (leq_trans H3 _).
+  exact: IHzs.
+Qed.
+
+Lemma all_leq_ltn : forall x y xs,
+  all (fun u : UsePos => y <= u) xs -> x < y
+    -> all (fun u : UsePos => x < u) xs.
+Proof.
+  move=> x y.
+  elim=> [|z zs IHzs] //=.
+  move/andP => [H1 H2] H3.
+  apply/andP; split.
+    exact: (leq_trans H3 _).
+  exact: IHzs.
+Qed.
+
+Lemma all_ltn : forall x y xs,
+  all (fun u : UsePos => u < y) xs -> y <= x
+    -> all (fun u : UsePos => u < x) xs.
+Proof.
+  move=> x y.
+  elim=> [|z zs IHzs] //=.
+  move/andP => [H1 H2] H3.
+  apply/andP; split.
+    exact: (ltn_leq_trans H1 _).
+  exact: IHzs.
+Qed.
+
 Lemma NE_StronglySorted_UsePos_impl : forall xs,
   NE_StronglySorted upos_lt xs -> NE_head xs < (NE_last xs).+1.
 Proof.

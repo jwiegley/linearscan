@@ -10,8 +10,15 @@ Machine.v
 Main.v
 NonEmpty.v
 Range.v
-SSMorph.v
+Morph.v
 ScanState.v
 Spec.v
 Ssr.v
 Vector.v
+Proto.v
+IntMap.v
+LiveSets.v
+Build.v
+Assign.v
+Resolve.v
+Order.v

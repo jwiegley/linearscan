@@ -1,8 +1,9 @@
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
+Require Import LinearScan.Machine.
 Require Import LinearScan.IState.
-
-Require Export LinearScan.SSMorph.
+Require Import LinearScan.ScanState.
+Require Import LinearScan.Morph.
 
 Generalizable All Variables.
 
@@ -10,7 +11,7 @@ Require LinearScan.Spec.
 
 Module MAllocate (Mach : Machine).
 
-Include MSSMorph Mach.
+Include MMorph Mach.
 
 Open Scope program_scope.
 

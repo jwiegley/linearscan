@@ -29,6 +29,8 @@ import           Data.Monoid
 import           LinearScan
 import           Test.Hspec
 
+import           Debug.Trace
+
 ------------------------------------------------------------------------------
 -- The input from the Tempest compiler has the following shape: 'Procedure a
 -- IRVar', which means that instructions ultimately refer to either physical
@@ -338,11 +340,11 @@ opInfo = OpInfo
     getReferences (Node (ReturnInstr _ i) _) = go i
     getReferences n = error $ "getReferences: unhandled node: " ++ show n
 
-    setRegister :: IntMap PhysReg -> IRVar -> Reg
+    setRegister :: [(Int, PhysReg)] -> IRVar -> Reg
     setRegister _ (IRVar (PhysicalIV r) _) = r
     setRegister m (IRVar (VirtualIV n _) _) =
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
-                  (Data.List.lookup n m)
+                  (Data.List.lookup n (traceShow m m))
 
 mkSaveOp r vid = do
     stack <- get

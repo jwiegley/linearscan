@@ -1,17 +1,19 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Build.
 Require Import LinearScan.Spec.
 Require Import LinearScan.IState.
-
-Require Export LinearScan.ScanState.
+Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MSSMorph (Mach : Machine).
+Module MMorph (Mach : Machine).
 
-Include MLinearSpec Mach.
+Module Import Spec := MSpec Mach.
+
+Include MBuild Mach.
 
 Open Scope nat_scope.
 
@@ -163,6 +165,31 @@ Proof.
     rewrite E /=. by [].
   rewrite E /=. by [].
 Defined.
+
+(** ** ScanStateCursor *)
+
+(** A [ScannStateCursor] gives us a view of the first unhandled element within
+    a [ScanState].  The cursor is only valid if such an unhandled element
+    exists, so it combines that assertion with a view onto that element. *)
+
+Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
+    curState  : ScanState InUse sd;
+    curExists : size (unhandled sd) > 0;
+
+    curId := safe_hd _ curExists;
+    curIntDetails := vnth (intervals sd) (fst curId)
+}.
+
+Arguments curState {sd} _.
+Arguments curExists {sd} _.
+Arguments curId {sd} _.
+Arguments curIntDetails {sd} _.
+
+Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
+Arguments curInterval [sd] cur /.
+Definition curPosition `(cur : ScanStateCursor sd) :=
+  intervalStart (curInterval cur).
+Arguments curPosition [sd] cur /.
 
 Definition withCursor {Q a pre}
   (f : forall sd : ScanStateDesc, ScanStateCursor sd
@@ -473,4 +500,4 @@ Proof.
   exact: ss'.
 Defined.
 
-End MSSMorph.
+End MMorph.

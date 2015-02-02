@@ -8,9 +8,9 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MLinearSpec (Mach : Machine).
+Module MSpec (Mach : Machine).
 
-Include MBlocks Mach.
+Module Import ScanState := MScanState Mach.
 
 (** * Linear scan specification *)
 
@@ -355,4 +355,4 @@ Proof.
 Qed.
 *)
 
-End MLinearSpec.
+End MSpec.

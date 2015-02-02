@@ -305,29 +305,4 @@ Arguments getScanStateDesc [sd] st /.
 Definition packScanState `(st : ScanState b sd) := exist (ScanState b) sd st.
 Arguments packScanState [b sd] st /.
 
-(** ** ScanStateCursor *)
-
-(** A [ScannStateCursor] gives us a view of the first unhandled element within
-    a [ScanState].  The cursor is only valid if such an unhandled element
-    exists, so it combines that assertion with a view onto that element. *)
-
-Record ScanStateCursor (sd : ScanStateDesc) : Prop := {
-    curState  : ScanState InUse sd;
-    curExists : size (unhandled sd) > 0;
-
-    curId := safe_hd _ curExists;
-    curIntDetails := vnth (intervals sd) (fst curId)
-}.
-
-Arguments curState {sd} _.
-Arguments curExists {sd} _.
-Arguments curId {sd} _.
-Arguments curIntDetails {sd} _.
-
-Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
-Arguments curInterval [sd] cur /.
-Definition curPosition `(cur : ScanStateCursor sd) :=
-  intervalStart (curInterval cur).
-Arguments curPosition [sd] cur /.
-
 End MScanState.
