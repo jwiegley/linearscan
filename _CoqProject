@@ -6,7 +6,6 @@ IState.v
 State.v
 Interval.v
 Lib.v
-Machine.v
 Main.v
 NonEmpty.v
 Range.v
@@ -22,3 +21,5 @@ Build.v
 Assign.v
 Resolve.v
 Order.v
+Cursor.v
+Split.v

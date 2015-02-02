@@ -3,7 +3,6 @@ Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
 Require Import LinearScan.Interval.
 Require Import LinearScan.IntMap.
-Require Import LinearScan.Machine.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.State.
@@ -13,16 +12,15 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MAssign (Mach : Machine).
-
-Include MResolve Mach.
-
 Section Assign.
+
+Variable maxReg : nat.          (* max number of registers *)
+Definition PhysReg : predArgType := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo accType opType1 opType2 varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
 Variable vinfo : VarInfo varType.
 
 Record AssnStateInfo := {
@@ -111,7 +109,8 @@ Definition generateMoves (moves : seq (option PhysReg * option PhysReg)) :
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
 
-Definition resolveMappings bid ops ops' mappings : AssnState (seq opType2) :=
+Definition resolveMappings bid ops ops' mappings :
+  AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
   if IntMap_lookup bid mappings isn't Some graphs then pure ops' else
@@ -141,7 +140,7 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2)) mappings :=
     pure $ setBlockOps binfo blk ops''.
 
 Definition assignRegNum `(st : ScanState InUse sd)
-  (mappings : IntMap BlockMoves) (blocks : seq blockType1)
+  (mappings : IntMap (BlockMoves maxReg)) (blocks : seq blockType1)
   (acc : accType) : seq blockType2 * accType :=
   let: (blocks', assn) :=
     considerOps
@@ -155,5 +154,3 @@ Definition assignRegNum `(st : ScanState InUse sd)
   (blocks', assnAcc assn).
 
 End Assign.
-
-End MAssign.

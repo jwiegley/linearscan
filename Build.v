@@ -1,10 +1,9 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Blocks.
-Require Import LinearScan.Interval.
 Require Import LinearScan.IntMap.
-Require Import LinearScan.LiveSets.
-Require Import LinearScan.Machine.
+Require Import LinearScan.Interval.
+Require Import LinearScan.Blocks.
 Require Import LinearScan.Proto.
+Require Import LinearScan.LiveSets.
 Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
@@ -12,21 +11,20 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MBuild (Mach : Machine).
+Section Build.
 
-Include MLiveSets Mach.
+Variable maxReg : nat.          (* max number of registers *)
+Definition PhysReg : predArgType := 'I_maxReg.
 
 Record BuildState (pos : nat) := {
   bsVars : seq (option (SortedProtoRanges pos.*2.+1));
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
 
-Section Build.
-
 Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo accType opType1 opType2 varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
 Variable vinfo : VarInfo varType.
 
 (* Create a proto range to represent a variable reference. *)
@@ -226,7 +224,7 @@ Definition reduceBlocks (blocks : seq blockType1)
   end.
 
 Definition buildIntervals (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : ScanStateSig InUse :=
+  (liveSets : IntMap BlockLiveSets) : ScanStateSig maxReg InUse :=
   (* for each block b in blocks in reverse order do
        int block_from = b.first_op.id
        int block_to = b.last_op.id + 2
@@ -262,11 +260,11 @@ Definition buildIntervals (blocks : seq blockType1)
      end for *)
   let mkint
         (vid : VarId)
-        (ss  : ScanStateSig Pending)
+        (ss  : ScanStateSig maxReg Pending)
         (pos : nat)
         (mrs : option (SortedBoundedRanges pos.*2.+1))
         (f   : forall sd, ScanState Pending sd
-                 -> forall d, Interval d -> ScanStateSig Pending) :=
+                 -> forall d, Interval d -> ScanStateSig maxReg Pending) :=
       if mrs is Some rs
       then f _ ss.2 _ (packInterval (Interval_fromRanges vid rs)).2
       else ss in
@@ -276,7 +274,7 @@ Definition buildIntervals (blocks : seq blockType1)
         packScanState (ScanState_newUnhandled st i I) in
 
   (fun (bs : BuildState 0) =>
-     let s0 := ScanState_nil in
+     let s0 := ScanState_nil maxReg in
      let f mx := if mx is Some x then Some x.1 else None in
      let regs := vmap f (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
@@ -424,5 +422,3 @@ Definition buildIntervals (blocks : seq blockType1)
 (************************************************************************)
 
 End Build.
-
-End MBuild.

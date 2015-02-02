@@ -1,6 +1,11 @@
-Require Import LinearScan.Lib.
+Require Import LinearScan.Ssr.
 
-Section Topsort.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+Generalizable All Variables.
+
+Section Graph.
 
 Variable a : eqType.
 
@@ -27,7 +32,7 @@ Definition addEdge e (g : Graph) : Graph :=
        ; edges := if e \in eg then eg else e :: eg
        |})
     (edges g) in
-  addVertex (fst e) $ addVertex (snd e) $ g'.
+  addVertex (fst e) (addVertex (snd e) g').
 
 Definition removeEdge (x : option a * option a) g :=
   {| vertices := vertices g
@@ -56,8 +61,7 @@ Fixpoint tsort' fuel l roots g :=
 
          jww (2015-01-30): This means I need a way to indicate swaps here,
          since effectively what I am doing now is swapping through memory. *)
-      ([:: de], addEdge (se, None) $
-                   removeEdge (se, de) $ g) in
+      ([:: de], addEdge (se, None) (removeEdge (se, de) g)) in
   if next isn't (n :: s, g') then [::] else
 
   let outEdges    := outbound n g' in
@@ -77,7 +81,7 @@ Definition topsort g :=
   (* +1 is added to the fuel in case None is injected as a root *)
   tsort' (size (vertices g)).+1 [::] noInbound g.
 
-End Topsort.
+End Graph.
 
 Arguments emptyGraph [a].
 Arguments addVertex [a] v g.

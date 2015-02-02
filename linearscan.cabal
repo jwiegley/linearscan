@@ -48,24 +48,36 @@ library
   exposed-modules:
     LinearScan
   other-modules:
-    -- LinearScan.List0
-    -- LinearScan.Peano
-    -- LinearScan.Ssreflect
+    LinearScan.Allocate
+    LinearScan.Assign
+    LinearScan.Blocks
+    LinearScan.Build
     LinearScan.Choice
+    LinearScan.Cursor
     LinearScan.Datatypes
     LinearScan.Eqtype
     LinearScan.Fintype
     LinearScan.Graph
     LinearScan.IState
+    LinearScan.IntMap
     LinearScan.Interval
     LinearScan.Lib
+    LinearScan.List0
+    LinearScan.LiveSets
     LinearScan.Logic
     LinearScan.Main
+    LinearScan.Morph
     LinearScan.NonEmpty0
+    LinearScan.Order
+    LinearScan.Proto
     LinearScan.Range
+    LinearScan.Resolve
+    LinearScan.ScanState
     LinearScan.Seq
     LinearScan.Specif
+    LinearScan.Split
     LinearScan.Ssrbool
+    LinearScan.Ssreflect
     LinearScan.Ssrfun
     LinearScan.Ssrnat
     LinearScan.State

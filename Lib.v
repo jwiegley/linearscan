@@ -1,5 +1,5 @@
-Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Ssr.
+Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 
 Require Export Coq.Classes.RelationClasses.

@@ -1,4 +1,5 @@
-Require Import LinearScan.Lib.
+Require Import Ssreflect.ssreflect.
+Require Import Ssreflect.seq.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

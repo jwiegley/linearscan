@@ -189,7 +189,7 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
 
     go blockIds =
         case evalState
-                 (allocate (blockInfo getBlockId) opInfo varInfo blocks)
+                 (allocate 32 (blockInfo getBlockId) opInfo varInfo blocks)
                  (newSpillStack 0) of
             Left e -> error $ "Allocation failed: " ++ e
             Right blks -> do

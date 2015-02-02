@@ -1,17 +1,11 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Blocks.
-Require Import LinearScan.Machine.
-Require Import LinearScan.Order.
 Require Import LinearScan.IntMap.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
-
-Module MLiveSets (Mach : Machine).
-
-Include MOrder Mach.
 
 Record BlockLiveSets := {
   blockLiveGen   : IntSet;
@@ -24,10 +18,13 @@ Record BlockLiveSets := {
 
 Section LiveSets.
 
+Variable maxReg : nat.          (* max number of registers *)
+Definition PhysReg : predArgType := 'I_maxReg.
+
 Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo accType opType1 opType2 varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
 Variable vinfo : VarInfo varType.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
@@ -138,5 +135,3 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
     end.
 
 End LiveSets.
-
-End MLiveSets.

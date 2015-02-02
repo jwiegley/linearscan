@@ -1,26 +1,16 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Machine.
-Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MBlocks (Mach : Machine).
+Section Blocks.
 
-Include MScanState Mach.
-
-Open Scope program_scope.
+Variable maxReg : nat.          (* max number of registers *)
+Definition PhysReg : predArgType := 'I_maxReg.
 
 Inductive VarKind : Set := Input | Temp | Output.
-
-Tactic Notation "VarKind_cases" tactic(first) ident(c) :=
-  first;
-  [ Case_aux c "VarKind_Input"
-  | Case_aux c "VarKind_Temp"
-  | Case_aux c "VarKind_Output"
-  ].
 
 Definition VarId := nat.
 
@@ -57,8 +47,6 @@ Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
   setBlockOps     : blockType1 -> seq opType2 -> blockType2
 }.
 
-Section Blocks.
-
 Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
@@ -73,6 +61,8 @@ Definition blockSize (block : blockType1) := size (blockOps binfo block).
    - Loop handling (reordering blocks to optimize allocation)
    - Extending of ranges for input/output variables
 *)
+
+Definition OpId := nat.
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
   foldl (fun bacc blk => foldl f bacc (blockOps binfo blk)) z.
@@ -94,8 +84,11 @@ Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a)
 Definition numberOperations (blocks : seq blockType1) : seq blockType1 :=
   blocks.
 
-Definition OpId := nat.
-
 End Blocks.
 
-End MBlocks.
+Tactic Notation "VarKind_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "VarKind_Input"
+  | Case_aux c "VarKind_Temp"
+  | Case_aux c "VarKind_Output"
+  ].

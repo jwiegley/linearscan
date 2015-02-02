@@ -1,7 +1,3 @@
-Require Import Ssreflect.ssreflect.
-Require Import Ssreflect.ssrfun.
-Require Import Ssreflect.seq.
-
 Generalizable All Variables.
 
 Definition State (s a : Type) := s -> (a * s).

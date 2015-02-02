@@ -32,7 +32,7 @@ import qualified LinearScan.Utils
 
     s/\| Spill/| Spill deriving (Prelude.Show, Prelude.Eq)/;
 
-    s/morphlen_transport b b' =/morphlen_transport b b' = GHC.Base.id/;
+    s/morphlen_transport maxReg b b' =/morphlen_transport maxReg b b' = GHC.Base.id/;
 
     s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
 

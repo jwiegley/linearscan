@@ -1,16 +1,10 @@
-Require Import LinearScan.Blocks.
 Require Import LinearScan.Lib.
-
-Require Export LinearScan.ScanState.
+Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
-
-Module MSpec (Mach : Machine).
-
-Module Import ScanState := MScanState Mach.
 
 (** * Linear scan specification *)
 
@@ -93,7 +87,7 @@ Proof.
   by [].
 Qed.
 
-Theorem unhandled_sorted `(st : ScanState b sd) :
+Theorem unhandled_sorted `(st : @ScanState maxReg b sd) :
   StronglySorted (lebf (@snd _ _)) (unhandled sd).
 Proof.
   ScanState_cases (induction st) Case.
@@ -114,7 +108,7 @@ Qed.
 
 End UnhandledSorted.
 
-Theorem allocated_regs_are_unique `(st : ScanState b sd) :
+Theorem allocated_regs_are_unique `(st : @ScanState maxReg b sd) :
   uniq ([ seq snd i | i <- active sd ]).
 Proof.
   ScanState_cases (induction st) Case.
@@ -137,51 +131,56 @@ Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
     first do [ exact: perm_eq_refl
              | by rewrite perm_catC; exact: perm_eq_refl ].
 
-Lemma move_active_to_inactive : forall sd x,
-  uniq (unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd)
+Lemma move_active_to_inactive : forall maxReg sd x,
+  uniq (@unhandledIds maxReg sd ++
+        activeIds sd ++ inactiveIds sd ++ handledIds sd)
     -> x \in active sd
     -> uniq (unhandledIds sd ++ [seq fst i | i <- rem x (active sd)] ++
               [seq fst i | i <- x :: inactive sd] ++ handledIds sd).
 Proof.
-  move=> sd x Huniq Hin.
+  move=> ? sd x Huniq Hin.
   uniq_reorg s2 sd Huniq (rewrite perm_cat2l !catA perm_cat2r -!map_cat).
 Qed.
 
-Lemma move_active_to_handled : forall sd x,
-  uniq (unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd)
+Lemma move_active_to_handled : forall maxReg sd x,
+  uniq (@unhandledIds maxReg sd ++
+        activeIds sd ++ inactiveIds sd ++ handledIds sd)
     -> x \in active sd
     -> uniq (unhandledIds sd ++ [seq fst i | i <- rem x (active sd)] ++
               inactiveIds sd ++ [seq fst i | i <- x :: handled sd]).
 Proof.
-  move=> sd x Huniq Hin.
+  move=> ? sd x Huniq Hin.
   uniq_reorg s2 sd Huniq
     (rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA
              perm_cat2l -!map_cat perm_eq_sym).
 Qed.
 
-Lemma move_inactive_to_active : forall sd x,
-  uniq (unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd)
+Lemma move_inactive_to_active : forall maxReg sd x,
+  uniq (@unhandledIds maxReg sd ++
+        activeIds sd ++ inactiveIds sd ++ handledIds sd)
     -> x \in inactive sd
     -> uniq (unhandledIds sd ++ [seq fst i | i <- x :: active sd] ++
               [seq fst i | i <- rem x (inactive sd)] ++ handledIds sd).
 Proof.
-  move=> sd x Huniq Hin.
+  move=> ? sd x Huniq Hin.
   uniq_reorg s2 sd Huniq
     (rewrite perm_cat2l !catA perm_cat2r perm_catC -!map_cat).
 Qed.
 
-Lemma move_inactive_to_handled : forall sd x,
-  uniq (unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd)
+Lemma move_inactive_to_handled : forall maxReg sd x,
+  uniq (@unhandledIds maxReg sd ++
+        activeIds sd ++ inactiveIds sd ++ handledIds sd)
     -> x \in inactive sd
     -> uniq (unhandledIds sd ++ activeIds sd
                ++ [seq fst i | i <- rem x (inactive sd)]
                ++ [seq fst i | i <- x :: handled sd]).
 Proof.
-  move=> sd x Huniq Hin.
+  move=> ? sd x Huniq Hin.
   uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
 Qed.
 
-Theorem lists_are_unique `(st : ScanState b sd) : uniq (all_state_lists sd).
+Theorem lists_are_unique `(st : @ScanState maxReg b sd) :
+  uniq (all_state_lists sd).
 Proof.
   rewrite /all_state_lists
           /unhandledIds /activeIds /inactiveIds /handledIds /=.
@@ -216,16 +215,17 @@ Proof.
     by rewrite -perm_cat_cons.
 
   - Case "ScanState_moveActiveToInactive".
-    exact: (@move_active_to_inactive _ x IHst H).
+    exact: (@move_active_to_inactive _ _ x IHst H).
   - Case "ScanState_moveActiveToHandled".
-    exact: (@move_active_to_handled _ x IHst H).
+    exact: (@move_active_to_handled _ _ x IHst H).
   - Case "ScanState_moveInactiveToActive".
-    exact: (@move_inactive_to_active _ x IHst H).
+    exact: (@move_inactive_to_active _ _ x IHst H).
   - Case "ScanState_moveInactiveToHandled".
-    exact: (@move_inactive_to_handled _ x IHst H).
+    exact: (@move_inactive_to_handled _ _ x IHst H).
 Qed.
 
-Theorem actives_are_unique `(st : ScanState b sd) : uniq (active sd).
+Theorem actives_are_unique `(st : @ScanState maxReg b sd) :
+  uniq (active sd).
 Proof.
   pose H1 := allocated_regs_are_unique st.
   pose H2 := lists_are_unique st.
@@ -239,7 +239,7 @@ Proof.
   exact: uniq_proj.
 Qed.
 
-Theorem all_intervals_represented `(st : ScanState b sd) :
+Theorem all_intervals_represented `(st : @ScanState maxReg b sd) :
   size (all_state_lists sd) == nextInterval sd.
 Proof.
   rewrite /all_state_lists
@@ -354,5 +354,3 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". exact: IHst.
 Qed.
 *)
-
-End MSpec.

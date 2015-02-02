@@ -1,7 +1,6 @@
-Require Import Ssreflect.ssreflect.
-Require Import Ssreflect.ssrfun.
-Require Import Ssreflect.seq.
-
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Section IState.
@@ -10,7 +9,7 @@ Variable errType : Set.
 
 Definition IState (i o a : Type) := (i -> errType + (a * o)).
 
-Axiom funext : forall a b (f g : a -> b), f =1 g -> f = g.
+Axiom funext : forall a b (f g : a -> b), (forall x, f x = g x) -> f = g.
 
 Definition ierr {i o a} (err : errType) : IState i o a :=
   fun _ => inl err.

@@ -16,39 +16,12 @@ Require Import LinearScan.Order.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
-Require Import LinearScan.Machine.
-
-Module MyMachine <: Machine.
-
-Definition maxReg := 32.
-Extract Constant maxReg => "32".
-
-Definition regSize := 8.
-Extract Constant regSize => "8".
-
-Lemma registers_exist : (maxReg > 0).
-Proof. unfold maxReg. exact: ltn0Sn. Qed.
-
-Definition PhysReg := 'I_maxReg.
-
-End MyMachine.
-
-Module Allocate  := MAllocate MyMachine.
-Module Assign    := MAssign MyMachine.
-Module Blocks    := MBlocks MyMachine.
-Module Build     := MBuild MyMachine.
-Module LiveSets  := MLiveSets MyMachine.
-Module Morph     := MMorph MyMachine.
-Module Order     := MOrder MyMachine.
-Module Resolve   := MResolve MyMachine.
-Module ScanState := MScanState MyMachine.
-
-Include MAssign MyMachine.
 
 Definition linearScan
   {blockType1 blockType2 opType1 opType2 varType accType : Set}
+  (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
-  (oinfo : OpInfo accType opType1 opType2 varType)
+  (oinfo : OpInfo maxReg accType opType1 opType2 varType)
   (vinfo : VarInfo varType)
   (blocks : seq blockType1) (accum : accType) :
   SSError + (seq blockType2 * accType) :=
@@ -62,7 +35,7 @@ Definition linearScan
   let ssig      := buildIntervals binfo oinfo vinfo blocks liveSets' in
 
   (* allocate registers *)
-  match walkIntervals ssig.2 (countOps binfo blocks).+1
+  match walkIntervals registers_exist ssig.2 (countOps binfo blocks).+1
   return SSError + (seq blockType2 * accType) with
   | inl err => inl err
   | inr ssig' =>

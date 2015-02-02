@@ -14,3 +14,7 @@ type Coq_sig a =
   a
   -- singleton inductive, whose constructor was exist
   
+type Coq_sig2 a =
+  a
+  -- singleton inductive, whose constructor was exist2
+  

@@ -1,43 +1,16 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IState.
-
-Require Export LinearScan.Machine.
-Require Export LinearScan.Interval.
+Require Import LinearScan.Interval.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MScanState (Mach : Machine).
+Section ScanState.
 
-Include Mach.
-
-Inductive SSError : Set :=
-  | ECannotSplitSingleton : nat -> SSError
-  | ECannotSplitAssignedSingleton : nat -> SSError
-  | ENoIntervalsToSplit
-  | ERegisterAlreadyAssigned : nat -> SSError
-  | ERegisterAssignmentsOverlap : nat -> SSError
-  | EFuelExhausted : SSError
-  | EUnexpectedNoMoreUnhandled : SSError.
-
-Definition stbind {P Q R a b}
-  (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
-  IState SSError P R b :=
-  @ijoin _ P Q R b (@imap _ P Q _ _ f x).
-
-Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
-
-Notation "X <<- A ;; B" := (A >>>= (fun X => B))
-  (right associativity, at level 84, A1 at next level).
-
-Notation "A ;;; B" := (_ <<- A ;; B)
-  (right associativity, at level 84, A1 at next level).
-
-Definition error_ {I O X} err : IState SSError I O X :=
-  fun (_ : I) => inl err.
-Definition return_ {I O X} := @ipure I O X.
+Variable maxReg : nat.          (* max number of registers *)
+Hypothesis registers_exist : maxReg > 0.
+Definition PhysReg : predArgType := 'I_maxReg.
 
 (** ** ScanStateDesc *)
 
@@ -45,7 +18,7 @@ Definition return_ {I O X} := @ipure I O X.
     through the sequentialized instruction stream over which registers are
     allocated. *)
 
-Definition fixedIntervalsType :=
+Definition FixedIntervalsType :=
   Vec (option { d : IntervalDesc | FixedInterval d }) maxReg.
 
 Record ScanStateDesc : Type := {
@@ -53,7 +26,7 @@ Record ScanStateDesc : Type := {
     IntervalId := 'I_nextInterval;
 
     intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
-    fixedIntervals : fixedIntervalsType;
+    fixedIntervals : FixedIntervalsType;
 
     (* The [nat] in this member indicates the beginning position of the
        interval. *)
@@ -200,7 +173,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        |}
 
   | ScanState_setFixedIntervals sd :
-    ScanState Pending sd -> forall (regs : fixedIntervalsType),
+    ScanState Pending sd -> forall (regs : FixedIntervalsType),
     ScanState Pending
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -282,6 +255,17 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        |}.
 
+Definition ScanStateSig (b : ScanStateStatus) :=
+  { sd : ScanStateDesc | ScanState b sd }.
+
+Definition getScanStateDesc `(st : ScanState InUse sd) := sd.
+Arguments getScanStateDesc [sd] st /.
+
+Definition packScanState `(st : ScanState b sd) := exist (ScanState b) sd st.
+Arguments packScanState [b sd] st /.
+
+End ScanState.
+
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
@@ -295,14 +279,3 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_moveInactiveToActive"
   | Case_aux c "ScanState_moveInactiveToHandled"
   ].
-
-Definition ScanStateSig (b : ScanStateStatus) :=
-  { sd : ScanStateDesc | ScanState b sd }.
-
-Definition getScanStateDesc `(st : ScanState InUse sd) := sd.
-Arguments getScanStateDesc [sd] st /.
-
-Definition packScanState `(st : ScanState b sd) := exist (ScanState b) sd st.
-Arguments packScanState [b sd] st /.
-
-End MScanState.

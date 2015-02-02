@@ -11,19 +11,18 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Module MResolve (Mach : Machine).
-
-Include MAllocate Mach.
-
 Section Resolve.
+
+Variable maxReg : nat.          (* max number of registers *)
+Definition PhysReg : predArgType := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo accType opType1 opType2 varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
 Variable vinfo : VarInfo varType.
 
-Definition checkIntervalBoundary `(st : ScanState InUse sd)
+Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
   key in_from from to mappings vid :=
 
   let mfrom_int := lookupInterval st vid (blockLastOpId from) in
@@ -103,5 +102,3 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
     end.
 
 End Resolve.
-
-End MResolve.

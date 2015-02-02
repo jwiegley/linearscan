@@ -1,4 +1,4 @@
-module LinearScan.Ssreflect where
+module LinearScan.NonEmpty0 where
 
 
 import qualified Prelude

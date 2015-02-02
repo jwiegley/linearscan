@@ -1,8 +1,5 @@
 Require Import LinearScan.Lib.
-(* Require Import LinearScan.Machine. *)
 Require Import LinearScan.Range.
-(* Require Import LinearScan.ScanState. *)
-(* Require Import LinearScan.Graph. *)
 
 Require Import Coq.Sorting.Sorted.
 

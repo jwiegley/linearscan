@@ -20,8 +20,10 @@ module LinearScan
     ) where
 
 import Control.Monad.Trans.State
+import qualified LinearScan.Blocks as LS
 import qualified LinearScan.Main as LS
-import LinearScan.Main
+import qualified LinearScan.Morph as LS
+import LinearScan.Blocks
     ( VarKind(..)
     , OpKind(..)
     , PhysReg
@@ -101,15 +103,17 @@ fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: BlockInfo blk1 blk2 op1 op2
+allocate :: Int                  -- ^ Maximum number of registers to use
+         -> BlockInfo blk1 blk2 op1 op2
          -> OpInfo accType op1 op2 var
          -> VarInfo var
          -> [blk1]
          -> State accType (Either String [blk2])
-allocate _ _ _ [] = return $ Left "No basic blocks were provided"
-allocate (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
+allocate 0 _ _ _ _  = return $ Left "Cannot allocate with no registers"
+allocate _ _ _ _ [] = return $ Left "No basic blocks were provided"
+allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
          (fromVarInfo -> vinfo) blocks = do
-    eres <- gets (LS.linearScan binfo oinfo vinfo blocks)
+    eres <- gets (LS.linearScan maxReg binfo oinfo vinfo blocks)
     case eres of
         Left x -> return $ Left $ case x of
             LS.ECannotSplitSingleton n ->
