@@ -63,3 +63,4 @@ clean: Makefile.coq
 	    while read file; do rm -f $$file; done
 	rm -f Makefile.coq Setup
 	rm -fr dist .coq-native
+	rm -fr .hdevtools.sock *.glob *.d *.vo
