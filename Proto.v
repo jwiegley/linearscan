@@ -101,7 +101,7 @@ Definition transportProtoRange
   `(Hlt : base < prev) `(x : ProtoRange prev) : ProtoRange base.
   case: x => [begx ? ? H ? ? Hbound] /= in Hlt *.
   apply: (@Build_ProtoRange _ begx) => //.
-  by match_all Hbound.
+  by match_all.
 Defined.
 
 Definition proto_lt {blimx blimy}

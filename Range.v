@@ -440,15 +440,14 @@ Proof.
   by rewrite NE_last_append_spec (minn_idPl H4) (maxn_idPl _).
 Defined.
 
-Definition RangeSigs_cons `(r : Range rd) (rs : NonEmpty RangeSig) :
-  NonEmpty RangeSig.
+Definition cons_range (r : RangeSig) (rs : NonEmpty RangeSig)
+  (H : rend r.1 <= rbeg (NE_head rs).1) : NonEmpty RangeSig.
 Proof.
-  case E: (rend rd == rbeg (NE_head rs).1);
-    last exact: (NE_Cons (packRange r) rs).
-  case: rs => [x|x xs] in E *;
-  have r' := packRange (@Range_cat _ r _ x.2 E).
-    exact: (NE_Sing r').
-  exact: (NE_Cons r' xs).
+  case E: (rend r.1 == rbeg (NE_head rs).1).
+    case: rs => [x|x xs] in H E *;
+      [ apply: (NE_Sing _) | apply: (NE_Cons _ xs) ];
+    exact: (packRange (@Range_cat r.1 r.2 x.1 x.2 E)).
+  exact: (NE_Cons r rs).
 Defined.
 
 Definition Range_append_fst

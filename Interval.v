@@ -77,7 +77,7 @@ Inductive Interval : IntervalDesc -> Prop :=
                 ; ibeg := rbeg r.1
                 ; iend := rend (NE_last xs).1
                 ; iknd := knd
-                ; rds  := NE_Cons r xs
+                ; rds  := NE_Cons r xs (* cons_range H *)
                 |}.
 
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=

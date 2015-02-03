@@ -1,10 +1,13 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Ltac.
 Require Import LinearScan.IntMap.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Proto.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.ScanState.
+
+Require Import Coq.Sorting.Sorted.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -17,7 +20,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
 Record BuildState (pos : nat) := {
-  bsVars : seq (option (SortedProtoRanges pos.*2.+1));
+  bsVars : seq (option (BoundedRange pos.*2.+1));
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
 
@@ -61,16 +64,74 @@ Proof.
   exact: exist _ (exist _ _ (I_Cons i Hrds)) _ => //=.
 Defined.
 
+(*
 (* Create a proto range to represent a variable reference. *)
-Definition protoRangeForVariable pos (block : blockType1) (var : varType)
-  (begin : OpId) (Hpos : begin <= pos < begin + blockSize binfo block) :
-  ProtoRange pos.*2.+1.
+Definition reduceVar pos (block : blockType1) (var : varType)
+  `(Hpos : begin <= pos < begin + blockSize binfo block)
+  (p : ProtoRange pos.*2.+1) : ProtoRange pos.*2.+1.
 Proof.
-  move/andP: Hpos => [Hbeg Hend].
-
   set upos := {| uloc   := pos.*2.+1
                ; regReq := regRequired vinfo var |}.
-  have Hodd : odd upos by rewrite /= odd_double.
+
+  set knd := varKind vinfo var.
+  case: (prUseLocs p) => [|u us].
+    apply:
+      {| prBeg := match knd with
+           | Input => begin.*2.+1
+           | _     => uloc upos
+           end
+       ; prEnd := match knd with
+           | Output => (begin + blockSize binfo block).*2.+1
+           | _      => (uloc upos).+1
+           end
+       ; prUseLocs := [:: upos] |};
+  case: knd => //=;
+  repeat by rewrite odd_double.
+  - rewrite 2!ltnS leq_double.
+    by ordered.
+  - rewrite ltnS ltn_double.
+    by ordered.
+  - constructor.
+      exact: prUseSorted p.
+    admit.
+  - constructor.
+      exact: prUseSorted p.
+    admit.
+  - constructor.
+      exact: prUseSorted p.
+    admit.
+  - apply/andP; split.
+      by ordered.
+    have H := prUseBounded p.
+    match_all H.
+  VarKind_cases (case: knd) Case.
+  - Case "VarKind_Input".
+
+  - Case "VarKind_Temp".
+    apply:
+      {| prBeg := match knd with
+           | Input => begin.*2.+1
+           | _     => uloc upos
+           end
+       ; prEnd := match knd with
+           | Output => (begin + blockSize binfo block).*2.+1
+           | _      => (uloc upos).+1
+           end
+       ; prUseLocs := upos :: prUseLocs p
+       |} => //=;
+
+  - Case "VarKind_Output".
+    apply:
+      {| prBeg := match knd with
+           | Input => begin.*2.+1
+           | _     => uloc upos
+           end
+       ; prEnd := match knd with
+           | Output => (begin + blockSize binfo block).*2.+1
+           | _      => (uloc upos).+1
+           end
+       ; prUseLocs := upos :: prUseLocs p
+       |} => //=;
 
   (* For temp variables a single position range is sufficient.  For an input
      variable, it must extend from the beginning of the block to one beyond
@@ -79,13 +140,10 @@ Proof.
 
      Variables in the [blockLiveOut] set which are not used otherwise cause an
      empty range to be inserted that extends throughout the entire block. *)
-  VarKind_cases (destruct (varKind vinfo var)) Case.
-  - Case "VarKind_Input".
-    apply:
-      {| prBeg        := begin.*2.+1
-       ; prBegOdd     := odd_double_plus begin
-       ; prEnd        := (uloc upos).+1
-       ; prUseLocs    := [:: upos] |} => //=.
+  case: knd) Case.
+    admit.
+
+    + admit.
     + admit.
     + admit.
     + admit.
@@ -133,6 +191,31 @@ Proof.
     (*     by apply/andP; split; rewrite odd_double. *)
     (*   by rewrite ltn_double. *)
 Defined.
+*)
+
+Definition UsePosList (pos : nat) :=
+  { us : seq (UsePos * VarKind)
+  | StronglySorted (fun x y => upos_lt (fst x) (fst y)) us
+  & if us is u :: _ then pos <= fst u else True
+  }.
+
+Definition appendVar (pos : nat) (var : varType)
+  (p : UsePosList (pos.+1).*2.+1) : UsePosList pos.*2.+1.
+Proof.
+  move: p => [us Hsort H].
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := regRequired vinfo var |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+  set knd := varKind vinfo var.
+  exists ((upos, knd) :: us) => //=.
+  constructor=> //.
+  case: us => //= [u us] in Hsort H *.
+  constructor=> //;
+  rewrite doubleS in H.
+    by ordered.
+  inversion Hsort; subst.
+  by match_all.
+Defined.
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=
@@ -146,8 +229,9 @@ Definition reduceOp {pos} (op : opType1) (block : blockType1)
                   then enum 'I_maxReg
                   else regRefs in
 
-  {| bsVars := map (option_map (transportSortedProtoRanges (ltnSSn _)))
-                   (bsVars bs)
+  {| bsVars := undefined
+               (* map (option_map (transportSortedProtoRanges (ltnSSn _))) *)
+               (*     (bsVars bs) *)
    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}.
 
 Definition reduceBlock {pos} (block : blockType1) (liveOut : IntSet)
@@ -237,7 +321,7 @@ Definition buildIntervals (blocks : seq blockType1)
      let regs := vmap f (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
-     let s3 := foldl_with_index (handleVar 0) s2 (bsVars bs) in
+     let s3 := foldl_with_index (handleVar 0) s2 undefined (* (bsVars bs) *) in
      let s4 := ScanState_finalize s3.2 in
      packScanState s4)
   (reduceBlocks blocks liveSets).

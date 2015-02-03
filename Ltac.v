@@ -1,4 +1,4 @@
-Require Import LinearScan.Ssr.
+Require Import LinearScan.Lib.
 Require Import Omega.
 
 Ltac ordered :=
@@ -24,13 +24,19 @@ Ltac ordered :=
     end;
   abstract omega.
 
-Ltac match_all H :=
+Ltac match_all :=
+  repeat match goal with
+  | [ H: List.Forall _ ?Z |- _ ] =>
+      move/Forall_all in H
+  | [ |- List.Forall _ ?Z ] =>
+      apply/Forall_all
+  end;
   match goal with
-  | [  Hall: is_true (all _ ?Z) |- is_true (all _ ?Z) ] =>
-      move/allP in Hall;
+  | [  H: is_true (all _ ?Z) |- is_true (all _ ?Z) ] =>
+      move/allP in H;
       apply/allP;
       intros x_1 H_1;
-      specialize (Hall x_1 H_1);
+      specialize (H x_1 H_1);
       clear H_1;
       ordered
   end.

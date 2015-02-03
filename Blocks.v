@@ -10,7 +10,40 @@ Section Blocks.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Inductive VarKind : Set := Input | Temp | Output.
+Inductive VarKind : Set := Input | Temp | Output | InputOutput.
+
+Section EqVarKind.
+
+Implicit Type s : VarKind.
+
+Fixpoint eqVarKind s1 s2 {struct s2} :=
+  match s1, s2 with
+  | Input, Input             => true
+  | Temp, Temp               => true
+  | Output, Output           => true
+  | InputOutput, InputOutput => true
+  | _, _ => false
+  end.
+
+Lemma eqVarKindP : Equality.axiom eqVarKind.
+Proof.
+  move.
+  move=> b1 b2 /=.
+  case: b1; case: b2=> /=;
+  constructor=> //=;
+  by case.
+Qed.
+
+Canonical VarKind_eqMixin := EqMixin eqVarKindP.
+Canonical VarKind_eqType :=
+  Eval hnf in EqType VarKind VarKind_eqMixin.
+
+Lemma eqVarKindE : eqVarKind = eq_op. Proof. by []. Qed.
+
+Definition UsePos_eqType (A : eqType) :=
+  Equality.Pack VarKind_eqMixin VarKind.
+
+End EqVarKind.
 
 Definition VarId := nat.
 
@@ -91,4 +124,5 @@ Tactic Notation "VarKind_cases" tactic(first) ident(c) :=
   [ Case_aux c "VarKind_Input"
   | Case_aux c "VarKind_Temp"
   | Case_aux c "VarKind_Output"
+  | Case_aux c "VarKind_InputOutput"
   ].
