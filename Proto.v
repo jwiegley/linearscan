@@ -97,20 +97,18 @@ Proof.
 Defined.
 *)
 
-Definition transportProtoRange `(x : ProtoRange prev)
-  `(Hlt : prBeg x <= base < prev) : ProtoRange base.
+Definition transportProtoRange
+  `(Hlt : base < prev) `(x : ProtoRange prev) : ProtoRange base.
   case: x => [begx ? ? H ? ? Hbound] /= in Hlt *.
   apply: (@Build_ProtoRange _ begx) => //.
-    by ordered.
   by match_all Hbound.
 Defined.
 
-Definition proto_lt `(x : ProtoRange blimx) `(y : ProtoRange blimy) :=
-  is_true (prEnd x < prBeg y).
+Definition proto_lt {blimx blimy}
+  (x : ProtoRange blimx) (y : ProtoRange blimy) : Prop :=
+  prEnd x < prBeg y.
 
-Definition proto_lower_bound `(x : ProtoRange base) : prBeg x <= base.
-Proof. by case: x => /= [? _ ? H *]; move/andP: H => [? _]. Qed.
-
+(*
 Lemma proto_lt_spec `(x : ProtoRange prev) `(y : ProtoRange prev)
   `(Hlt : prBeg x <= base < prev) :
   proto_lt x y -> prBeg y <= base < prev.
@@ -121,24 +119,24 @@ Proof.
   move=> ?.
   by ordered.
 Qed.
+*)
 
-Lemma proto_lt_transport `(x : ProtoRange prev) `(y : ProtoRange prev)
-  `(Hlt : prBeg x <= base < prev) (Hpr : proto_lt x y) :
-  proto_lt (@transportProtoRange Hlt)
-           (transportProtoRange Hlt).
+Lemma proto_lt_transport `(Hlt : base < prev)
+  (x : ProtoRange prev) (y : ProtoRange prev) (Hpr : proto_lt x y) :
+  proto_lt (transportProtoRange Hlt x)
+           (transportProtoRange Hlt y).
 Proof.
   destruct x; destruct y.
   rewrite /proto_lt /transportProtoRange //=.
 Qed.
 
 Lemma NE_Forall_transport {base prev} :
-  forall (Hlt : base < prev) (r : ProtoRange prev) rs
-         (Hb : prBeg r <= base),
+  forall (Hlt : base < prev) (r : ProtoRange prev) rs,
   NE_Forall (proto_lt r) rs
-    -> NE_Forall (proto_lt (transportProtoRange Hlt Hb))
-                 (NE_map (transportProtoRange Hlt Hb) rs).
+    -> NE_Forall (proto_lt (transportProtoRange Hlt r))
+                 (NE_map (transportProtoRange Hlt) rs).
 Proof.
-  move=> r rs Hlt.
+  move=> Hlt r rs.
   elim: rs => [x|x xs IHxs] H.
     constructor.
     move/NE_Forall_head in H.

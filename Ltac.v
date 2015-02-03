@@ -22,7 +22,7 @@ Ltac ordered :=
     | [ |- is_true (?X == ?Y) ] => apply/eqP
     | [ |- is_true (?X != ?Y) ] => apply/eqP
     end;
-  omega.
+  abstract omega.
 
 Ltac match_all H :=
   match goal with
