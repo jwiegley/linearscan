@@ -216,42 +216,59 @@ Proof.
   by match_all.
 Defined.
 
-Require Import Recdef.
+Lemma uniq_nil {a} : uniq (T:=a) [::].
+Proof. by []. Qed.
 
 (* Given a list a of variable uses, it is possible that the same variable is
    used more than once (for example, as both the input and output of an
    instruction which leaves the result in the input register.  In those cases,
    we must combine the multiple [VarInfo] records into the most informative
    version of the collective information. *)
-Function refineVars (vars : seq VarInfo) {measure size vars} :
-  seq VarInfo :=
+Program Fixpoint refineVars (vars : seq VarInfo) {measure (size vars)} :
+  { vs : seq VarInfo | uniq [seq varId v | v <- vs] } :=
   match vars with
-  | [::] => [::]
+  | [::] => exist _ [::] uniq_nil
   | x :: xs =>
       let vs := [seq y <- xs | varId y == varId x] in
       let f v' v :=
           let knd' := match varKind v', varKind v with
-            | InputOutput, _ => InputOutput
-            | _, InputOutput => InputOutput
-            | Input, Temp    => Input
-            | Temp, Input    => Input
-            | Output, Temp   => Output
-            | Temp, Output   => Output
-            | Input, Output  => InputOutput
-            | k, _           => k
+            | Input,       Input       => Input
+            | Input,       InputOutput => InputOutput
+            | Input,       Output      => InputOutput
+            | Input,       Temp        => Input
+            | Temp,        Input       => Input
+            | Temp,        InputOutput => InputOutput
+            | Temp,        Output      => Output
+            | Temp,        Temp        => Temp
+            | Output,      Input       => InputOutput
+            | Output,      InputOutput => InputOutput
+            | Output,      Output      => Temp
+            | Output,      Temp        => Output
+            | InputOutput, Input       => InputOutput
+            | InputOutput, InputOutput => Temp
+            | InputOutput, Output      => InputOutput
+            | InputOutput, Temp        => InputOutput
             end in
           {| varId       := varId v
            ; varKind     := knd'
            ; regRequired := regRequired v || regRequired v'
            |} in
-      foldl f x vs :: refineVars [seq y <- xs | varId y != varId x]
+      let xs' := refineVars [seq y <- xs | varId y != varId x] in
+      exist _ (foldl f x vs :: xs'.1) _
   end.
-Proof.
+Obligation 1.
   move=> *.
   apply/ltP.
   rewrite size_filter /= ltnS.
   exact: count_size.
 Qed.
+Obligation 2.
+  set f   := (X in foldl X _ _).
+  set nxs := (X in refineVars X).
+  set xs' := (refineVars _ _).
+  case: xs' => x0 Huniq /=.
+  apply/andP; split=> //.
+  
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=

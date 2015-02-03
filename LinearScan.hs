@@ -19,6 +19,7 @@ module LinearScan
     , PhysReg
     ) where
 
+import Control.Arrow (first)
 import Control.Monad.Trans.State
 import qualified LinearScan.Blocks as LS
 import qualified LinearScan.Main as LS
@@ -35,16 +36,16 @@ import LinearScan.Blocks
 --   scope of their lifetime.  For example, output variables are not needed in a
 --   basic block until the first point of use, while the lifetime of input
 --   variables extends until their final use.
-data VarInfo v = VarInfo
-    { varId       :: v -> Int
-    , varKind     :: v -> VarKind
-    , regRequired :: v -> Bool
+data VarInfo = VarInfo
+    { varId       :: Int
+    , varKind     :: VarKind
+    , regRequired :: Bool
     }
 
 deriving instance Eq VarKind
 deriving instance Show VarKind
 
-fromVarInfo :: VarInfo v -> LS.VarInfo v
+fromVarInfo :: VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 
 -- | Every operation may reference multiple variables and/or specific physical
@@ -58,9 +59,9 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 --   and restore all registers around a call, but indication of loops is
 --   optional, as it's merely avoids reloading of spilled variables inside
 --   loop bodies.
-data OpInfo accType op1 op2 var = OpInfo
+data OpInfo accType op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
-    , opRefs      :: op1 -> ([var], [PhysReg])
+    , opRefs      :: op1 -> ([VarInfo], [PhysReg])
     , moveOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , swapOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
@@ -71,9 +72,10 @@ data OpInfo accType op1 op2 var = OpInfo
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: OpInfo accType op1 op2 var -> LS.OpInfo accType op1 op2 var
+fromOpInfo :: OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
 fromOpInfo (OpInfo a b c d e f g) =
-    LS.Build_OpInfo a b
+    LS.Build_OpInfo a
+        (first (map fromVarInfo) . b)
         ((runState .) . c)
         ((runState .) . d)
         ((runState .) . e)
@@ -105,15 +107,13 @@ fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
 --   describing the error.
 allocate :: Int                  -- ^ Maximum number of registers to use
          -> BlockInfo blk1 blk2 op1 op2
-         -> OpInfo accType op1 op2 var
-         -> VarInfo var
+         -> OpInfo accType op1 op2
          -> [blk1]
          -> State accType (Either String [blk2])
-allocate 0 _ _ _ _  = return $ Left "Cannot allocate with no registers"
-allocate _ _ _ _ [] = return $ Left "No basic blocks were provided"
-allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo)
-         (fromVarInfo -> vinfo) blocks = do
-    eres <- gets (LS.linearScan maxReg binfo oinfo vinfo blocks)
+allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
+allocate _ _ _ [] = return $ Left "No basic blocks were provided"
+allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
+    eres <- gets (LS.linearScan maxReg binfo oinfo blocks)
     case eres of
         Left x -> return $ Left $ case x of
             LS.ECannotSplitSingleton n ->

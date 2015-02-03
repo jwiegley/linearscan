@@ -189,7 +189,7 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
 
     go blockIds =
         case evalState
-                 (allocate 32 (blockInfo getBlockId) opInfo varInfo blocks)
+                 (allocate 32 (blockInfo getBlockId) opInfo blocks)
                  (newSpillStack 0) of
             Left e -> error $ "Allocation failed: " ++ e
             Right blks -> do
@@ -286,7 +286,7 @@ newSpillStack offset = StackInfo
     , stackSlots = mempty
     }
 
-opInfo :: OpInfo StackInfo (NodeV a IRVar) (NodeV a Reg) (Int, VarKind)
+opInfo :: OpInfo StackInfo (NodeV a IRVar) (NodeV a Reg)
 opInfo = OpInfo
     { opKind = \n -> case n of
            NodeOO (Node i _) -> case i of
@@ -325,16 +325,25 @@ opInfo = OpInfo
     , applyAllocs = \node m -> [fmap (setRegister m) node]
     }
   where
-    go :: Instruction IRVar -> ([(Int, VarKind)], [PhysReg])
+    go :: Instruction IRVar -> ([VarInfo], [PhysReg])
+    go Nop = mempty
     go (Add s1 s2 d1) =
         mkv Input s1 <> mkv Input s2 <> mkv Output d1
       where
-        mkv :: VarKind -> IRVar -> ([(Int, VarKind)], [PhysReg])
+        mkv :: VarKind -> IRVar -> ([VarInfo], [PhysReg])
         mkv _ (IRVar (PhysicalIV n) _)    = ([], [n])
-        mkv k (IRVar (VirtualIV n _) _) = ([(n, k)], [])
-    go Nop = mempty
+        mkv k (IRVar (VirtualIV n _) _) = ([vinfo], [])
+          where
+            vinfo = VarInfo
+                { varId   = n
+                , varKind = k
+                  -- If there are variables which can be used directly from
+                  -- memory, then this can be False, which relaxes some
+                  -- requirements.
+                , regRequired = True
+                }
 
-    getReferences :: Node a IRVar e x -> ([(Int, VarKind)], [PhysReg])
+    getReferences :: Node a IRVar e x -> ([VarInfo], [PhysReg])
     getReferences (Node (Label _) _) = mempty
     getReferences (Node (Instr i) _) = go i
     getReferences (Node (ReturnInstr _ i) _) = go i
@@ -368,16 +377,6 @@ mkRestoreOp vid r = do
                       (M.lookup vid (stackSlots stack))
         rs = Restore (Linearity False) off r
     return [NodeOO (Node rs (error "no restore meta"))]
-
-varInfo :: VarInfo (Int, VarKind)
-varInfo = VarInfo
-    { varId   = fst
-    , varKind = snd
-
-      -- If there are variables which can be used directly from memory, then
-      -- this can be False, which relaxes some requirements.
-    , regRequired = const True
-    }
 
 assignVar :: IntMap PhysReg -> IRVar -> IRVar
 assignVar _ v@(IRVar (PhysicalIV _) _) = v
