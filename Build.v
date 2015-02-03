@@ -24,11 +24,10 @@ Record BuildState (pos : nat) := {
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
 
-Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
+Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
-Variable vinfo : VarInfo varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
@@ -71,9 +70,9 @@ Definition reduceVar pos (block : blockType1) (var : varType)
   (p : ProtoRange pos.*2.+1) : ProtoRange pos.*2.+1.
 Proof.
   set upos := {| uloc   := pos.*2.+1
-               ; regReq := regRequired vinfo var |}.
+               ; regReq := regRequired var |}.
 
-  set knd := varKind vinfo var.
+  set knd := varKind var.
   case: (prUseLocs p) => [|u us].
     apply:
       {| prBeg := match knd with
@@ -199,14 +198,14 @@ Definition UsePosList (pos : nat) :=
   & if us is u :: _ then pos <= fst u else True
   }.
 
-Definition appendVar (pos : nat) (var : varType)
+Definition appendVar (pos : nat) (var : VarInfo)
   (p : UsePosList (pos.+1).*2.+1) : UsePosList pos.*2.+1.
 Proof.
   move: p => [us Hsort H].
   set upos := {| uloc   := pos.*2.+1
-               ; regReq := regRequired vinfo var |}.
+               ; regReq := regRequired var |}.
   have Hodd : odd upos by rewrite /= odd_double.
-  set knd := varKind vinfo var.
+  set knd := varKind var.
   exists ((upos, knd) :: us) => //=.
   constructor=> //.
   case: us => //= [u us] in Hsort H *.
@@ -216,6 +215,43 @@ Proof.
   inversion Hsort; subst.
   by match_all.
 Defined.
+
+Require Import Recdef.
+
+(* Given a list a of variable uses, it is possible that the same variable is
+   used more than once (for example, as both the input and output of an
+   instruction which leaves the result in the input register.  In those cases,
+   we must combine the multiple [VarInfo] records into the most informative
+   version of the collective information. *)
+Function refineVars (vars : seq VarInfo) {measure size vars} :
+  seq VarInfo :=
+  match vars with
+  | [::] => [::]
+  | x :: xs =>
+      let vs := [seq y <- xs | varId y == varId x] in
+      let f v' v :=
+          let knd' := match varKind v', varKind v with
+            | InputOutput, _ => InputOutput
+            | _, InputOutput => InputOutput
+            | Input, Temp    => Input
+            | Temp, Input    => Input
+            | Output, Temp   => Output
+            | Temp, Output   => Output
+            | Input, Output  => InputOutput
+            | k, _           => k
+            end in
+          {| varId       := varId v
+           ; varKind     := knd'
+           ; regRequired := regRequired v || regRequired v'
+           |} in
+      foldl f x vs :: refineVars [seq y <- xs | varId y != varId x]
+  end.
+Proof.
+  move=> *.
+  apply/ltP.
+  rewrite size_filter /= ltnS.
+  exact: count_size.
+Qed.
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=
@@ -246,7 +282,7 @@ Definition reduceBlocks (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : BuildState 0 :=
   let: highestVar :=
       foldOps binfo (fun n op =>
-        foldl (fun m v => maxn m (varId vinfo v)) n
+        foldl (fun m v => maxn m (varId v)) n
               (fst (opRefs oinfo op)))
         0 blocks in
   let fix go b bs pos : BuildState pos :=

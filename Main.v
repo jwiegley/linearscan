@@ -18,11 +18,10 @@ Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
 
 Definition linearScan
-  {blockType1 blockType2 opType1 opType2 varType accType : Set}
+  {blockType1 blockType2 opType1 opType2 accType : Set}
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
-  (oinfo : OpInfo maxReg accType opType1 opType2 varType)
-  (vinfo : VarInfo varType)
+  (oinfo : OpInfo maxReg accType opType1 opType2)
   (blocks : seq blockType1) (accum : accType) :
   SSError + (seq blockType2 * accType) :=
   (* order blocks and operations (including loop detection) *)
@@ -30,9 +29,9 @@ Definition linearScan
   (* numberOperations blocks' ;;; *)
 
   (* create intervals with live ranges *)
-  let liveSets  := computeLocalLiveSets binfo oinfo vinfo blocks' in
+  let liveSets  := computeLocalLiveSets binfo oinfo blocks' in
   let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
-  let ssig      := buildIntervals binfo oinfo vinfo blocks liveSets' in
+  let ssig      := buildIntervals binfo oinfo blocks liveSets' in
 
   (* allocate registers *)
   match walkIntervals registers_exist ssig.2 (countOps binfo blocks).+1
@@ -42,7 +41,7 @@ Definition linearScan
       let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
 
       (* replace virtual registers with physical registers *)
-      inr $ assignRegNum binfo oinfo vinfo ssig'.2 mappings blocks accum
+      inr $ assignRegNum binfo oinfo ssig'.2 mappings blocks accum
   end.
 
 Extraction Language Haskell.

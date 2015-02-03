@@ -21,11 +21,10 @@ Section LiveSets.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
+Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
-Variable vinfo : VarInfo varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
   IntMap BlockLiveSets :=
@@ -66,8 +65,8 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
         let: (lastIdx, liveSet1) := acc in
         (lastIdx.+2,
          forFold liveSet1 (fst (opRefs oinfo o)) $ fun liveSet2 v =>
-           let vid := varId vinfo v in
-           if varKind vinfo v is Input
+           let vid := varId v in
+           if varKind v is Input
            then
              if ~~ (IntSet_member vid (blockLiveKill liveSet2))
              then {| blockLiveGen   := IntSet_insert vid (blockLiveGen liveSet2)

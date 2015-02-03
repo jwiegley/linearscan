@@ -17,11 +17,10 @@ Section Assign.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
+Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
-Variable vinfo : VarInfo varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
 Record AssnStateInfo := {
   assnOpId : OpId;
@@ -73,7 +72,7 @@ Definition savesAndRestores opid vid reg int :
     end.
 
 Definition collectAllocs opid ints acc v :=
-  let vid := varId vinfo v in
+  let vid := varId v in
   let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
   if v_ints is (int, reg) :: _
   return AssnState (seq (VarId * PhysReg) *

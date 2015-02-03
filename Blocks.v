@@ -49,10 +49,10 @@ Definition VarId := nat.
 
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
-Record VarInfo (varType : Set) := {
-  varId       : varType -> VarId;     (* from 0 to highest var index *)
-  varKind     : varType -> VarKind;
-  regRequired : varType -> bool
+Record VarInfo := {
+  varId       : VarId;     (* from 0 to highest var index *)
+  varKind     : VarKind;
+  regRequired : bool
 }.
 
 Inductive OpKind : Set :=
@@ -61,9 +61,9 @@ Inductive OpKind : Set :=
 (* The [OpInfo] structure is a collection of functions that allow us to
    determine information about each operation coming from the caller's
    side. *)
-Record OpInfo (accType opType1 opType2 varType : Set) := {
+Record OpInfo (accType opType1 opType2 : Set) := {
   opKind      : opType1 -> OpKind;
-  opRefs      : opType1 -> seq varType * seq PhysReg;
+  opRefs      : opType1 -> seq VarInfo * seq PhysReg;
   moveOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
   swapOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
   saveOp      : PhysReg -> option VarId -> accType -> seq opType2 * accType;
@@ -80,11 +80,10 @@ Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
   setBlockOps     : blockType1 -> seq opType2 -> blockType2
 }.
 
-Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
+Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo accType opType1 opType2 varType.
-Variable vinfo : VarInfo varType.
+Variable oinfo : OpInfo accType opType1 opType2.
 
 Definition blockSize (block : blockType1) := size (blockOps binfo block).
 

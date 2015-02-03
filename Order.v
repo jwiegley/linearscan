@@ -11,11 +11,10 @@ Section Order.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 varType accType : Set.
+Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2 varType.
-Variable vinfo : VarInfo varType.
+Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
 (* jww (2014-11-19): Note that we are currently not computing the block order
    in any intelligent way. This is covered in quite some depth in Christian
