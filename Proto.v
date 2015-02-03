@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Range.
+Require Import LinearScan.Ltac.
 
 Require Import Coq.Sorting.Sorted.
 
@@ -8,64 +9,83 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Record ProtoRange (prLim : nat) := {
+Record ProtoRange (prBound : nat) := {
   prBeg        : nat;
   prBegOdd     : odd prBeg;
-  prBegLim     : prLim <= prBeg;
   prEnd        : nat;
-  prEndEven    : ~~ odd prEnd;
   prOrdered    : prBeg < prEnd;
   prUseLocs    : seq UsePos;
   prUseSorted  : StronglySorted upos_lt prUseLocs;
-  prBegBounded : all (fun u => prBeg <= uloc u) prUseLocs;
-  prEndBounded : all (fun u => uloc u < prEnd) prUseLocs
+  prUseBounded : all (fun u => prBound <= uloc u < prEnd) prUseLocs
 }.
 
+Definition emptyProtoRange (b e : nat) (Hodd : odd b) (Hlt : b < e) :
+  ProtoRange e :=
+  {| prBeg        := b
+   ; prBegOdd     := Hodd
+   ; prEnd        := e
+   ; prOrdered    := Hlt
+   ; prUseLocs    := [::]
+   ; prUseSorted  := SSorted_nil upos_lt
+   ; prUseBounded := all_nil (fun u => e <= uloc u < e)
+   |}.
+
+(*
 Definition catProtoRanges `(x : ProtoRange blimx) `(y : ProtoRange blimy) :
   prEnd x <= prBeg y -> ProtoRange blimx.
 Proof.
   move=> H.
-  case: x => [begx Hbegx Hblimx endx Hendx
-              Hordx usx Husx Hbbx Hebx] in H *.
-  case: y => [begy Hbegy Hblimy endy Hendy
-              Hordy usy Husy Hbby Heby] in H *.
+  case: x => [begx Hbegx endx Hordx usx Hsortx Hbndx] in H *.
+  case: y => [begy Hbegy endy Hordy usy Hsorty Hbndy] in H *.
   rewrite /= in H.
+
+  move: Hordx Hordy => /andP [Hordx1 Hordx2] /andP [Hordy1 Hordy2].
 
   apply:
     {| prBeg        := begx
      ; prBegOdd     := Hbegx
-     ; prBegLim     := Hblimx
      ; prEnd        := endy
-     ; prEndEven    := Hendy
-     ; prOrdered    := _
-     ; prUseLocs    := usx ++ usy
-     ; prUseSorted  := _
-     ; prBegBounded := _
-     ; prEndBounded := _ |}.
+     ; prUseLocs    := usx ++ usy |} => //.
 
-  - apply: (ltn_leq_trans Hordx _).
-    apply: (leq_trans _ Hordy).
-    exact/leqW.
+  - apply/andP; split=> //.
+    apply: (leq_trans Hordx2 _).
+    apply: (leq_trans H _).
+    exact: (leq_trans Hordy1 _).
 
-  - elim E: usx => [|u us IHus] //= in Husx Hbbx Hebx *.
+  - elim E: usx => [|u us IHus] //= in Hsortx Hbndx *.
     constructor.
-      apply: IHus.
-      + by inversion Husx.
-      + by move/andP: Hbbx => [? ?].
-      + by move/andP: Hebx => [? ?].
+      apply: IHus=> //.
+        by inversion Hsortx.
+      by move/andP: Hbndx => [? ?].
     apply/Forall_append; split.
-      by inversion Husx; subst.
-    inversion Husx; subst.
+      by inversion Hsortx; subst.
+    inversion Hsortx; subst; clear Hsortx.
+    case: usy => //= [y ys] in Hsorty Hbndy IHus *.
+    move/andP: Hbndx => [/andP [H4 H5] H6].
+    move/andP: Hbndy => [/andP [H7 H8] H9].
+    constructor.
+      apply: (ltn_trans H5 _).
+      apply: (leq_ltn_trans H _).
+      apply: (leq_ltn_trans Hordy1 _).
+      admit.
     apply/Forall_all.
-    apply: (all_leq_ltn Hbby).
-    move/andP: Hebx => [H4 H5].
-    by apply: (ltn_leq_trans H4 _).
+    move/allP in H9.
+    apply/allP.
+    move=> x Hin.
+    move: H9 => /(_ x Hin) /andP [H10 H11].
+    apply: (ltn_trans H5 _).
+    apply: (leq_ltn_trans H _).
+    apply: (leq_ltn_trans Hordy1 _).
+      by apply: (ltn_leq_trans H4 _).
 
   - rewrite all_cat.
     apply/andP; split.
-      exact: Hbbx.
-    apply: (all_leq Hbby).
+      exact: Husx.
+    apply: (all_leq Husy).
+    apply: (leq_trans _ Hbby).
     apply: (leq_trans _ H).
+    move/allP in Husx.
+    move/allP in Hebx.
     exact/ltnW.
 
   - rewrite all_cat.
@@ -75,34 +95,48 @@ Proof.
     apply: (leq_trans H _).
     exact/ltnW.
 Defined.
+*)
 
-Definition transportProtoRange `(Hlt : base < prev)
-  (x : ProtoRange prev) : ProtoRange base.
-  case: x => begx ? Hlim ? ? ? ? ? H ?.
+Definition transportProtoRange `(x : ProtoRange prev)
+  `(Hlt : prBeg x <= base < prev) : ProtoRange base.
+  case: x => [begx ? ? H ? ? Hbound] /= in Hlt *.
   apply: (@Build_ProtoRange _ begx) => //.
-  apply: (leq_trans _ Hlim).
-  exact/ltnW.
+    by ordered.
+  by match_all Hbound.
 Defined.
 
-Definition proto_lt {blimx blimy}
-  (x : ProtoRange blimx) (y : ProtoRange blimy) : Prop :=
-  prEnd x < prBeg y.
+Definition proto_lt `(x : ProtoRange blimx) `(y : ProtoRange blimy) :=
+  is_true (prEnd x < prBeg y).
 
-Lemma proto_lt_transport `(Hlt : base < prev)
-  `(x : ProtoRange prev) `(y : ProtoRange prev) :
-  proto_lt x y
-    -> proto_lt (transportProtoRange Hlt x)
-                (transportProtoRange Hlt y).
+Definition proto_lower_bound `(x : ProtoRange base) : prBeg x <= base.
+Proof. by case: x => /= [? _ ? H *]; move/andP: H => [? _]. Qed.
+
+Lemma proto_lt_spec `(x : ProtoRange prev) `(y : ProtoRange prev)
+  `(Hlt : prBeg x <= base < prev) :
+  proto_lt x y -> prBeg y <= base < prev.
 Proof.
-  move=> H /=.
+  rewrite /proto_lt.
+  case: x => /= [? _ ? ? ? _ _] in Hlt *.
+  case: y => /= [? _ ? ? ? _ _] in Hlt *.
+  move=> ?.
+  by ordered.
+Qed.
+
+Lemma proto_lt_transport `(x : ProtoRange prev) `(y : ProtoRange prev)
+  `(Hlt : prBeg x <= base < prev) (Hpr : proto_lt x y) :
+  proto_lt (@transportProtoRange Hlt)
+           (transportProtoRange Hlt).
+Proof.
   destruct x; destruct y.
   rewrite /proto_lt /transportProtoRange //=.
 Qed.
 
-Lemma NE_Forall_transport {base prev} : forall r rs (Hlt : base < prev),
+Lemma NE_Forall_transport {base prev} :
+  forall (Hlt : base < prev) (r : ProtoRange prev) rs
+         (Hb : prBeg r <= base),
   NE_Forall (proto_lt r) rs
-    -> NE_Forall (proto_lt (transportProtoRange Hlt r))
-                 (NE_map (transportProtoRange Hlt) rs).
+    -> NE_Forall (proto_lt (transportProtoRange Hlt Hb))
+                 (NE_map (transportProtoRange Hlt Hb) rs).
 Proof.
   move=> r rs Hlt.
   elim: rs => [x|x xs IHxs] H.
