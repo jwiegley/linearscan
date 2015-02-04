@@ -1,6 +1,8 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Ltac.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.UsePos.
+Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Proto.
@@ -216,12 +218,13 @@ Proof.
   by match_all.
 Defined.
 
+(*
 Lemma uniq_nil {a} : uniq (T:=a) [::].
 Proof. by []. Qed.
 
 (* Given a list a of variable uses, it is possible that the same variable is
    used more than once (for example, as both the input and output of an
-   instruction which leaves the result in the input register.  In those cases,
+   instruction that leaves the result in the input register).  In those cases,
    we must combine the multiple [VarInfo] records into the most informative
    version of the collective information. *)
 Program Fixpoint refineVars (vars : seq VarInfo) {measure (size vars)} :
@@ -261,14 +264,15 @@ Obligation 1.
   apply/ltP.
   rewrite size_filter /= ltnS.
   exact: count_size.
-Qed.
+Defined.
 Obligation 2.
-  set f   := (X in foldl X _ _).
+  set f := (X in foldl X _ _).
+  elim: xs => //= [|y ys IHys] in refineVars *.
   set nxs := (X in refineVars X).
   set xs' := (refineVars _ _).
   case: xs' => x0 Huniq /=.
   apply/andP; split=> //.
-  
+*)
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=

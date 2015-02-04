@@ -1,6 +1,7 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Range.
 Require Import LinearScan.Ltac.
+Require Import LinearScan.Range.
+Require Import LinearScan.UsePos.
 
 Require Import Coq.Sorting.Sorted.
 

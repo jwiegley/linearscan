@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.IState.
+Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.ScanState.

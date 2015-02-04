@@ -1,6 +1,6 @@
 Require Import LinearScan.Lib.
-
-Require Export LinearScan.Range.
+Require Import LinearScan.Range.
+Require Import LinearScan.UsePos.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
