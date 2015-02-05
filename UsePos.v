@@ -1,4 +1,7 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Ltac.
+
+Require Import Coq.Sorting.Sorted.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -27,8 +30,17 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
+Definition upos_ge (x y : UsePos) : bool := ~~ upos_lt x y.
+Arguments upos_ge x y /.
+
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
+
+Definition head_or x xs := head x [seq uloc u | u <- xs].
+Arguments head_or x xs /.
+
+Definition last_or x xs := last x [seq uloc u | u <- xs].
+Arguments last_or x xs /.
 
 Section EqUpos.
 
@@ -85,6 +97,19 @@ Proof.
   exact: IHzs.
 Qed.
 
+Lemma all_ltn_leq : forall x y xs,
+  all (fun u : UsePos => y < u) xs -> x <= y
+    -> all (fun u : UsePos => x <= u) xs.
+Proof.
+  move=> x y.
+  elim=> [|z zs IHzs] //=.
+  move/andP => [H1 H2] H3.
+  apply/andP; split.
+    apply: (leq_trans H3 _).
+    exact/ltnW.
+  exact: IHzs.
+Qed.
+
 Lemma all_ltn : forall x y xs,
   all (fun u : UsePos => u < y) xs -> y <= x
     -> all (fun u : UsePos => u < x) xs.
@@ -97,69 +122,78 @@ Proof.
   exact: IHzs.
 Qed.
 
-Lemma NE_StronglySorted_UsePos_impl : forall xs,
-  NE_StronglySorted upos_lt xs -> NE_head xs < (NE_last xs).+1.
+Lemma all_last : forall x xs before,
+  x < before
+    -> all (fun y : UsePos => uloc y < before) xs
+    -> last_or x xs < before.
 Proof.
-  intros.
-  induction xs; simpl in *; auto.
-  inversion H.
-  apply NE_Forall_last in H3.
-  exact/ltnW.
+  move=> x xs before Hlt Hall.
+  elim: xs => //= [y ys IHys] in x Hlt Hall *.
+  move/andP: Hall => [H1 H2].
+  exact: IHys.
 Qed.
 
-(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
-    point, the result type must be able to relate the sublists to the original
-    list. *)
-Definition UsePosSublistsOf (before : nat)
-  `(H : NE_StronglySorted upos_lt l) :=
-  { p : option (NonEmpty UsePos) * option (NonEmpty UsePos)
-  | let f x := x < before in match p with
-    | (Some l1, Some l2) =>
-        [ /\ l = NE_append l1 l2
-        &    NE_last l1 < before <= NE_head l2
-        ]
-
-    | (Some l1, None) => l = l1 /\ NE_last l1 < before
-    | (None, Some l2) => l = l2 /\ before <= NE_head l2
-    | (None, None)    => False
-    end
-  }.
-
-(** Return two sublists of [l] such that for every element in the first
-    sublist, [f elem] return [true]. *)
-Fixpoint usePosSpan (before : nat) `(H : NE_StronglySorted upos_lt l) :
-  UsePosSublistsOf before H.
+Lemma all_head : forall x xs before,
+  before <= x
+    -> all (fun y : UsePos => before <= uloc y) xs
+    -> before <= head_or x xs.
 Proof.
-  destruct l as [x|x xs] eqn:Heqe.
-    destruct (x < before) eqn:Heqef.
-      exists (Some (NE_Sing x), None).
-      by split.
-    exists (None, Some (NE_Sing x)).
-      by split; try rewrite leqNgt Heqef.
+  move=> x xs before Hlt Hall.
+  case: xs => //= [y ys] in x Hlt Hall *.
+  move/andP: Hall => [H1 H2] //.
+Qed.
 
-  destruct (x < before) eqn:Heqef.
-  - Case "x < before".
-    destruct (usePosSpan before xs)
-      as [[[l1| ] [l2| ]] Hsublists];
-    try match goal with
-          [ |- NE_StronglySorted _ _ ] => by inversion H
-        end;
-    inversion Hsublists;
+Lemma head_last : forall x xs before,
+  StronglySorted upos_lt (x :: xs)
+    -> last_or x xs < before
+    -> x < head_or before xs.
+Proof.
+  move=> x xs before Hsort Hlast.
+  inv Hsort; clear Hsort.
+  elim: xs => //= [y ys IHys] in x H1 H2 Hlast *.
+  inv H2.
+Qed.
 
-    [ SCase "sublists = (Some, Some)";
-      eexists (Some (NE_Cons x l1), Some l2)
-    | SCase "sublists = (Some, None)";
-      eexists (Some (NE_Cons x l1), None)
-    | SCase "sublists = (None, Some)";
-      eexists (Some (NE_Sing x), Some l2) ];
-    simpl; split; f_equal; try assumption;
-    intuition; constructor; assumption.
+Lemma last_rcons_upos : forall (b : nat) x (l1 : seq UsePos),
+  last b [seq uloc u | u <- rcons l1 x] = x.
+Proof. by move=> b x l1; elim: l1 b => //=. Qed.
 
-  - Case "before <= x".
-    eexists (None, Some (NE_Cons x xs)).
-    by split; try rewrite leqNgt Heqef.
-Defined.
+Lemma last_cat_upos : forall (b : nat) x (xs l1 : seq UsePos),
+  last b [seq uloc u | u <- l1 ++ x :: xs] =
+  last b [seq uloc u | u <- x :: xs].
+Proof.
+  move=> b x xs l1.
+  elim: xs => /= [|y ys IHys] in x l1 *.
+    by rewrite cats1 last_rcons_upos.
+  by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
+Qed.
 
-Lemma usePosSpan_spec (before : nat) `(H : NE_StronglySorted upos_lt l) :
-  (usePosSpan before H).1 <> (None, None).
-Proof. by case: (usePosSpan before H) => [[[?| ] [?| ]] ?]. Qed.
+Lemma last_cons_upos : forall (b : nat) x y (xs : seq UsePos),
+  last b [seq uloc u | u <- x :: y :: xs] =
+  last b [seq uloc u | u <- y :: xs].
+Proof. by move=> b x y; elim=> //= [z zs IHzs]. Qed.
+
+Lemma span_all (l : list UsePos) : forall (x : nat) l1 l2,
+  StronglySorted upos_lt l
+    -> (l1, l2) = span (fun y => uloc y < x) l
+    -> all (fun y => uloc y < x) l1 && all (fun y => x <= uloc y) l2.
+Proof.
+  move=> p l1 l2 Hsort Heqe.
+  elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
+    by inv Heqe.
+  case E: (x < p) in Heqe *.
+    inv Hsort; clear Hsort.
+    case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
+    move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
+    apply/andP; split.
+      inv Heqe.
+      by apply/andP; split.
+    by inv Heqe.
+  inv Hsort; inv Heqe.
+  clear Hsort Heqe IHxs H1.
+  move/negbT: E.
+  rewrite -leqNgt => Hle.
+  apply/andP; split=> //.
+  move/Forall_all in H2.
+  exact: (all_ltn_leq H2).
+Qed.

@@ -48,7 +48,8 @@ Proof.
                ; regReq := true |}.
   have Hodd : odd upos by rewrite /= odd_double.
 
-  set r := exist _ _ (R_Sing Hodd).
+  have H: pos.*2.+1 <= pos.*2.+1 < pos.*2.+2 by ordered.
+  pose r := packRange (R_cons Hodd (R_nil (ltnSn (uloc upos))) H).
   apply: (vreplace regs' reg _).
   apply: Some _.
   case: (vnth regs reg) => [[[d i] /= Hlt]|];

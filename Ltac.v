@@ -1,7 +1,7 @@
 Require Import LinearScan.Lib.
 Require Import Omega.
 
-Ltac ordered :=
+Ltac breakup :=
   repeat match goal with
     | [ H: is_true (?X <  ?Y <  ?Z) |- _ ] => move: H => /andP [? ?]
     | [ H: is_true (?X <= ?Y <= ?Z) |- _ ] => move: H => /andP [? ?]
@@ -13,6 +13,29 @@ Ltac ordered :=
     | [ |- is_true (?X <= ?Y <  ?Z) ] => apply/andP; split
     end;
   repeat match goal with
+    | [ H1: is_true (?X <  ?Y), H2: is_true (?Y <  ?Z) |- _ ] =>
+        match goal with
+        | [ H: is_true (X < Z) |- _ ] => idtac
+        | _ => move: (ltn_trans H1 H2) => ?
+        end
+    | [ H1: is_true (?X <  ?Y), H2: is_true (?Y <= ?Z) |- _ ] =>
+        match goal with
+        | [ H: is_true (X < Z) |- _ ] => idtac
+        | _ => move: (ltn_leq_trans H1 H2) => ?
+        end
+    | [ H1: is_true (?X <= ?Y), H2: is_true (?Y <  ?Z) |- _ ] =>
+        match goal with
+        | [ H: is_true (X < Z) |- _ ] => idtac
+        | _ => move: (leq_ltn_trans H1 H2) => ?
+        end
+    | [ H1: is_true (?X <= ?Y), H2: is_true (?Y <= ?Z) |- _ ] =>
+        match goal with
+        | [ H: is_true (X <= Z) |- _ ] => idtac
+        | _ => move: (leq_trans H1 H2) => ?
+        end
+    end;
+  intuition;
+  repeat match goal with
     | [ H: is_true (?X <  ?Y) |- _ ] => move/ltP in H
     | [ H: is_true (?X <= ?Y) |- _ ] => move/leP in H
     | [ H: is_true (?X == ?Y) |- _ ] => move/eqP in H
@@ -21,8 +44,9 @@ Ltac ordered :=
     | [ |- is_true (?X <= ?Y) ] => apply/leP
     | [ |- is_true (?X == ?Y) ] => apply/eqP
     | [ |- is_true (?X != ?Y) ] => apply/eqP
-    end;
-  abstract omega.
+    end.
+
+Ltac ordered := abstract (intuition; breakup; omega).
 
 Ltac match_all :=
   repeat match goal with

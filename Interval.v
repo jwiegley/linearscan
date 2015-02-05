@@ -1,4 +1,5 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Ltac.
 Require Import LinearScan.Range.
 Require Import LinearScan.UsePos.
 
@@ -185,17 +186,15 @@ Definition nextUseAfter (d : IntervalDesc) (pos : nat) : option nat :=
   option_map (uloc \o @snd _ _) (findIntervalUsePos d (fun u => pos < uloc u)).
 Arguments nextUseAfter d pos /.
 
-Definition firstUsePos (d : IntervalDesc) : nat :=
-  uloc (NE_head (ups (NE_head (rds d)).1)).
+Definition firstUsePos (d : IntervalDesc) : option nat :=
+  if ups (NE_head (rds d)).1 is u :: _
+  then Some (uloc u)
+  else None.
 Arguments firstUsePos d /.
 
 Definition firstUseReqReg (d : IntervalDesc) : option nat :=
   option_map (uloc \o @snd _ _) (findIntervalUsePos d regReq).
 Arguments firstUseReqReg d /.
-
-Definition lastUsePos (d : IntervalDesc) : nat :=
-  uloc (NE_last (ups (NE_last (rds d)).1)).
-Arguments lastUsePos d /.
 
 Lemma Interval_nonempty : forall `(i : Interval d),
   intervalStart i < intervalEnd i.
@@ -207,6 +206,14 @@ Proof.
   move=> H0.
   exact/(ltn_trans H0)/(ltn_trans Hend).
 Qed.
+
+Lemma Interval_beg_of_rds `(i : Interval d) :
+  ibeg d == rbeg (NE_head (rds d)).2.
+Proof. by elim: i => * //=. Qed.
+
+Lemma Interval_end_of_rds `(i : Interval d) :
+  iend d == rend (NE_last (rds d)).2.
+Proof. by elim: i => * //=. Qed.
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
@@ -233,52 +240,6 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
                           &   before <= ibeg i2.1]
   | (None, None)       => False
   end.
-
-Lemma Interval_beg_bounded `(i : Interval d) : ibeg d <= firstUsePos d.
-Proof.
-  rewrite /firstUsePos.
-  elim: i => [iv ? rd r|iv ? rs i H [rd r]] * /=;
-    first exact: (Range_beg_bounded r).
-  exact: (Range_beg_bounded r).
-Qed.
-
-Lemma Interval_beg_of_rds `(i : Interval d) :
-  ibeg d == rbeg (NE_head (rds d)).2.
-Proof. by elim: i => * //=. Qed.
-
-Lemma Interval_end_of_rds `(i : Interval d) :
-  iend d == rend (NE_last (rds d)).2.
-Proof. by elim: i => * //=. Qed.
-
-Fixpoint Interval_end_bounded `(i : Interval d) : lastUsePos i < iend d.
-Proof.
-  case: d i => ib ie ? ? rds /=.
-  invert as [iv ? rd r| ] => /=;
-    first apply: (Range_end_bounded r);
-  rename H1 into i';
-  exact: (Interval_end_bounded i').
-Qed.
-
-Fixpoint Interval_rds_bounded `(i : Interval d) :
-  firstUsePos i <= lastUsePos i.
-Proof.
-  Interval_cases (inversion i) Case; simpl in *.
-  - Case "I_Sing".
-    rewrite -{}H /=.
-    exact: (Range_ups_bounded r).
-  - Case "I_Cons".
-    rewrite -{}H1 /=.
-    move: (Interval_rds_bounded _ H) => /= {H} H1.
-    move: (Range_ups_bounded r.2) => H2.
-    move: (Range_end_bounded r.2) => H3.
-    move: (Range_beg_bounded (NE_head xs).2) => H4.
-    apply (leq_trans H2).
-    apply ltnW in H3.
-    apply (leq_trans H3).
-    apply ltnW in H0.
-    apply (leq_trans H0).
-    by apply (leq_trans H4).
-Qed.
 
 Definition BoundedInterval (pos : nat) :=
   { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }.
@@ -310,18 +271,17 @@ Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
 
 Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
 Proof.
-  case: d i => ib ie iv ? rds /= i.
-  move: (Interval_beg_bounded i) => /= H1.
-  move: (Interval_end_bounded i) => /= H2.
-  move: (Interval_rds_bounded i) => /= H3.
-  exact/(leq_ltn_trans H1)/(leq_ltn_trans H3).
+  elim: i => //= [i knd x r|i knd xs i0 H r Hlt].
+    exact: Range_bounded r.
+  move: (Range_bounded r.2) => H2.
+  by ordered.
 Qed.
 
 (** Split the current interval before the position [before].  This must
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Fixpoint intervalSpan (rs : NonEmpty RangeSig) (before : nat)
+Fixpoint intervalSpan {rs : NonEmpty RangeSig} (before : nat)
   `(i : Interval {| ivar := iv
                   ; ibeg := ib
                   ; iend := ie
@@ -336,12 +296,10 @@ Proof.
   (* We have a single range, and the splitting point occur somewhere within
      that range, meaning that there are use positions both before and after.
      Therefore, we need to create two new intervals out of these parts. *)
-  - Case "rs = R_Sing r; (o, o0) = (Some, Some)".
-    move=> [? ? /eqP H2 /eqP H3].
-
+  - Case "rs = R_Sing r; (r0, r1) = (Some, Some)".
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
     move: (Interval_beg_of_rds i) (Interval_end_of_rds i).
     rewrite H2 H3 /= => *.
-
     by exists (Some (exist _ _ (I_Sing iv lknd r0.2)),
                Some (exist _ _ (I_Sing iv rknd r1.2))).
 
@@ -353,9 +311,9 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (Some, None)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move=> [? /eqP ? ? ?].
-
-    by exists (Some (exist _ _ (I_Sing iv knd r0.2)), None).
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    exists (Some (exist _ _ (I_Sing iv knd r0.2)), None).
+    by rewrite /= {}H2 {}H3; firstorder.
 
   (* Likewise, in this case all use positions occur after the split point, but
      we may still be shortening the range if it began before the split point.
@@ -365,9 +323,9 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (None, Some)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move=> [? /eqP ? ? ?].
-
-    by exists (None, Some (exist _ _ (I_Sing iv knd r1.2))).
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    exists (None, Some (exist _ _ (I_Sing iv knd r1.2))).
+    by rewrite /= {}H2 {}H3; firstorder.
 
   (* If there are no use positions on either side of the split, it would
      indicate an empty range which is invalid. *)
@@ -379,7 +337,7 @@ Proof.
      [(r :: rs)] into [[:: r0]] and [(r1 :: rs)], where [r0] and [r1] are
      the split parts of the first range. *)
   - Case "rs = R_Cons r rs; (o, o0) = (Some, Some)".
-    move=> [? ? /eqP H2 /eqP H3].
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
 
     move: (intervalUncons i) => [_ i1].
     move: (intervalConnected i) => ?.
@@ -400,7 +358,7 @@ Proof.
      [rs].  This means splitting on [rs], we which accomplish by calling this
      function recursively. *)
   - Case "rs = R_Cons r rs; (o, o0) = (Some, None)".
-    move=> [Hx Hy Hz Hw].
+    move/andP=> [H1 /andP [/eqP Hx /eqP Hy]].
 
     move: (intervalUncons i) => [i0 i1].
     move: (intervalConnected i) => Hi0.
@@ -464,7 +422,7 @@ Proof.
       simpl in *; clear Heqe.
       rewrite Hb He in i1_2i.
       rewrite Hb in H2 H3.
-      rewrite Hy in H4.
+      rewrite Hx in H4.
       move/eqP in H4.
       rewrite He in H0.
       rewrite -H5 in H0.
@@ -479,18 +437,19 @@ Proof.
       contradiction.
 
   - Case "rs = R_Cons r rs; (o, o0) = (None, Some)".
-    move=> [H0 H1 H2 H3].
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
 
     move: (intervalUncons i) => [_ i1].
     move: (intervalConnected i) => Hi0.
-    rewrite {}H1 in Hi0.
+    rewrite {}H3 in Hi0.
     move: (Interval_beg_of_rds i) => /= /eqP Heq1.
     rewrite -Heq1 in H2.
     move: (Interval_exact_end i) => /= Heq2.
     rewrite Heq2 in i1.
     move/eqP in Heq2.
 
-    by exists (None, Some (exist _ _ (I_Cons i1 Hi0))).
+    exists (None, Some (exist _ _ (I_Cons i1 Hi0))).
+    by rewrite /= {}H2; firstorder.
 
   - Case "rs = R_Cons r rs; (o, o0) = (None, None)".
     contradiction.

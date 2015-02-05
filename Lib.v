@@ -527,7 +527,7 @@ Fixpoint span {a} (p : a -> bool) (l : list a) : (list a * list a) :=
     else (nil,l)
   end.
 
-Lemma span_spec {a} (l : list a) : forall p l1 l2,
+Lemma span_cat {a} (l : list a) : forall p l1 l2,
   (l1, l2) = span p l -> l = l1 ++ l2.
 Proof.
   move=> p.
@@ -540,6 +540,18 @@ Proof.
     rewrite {}IHxs; by reflexivity.
   inv Heqe.
 Qed.
+
+Lemma span_negb {a} (l : list a) : forall p x,
+  ~~ p x -> ([::], x :: l) = span p (x :: l).
+Proof.
+  move=> p x Hneg.
+  elim: l => //= [|y ys IHys];
+  by case: (p x) in Hneg *.
+Qed.
+
+Example span_ex1 :
+  span (fun x => x < 10) [:: 1; 5; 10; 15] = ([:: 1; 5], [:: 10; 15]).
+Proof. reflexivity. Qed.
 
 Lemma lt_size_rev : forall a (xs : seq a),
   0 < size xs -> 0 < size (rev xs).

@@ -56,9 +56,9 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
   y' <-- y ;;
   pure (x', y').
 
-Definition savesAndRestores opid vid reg int :
+Definition savesAndRestores (opid : OpId) vid reg int :
   AssnState (seq opType2 * seq opType2) :=
-  let isFirst := firstUsePos int == opid in
+  let isFirst := firstUsePos int == Some opid in
   let isLast  := nextUseAfter int opid == None in
   let save    := saveOpM reg (Some vid) in
   let restore := restoreOpM (Some vid) reg in
