@@ -220,26 +220,37 @@ Definition SortedRanges bound :=
   | StronglySorted range_ltn rs
   & bound <= head bound [seq rbeg r.1 | r <- rs] }.
 
-(* A [RangePair] combines a range that is currently being constructed, with a
-   list of sorted ranges to which it will be prepended when construction is
-   complete.  The parameter [n] ensures that the end of the range under
-   construction is always less than or equal to the bound for the
-   [SortedRanges]. *)
+Definition emptySortedRanges {bound : nat} : SortedRanges bound.
+Proof.
+  exists [::] => //.
+  by constructor.
+Defined.
+
+(* A [RangePair] combines a (possible) range that is currently being
+   constructed, with a list of sorted ranges to which it will be prepended
+   when construction is complete.  The parameter [n] ensures that the end of
+   the range under construction is always less than or equal to the bound for
+   the [SortedRanges]. *)
 Definition RangePair (n : nat) :=
-  { p : RangeSig * SortedRanges n | rend (fst p).1 <= n }.
+  { p : option RangeSig * SortedRanges n
+  | if fst p is Some r then rend r.1 <= n else True }.
 
 (* [prependRange] takes a [RangePair] and merges in the
    range-under-construction, resulting in a new [SortedRanges] whose initial
    bound is the beginning of the range that was merged in. *)
-Definition prependRange `(rp : RangePair n) : SortedRanges (rbeg (fst rp.1).1).
+Definition prependRange `(rp : RangePair n) :
+  forall r, fst rp.1 = Some r -> SortedRanges (rbeg r.1).
 Proof.
-  case: rp => [[[rd r] [rs Hsort Hbound]] /= Hlt].
+  move=> [rd r] H0.
+  case: rp => [[[[? ?]|] [rs Hsort Hbound]] /= Hlt] in H0 *;
+    last by discriminate.
+  inv H0.
   case: rs => [|x xs] in Hsort Hbound *.
-    exists [::] => //.
+    by exists [::] => //.
   rewrite /= in Hbound.
   case Heqe: (rend rd == rbeg x.1).
     exists [:: (Range_cat r x.2 Heqe) & xs] => //=.
-    constructor; inv Hsort => //.
+    by constructor; inv Hsort => //.
   move: (leq_trans Hlt Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
   exists [:: (rd; r), x & xs] => //.
@@ -260,15 +271,9 @@ Proof.
   by match_all.
 Defined.
 
-(* Construct a branch new range pair, which is an empty range from [b] to [e],
-   and an empty list of "sorted" ranges, bounded at [e]. *)
-Definition newRangePair (b e : nat) (H : b < e) : RangePair e.
+Definition newRangePair {pos} : RangePair pos.
 Proof.
-  pose rd := {| rbeg := b; rend := e; ups := [::] |}.
-  have r: Range rd.
-    constructor=> //=.
-    by constructor.
-  apply: (exist _ (packRange r, _) _) => //=.
+  apply: (exist _ (None, _) _) => //=.
   apply: exist2 _ _ [::] _ _ => //.
   by constructor.
 Defined.
@@ -286,19 +291,44 @@ Defined.
 (* This function collapses a [RangePair], so that the "range under
    construction" is prepended to its corresponding list of sorted ranges; and
    we then create a new "range under construction", from [base] to [prev]. *)
-Definition mergeRangePair `(rp : RangePair m)
-  `(H : o < n <= rbeg (fst rp.1).1) : RangePair n.
+Definition mergeRangePair `(rp : RangePair m) `(H0 : fst rp.1 = Some r)
+  `(H : o < n <= rbeg r.1) : RangePair n.
 Proof.
-  pose new_rd := {| rbeg := o; rend := n; ups := [::] |}.
-  have new: Range new_rd.
-    constructor=> //=; try by move/andP: H => [? ?].
-    by constructor.
-  have next := prependRange rp.
-  case: rp => [[[rd r] [? ? ?]] /= Hlt] /= in next H *.
+  have next := prependRange H0.
+  case: rp => [[[[rd ?]|] [? ? ?]] /= Hlt] /= in next H H0 *;
+    last by discriminate.
   move/andP: H => [H1 H2].
-  pose p := (packRange new, transportSortedRange H2 next).
+  pose p := (@None RangeSig, transportSortedRange H2 next).
   exists p => //=.
 Defined.
+
+Lemma NE_Forall_from_list : forall r x xs,
+  List.Forall (range_ltn r) (x :: xs)
+    -> NE_Forall (range_ltn r) (NE_from_list x xs).
+Proof.
+  move=> r x xs H.
+  elim: xs => /= [|y ys IHys] in r x H *.
+    constructor.
+    by inv H.
+  constructor.
+    by inv H.
+  apply: IHys.
+  by inv H.
+Qed.
+
+Lemma NE_StronglySorted_from_list : forall r rs,
+  Sorted.StronglySorted range_ltn (r :: rs)
+    -> NE_StronglySorted range_ltn (NE_from_list r rs).
+Proof.
+  move=> r rs.
+  elim: rs => /= [|x xs IHxs] in r *.
+    by constructor.
+  constructor.
+  apply: IHxs.
+    by inv H.
+  inv H.
+  exact: NE_Forall_from_list.
+Qed.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x < rbeg y

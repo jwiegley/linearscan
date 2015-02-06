@@ -21,7 +21,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
 Record BuildState (pos : nat) := {
-  bsVars : seq (RangePair pos.*2.+1);
+  bsVars : seq (SortedRanges pos.*2.+1);
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
 
@@ -97,7 +97,7 @@ Proof.
   by match_all.
 Defined.
 
-Definition reduceOp {pos} (op : opType1) (block : blockType1)
+Program Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=
   let: (varRefs, regRefs) := opRefs oinfo op in
 
@@ -109,9 +109,11 @@ Definition reduceOp {pos} (op : opType1) (block : blockType1)
                   then enum 'I_maxReg
                   else regRefs in
 
-  {| bsVars := undefined
-               (* map (option_map (transportSortedProtoRanges (ltnSSn _))) *)
-               (*     (bsVars bs) *)
+  (* jww (2015-02-06): The next bit of work to be done is to use the list of
+     var references to compute a sequence of RangePair's for this block. *)
+  let varRefs' := @undefined nat in
+
+  {| bsVars := map (transportSortedRange _) (bsVars bs)
    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}.
 
 Definition reduceBlock {pos} (block : blockType1) (liveOut : IntSet)
@@ -135,13 +137,12 @@ Definition reduceBlocks (blocks : seq blockType1)
                   then emptyIntSet
                   else blockLiveOut ls in
       reduceBlock outs $ match bs with
-        | nil => {| bsVars :=
-                      nseq highestVar.+1 undefined
+        | nil => {| bsVars := nseq highestVar.+1 emptySortedRanges
                   ; bsRegs := vconst None |}
         | cons b' bs' => go b' bs' (pos + size (blockOps binfo b))
         end in
   match blocks with
-  | [::] => {| bsVars := nseq highestVar.+1 undefined
+  | [::] => {| bsVars := nseq highestVar.+1 emptySortedRanges
              ; bsRegs := vconst None |}
   | x :: xs => go x xs 0
   end.
@@ -204,7 +205,7 @@ Definition buildIntervals (blocks : seq blockType1)
      let regs := vmap f (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
-     let s3 := foldl_with_index (handleVar 0) s2 undefined (* (bsVars bs) *) in
+     let s3 := foldl_with_index (handleVar 0) s2 (bsVars bs) in
      let s4 := ScanState_finalize s3.2 in
      packScanState s4)
   (reduceBlocks blocks liveSets).

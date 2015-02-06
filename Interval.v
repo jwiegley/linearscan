@@ -252,36 +252,7 @@ Definition transportBoundedInterval {base : nat} `(Hlt : base < prev)
   exact/(leq_trans _ H)/ltnW.
 Defined.
 
-Lemma NE_Forall_from_list : forall (pos : nat) r x xs,
-  List.Forall (range_ltn r) (x :: xs)
-    -> NE_Forall (range_ltn r) (NE_from_list x xs).
-Proof.
-  move=> pos r x xs H.
-  elim: xs => /= [|y ys IHys] in r x H *.
-    constructor.
-    by inv H.
-  constructor.
-    by inv H.
-  apply: IHys.
-  by inv H.
-Qed.
-
-Lemma NE_StronglySorted_from_list : forall (pos : nat) r rs,
-  Sorted.StronglySorted range_ltn (r :: rs)
-    -> NE_StronglySorted range_ltn (NE_from_list r rs).
-Proof.
-  move=> pos r rs.
-  elim: rs => /= [|x xs IHxs] in r *.
-    by constructor.
-  constructor.
-  apply: IHxs.
-    by inv H.
-  inv H.
-  exact: NE_Forall_from_list.
-Qed.
-
-Definition Interval_fromRanges {pos} (vid : nat)
-  (sr : SortedRanges pos) :
+Definition Interval_fromRanges {pos} (vid : nat) (sr : SortedRanges pos) :
   forall r rs, sr.1 = r :: rs ->
   let rs' := NE_from_list r rs in
   Interval {| ivar := vid
@@ -290,25 +261,21 @@ Definition Interval_fromRanges {pos} (vid : nat)
             ; iknd := Whole
             ; rds  := rs' |}.
 Proof.
-Admitted.
-(*
   case: sr => /=.
-  move=> x Hsort r rs Heqe; subst.
+  move=> x Hsort Hlt r rs Heqe; subst.
   set ups0 := NE_from_list _ _.
-  have: NE_StronglySorted range_lt ups0
+  have: NE_StronglySorted range_ltn ups0
     by exact: NE_StronglySorted_from_list.
   elim: ups0 => //= [r'|r' rs' IHrs'].
-    move: (I_Sing vid Whole r'.1.2).
+    move: (I_Sing vid Whole r'.2).
     by destruct r'; destruct x.
   move=> Hnesort; inv Hnesort.
   move: IHrs' => /(_ H1) i.
-  have Hlt: rend r'.1.1 < rbeg (NE_head (NE_map sval rs')).1.
+  have Hlt': rend r'.1 < rbeg (NE_head rs').1.
     move/NE_Forall_head in H2.
-    rewrite /range_lt in H2.
-    by rewrite NE_map_head.
-  exact: (I_Cons (i:=vid) (knd:=Whole) i Hlt).
+    by rewrite /range_ltn in H2.
+  exact: (I_Cons (i:=vid) (knd:=Whole) i Hlt').
 Defined.
-*)
 
 Inductive SplitPosition :=
   | BeforePos of nat
