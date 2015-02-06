@@ -1,4 +1,5 @@
 Require Export LinearScan.Ssr.
+Require Export LinearScan.Ltac.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 
@@ -9,7 +10,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Ltac inv H  := inversion H; subst; simpl; auto.
+Ltac inv H  := inversion H; subst; simpl; clear H.
 Ltac contra := intros top; contradiction top; clear top.
 Ltac invert := intros top; inversion top; clear top.
 
@@ -218,27 +219,63 @@ Proof.
   by move/Forall_append: H3 => [? ?].
 Qed.
 
-Lemma Forall_all : forall (T : Type) (a : pred T) (s : seq T),
-  reflect (List.Forall a s) (all a s).
+Lemma StronglySorted_cat
+  {A : Type} {x y : A} {xs ys : seq A} {R : A -> A -> Prop}
+  `{Transitive _ R} :
+  StronglySorted R (x :: xs) ->
+  StronglySorted R (y :: ys)
+    -> R (last x xs) y
+    -> StronglySorted R (x :: xs ++ y :: ys).
 Proof.
-  move=> T a.
-  elim=> [|x xs IHxs] //=.
-    by constructor; constructor.
-  case E: (a x) => /=.
-    case A: (all a xs).
-      constructor.
-      constructor.
-        by rewrite E.
-      exact/IHxs.
-    constructor.
-    move=> Hcontra.
-    inversion Hcontra; subst.
-    rewrite A in IHxs.
-    by move/IHxs in H2.
+  move=> rel Hsort1 Hsort2.
   constructor.
-  move=> Hcontra.
-  inversion Hcontra; subst.
-  by rewrite E in H1.
+    induction xs; simpl in *.
+      induction ys; simpl in *.
+        constructor.
+          by constructor.
+        by constructor.
+      assumption.
+    constructor.
+      apply: IHxs.
+        inv rel.
+        constructor.
+          by inv H2.
+        by inv H3.
+      induction xs; simpl in *.
+        inv rel; inv H3.
+        by transitivity a.
+      assumption.
+    induction xs; simpl in *.
+      induction ys; simpl in *.
+        by constructor.
+      constructor=> //.
+      inv Hsort1; inv H2; inv H3.
+      constructor.
+        by transitivity y.
+      specialize (IHys (SSorted_cons y H4 H6)).
+      admit.
+    constructor; inv rel.
+      admit.
+    admit.
+  induction xs; simpl in *.
+    induction ys; simpl in *.
+      by constructor.
+    constructor=> //.
+    inv Hsort1; inv H2; inv H3.
+    constructor.
+      by transitivity y.
+    specialize (IHys (SSorted_cons y H4 H6)).
+    by inv IHys.
+  constructor; inv rel.
+    by inv H3.
+  apply: IHxs.
+    constructor.
+      by inv H2.
+    by inv H3.
+  inv H2; inv H3.
+  induction xs; simpl in *.
+    by transitivity a.
+  assumption.
 Qed.
 
 Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=
@@ -247,6 +284,16 @@ Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=
        then v
        else lookup dflt xs x
   else dflt.
+
+Fixpoint maybe_nth {a} (v : seq a) i {struct i} :=
+  match v with
+  | [::] => None
+  | x :: s' =>
+      match i with
+      | 0 => Some x
+      | n'.+1 => maybe_nth s' n'
+      end
+  end.
 
 Fixpoint apply_nth {a} (def : a) (v : seq a) i (f : a -> a) {struct i} :=
   if v is x :: v'
@@ -364,12 +411,6 @@ Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
   rewrite addnS; exact: IHm.
 Qed.
 
-Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
-Proof.
-  move=> n m p H1 H2.
-  exact: (leq_trans H1).
-Qed.
-
 Lemma ltnSSn : forall n, n < n.+2.
 Proof. move=> n. exact: ltnW. Qed.
 
@@ -381,6 +422,13 @@ Proof.
   elim=> //= [n IHn] m o H.
   rewrite leq_subLR.
   by rewrite ltn_addl.
+Qed.
+
+Lemma leq_eqF : forall n m, (n == m) = false -> n <= m -> n < m.
+Proof.
+  move=> n m.
+  move/eqP=> H1 H2.
+  by ordered.
 Qed.
 
 Lemma addsubsubeq : forall n m o, n <= o -> n + m == o + m - (o - n).
@@ -437,6 +485,13 @@ Example ex_foldr_with_index_1 :
   foldr_with_index (fun n x z => (n, x) :: z) nil [:: 1; 2; 3]
     == [:: (0, 1); (1, 2); (2, 3)].
 Proof. reflexivity. Qed.
+
+Lemma eq_addn1 : forall n m, n = m -> n.+1 = m.+1.
+Proof.
+  move=> n m.
+  move=> /eqP H.
+  by apply/eqP.
+Qed.
 
 Fixpoint mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
   (s : A) (v : seq X) : A * seq Y :=
@@ -537,8 +592,8 @@ Proof.
     destruct (span p xs) eqn:S.
     inv Heqe.
     specialize (IHxs l l0).
-    rewrite {}IHxs; by reflexivity.
-  inv Heqe.
+    by rewrite {}IHxs.
+  by inv Heqe.
 Qed.
 
 Lemma span_negb {a} (l : list a) : forall p x,
@@ -779,7 +834,7 @@ Proof.
   move=> a x l l'.
   rewrite mem_cat.
   move/norP.
-  move=> H. inv H.
+  by invert.
 Qed.
 
 Lemma map_f_notin :

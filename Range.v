@@ -39,6 +39,17 @@ Arguments last_or_beg rd /.
 (** A [Range] constrains how a [RangeDesc] may be constructed, and maintains
     any invariants. *)
 
+Record Range (rd : RangeDesc) : Prop := {
+  Range_beg_bounded :
+    if ups rd is u :: _
+    then rbeg rd <= u
+    else rbeg rd < rend rd;
+  Range_end_bounded : last_or_beg rd < rend rd;
+  Range_sorted      : StronglySorted upos_lt (ups rd);
+  Range_all_odd     : all (odd \o uloc) (ups rd)
+}.
+
+(*
 Inductive Range : RangeDesc -> Prop :=
   | R_nil b e : b < e ->
     Range {| rbeg := b
@@ -76,6 +87,7 @@ Tactic Notation "Range_cases" tactic(first) ident(c) :=
   | Case_aux c "R_adjust_beg"
   | Case_aux c "R_adjust_end"
   ].
+*)
 
 Definition getRangeDesc `(r : Range d) := d.
 Arguments getRangeDesc [d] r /.
@@ -87,6 +99,7 @@ Arguments packRange [d] r /.
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
+(*
 Definition BoundedRange (pos : nat) :=
   { r : RangeSig | pos <= head_or_end r.1 }.
 
@@ -97,76 +110,20 @@ Definition transportBoundedRange `(Hlt : base < prev)
   apply: r.
   exact/(leq_trans _ H)/ltnW.
 Defined.
-
-Lemma Range_beg_bounded `(r : Range rd) :
-  if ups rd is u :: _
-  then rbeg rd <= u
-  else rbeg rd < rend rd.
-Proof.
-  elim: r => //= ? x;
-  case: (ups x) => /= *;
-  by ordered.
-Qed.
-
-Lemma Range_end_bounded `(r : Range rd) :
-  last_or_beg rd < rend rd.
-Proof.
-  elim: r => //= ? x;
-  case: (ups x) => /= *;
-  by ordered.
-Qed.
-
-Theorem Range_sorted `(r : Range rd) : StronglySorted upos_lt (ups rd).
-Proof.
-  elim: r => //=; constructor=> //.
-  case: (ups x) => //= [y ys] in H1 H2 *.
-  constructor.
-    by ordered.
-  inversion H1; subst.
-  by match_all.
-Qed.
-
-Theorem Range_all_odd `(r : Range rd) : List.Forall (odd \o uloc) (ups rd).
-Proof.
-  elim: r => //= [u x Hodd r Hall H].
-  by constructor.
-Qed.
-
-Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
-  last z xs < n -> y <= z -> last y xs < n.
-Proof.
-  move=> z y.
-  elim=> //= [x xs IHxs].
-  exact: leq_ltn_trans IHxs _.
-Qed.
-
-Lemma Forall_last_ltn : forall (y : UsePos) (ys : seq UsePos) (n : nat),
-  last (uloc y) [seq uloc u | u <- ys] < n
-    -> List.Forall (fun x : UsePos => y < x) ys -> y < n.
-Proof.
-  move=> y.
-  elim=> //= [z zs IHzs] n Hlast.
-  invert; subst.
-  apply: IHzs => //.
-  move/ltnW in H1.
-  exact (last_ltn Hlast H1).
-Qed.
+*)
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
-  elim: r => //=;
-  try ordered;
-  move=> n x r;
-  move: (Range_sorted r);
-  move: (Range_beg_bounded r);
-  move: (Range_end_bounded r) => /=;
-  case: (ups x) => [|y ys] /= He Hb Hsort H1 H2;
-  try ordered; inv Hsort;
-    first by move: (Forall_last_ltn He H4); ordered.
-  by move: (Forall_last_ltn H2 H4); ordered.
+  case: rd => [rb re rus] in r *.
+  case: rus => /= [|u us] in r *.
+    by move: r => [/= *].
+  move: r => [/= H1 H2 H3 H4].
+  inv H3.
+  move: (Forall_last_ltn H2 H6).
+  by ordered.
 Qed.
 
-Definition Range_cat
+Definition Range_split
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups  := l1 ++ l2 |}) :
@@ -183,7 +140,7 @@ Definition Range_cat
 Proof.
   move=> before Hlt1 Hlt2.
   move/StronglySorted_inv_app: (Range_sorted r) => [Hsortedl Hsortedr].
-  move/Forall_append: (Range_all_odd r) => /= [Hoddl Hoddr].
+  move/Forall_all/Forall_append: (Range_all_odd r) => /= [Hoddl Hoddr].
   move: (Range_bounded r) => /= Hbound.
   move: (Range_beg_bounded r) => /= Hbeg.
   move: (Range_end_bounded r) => /= Hend.
@@ -191,48 +148,156 @@ Proof.
     clear Hsortedr Hoddr Hend.
     elim: l1 {r} => /= [|x xs IHxs] in Hlt1 Hsortedl Hoddl Hbeg *.
       by constructor.
-    inv Hsortedl; inv Hoddl.
-    apply: (R_cons H3 (IHxs _ H1 H4 _)) => /=.
-    - exact: (last_ltn Hlt1).
-    - case: xs {IHxs} => /= [|z zs] in H2 Hlt1 Hsortedl Hoddl H1 H4 *;
-      try move/StronglySorted_UsePos_cons in Hsortedl;
-      inv H2; try ordered.
-      case: l2 => //= [w ws] in Hlt2 *.
-      by ordered.
-    - apply/andP; split=> //.
-      move/Forall_all in H2.
-      exact: head_last.
+    inversion Hsortedl; subst; inv Hoddl.
+    constructor=> //=.
+    apply/andP; split=> //.
+    move/Forall_all in H4.
+    by rewrite /funcomp.
   clear Hsortedl Hoddl Hbeg.
   elim: l2 {r} => /= [|x xs IHxs] in Hlt2 Hsortedr Hoddr Hend *.
     by constructor.
-  inv Hsortedr; inv Hoddr.
-  apply: (R_cons H3 (IHxs _ H1 H4 _)) => /=.
-  - case: xs => [|y ys] in IHxs Hsortedr Hoddr Hend H1 H2 H4 *.
-      rewrite last_cat_upos /= in Hend.
-      by ordered.
-    by inv H2; ordered.
-  - case: xs => /= [|y ys] in IHxs Hsortedr Hoddr Hend H1 H2 H4 *.
-      case: l1 => //= [z zs] in Hlt1 IHxs Hend *.
-      rewrite cats0.
-      rewrite cats1 last_rcons_upos in Hend.
-      by ordered.
-    move: Hend.
-    by rewrite !last_cat_upos /=.
+  inversion Hsortedr; subst; inv Hoddr.
+  constructor=> //=.
+  - case: xs => [|y ys] in IHxs Hsortedr Hend H1 H2 H4 *;
+    by rewrite last_cat_upos /= in Hend.
   - apply/andP; split=> //.
-    move/Forall_all in H2.
-    apply: head_last => //.
-    rewrite last_cat_upos in Hend.
-    have: forall (b e : nat) x (xs l1 : seq UsePos),
-            last b [seq uloc u | u <- l1 ++ x :: xs] < e
-              -> last_or x xs < e.
-      move=> b e x0 xs0 l10 Hlast.
-      elim: xs0 => /= [|z zs IHzs] in x0 Hlast *.
-        by rewrite last_cat_upos /= in Hlast.
-      apply: IHzs.
-      move: Hlast.
-      rewrite !last_cat_upos.
-      by rewrite last_cons_upos.
-    exact.
+    move/Forall_all in H4.
+    by rewrite /funcomp.
+Defined.
+
+Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
+Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
+
+Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
+  rend rd1 == rbeg rd2 -> RangeSig.
+Proof.
+  move=> H.
+  pose rd' := {| rbeg := rbeg rd1
+               ; rend := rend rd2
+               ; ups  := ups rd1 ++ ups rd2 |}.
+  exists rd'; rewrite /rd'.
+
+  case: r1 => [/= Hr1a Hr1b Hr1c Hr1d].
+  case: r2 => [/= Hr2a Hr2b Hr2c Hr2d].
+  constructor=> /=.
+
+  - case: (ups rd1) => [|? ?] //= in Hr1a *.
+    case: (ups rd2) => [|? ?] /= in Hr2a *.
+      by ordered.
+    by ordered.
+
+  - move/eqP in H.
+    case: (ups rd1) => [|? ?] /= in Hr1b *.
+      case: (ups rd2) => [|? ?] //= in Hr2b *.
+      by ordered.
+    case: (ups rd2) => [|? ?] /= in Hr2b *.
+      rewrite cats0.
+      by ordered.
+    rewrite last_cat_upos => //=.
+
+  - case: (ups rd1) => //= [? ?] in Hr1a Hr1b Hr1c *.
+    case: (ups rd2) => /= [|? ?] in Hr2a Hr2b Hr2c *.
+      by rewrite cats0.
+    apply: StronglySorted_cat => //=.
+    move/eqP in H; rewrite -H in Hr2a.
+    rewrite -last_map.
+    by ordered.
+
+  - case: (ups rd1) => //= [? ?] in Hr1d *.
+    case: (ups rd2) => /= [|? ?] in Hr2d *.
+      by rewrite cats0.
+    move/andP: Hr1d => [? ?].
+    apply/andP; split=> //.
+    rewrite all_cat.
+    apply/andP; split=> //.
+Defined.
+
+(* A [SortedRanges] is a list of non-contiguous, ordered ranges, for which we
+   know that the parameter [bound] is less than or equal to the beginning of
+   the first range. *)
+Definition SortedRanges bound :=
+  { rs : seq RangeSig
+  | StronglySorted range_ltn rs
+  & bound <= head bound [seq rbeg r.1 | r <- rs] }.
+
+(* A [RangePair] combines a range that is currently being constructed, with a
+   list of sorted ranges to which it will be prepended when construction is
+   complete.  The parameter [n] ensures that the end of the range under
+   construction is always less than or equal to the bound for the
+   [SortedRanges]. *)
+Definition RangePair (n : nat) :=
+  { p : RangeSig * SortedRanges n | rend (fst p).1 <= n }.
+
+(* [prependRange] takes a [RangePair] and merges in the
+   range-under-construction, resulting in a new [SortedRanges] whose initial
+   bound is the beginning of the range that was merged in. *)
+Definition prependRange `(rp : RangePair n) : SortedRanges (rbeg (fst rp.1).1).
+Proof.
+  case: rp => [[[rd r] [rs Hsort Hbound]] /= Hlt].
+  case: rs => [|x xs] in Hsort Hbound *.
+    exists [::] => //.
+  rewrite /= in Hbound.
+  case Heqe: (rend rd == rbeg x.1).
+    exists [:: (Range_cat r x.2 Heqe) & xs] => //=.
+    constructor; inv Hsort => //.
+  move: (leq_trans Hlt Hbound) => Hleq.
+  move/(leq_eqF Heqe) in Hleq.
+  exists [:: (rd; r), x & xs] => //.
+  constructor=> //.
+  constructor=> //.
+  inv Hsort.
+  move: (Range_bounded x.2) => Hb.
+  rewrite /range_ltn /= in H1 H2 *.
+  case: xs => //= [y ys] in H1 H2 *.
+  constructor.
+    inv H2.
+    by ordered.
+  inv H2.
+  move/Forall_all in H4.
+  apply/Forall_all.
+  rewrite -all_map in H4.
+  rewrite -all_map.
+  by match_all.
+Defined.
+
+(* Construct a branch new range pair, which is an empty range from [b] to [e],
+   and an empty list of "sorted" ranges, bounded at [e]. *)
+Definition newRangePair (b e : nat) (H : b < e) : RangePair e.
+Proof.
+  pose rd := {| rbeg := b; rend := e; ups := [::] |}.
+  have r: Range rd.
+    constructor=> //=.
+    by constructor.
+  apply: (exist _ (packRange r, _) _) => //=.
+  apply: exist2 _ _ [::] _ _ => //.
+  by constructor.
+Defined.
+
+(* The bound for a [SortedRanges] may always move downwards. *)
+Definition transportSortedRange `(H : base <= prev) (rp : SortedRanges prev) :
+  SortedRanges base.
+Proof.
+  case: rp => [rs Hsort Hlt] /=.
+  exists rs => //.
+  case: rs => [|r rs] //= in Hsort Hlt *.
+  by ordered.
+Defined.
+
+(* This function collapses a [RangePair], so that the "range under
+   construction" is prepended to its corresponding list of sorted ranges; and
+   we then create a new "range under construction", from [base] to [prev]. *)
+Definition mergeRangePair `(rp : RangePair m)
+  `(H : o < n <= rbeg (fst rp.1).1) : RangePair n.
+Proof.
+  pose new_rd := {| rbeg := o; rend := n; ups := [::] |}.
+  have new: Range new_rd.
+    constructor=> //=; try by move/andP: H => [? ?].
+    by constructor.
+  have next := prependRange rp.
+  case: rp => [[[rd r] [? ? ?]] /= Hlt] /= in next H *.
+  move/andP: H => [H1 H2].
+  pose p := (packRange new, transportSortedRange H2 next).
+  exists p => //=.
 Defined.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
@@ -290,7 +355,7 @@ Proof.
             else before < rend0).
     case: l2 => //= [y ys] in E r H2 *.
     by move/andP: H2; ordered.
-  move: (Range_cat r H3 H4) => [r1 r2].
+  move: (Range_split r H3 H4) => [r1 r2].
   exists (Some (packRange r1), Some (packRange r2)).
   by repeat (apply/andP; split=> //=).
 Defined.

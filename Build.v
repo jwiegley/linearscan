@@ -5,7 +5,6 @@ Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
-Require Import LinearScan.Proto.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.ScanState.
 
@@ -22,7 +21,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
 Record BuildState (pos : nat) := {
-  bsVars : seq (option (BoundedRange pos.*2.+1));
+  bsVars : seq (RangePair pos.*2.+1);
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
 
@@ -47,153 +46,32 @@ Proof.
   set upos := {| uloc   := pos.*2.+1
                ; regReq := true |}.
   have Hodd : odd upos by rewrite /= odd_double.
+  have H : pos.*2.+1 <= pos.*2.+1 < pos.*2.+2 by ordered.
 
-  have H: pos.*2.+1 <= pos.*2.+1 < pos.*2.+2 by ordered.
-  pose r := packRange (R_cons Hodd (R_nil (ltnSn (uloc upos))) H).
+  pose rd := {| rbeg := uloc upos
+              ; rend := (uloc upos).+1
+              ; ups  := [:: upos] |}.
+  have r : Range rd.
+    rewrite /rd.
+    constructor=> //=.
+      by constructor; constructor.
+    by apply/andP; split.
+
   apply: (vreplace regs' reg _).
   apply: Some _.
   case: (vnth regs reg) => [[[d i] /= Hlt]|];
-    last exact: exist _ (exist _ _ (I_Sing 0 Whole r.2)) _.
+    last exact: exist _ (exist _ _ (I_Sing 0 Whole r)) _.
 
   case: d => [iv ib ie ik rds] in i Hlt *.
   rewrite /= in Hlt.
-  have Hrds: rend r.1 < rbeg (NE_head rds).1.
-    rewrite /r /=.
+  have Hrds: rend rd < rbeg (NE_head rds).1.
     by rewrite doubleS in Hlt.
   move: (Interval_exact_beg i)
         (Interval_exact_end i) => /= Hbeg Hend.
   move: Hbeg Hend i => -> -> i.
-  exact: exist _ (exist _ _ (I_Cons i Hrds)) _ => //=.
+  rewrite /BoundedInterval.
+  by exists (exist _ _ (I_Cons (r:=packRange r) i Hrds)).
 Defined.
-
-(*
-(* Create a proto range to represent a variable reference. *)
-Definition reduceVar pos (block : blockType1) (var : varType)
-  `(Hpos : begin <= pos < begin + blockSize binfo block)
-  (p : ProtoRange pos.*2.+1) : ProtoRange pos.*2.+1.
-Proof.
-  set upos := {| uloc   := pos.*2.+1
-               ; regReq := regRequired var |}.
-
-  set knd := varKind var.
-  case: (prUseLocs p) => [|u us].
-    apply:
-      {| prBeg := match knd with
-           | Input => begin.*2.+1
-           | _     => uloc upos
-           end
-       ; prEnd := match knd with
-           | Output => (begin + blockSize binfo block).*2.+1
-           | _      => (uloc upos).+1
-           end
-       ; prUseLocs := [:: upos] |};
-  case: knd => //=;
-  repeat by rewrite odd_double.
-  - rewrite 2!ltnS leq_double.
-    by ordered.
-  - rewrite ltnS ltn_double.
-    by ordered.
-  - constructor.
-      exact: prUseSorted p.
-    admit.
-  - constructor.
-      exact: prUseSorted p.
-    admit.
-  - constructor.
-      exact: prUseSorted p.
-    admit.
-  - apply/andP; split.
-      by ordered.
-    have H := prUseBounded p.
-    match_all H.
-  VarKind_cases (case: knd) Case.
-  - Case "VarKind_Input".
-
-  - Case "VarKind_Temp".
-    apply:
-      {| prBeg := match knd with
-           | Input => begin.*2.+1
-           | _     => uloc upos
-           end
-       ; prEnd := match knd with
-           | Output => (begin + blockSize binfo block).*2.+1
-           | _      => (uloc upos).+1
-           end
-       ; prUseLocs := upos :: prUseLocs p
-       |} => //=;
-
-  - Case "VarKind_Output".
-    apply:
-      {| prBeg := match knd with
-           | Input => begin.*2.+1
-           | _     => uloc upos
-           end
-       ; prEnd := match knd with
-           | Output => (begin + blockSize binfo block).*2.+1
-           | _      => (uloc upos).+1
-           end
-       ; prUseLocs := upos :: prUseLocs p
-       |} => //=;
-
-  (* For temp variables a single position range is sufficient.  For an input
-     variable, it must extend from the beginning of the block to one beyond
-     the use position.  For an output variable, it extensd from the use
-     position to the end of the block.
-
-     Variables in the [blockLiveOut] set which are not used otherwise cause an
-     empty range to be inserted that extends throughout the entire block. *)
-  case: knd) Case.
-    admit.
-
-    + admit.
-    + admit.
-    + admit.
-    + admit.
-    (* + exact/leqW/leqnn_double. *)
-    (* + apply/negPn. *)
-    (*   by rewrite odd_double. *)
-    (* + by rewrite -2![_.*2.+2]addn2 leq_add2r leq_double. *)
-    (* + by repeat constructor. *)
-    (* + apply/andP; split=> //. *)
-    (*   by rewrite ltnS leq_double. *)
-    (* + by apply/andP; split=> //. *)
-
-  - Case "VarKind_Temp".
-    apply:
-      {| prBeg        := uloc upos
-       ; prBegOdd     := Hodd
-       ; prEnd        := (uloc upos).+1
-       ; prUseLocs    := [:: upos] |} => //=.
-    + admit.
-    + admit.
-    (* + apply/negPn. *)
-    (*   by rewrite odd_double. *)
-    (* + by repeat constructor. *)
-    (* + by apply/andP; split. *)
-    (* + by apply/andP; split. *)
-
-  - Case "VarKind_Output".
-    apply:
-      {| prBeg        := uloc upos
-       ; prBegOdd     := Hodd
-       ; prEnd        := (begin + blockSize binfo block).*2
-       ; prUseLocs    := [:: upos] |} => //=.
-    + admit.
-    + admit.
-    + admit.
-    (* + apply/negPn. *)
-    (*   by rewrite odd_double. *)
-    (* + apply: ltn_even. *)
-    (*   by apply/andP; split; rewrite odd_double. *)
-    (* + by rewrite ltn_double. *)
-    (* + by repeat constructor. *)
-    (* + by apply/andP; split=> //. *)
-    (* + apply/andP; split=> //. *)
-    (*   apply: ltn_even. *)
-    (*     by apply/andP; split; rewrite odd_double. *)
-    (*   by rewrite ltn_double. *)
-Defined.
-*)
 
 Definition UsePosList (pos : nat) :=
   { us : seq (UsePos * VarKind)
@@ -218,62 +96,6 @@ Proof.
   inversion Hsort; subst.
   by match_all.
 Defined.
-
-(*
-Lemma uniq_nil {a} : uniq (T:=a) [::].
-Proof. by []. Qed.
-
-(* Given a list a of variable uses, it is possible that the same variable is
-   used more than once (for example, as both the input and output of an
-   instruction that leaves the result in the input register).  In those cases,
-   we must combine the multiple [VarInfo] records into the most informative
-   version of the collective information. *)
-Program Fixpoint refineVars (vars : seq VarInfo) {measure (size vars)} :
-  { vs : seq VarInfo | uniq [seq varId v | v <- vs] } :=
-  match vars with
-  | [::] => exist _ [::] uniq_nil
-  | x :: xs =>
-      let vs := [seq y <- xs | varId y == varId x] in
-      let f v' v :=
-          let knd' := match varKind v', varKind v with
-            | Input,       Input       => Input
-            | Input,       InputOutput => InputOutput
-            | Input,       Output      => InputOutput
-            | Input,       Temp        => Input
-            | Temp,        Input       => Input
-            | Temp,        InputOutput => InputOutput
-            | Temp,        Output      => Output
-            | Temp,        Temp        => Temp
-            | Output,      Input       => InputOutput
-            | Output,      InputOutput => InputOutput
-            | Output,      Output      => Temp
-            | Output,      Temp        => Output
-            | InputOutput, Input       => InputOutput
-            | InputOutput, InputOutput => Temp
-            | InputOutput, Output      => InputOutput
-            | InputOutput, Temp        => InputOutput
-            end in
-          {| varId       := varId v
-           ; varKind     := knd'
-           ; regRequired := regRequired v || regRequired v'
-           |} in
-      let xs' := refineVars [seq y <- xs | varId y != varId x] in
-      exist _ (foldl f x vs :: xs'.1) _
-  end.
-Obligation 1.
-  move=> *.
-  apply/ltP.
-  rewrite size_filter /= ltnS.
-  exact: count_size.
-Defined.
-Obligation 2.
-  set f := (X in foldl X _ _).
-  elim: xs => //= [|y ys IHys] in refineVars *.
-  set nxs := (X in refineVars X).
-  set xs' := (refineVars _ _).
-  case: xs' => x0 Huniq /=.
-  apply/andP; split=> //.
-*)
 
 Definition reduceOp {pos} (op : opType1) (block : blockType1)
   (bs : BuildState pos.+1) : BuildState pos :=
@@ -313,12 +135,13 @@ Definition reduceBlocks (blocks : seq blockType1)
                   then emptyIntSet
                   else blockLiveOut ls in
       reduceBlock outs $ match bs with
-        | nil => {| bsVars := nseq highestVar.+1 None
+        | nil => {| bsVars :=
+                      nseq highestVar.+1 undefined
                   ; bsRegs := vconst None |}
         | cons b' bs' => go b' bs' (pos + size (blockOps binfo b))
         end in
   match blocks with
-  | [::] => {| bsVars := nseq highestVar.+1 None
+  | [::] => {| bsVars := nseq highestVar.+1 undefined
              ; bsRegs := vconst None |}
   | x :: xs => go x xs 0
   end.
@@ -362,12 +185,14 @@ Definition buildIntervals (blocks : seq blockType1)
         (vid : VarId)
         (ss  : ScanStateSig maxReg Pending)
         (pos : nat)
-        (mrs : option (SortedProtoRanges pos.*2.+1))
+        (mrs : SortedRanges pos.*2.+1)
         (f   : forall sd, ScanState Pending sd
                  -> forall d, Interval d -> ScanStateSig maxReg Pending) :=
-      if mrs is Some rs
-      then f _ ss.2 _ (Interval_fromSortedProtoRanges vid rs).2
-      else ss in
+      match List.destruct_list mrs.1 with
+      | inright _ => ss
+      | inleft (existT _ (exist _ H)) =>
+          f _ ss.2 _ (Interval_fromRanges vid H)
+      end in
 
   let handleVar pos vid ss mrs :=
       mkint vid ss pos mrs $ fun _ st _ i =>

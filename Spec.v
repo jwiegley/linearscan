@@ -38,7 +38,7 @@ Lemma StronglySorted_widen : forall n (xs : list ('I_n * nat)),
 Proof.
   move=> ?.
   elim=> /= [|? ? ?] H; first by constructor.
-  constructor; first by inv H.
+  constructor; first by inv H; auto.
   by apply Forall_widen; inv H.
 Qed.
 
@@ -63,7 +63,7 @@ Proof.
   move=> z.
   elim: l => /= [|x xs IHxs] Hsort.
     by constructor.
-  inv Hsort. clear Hsort.
+  inv Hsort.
   specialize (IHxs H1).
   rewrite /insert.
   case L: (lebf (@snd _ _) x z).
@@ -99,7 +99,7 @@ Proof.
   - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive". inv IHst.
+  - Case "ScanState_moveUnhandledToActive". by inv IHst.
   - Case "ScanState_moveActiveToInactive". exact: IHst.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.

@@ -1,5 +1,16 @@
-Require Import LinearScan.Lib.
+Require Import LinearScan.Ssr.
 Require Import Omega.
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+Generalizable All Variables.
+
+Lemma ltn_leq_trans : forall n m p : nat, m < n -> n <= p -> m < p.
+Proof.
+  move=> n m p H1 H2.
+  exact: (leq_trans H1).
+Qed.
 
 Ltac breakup :=
   repeat match goal with
@@ -47,6 +58,29 @@ Ltac breakup :=
     end.
 
 Ltac ordered := abstract (intuition; breakup; omega).
+
+Lemma Forall_all : forall (T : Type) (a : pred T) (s : seq T),
+  reflect (List.Forall a s) (all a s).
+Proof.
+  move=> T a.
+  elim=> [|x xs IHxs] //=.
+    by constructor; constructor.
+  case E: (a x) => /=.
+    case A: (all a xs).
+      constructor.
+      constructor.
+        by rewrite E.
+      exact/IHxs.
+    constructor.
+    move=> Hcontra.
+    inversion Hcontra; subst.
+    rewrite A in IHxs.
+    by move/IHxs in H2.
+  constructor.
+  move=> Hcontra.
+  inversion Hcontra; subst.
+  by rewrite E in H1.
+Qed.
 
 Ltac match_all :=
   repeat match goal with

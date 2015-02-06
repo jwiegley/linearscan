@@ -149,9 +149,9 @@ Lemma head_last : forall x xs before,
     -> x < head_or before xs.
 Proof.
   move=> x xs before Hsort Hlast.
-  inv Hsort; clear Hsort.
+  inv Hsort.
   elim: xs => //= [y ys IHys] in x H1 H2 Hlast *.
-  inv H2.
+  by inv H2.
 Qed.
 
 Lemma last_rcons_upos : forall (b : nat) x (l1 : seq UsePos),
@@ -182,7 +182,7 @@ Proof.
   elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
     by inv Heqe.
   case E: (x < p) in Heqe *.
-    inv Hsort; clear Hsort.
+    inv Hsort.
     case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
     move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
     apply/andP; split.
@@ -190,10 +190,30 @@ Proof.
       by apply/andP; split.
     by inv Heqe.
   inv Hsort; inv Heqe.
-  clear Hsort Heqe IHxs H1.
+  clear IHxs H1.
   move/negbT: E.
   rewrite -leqNgt => Hle.
   apply/andP; split=> //.
   move/Forall_all in H2.
   exact: (all_ltn_leq H2).
+Qed.
+
+Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
+  last z xs < n -> y <= z -> last y xs < n.
+Proof.
+  move=> z y.
+  elim=> //= [x xs IHxs].
+  exact: leq_ltn_trans IHxs _.
+Qed.
+
+Lemma Forall_last_ltn : forall (y : UsePos) (ys : seq UsePos) (n : nat),
+  last (uloc y) [seq uloc u | u <- ys] < n
+    -> List.Forall (fun x : UsePos => y < x) ys -> y < n.
+Proof.
+  move=> y.
+  elim=> //= [z zs IHzs] n Hlast.
+  invert; subst.
+  apply: IHzs => //.
+  move/ltnW in H1.
+  exact (last_ltn Hlast H1).
 Qed.

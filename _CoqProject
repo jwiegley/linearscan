@@ -15,7 +15,6 @@ Main.v
 Morph.v
 NonEmpty.v
 Order.v
-Proto.v
 Range.v
 Resolve.v
 ScanState.v
