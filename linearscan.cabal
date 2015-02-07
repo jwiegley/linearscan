@@ -69,7 +69,6 @@ library
     LinearScan.Morph
     LinearScan.NonEmpty0
     LinearScan.Order
-    LinearScan.Proto
     LinearScan.Range
     LinearScan.Resolve
     LinearScan.ScanState
@@ -81,6 +80,7 @@ library
     LinearScan.Ssrfun
     LinearScan.Ssrnat
     LinearScan.State
+    LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
   cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
