@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Ltac.
 Require Import LinearScan.UsePos.
 
 Require Import Coq.Sorting.Sorted.
@@ -99,18 +98,18 @@ Arguments packRange [d] r /.
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
-(*
-Definition BoundedRange (pos : nat) :=
-  { r : RangeSig | pos <= head_or_end r.1 }.
+Definition BoundedRange (b e : nat) :=
+  { r : RangeSig | (b <= rbeg r.1) && (rend r.1 <= e) }.
 
-Definition transportBoundedRange `(Hlt : base < prev)
-  (x : BoundedRange prev) : BoundedRange base.
+Definition transportBoundedRange {e} `(Hlt : a <= b)
+  (x : BoundedRange b e) : BoundedRange a e.
   case: x => [r H].
   apply: exist.
   apply: r.
-  exact/(leq_trans _ H)/ltnW.
+  move/andP: H => [? ?].
+  apply/andP; split=> //.
+  by ordered.
 Defined.
-*)
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
@@ -226,32 +225,34 @@ Proof.
   by constructor.
 Defined.
 
+(*
 (* A [RangePair] combines a (possible) range that is currently being
    constructed, with a list of sorted ranges to which it will be prepended
    when construction is complete.  The parameter [n] ensures that the end of
    the range under construction is always less than or equal to the bound for
    the [SortedRanges]. *)
-Definition RangePair (n : nat) :=
-  { p : option RangeSig * SortedRanges n
-  | if fst p is Some r then rend r.1 <= n else True }.
+Definition RangePair (b e : nat) :=
+  { p : option RangeSig * SortedRanges e
+  | if fst p is Some r
+    then (b <= rbeg r.1) && (rend r.1 <= e)
+    else b <= e }.
+*)
 
 (* [prependRange] takes a [RangePair] and merges in the
    range-under-construction, resulting in a new [SortedRanges] whose initial
    bound is the beginning of the range that was merged in. *)
-Definition prependRange `(rp : RangePair n) :
-  forall r, fst rp.1 = Some r -> SortedRanges (rbeg r.1).
+Definition prependRange `(rp : BoundedRange b e) (ranges : SortedRanges e) :
+  SortedRanges b.
 Proof.
-  move=> [rd r] H0.
-  case: rp => [[[[? ?]|] [rs Hsort Hbound]] /= Hlt] in H0 *;
-    last by discriminate.
-  inv H0.
+  case: rp ranges => [[rd r] /= Hlt] [rs Hsort Hbound].
+  move/andP: Hlt => [Hlt1 Hlt2].
   case: rs => [|x xs] in Hsort Hbound *.
     by exists [::] => //.
   rewrite /= in Hbound.
   case Heqe: (rend rd == rbeg x.1).
     exists [:: (Range_cat r x.2 Heqe) & xs] => //=.
     by constructor; inv Hsort => //.
-  move: (leq_trans Hlt Hbound) => Hleq.
+  move: (leq_trans Hlt2 Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
   exists [:: (rd; r), x & xs] => //.
   constructor=> //.
@@ -271,13 +272,6 @@ Proof.
   by match_all.
 Defined.
 
-Definition newRangePair {pos} : RangePair pos.
-Proof.
-  apply: (exist _ (None, _) _) => //=.
-  apply: exist2 _ _ [::] _ _ => //.
-  by constructor.
-Defined.
-
 (* The bound for a [SortedRanges] may always move downwards. *)
 Definition transportSortedRange `(H : base <= prev) (rp : SortedRanges prev) :
   SortedRanges base.
@@ -288,19 +282,43 @@ Proof.
   by ordered.
 Defined.
 
+(*
+Definition newRangePair `(H : b <= e) : RangePair b e.
+Proof.
+  apply: (exist _ (None, _) _) => //=.
+  apply: exist2 _ _ [::] _ _ => //.
+  by constructor.
+Defined.
+
+Definition transportRangePair `(rp : RangePair b e) `(H : a <= b) :
+  RangePair a e.
+Proof.
+  case E: rp => [[[r|] sr] /= Hlt] /= in H; last first.
+    apply: (exist _ (None, transportSortedRange _ sr) _).
+    exact: leq_trans H Hlt.
+  have H1 : a <= e.
+    clear E.
+    move/andP: Hlt => [? ?].
+    move: (Range_bounded r.2).
+    by ordered.
+  exists (Some r, sr) => //=.
+  clear E.
+  move/andP: Hlt => [? ?].
+  by apply/andP; split; ordered.
+Defined.
+
 (* This function collapses a [RangePair], so that the "range under
    construction" is prepended to its corresponding list of sorted ranges; and
    we then create a new "range under construction", from [base] to [prev]. *)
-Definition mergeRangePair `(rp : RangePair m) `(H0 : fst rp.1 = Some r)
-  `(H : o < n <= rbeg r.1) : RangePair n.
+Definition mergeRangePair `(rp : RangePair b e) `(H : a <= b) :
+  RangePair a b.
 Proof.
-  have next := prependRange H0.
-  case: rp => [[[[rd ?]|] [? ? ?]] /= Hlt] /= in next H H0 *;
-    last by discriminate.
-  move/andP: H => [H1 H2].
-  pose p := (@None RangeSig, transportSortedRange H2 next).
-  exists p => //=.
+  case E: rp => [[[r|] sr] /= Hlt] /= in H; last first.
+    by exists (@None RangeSig, transportSortedRange Hlt sr).
+  have E2: fst rp.1 = Some r by inv E.
+  by exists (@None RangeSig, prependRange E2).
 Defined.
+*)
 
 Lemma NE_Forall_from_list : forall r x xs,
   List.Forall (range_ltn r) (x :: xs)

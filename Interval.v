@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Ltac.
 Require Import LinearScan.Range.
 Require Import LinearScan.UsePos.
 
@@ -244,12 +243,12 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
 Definition BoundedInterval (pos : nat) :=
   { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }.
 
-Definition transportBoundedInterval {base : nat} `(Hlt : base < prev)
+Definition transportBoundedInterval {base : nat} `(Hlt : base <= prev)
   (x : BoundedInterval prev) : BoundedInterval base.
   case: x => [i H].
   apply: exist.
   apply: i.
-  exact/(leq_trans _ H)/ltnW.
+  exact/(leq_trans _ H).
 Defined.
 
 Definition Interval_fromRanges {pos} (vid : nat) (sr : SortedRanges pos) :

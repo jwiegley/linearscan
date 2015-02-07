@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Ltac.
 Require Import LinearScan.IntMap.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.
@@ -21,9 +20,33 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
 Record BuildState (pos : nat) := {
-  bsVars : seq (SortedRanges pos.*2.+1);
+  bsVars : IntMap (SortedRanges pos.*2.+1);
   bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
 }.
+
+(*
+Definition transportBuildState `(bs : BuildState b e) `(H : a <= b) :
+  BuildState a e.
+Proof.
+  case: bs => [vars regs].
+  have H': a.*2.+1 <= b.*2.+1
+    by rewrite ltnS leq_double.
+  apply: Build_BuildState.
+  - exact: [seq transportRangePair rp H' | rp <- vars].
+  - exact: vmap (option_map (transportBoundedInterval H')) regs.
+Defined.
+
+Definition mergeBuildState `(bs : BuildState b e) `(H : a <= b) :
+  BuildState a b.
+Proof.
+  case: bs => [vars regs].
+  have H': a.*2.+1 <= b.*2.+1
+    by rewrite ltnS leq_double.
+  apply: Build_BuildState.
+    exact: [seq mergeRangePair x H' | x <- vars].
+  exact: vmap (option_map (transportBoundedInterval H')) regs.
+Defined.
+*)
 
 Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
@@ -33,14 +56,17 @@ Variable oinfo : OpInfo maxReg accType opType1 opType2.
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
    one-position wide ranges. *)
-Definition setIntervalsForRegs (pos : nat)
-  (regs : Vec (option (BoundedInterval (pos.+1).*2.+1)) maxReg)
+Definition setIntervalsForRegs
+  `(regs : Vec (option (BoundedInterval (pos.+1).*2.+1)) maxReg)
   (regRefs : seq PhysReg) :
   Vec (option (BoundedInterval pos.*2.+1)) maxReg.
 Proof.
   have regs' := regs.
-  move/(vmap (option_map (transportBoundedInterval
-                            (inner_addn1 pos)))) in regs'.
+  move/(vmap (option_map (transportBoundedInterval _))) in regs'.
+  have Hleq : pos.*2.+1 <= (pos.+1).*2.+1.
+    rewrite doubleS.
+    exact/ltnW/ltnW.
+  specialize (regs' pos.*2.+1 Hleq).
   apply: foldl _ regs' regRefs => regs' reg.
 
   set upos := {| uloc   := pos.*2.+1
@@ -97,8 +123,12 @@ Proof.
   by match_all.
 Defined.
 
-Program Definition reduceOp {pos} (op : opType1) (block : blockType1)
-  (bs : BuildState pos.+1) : BuildState pos :=
+Definition PendingRanges b e :=
+  IntMap (option (BoundedRange b.*2.+1 e.*2.+1)).
+
+Program Definition reduceOp {pos n} (op : opType1) (block : blockType1)
+  (bs : BuildState (pos.+1)) (ranges : PendingRanges (pos.+1) n) :
+  (BuildState pos * PendingRanges pos n) :=
   let: (varRefs, regRefs) := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
@@ -113,15 +143,25 @@ Program Definition reduceOp {pos} (op : opType1) (block : blockType1)
      var references to compute a sequence of RangePair's for this block. *)
   let varRefs' := @undefined nat in
 
-  {| bsVars := map (transportSortedRange _) (bsVars bs)
-   ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}.
+  ({| bsVars := IntMap_map (transportSortedRange _) (bsVars bs)
+    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |},
+   emptyIntMap).
 
-Definition reduceBlock {pos} (block : blockType1) (liveOut : IntSet)
-  (bs : BuildState (pos + size (blockOps binfo block))) : BuildState pos.
-  elim: (blockOps binfo block) => [|o os IHos] /= in bs *.
-    by rewrite addn0 in bs.
-  rewrite addnS in bs.
-  exact: (IHos (reduceOp o block bs)).
+Definition reduceBlock (block : blockType1) (liveOut : IntSet) :
+  let sz := size (blockOps binfo block) in
+  forall {pos} (bs : BuildState (pos + sz)), BuildState pos.
+Proof.
+  move=> sz pos.
+  have n := pos + sz.
+  have: PendingRanges (pos + sz) n.
+    by exact: emptyIntMap.
+  rewrite {}/sz.
+  elim: (blockOps binfo block) => [|o os IHos] /=.
+    by rewrite !addn0.
+  rewrite !addnS.
+  move=> ranges bs.
+  move: (reduceOp o block bs ranges) => [bs' ranges'].
+  exact: (IHos ranges' bs').
 Defined.
 
 Definition reduceBlocks (blocks : seq blockType1)
@@ -131,19 +171,20 @@ Definition reduceBlocks (blocks : seq blockType1)
         foldl (fun m v => maxn m (varId v)) n
               (fst (opRefs oinfo op)))
         0 blocks in
+  let base : forall n, BuildState n := fun _ =>
+      {| bsVars := emptyIntMap
+       ; bsRegs := vconst None |} in
   let fix go b bs pos : BuildState pos :=
       let bid  := blockId binfo b in
       let outs := if IntMap_lookup bid liveSets isn't Some ls
                   then emptyIntSet
                   else blockLiveOut ls in
       reduceBlock outs $ match bs with
-        | nil => {| bsVars := nseq highestVar.+1 emptySortedRanges
-                  ; bsRegs := vconst None |}
-        | cons b' bs' => go b' bs' (pos + size (blockOps binfo b))
+        | [::]      => base _
+        | b' :: bs' => go b' bs' (pos + size (blockOps binfo b))
         end in
   match blocks with
-  | [::] => {| bsVars := nseq highestVar.+1 emptySortedRanges
-             ; bsRegs := vconst None |}
+  | [::]    => base _
   | x :: xs => go x xs 0
   end.
 
@@ -195,7 +236,7 @@ Definition buildIntervals (blocks : seq blockType1)
           f _ ss.2 _ (Interval_fromRanges vid H)
       end in
 
-  let handleVar pos vid ss mrs :=
+  let handleVar pos ss vid mrs :=
       mkint vid ss pos mrs $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i I) in
 
@@ -205,7 +246,7 @@ Definition buildIntervals (blocks : seq blockType1)
      let regs := vmap f (bsRegs bs) in
      let s1 := ScanState_setFixedIntervals s0 regs in
      let s2 := packScanState s1 in
-     let s3 := foldl_with_index (handleVar 0) s2 (bsVars bs) in
+     let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
      let s4 := ScanState_finalize s3.2 in
      packScanState s4)
   (reduceBlocks blocks liveSets).

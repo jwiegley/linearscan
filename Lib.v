@@ -320,6 +320,13 @@ Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=
        else lookup dflt xs x
   else dflt.
 
+Fixpoint maybeLookup {a : eqType} {b} (v : seq (a * b)) (x : a) : option b :=
+  if v is (k, v) :: xs
+  then if k == x
+       then Some v
+       else maybeLookup xs x
+  else None.
+
 Fixpoint maybe_nth {a} (v : seq a) i {struct i} :=
   match v with
   | [::] => None
@@ -353,9 +360,6 @@ Proof.
   apply/eqP.
   by auto.
 Qed.
-
-Lemma inner_addn1: forall n, n.*2.+1 < (n.+1).*2.+1.
-Proof. by move=> n; rewrite doubleS. Qed.
 
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 

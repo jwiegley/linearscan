@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Ltac.
 
 Require Import Coq.Sorting.Sorted.
 

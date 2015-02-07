@@ -1,42 +1,49 @@
-Require Import Ssreflect.ssreflect.
-Require Import Ssreflect.seq.
+Require Import LinearScan.Lib.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Inductive IntMap (a : Type) :=
-  | emptyIntMap
-  | getIntMap of seq (nat * a).
+Inductive IntMap (a : Type) := getIntMap of seq (nat * a).
 
-Arguments emptyIntMap [a].
 Arguments getIntMap [a] _.
+
+Definition emptyIntMap {a} := @getIntMap a [::].
 
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
    [Data.IntMap]. *)
 Definition IntMap_lookup : forall a, nat -> IntMap a -> option a :=
-  fun _ _ _ => None.
+  fun _ k m => let: getIntMap x := m in maybeLookup x k.
 Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
   fun _ _ _ x => x.
 Definition IntMap_alter : forall a,
   (option a -> option a) -> nat -> IntMap a -> IntMap a :=
   fun _ _ _ x => x.
 
+Definition IntMap_map {a b} (f : a -> b) (m : IntMap a) : IntMap b :=
+  match m with
+  | getIntMap xs => getIntMap (map (fun x => (fst x, f (snd x))) xs)
+  end.
+
+Definition IntMap_foldlWithKey
+  {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a := z.
+
 Definition IntMap_toList {a} (m : IntMap a) : seq (nat * a) :=
   match m with
-    | emptyIntMap => nil
     | getIntMap xs => xs
   end.
 
 Extract Inductive IntMap => "Data.IntMap.IntMap"
-  ["Data.IntMap.empty" "Data.IntMap.fromList"] "(\fO fS _ -> fO ())".
+  ["Data.IntMap.fromList"] "(\fS _ -> ())".
 
-Extract Inlined Constant IntMap_lookup => "Data.IntMap.lookup".
-Extract Inlined Constant IntMap_insert => "Data.IntMap.insert".
-Extract Inlined Constant IntMap_alter  => "Data.IntMap.alter".
-Extract Inlined Constant IntMap_toList => "Data.IntMap.toList".
+Extract Inlined Constant IntMap_lookup       => "Data.IntMap.lookup".
+Extract Inlined Constant IntMap_insert       => "Data.IntMap.insert".
+Extract Inlined Constant IntMap_alter        => "Data.IntMap.alter".
+Extract Inlined Constant IntMap_map          => "Data.IntMap.map".
+Extract Inlined Constant IntMap_foldlWithKey => "Data.IntMap.foldlWithKey".
+Extract Inlined Constant IntMap_toList       => "Data.IntMap.toList".
 
 Inductive IntSet :=
   | emptyIntSet
