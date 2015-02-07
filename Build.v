@@ -19,34 +19,14 @@ Section Build.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Record BuildState (pos : nat) := {
-  bsVars : IntMap (SortedRanges pos.*2.+1);
-  bsRegs : Vec (option (BoundedInterval pos.*2.+1)) maxReg
+Record BuildState (b e : nat) := {
+  bsVars : IntMap (SortedRanges e.*2.+1);
+  bsRegs : Vec (option (BoundedInterval b.*2.+1)) maxReg
 }.
 
-(*
-Definition transportBuildState `(bs : BuildState b e) `(H : a <= b) :
-  BuildState a e.
-Proof.
-  case: bs => [vars regs].
-  have H': a.*2.+1 <= b.*2.+1
-    by rewrite ltnS leq_double.
-  apply: Build_BuildState.
-  - exact: [seq transportRangePair rp H' | rp <- vars].
-  - exact: vmap (option_map (transportBoundedInterval H')) regs.
-Defined.
-
-Definition mergeBuildState `(bs : BuildState b e) `(H : a <= b) :
-  BuildState a b.
-Proof.
-  case: bs => [vars regs].
-  have H': a.*2.+1 <= b.*2.+1
-    by rewrite ltnS leq_double.
-  apply: Build_BuildState.
-    exact: [seq mergeRangePair x H' | x <- vars].
-  exact: vmap (option_map (transportBoundedInterval H')) regs.
-Defined.
-*)
+Definition newBuildState {n} : BuildState n n :=
+  {| bsVars := emptyIntMap
+   ; bsRegs := vconst None |}.
 
 Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
@@ -123,12 +103,11 @@ Proof.
   by match_all.
 Defined.
 
-Definition PendingRanges b e :=
-  IntMap (option (BoundedRange b.*2.+1 e.*2.+1)).
+Definition PendingRanges b e := IntMap (BoundedRange b.*2.+1 e.*2.+1).
 
-Program Definition reduceOp {pos n} (op : opType1) (block : blockType1)
-  (bs : BuildState (pos.+1)) (ranges : PendingRanges (pos.+1) n) :
-  (BuildState pos * PendingRanges pos n) :=
+Program Definition reduceOp {pos b e} (op : opType1) (block : blockType1)
+  (ranges : PendingRanges b e) (bs : BuildState (pos.+1) e) :
+  (PendingRanges b e * BuildState pos e) :=
   let: (varRefs, regRefs) := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
@@ -138,55 +117,64 @@ Program Definition reduceOp {pos n} (op : opType1) (block : blockType1)
   let regRefs' := if opKind oinfo op is IsCall
                   then enum 'I_maxReg
                   else regRefs in
-
+  
   (* jww (2015-02-06): The next bit of work to be done is to use the list of
      var references to compute a sequence of RangePair's for this block. *)
   let varRefs' := @undefined nat in
 
-  ({| bsVars := IntMap_map (transportSortedRange _) (bsVars bs)
-    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |},
-   emptyIntMap).
+  (emptyIntMap,
+   {| bsVars := bsVars bs
+    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
 
-Definition reduceBlock (block : blockType1) (liveOut : IntSet) :
+Definition reduceBlock (block : blockType1) :
   let sz := size (blockOps binfo block) in
-  forall {pos} (bs : BuildState (pos + sz)), BuildState pos.
+  forall {pos b e} (ranges : PendingRanges b e)
+    (bs : BuildState (pos + sz) e),
+      (PendingRanges b e * BuildState pos e).
 Proof.
-  move=> sz pos.
-  have n := pos + sz.
-  have: PendingRanges (pos + sz) n.
-    by exact: emptyIntMap.
+  move=> sz pos b e.
   rewrite {}/sz.
   elim: (blockOps binfo block) => [|o os IHos] /=.
     by rewrite !addn0.
   rewrite !addnS.
   move=> ranges bs.
-  move: (reduceOp o block bs ranges) => [bs' ranges'].
-  exact: (IHos ranges' bs').
+  case: (reduceOp o block ranges bs).
+  exact: IHos.
 Defined.
 
 Definition reduceBlocks (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : BuildState 0 :=
-  let: highestVar :=
-      foldOps binfo (fun n op =>
-        foldl (fun m v => maxn m (varId v)) n
-              (fst (opRefs oinfo op)))
-        0 blocks in
-  let base : forall n, BuildState n := fun _ =>
-      {| bsVars := emptyIntMap
-       ; bsRegs := vconst None |} in
-  let fix go b bs pos : BuildState pos :=
-      let bid  := blockId binfo b in
-      let outs := if IntMap_lookup bid liveSets isn't Some ls
-                  then emptyIntSet
-                  else blockLiveOut ls in
-      reduceBlock outs $ match bs with
-        | [::]      => base _
-        | b' :: bs' => go b' bs' (pos + size (blockOps binfo b))
-        end in
-  match blocks with
-  | [::]    => base _
-  | x :: xs => go x xs 0
-  end.
+  (liveSets : IntMap BlockLiveSets) pos :
+  BuildState pos pos.
+Proof.
+  elim: blocks => [|b blocks IHbs] in pos *.
+    exact: newBuildState.
+  have bid    := blockId binfo b.
+  have outs   := if IntMap_lookup bid liveSets isn't Some ls
+                 then emptyIntSet
+                 else blockLiveOut ls.
+
+  pose sz := size (blockOps binfo b).
+  case E: (0 < sz); last exact: IHbs pos.
+
+  pose endpos := pos + sz.
+  have Hsz : pos.*2.+1 < endpos.*2.+1.
+    rewrite /endpos.
+    apply/ltn_addn1.
+    rewrite ltn_double addnC.
+    exact: ltn_plus.
+  pose empty := emptyBoundedRange Hsz.
+  pose f xs vid := IntMap_insert vid empty xs.
+  pose pending  := IntSet_foldl f emptyIntMap outs.
+
+  have bs := IHbs endpos.
+  rewrite /endpos /sz in bs.
+  case: (reduceBlock pending bs) => [ranges bs'].
+
+  exact: {| bsVars :=
+              mergePendingRanges (ltn_Sdouble_nn _ _) ranges
+                                 (bsVars bs')
+          ; bsRegs := bsRegs bs' |}.
+Defined.
 
 Definition buildIntervals (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : ScanStateSig maxReg InUse :=
@@ -240,15 +228,18 @@ Definition buildIntervals (blocks : seq blockType1)
       mkint vid ss pos mrs $ fun _ st _ i =>
         packScanState (ScanState_newUnhandled st i I) in
 
-  (fun (bs : BuildState 0) =>
-     let s0 := ScanState_nil maxReg in
-     let f mx := if mx is Some x then Some x.1 else None in
-     let regs := vmap f (bsRegs bs) in
-     let s1 := ScanState_setFixedIntervals s0 regs in
-     let s2 := packScanState s1 in
-     let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
-     let s4 := ScanState_finalize s3.2 in
-     packScanState s4)
-  (reduceBlocks blocks liveSets).
+  let s0 := ScanState_nil maxReg in
+  if blocks isn't b :: bs
+  then packScanState (ScanState_finalize s0)
+  else
+    (fun (bs : BuildState 0 0) =>
+       let f mx := if mx is Some x then Some x.1 else None in
+       let regs := vmap f (bsRegs bs) in
+       let s1 := ScanState_setFixedIntervals s0 regs in
+       let s2 := packScanState s1 in
+       let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
+       let s4 := ScanState_finalize s3.2 in
+       packScanState s4)
+    (reduceBlocks bs liveSets 0).
 
 End Build.

@@ -218,9 +218,9 @@ Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
 Record DividedInterval `(i : Interval d) (before : nat)
   `(i1 : Interval d1) `(i2 : Interval d2) : Prop := {
-    _ : iend i1 <= before <= ibeg i2;
-    _ : ibeg i == ibeg i1;
-    _ : iend i == iend i2
+  _ : iend i1 <= before <= ibeg i2;
+  _ : ibeg i == ibeg i1;
+  _ : iend i == iend i2
 }.
 
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific

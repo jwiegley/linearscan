@@ -441,6 +441,13 @@ Proof.
   exact: (IHn m).
 Qed.
 
+Lemma ltn_nSm : forall n m : nat, n < n + m.+1.
+Proof.
+  elim=> [|n IHn].
+    by case.
+  by ordered.
+Qed.
+
 Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
 Proof. exact: ltnW. Qed.
 
@@ -448,6 +455,19 @@ Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
   elim=> [|m IHm] // n H;
     first by rewrite addn0.
   rewrite addnS; exact: IHm.
+Qed.
+
+Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
+Proof. by []. Qed.
+
+Lemma ltn_Sdouble_nn : forall n m, n.*2 < (n + m).*2.+1.
+Proof.
+  elim=> [|n IHn] m //=.
+  rewrite addSn !doubleS.
+  case: m => [|m].
+    rewrite addn0.
+    by ordered.
+  exact/ltn_addn1/ltn_addn1.
 Qed.
 
 Lemma ltnSSn : forall n, n < n.+2.
@@ -654,20 +674,6 @@ Proof.
   elim=> //= [x xs IHxs] H.
   by rewrite size_rev /=.
 Qed.
-
-(*
-Lemma last_cons_rev : forall a (y : a) ys H,
-  safe_last (rev (y :: ys)) H = y.
-Proof.
-
-Lemma hd_last_spec : forall a (xs : seq a) (H : 0 < size xs),
-  safe_hd xs H = safe_last (rev xs) (lt_size_rev H).
-Proof.
-  move=> a.
-  elim=> [//|y ys IHys] /= H.
-  by rewrite last_cons_rev.
-Qed.
-*)
 
 Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).

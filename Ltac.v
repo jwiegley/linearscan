@@ -14,10 +14,18 @@ Qed.
 
 Ltac breakup :=
   repeat match goal with
-    | [ H: is_true (?X <  ?Y <  ?Z) |- _ ] => move: H => /andP [? ?]
-    | [ H: is_true (?X <= ?Y <= ?Z) |- _ ] => move: H => /andP [? ?]
-    | [ H: is_true (?X <  ?Y <= ?Z) |- _ ] => move: H => /andP [? ?]
-    | [ H: is_true (?X <= ?Y <  ?Z) |- _ ] => move: H => /andP [? ?]
+    | [ H: is_true ((?X <  ?Y) && (?W <  ?Z)) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true ((?X <= ?Y) && (?W <  ?Z)) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true ((?X <  ?Y) && (?W <= ?Z)) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true ((?X <= ?Y) && (?W <= ?Z)) |- _ ] => move/andP: H => [? ?]
+    | [ |- is_true ((?X <  ?Y) && (?W <  ?Z)) ] => apply/andP; split
+    | [ |- is_true ((?X <= ?Y) && (?W <  ?Z)) ] => apply/andP; split
+    | [ |- is_true ((?X <  ?Y) && (?W <= ?Z)) ] => apply/andP; split
+    | [ |- is_true ((?X <= ?Y) && (?W <= ?Z)) ] => apply/andP; split
+    | [ H: is_true (?X <  ?Y <  ?Z) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true (?X <= ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true (?X <  ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]
+    | [ H: is_true (?X <= ?Y <  ?Z) |- _ ] => move/andP: H => [? ?]
     | [ |- is_true (?X <  ?Y <  ?Z) ] => apply/andP; split
     | [ |- is_true (?X <= ?Y <= ?Z) ] => apply/andP; split
     | [ |- is_true (?X <  ?Y <= ?Z) ] => apply/andP; split
@@ -84,10 +92,8 @@ Qed.
 
 Ltac match_all :=
   repeat match goal with
-  | [ H: List.Forall _ ?Z |- _ ] =>
-      move/Forall_all in H
-  | [ |- List.Forall _ ?Z ] =>
-      apply/Forall_all
+  | [ H: List.Forall _ ?Z |- _ ] => move/Forall_all in H
+  | [ |- List.Forall _ ?Z ]      => apply/Forall_all
   end;
   match goal with
   | [  H: is_true (all _ ?Z) |- is_true (all _ ?Z) ] =>
