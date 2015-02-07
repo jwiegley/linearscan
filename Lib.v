@@ -21,6 +21,8 @@ Definition undefined {a : Type} : a. Admitted.
 
 Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
 
+Definition flip `(f : a -> b -> c) : b -> a -> c := fun y x => f x y.
+
 Definition ex_falso_quodlibet : forall {P : Type}, False -> P.
 Proof. intros P. contra. Defined.
 

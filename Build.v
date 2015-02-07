@@ -103,9 +103,41 @@ Proof.
   by match_all.
 Defined.
 
+Definition RangeCursor b pos e :=
+  { r : BoundedRange b.*2.+1 e.*2.+1
+  | (rbeg r.1.1 <= pos.*2.+1) &&
+    (if ups r.1.1 is u :: _
+     then pos.*2.+1 <= u
+     else pos.*2.+1 < rend r.1.1) }.
+
 Definition PendingRanges b e := IntMap (BoundedRange b.*2.+1 e.*2.+1).
 
-Program Definition reduceOp {pos b e} (op : opType1) (block : blockType1)
+Program Definition handleOutputVar {b e} (pos : nat) (v : VarInfo) :
+  PendingRanges b e -> PendingRanges b e :=
+  (* jww (2015-02-07): Every output variable should have occurred in
+     liveOut.  This should be proven, but we assume it for now. *)
+  let f (mx : option (BoundedRange b.*2.+1 e.*2.+1)) :
+      option (BoundedRange b.*2.+1 e.*2.+1) :=
+      if mx is Some x
+      then Some (exist _ (Range_shiftup (b:=pos) x.1.2 _) _)
+      else mx in
+  IntMap_alter f (varId v).
+Obligation 1.
+  case: x => [r /= Hlt].
+Admitted.
+Obligation 2.
+  case: x => [r /= Hlt].
+Admitted.
+
+Program Definition handleTempVar {b e} (pos : nat) (v : VarInfo) :
+  PendingRanges b e -> PendingRanges b e.
+Admitted.
+
+Program Definition handleInputVar {b e} (pos : nat) (v : VarInfo) :
+  PendingRanges b e -> PendingRanges b e.
+Admitted.
+
+Definition reduceOp {pos b e} (block : blockType1) (op : opType1)
   (ranges : PendingRanges b e) (bs : BuildState (pos.+1) e) :
   (PendingRanges b e * BuildState pos e) :=
   let: (varRefs, regRefs) := opRefs oinfo op in
@@ -117,14 +149,21 @@ Program Definition reduceOp {pos b e} (op : opType1) (block : blockType1)
   let regRefs' := if opKind oinfo op is IsCall
                   then enum 'I_maxReg
                   else regRefs in
-  
-  (* jww (2015-02-06): The next bit of work to be done is to use the list of
-     var references to compute a sequence of RangePair's for this block. *)
-  let varRefs' := @undefined nat in
 
-  (emptyIntMap,
-   {| bsVars := bsVars bs
-    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
+  (* First consider the output variables. *)
+  let outputs := [seq v <- varRefs | varKind v == Output] in
+  let v0 := forFold ranges outputs (flip (handleOutputVar pos)) in
+
+  (* Next, consider the temp variables. *)
+  let temps := [seq v <- varRefs | varKind v == Temp] in
+  let v1 := forFold v0 temps (flip (handleTempVar pos)) in
+
+  (* Last, consider the input variables. *)
+  let inputs := [seq v <- varRefs | varKind v == Input] in
+  let v2 := forFold v1 inputs (flip (handleInputVar pos)) in
+
+  (v2, {| bsVars := bsVars bs
+        ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
 
 Definition reduceBlock (block : blockType1) :
   let sz := size (blockOps binfo block) in
@@ -138,7 +177,7 @@ Proof.
     by rewrite !addn0.
   rewrite !addnS.
   move=> ranges bs.
-  case: (reduceOp o block ranges bs).
+  case: (reduceOp block o ranges bs).
   exact: IHos.
 Defined.
 
@@ -148,23 +187,26 @@ Definition reduceBlocks (blocks : seq blockType1)
 Proof.
   elim: blocks => [|b blocks IHbs] in pos *.
     exact: newBuildState.
-  have bid    := blockId binfo b.
-  have outs   := if IntMap_lookup bid liveSets isn't Some ls
-                 then emptyIntSet
-                 else blockLiveOut ls.
+
+  have bid  := blockId binfo b.
+  have outs := if IntMap_lookup bid liveSets isn't Some ls
+               then emptyIntSet
+               else blockLiveOut ls.
 
   pose sz := size (blockOps binfo b).
   case E: (0 < sz); last exact: IHbs pos.
 
+  (* For every variable in the live out set, create an empty range covering
+     the entire span. *)
   pose endpos := pos + sz.
   have Hsz : pos.*2.+1 < endpos.*2.+1.
     rewrite /endpos.
     apply/ltn_addn1.
     rewrite ltn_double addnC.
     exact: ltn_plus.
-  pose empty := emptyBoundedRange Hsz.
-  pose f xs vid := IntMap_insert vid empty xs.
-  pose pending  := IntSet_foldl f emptyIntMap outs.
+  have empty    := emptyBoundedRange Hsz.
+  have f xs vid := IntMap_insert vid empty xs.
+  have pending  := IntSet_foldl f emptyIntMap outs.
 
   have bs := IHbs endpos.
   rewrite /endpos /sz in bs.

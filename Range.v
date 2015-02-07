@@ -40,10 +40,9 @@ Arguments last_or_beg rd /.
     any invariants. *)
 
 Record Range (rd : RangeDesc) : Prop := {
-  Range_beg_bounded :
-    if ups rd is u :: _
-    then rbeg rd <= u
-    else rbeg rd < rend rd;
+  Range_beg_bounded : if ups rd is u :: _
+                      then rbeg rd <= u
+                      else rbeg rd < rend rd;
   Range_end_bounded : last_or_beg rd < rend rd;
   Range_sorted      : StronglySorted upos_lt (ups rd);
   Range_all_odd     : all (odd \o uloc) (ups rd)
@@ -58,6 +57,32 @@ Definition packRange `(r : Range d) := exist Range d r.
 Arguments packRange [d] r /.
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
+
+Definition Range_shiftup `(r : Range rd)
+  `(H : if ups rd is u :: _
+        then b <= u
+        else b < rend rd) : RangeSig.
+Proof.
+  exists {| rbeg := b
+          ; rend := rend rd
+          ; ups  := ups rd |}.
+  case: r => [Hbeg Hend Hsort ?].
+  constructor=> //=.
+  rewrite /last_or_beg /last_or in Hend.
+  by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
+Defined.
+
+Definition Range_shiftdown `(r : Range rd) `(H : last_or_beg rd < e) :
+  RangeSig.
+Proof.
+  exists {| rbeg := rbeg rd
+          ; rend := e
+          ; ups  := ups rd |}.
+  case: r => [Hbeg Hend Hsort ?].
+  constructor=> //=.
+  rewrite /last_or_beg /last_or in H.
+  by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
+Defined.
 
 Definition BoundedRange (b e : nat) :=
   { r : RangeSig | (b <= rbeg r.1) && (rend r.1 <= e) }.
