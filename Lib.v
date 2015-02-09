@@ -210,6 +210,19 @@ Proof.
   by move/IHxs: H3 => [? ?].
 Qed.
 
+Lemma Forall_rcons_inv : forall a P (x : a) xs,
+  List.Forall P (rcons xs x) -> List.Forall P xs /\ P x.
+Proof.
+  move=> a P x.
+  elim=> [|y ys IHys] /=.
+    by invert.
+  invert.
+  specialize (IHys H2).
+  inversion IHys.
+  split=> //.
+  constructor=> //.
+Qed.
+
 Require Import Coq.Sorting.Sorted.
 
 Lemma StronglySorted_inv_app : forall a R (l1 l2 : seq a),
@@ -320,6 +333,30 @@ Proof.
   induction xs; simpl in *.
     by transitivity a.
   assumption.
+Qed.
+
+Lemma StronglySorted_rcons_inv : forall a R (x : a) xs,
+  StronglySorted R (rcons xs x) -> StronglySorted R xs.
+Proof.
+  move=> a R x.
+  elim=> [|y ys IHys] /=.
+    by invert.
+  invert.
+  specialize (IHys H1).
+  constructor=> //.
+  apply Forall_rcons_inv in H2.
+  by inversion H2.
+Qed.
+
+Lemma StronglySorted_rcons_rcons_inv : forall a R (x y : a) xs,
+  StronglySorted R (rcons (rcons xs x) y) -> R x y.
+Proof.
+  move=> a R x y.
+  elim=> [|z zs IHzs] /=.
+    invert.
+    by inv H2.
+  invert.
+  exact: IHzs H1.
 Qed.
 
 Fixpoint lookup {a : eqType} {b} (dflt : b) (v : seq (a * b)) (x : a) : b :=

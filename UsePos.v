@@ -110,14 +110,14 @@ Proof.
 Qed.
 
 Lemma all_ltn : forall x y xs,
-  all (fun u : UsePos => u < y) xs -> y <= x
+  all (fun u : UsePos => u < y) xs -> y < x
     -> all (fun u : UsePos => u < x) xs.
 Proof.
   move=> x y.
   elim=> [|z zs IHzs] //=.
   move/andP => [H1 H2] H3.
   apply/andP; split.
-    exact: (ltn_leq_trans H1 _).
+    exact: (ltn_trans H1 _).
   exact: IHzs.
 Qed.
 

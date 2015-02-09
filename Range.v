@@ -204,18 +204,18 @@ Obligation 1.
 Qed.
 
 Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
-  rend rd1 == rbeg rd2 -> RangeSig.
+  rend rd1 == rbeg rd2
+  -> Range {| rbeg := rbeg r1
+            ; rend := rend r2
+            ; ups  := ups r1 ++ ups r2 |}.
 Proof.
   move=> H.
   pose rd' := {| rbeg := rbeg rd1
                ; rend := rend rd2
                ; ups  := ups rd1 ++ ups rd2 |}.
-  exists rd'; rewrite /rd'.
-
   case: r1 => [/= Hr1a Hr1b Hr1c Hr1d].
   case: r2 => [/= Hr2a Hr2b Hr2c Hr2d].
   constructor=> /=.
-
   - case: (ups rd1) => [|? ?] //= in Hr1a *.
     case: (ups rd2) => [|? ?] /= in Hr2a *.
       by ordered.
@@ -277,7 +277,8 @@ Proof.
   move/andP: Hlt => [Hlt1 Hlt2].
   rewrite /= in Hbound.
   case Heqe: (rend rd == rbeg x.1); move=> ?.
-    apply: exist _ (exist2 _ _ [:: (Range_cat r x.2 Heqe) & xs] _ _) _ => /=.
+    pose r' := packRange (Range_cat r x.2 Heqe).
+    apply: exist _ (exist2 _ _ [:: r' & xs] _ _) _ => /=.
       by constructor; inv Hsort.
     inv Hsort; invert; subst.
     by case: xs => //= in H1 H2 H3 H4 *.
@@ -303,45 +304,69 @@ Proof.
   by match_all.
 Defined.
 
+Lemma Forall_ltn : forall (p r : RangeSig) rs,
+  List.Forall (fun y : RangeSig => rend r.1 < rbeg y.1) rs
+    -> rend p.1 <= rend r.1
+    -> List.Forall (fun y : RangeSig => rend p.1 < rbeg y.1) rs.
+Proof.
+  move=> p r.
+  elim=> [|x xs IHxs] /=.
+    by constructor.
+  invert; subst.
+  move=> H.
+  specialize (IHxs H2 H).
+  constructor=> //.
+  by ordered.
+Qed.
+
 Definition SortedRanges_cat `(xs : SortedRanges b) `(ys : SortedRanges pos)
   `(H : last b [seq rend r.1 | r <- xs.1] <= pos) : SortedRanges b.
 Proof.
   move: xs => [ps Hpsort Hplt] in H *.
   move: ys => [rs Hrsort Hrlt] in H *.
-  case: ps => [|p ps] //= in Hpsort Hplt H *;
+  case/lastP: ps => [|ps p] //= in Hpsort Hplt H *;
   case: rs => [|r rs] //= in Hrsort Hrlt H *.
   + by apply: exist2 _ _ [::] _ _.
   + apply: exist2 _ _ (r :: rs) Hrsort _ => /=.
     exact: leq_trans H Hrlt.
-  + by apply: exist2 _ _ (p :: ps) Hpsort _.
-  + pose mid := last p ps.
-    case E: (rend mid.1 == rbeg r.1).
-      pose r' := Range_cat mid.2 r.2 E.
-      apply: exist2 _ _ (init p ps ++ r' :: rs) _ _.
-        case: ps => /= [|p' ps'] in H Hpsort mid E r' *.
-          admit.
-        case: ps' => /= [|y ys] in H Hpsort mid E r' *.
-          constructor.
-            admit.
-          constructor.
-            rewrite /range_ltn.
-            admit.
-          inv Hrsort.
-          admit.
-        constructor.
-          admit.
-        admit.
-      case: ps => /= [|p' ps'] in H Hpsort mid E r' *.
-        admit.
-      by case: ps' => //= [|y ys] in H Hpsort mid E r' *.
-    apply: exist2 _ _ (p :: ps ++ r :: rs) _ _ => //=.
+  + by apply: exist2 _ _ (rcons ps p) Hpsort _.
+  + case E: (rend p.1 == rbeg r.1).
+      pose r' := packRange (Range_cat p.2 r.2 E).
+      apply: exist2 _ _ (ps ++ r' :: rs) _ _.
+        case: ps => /= [|p' ps'] in H Hpsort Hplt E r' *.
+          by constructor; inv Hrsort.
+        apply: StronglySorted_cat => //=.
+        * constructor; inv Hpsort.
+            exact: (StronglySorted_rcons_inv H2).
+          move: H3.
+          by apply Forall_rcons_inv.
+        * by constructor; inv Hrsort.
+        * rewrite /range_ltn {}/r' /=.
+          inv Hpsort.
+          apply Forall_rcons_inv in H3; inv H3.
+          case/lastP: ps' => //= [ys y] in H H0 H2 *.
+          rewrite last_rcons.
+          by apply StronglySorted_rcons_rcons_inv in H2.
+      case: ps => /= [|p' ps'] in H Hpsort Hplt E r' *.
+        by ordered.
+      by case: ps' => //= [|y ys] in H Hpsort Hplt E r' *.
+    apply: exist2 _ _ (rcons ps p ++ r :: rs) _ _ => /=;
+    case: ps => //= [|y ys] in H Hpsort Hplt E *.
+      constructor=> //.
+      rewrite /range_ltn in Hpsort Hrsort *.
+      move/negbT in E.
+      constructor.
+        by ordered.
+      inv Hrsort.
+      move: (Range_bounded r.2) => Hr.
+      apply: (Forall_ltn H3).
+      by ordered.
     apply: StronglySorted_cat => //=.
-    rewrite /range_ltn /=.
+    rewrite last_rcons /range_ltn /=.
     move/negbT in E.
-    rewrite /mid /= in E.
-    rewrite map_comp 2!last_map in H.
+    rewrite map_comp 2!last_map last_rcons in H.
     by ordered.
-Admitted.
+Defined.
 
 (* The bound for a [SortedRanges] may always move downwards. *)
 Definition transportSortedRanges `(H : b <= pos)
