@@ -251,7 +251,8 @@ Definition transportBoundedInterval {base : nat} `(Hlt : base <= prev)
   exact/(leq_trans _ H).
 Defined.
 
-Definition Interval_fromRanges {pos} (vid : nat) (sr : SortedRanges pos) :
+Definition Interval_fromRanges (vid : nat)
+  `(sr : SortedRanges b) :
   forall r rs, sr.1 = r :: rs ->
   let rs' := NE_from_list r rs in
   Interval {| ivar := vid
@@ -268,7 +269,7 @@ Proof.
   elim: ups0 => //= [r'|r' rs' IHrs'].
     move: (I_Sing vid Whole r'.2).
     by destruct r'; destruct x.
-  move=> Hnesort; inv Hnesort.
+  invert.
   move: IHrs' => /(_ H1) i.
   have Hlt': rend r'.1 < rbeg (NE_head rs').1.
     move/NE_Forall_head in H2.

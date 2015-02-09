@@ -89,7 +89,7 @@ Ltac match_all :=
   | [ H: List.Forall _ ?Z |- _ ] => move/Forall_all in H
   | [ |- List.Forall _ ?Z ]      => apply/Forall_all
   end;
-  match goal with
+  abstract match goal with
   | [  H: is_true (all _ ?Z) |- is_true (all _ ?Z) ] =>
       move/allP in H;
       apply/allP;

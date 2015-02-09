@@ -35,6 +35,7 @@
 /LinearScan/Ssrfun.hs
 /LinearScan/Ssrnat.hs
 /LinearScan/State.hs
+/LinearScan/UsePos.hs
 /LinearScan/Vector0.hs
 /LinearScan/choice.hs
 /LinearScan/eqtype.hs

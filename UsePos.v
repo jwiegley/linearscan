@@ -216,3 +216,11 @@ Proof.
   move/ltnW in H1.
   exact (last_ltn Hlast H1).
 Qed.
+
+Lemma last_leq : forall (z y : nat) (xs : seq nat) (n : nat),
+  last z xs <= n -> y <= z -> last y xs <= n.
+Proof.
+  move=> z y.
+  elim=> //= [x xs IHxs].
+  exact: leq_trans IHxs _.
+Qed.

@@ -72,6 +72,16 @@ Proof.
   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
 Defined.
 
+Definition Range_shiftup_spec `(r : Range rd)
+  `(H : if ups rd is u :: _
+        then b <= u
+        else b < rend rd) :
+  forall r1, r1 = Range_shiftup r H
+    -> [/\ rbeg r1.1 = b
+       ,   rend r1.1 = rend r
+       &   ups  r1.1 = ups r ].
+Proof. by move=> r1; invert. Qed.
+
 Definition Range_shiftdown `(r : Range rd) `(H : last_or_beg rd < e) :
   RangeSig.
 Proof.
@@ -82,6 +92,30 @@ Proof.
   constructor=> //=.
   rewrite /last_or_beg /last_or in H.
   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
+Defined.
+
+Definition Range_cons (upos : UsePos) (Hodd : odd upos) `(r : Range rd)
+  `(H : rbeg rd <= upos < head_or_end rd) : RangeSig.
+Proof.
+  exists {| rbeg := rbeg rd
+          ; rend := rend rd
+          ; ups  := upos :: ups rd |}.
+  move/andP: H => [H1 H2].
+  rewrite /head_or_end /head_or in H2.
+  move: (Range_beg_bounded r) => Hbeg.
+  move: (Range_end_bounded r) => Hend.
+  rewrite /last_or_beg /last_or in Hend.
+  move: (Range_sorted r) => Hsort.
+  move: (Range_all_odd r) => Hall.
+  constructor=> /=.
+  - by case: (ups rd) => //= in H2 *.
+  - by case: (ups rd) => //= in H2 Hend Hsort *.
+  - constructor=> //.
+    case: (ups rd) => //= [u us] in H2 Hsort *.
+    constructor=> //.
+    inv Hsort.
+    by match_all.
+  - by apply/andP; split.
 Defined.
 
 Definition BoundedRange (b e : nat) :=
@@ -162,6 +196,13 @@ Defined.
 Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
 Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
 
+Program Instance range_ltn_trans : Transitive range_ltn.
+Obligation 1.
+  rewrite /range_ltn /= in H H0 *.
+  move: (Range_bounded H2).
+  by ordered.
+Qed.
+
 Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
   rend rd1 == rbeg rd2 -> RangeSig.
 Proof.
@@ -214,29 +255,36 @@ Definition SortedRanges bound :=
   | StronglySorted range_ltn rs
   & bound <= head bound [seq rbeg r.1 | r <- rs] }.
 
-Definition emptySortedRanges {bound : nat} : SortedRanges bound.
+Definition emptySortedRanges {b} : SortedRanges b.
 Proof.
   exists [::] => //.
   by constructor.
 Defined.
 
-(* [prependRange] takes a [RangePair] and merges in the
-   range-under-construction, resulting in a new [SortedRanges] whose initial
-   bound is the beginning of the range that was merged in. *)
-Definition prependRange `(rp : BoundedRange b e) (ranges : SortedRanges e) :
-  SortedRanges b.
+(* [prependRange] takes a [RangePair] and merges in the range under
+   construction, resulting in a new [SortedRanges] whose initial bound
+   is the beginning of the range that was merged in. *)
+Definition prependRange `(rp : BoundedRange b pos)
+  `(ranges : SortedRanges pos) :
+  { ranges' : SortedRanges b
+  | rend (last rp.1 ranges.1).1 = rend (last rp.1 ranges'.1).1 }.
 Proof.
-  case: rp ranges => [[rd r] /= Hlt] [rs Hsort Hbound].
-  move/andP: Hlt => [Hlt1 Hlt2].
+  case: ranges => [rs Hsort Hbound].
   case: rs => [|x xs] in Hsort Hbound *.
-    by exists [::] => //.
+    exact: exist _ (exist2 _ _ [::] _ _) _.
+  case: rp => [[rd r] /= Hlt].
+  move: (Range_bounded r).
+  move/andP: Hlt => [Hlt1 Hlt2].
   rewrite /= in Hbound.
-  case Heqe: (rend rd == rbeg x.1).
-    exists [:: (Range_cat r x.2 Heqe) & xs] => //=.
-    by constructor; inv Hsort => //.
+  case Heqe: (rend rd == rbeg x.1); move=> ?.
+    apply: exist _ (exist2 _ _ [:: (Range_cat r x.2 Heqe) & xs] _ _) _ => /=.
+      by constructor; inv Hsort.
+    inv Hsort; invert; subst.
+    by case: xs => //= in H1 H2 H3 H4 *.
   move: (leq_trans Hlt2 Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
-  exists [:: (rd; r), x & xs] => //.
+  apply: exist _ (exist2 _ _ [:: (rd; r), x & xs] _ _) _ => /=;
+    last by ordered.
   constructor=> //.
   constructor=> //.
   inv Hsort.
@@ -245,6 +293,7 @@ Proof.
   case: xs => //= [y ys] in H1 H2 *.
   constructor.
     inv H2.
+    rewrite /range_leq in H4.
     by ordered.
   inv H2.
   move/Forall_all in H4.
@@ -254,34 +303,54 @@ Proof.
   by match_all.
 Defined.
 
+Definition SortedRanges_cat `(xs : SortedRanges b) `(ys : SortedRanges pos)
+  `(H : last b [seq rend r.1 | r <- xs.1] <= pos) : SortedRanges b.
+Proof.
+  move: xs => [ps Hpsort Hplt] in H *.
+  move: ys => [rs Hrsort Hrlt] in H *.
+  case: ps => [|p ps] //= in Hpsort Hplt H *;
+  case: rs => [|r rs] //= in Hrsort Hrlt H *.
+  + by apply: exist2 _ _ [::] _ _.
+  + apply: exist2 _ _ (r :: rs) Hrsort _ => /=.
+    exact: leq_trans H Hrlt.
+  + by apply: exist2 _ _ (p :: ps) Hpsort _.
+  + pose mid := last p ps.
+    case E: (rend mid.1 == rbeg r.1).
+      pose r' := Range_cat mid.2 r.2 E.
+      apply: exist2 _ _ (init p ps ++ r' :: rs) _ _.
+        case: ps => /= [|p' ps'] in H Hpsort mid E r' *.
+          admit.
+        case: ps' => /= [|y ys] in H Hpsort mid E r' *.
+          constructor.
+            admit.
+          constructor.
+            rewrite /range_ltn.
+            admit.
+          inv Hrsort.
+          admit.
+        constructor.
+          admit.
+        admit.
+      case: ps => /= [|p' ps'] in H Hpsort mid E r' *.
+        admit.
+      by case: ps' => //= [|y ys] in H Hpsort mid E r' *.
+    apply: exist2 _ _ (p :: ps ++ r :: rs) _ _ => //=.
+    apply: StronglySorted_cat => //=.
+    rewrite /range_ltn /=.
+    move/negbT in E.
+    rewrite /mid /= in E.
+    rewrite map_comp 2!last_map in H.
+    by ordered.
+Admitted.
+
 (* The bound for a [SortedRanges] may always move downwards. *)
-Definition transportSortedRange `(H : base <= prev) (rp : SortedRanges prev) :
-  SortedRanges base.
+Definition transportSortedRanges `(H : b <= pos)
+  `(rp : SortedRanges pos) : SortedRanges b.
 Proof.
   case: rp => [rs Hsort Hlt] /=.
   exists rs => //.
   case: rs => [|r rs] //= in Hsort Hlt *.
   by ordered.
-Defined.
-
-Definition mergePendingRanges {base prev} (H : base <= prev)
-  (pmap : IntMap (BoundedRange base prev))
-  (rmap : IntMap (SortedRanges prev)) : IntMap (SortedRanges base).
-Proof.
-  apply: (IntMap_mergeWithKey _ _ _ rmap pmap).
-  - (* The combining function, when entries are present in both maps. *)
-    move=> vid ranges r.
-    apply: Some _.
-    exact: (prependRange r ranges).
-  - (* When no bounded range is present. *)
-    exact: (IntMap_map (transportSortedRange H)).
-  - (* When no sorted ranges are present. *)
-    move=> pending.
-    apply: IntMap_map _ pending.
-    move=> [r /= Hlt].
-    exists [:: r].
-      by constructor; constructor.
-    by ordered.
 Defined.
 
 Lemma NE_Forall_from_list : forall r x xs,

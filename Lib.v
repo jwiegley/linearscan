@@ -177,6 +177,13 @@ Definition list_membership {a : eqType} (l : seq a) :
       end in
   go l.
 
+Fixpoint init {a : Type} (x : a) (l : seq a) :=
+  match l with
+    | nil => nil
+    | cons y nil => [:: x]
+    | cons y ys => x :: init y ys
+  end.
+
 Lemma Forall_append : forall A (P : A -> Prop) xs ys,
    List.Forall P xs /\ List.Forall P ys <-> List.Forall P (xs ++ ys).
 Proof.
