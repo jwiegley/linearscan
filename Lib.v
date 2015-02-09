@@ -462,7 +462,27 @@ Qed.
 Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
 Proof. by []. Qed.
 
-Lemma ltn_Sdouble_nn : forall n m, n.*2 < (n + m).*2.+1.
+Lemma ltn_addn1r : forall n m, n.+1 < m.+1 -> n < m.
+Proof. by []. Qed.
+
+Lemma leq_addn1 : forall n m, n <= m -> n.+1 <= m.+1.
+Proof. by []. Qed.
+
+Lemma leq_addn1r : forall n m, n.+1 <= m.+1 -> n <= m.
+Proof. by []. Qed.
+
+Lemma ltn_Sdouble_nn : forall n m, m > 0 -> n.*2.+1 < (n + m).*2.+1.
+Proof.
+  elim=> [|n IHn] m H /=.
+    rewrite add0n.
+    apply/ltn_addn1.
+    by rewrite ltn_double.
+  apply/ltn_addn1.
+  rewrite ltn_double addnC.
+  exact: ltn_plus.
+Qed.
+
+Lemma leq_Sdouble_nn : forall n m, n.*2.+1 <= (n + m).*2.+1.
 Proof.
   elim=> [|n IHn] m //=.
   rewrite addSn !doubleS.
@@ -470,6 +490,20 @@ Proof.
     rewrite addn0.
     by ordered.
   exact/ltn_addn1/ltn_addn1.
+Qed.
+
+Lemma ltn_Sdouble_nm : forall n m o, n.*2 < m.*2.+1 -> n.*2 < (m + o).*2.+1.
+Proof.
+  elim=> [|n IHn] m o H //=.
+  rewrite doubleS.
+  case: m => [|m] in H *.
+    rewrite add0n.
+    by ordered.
+  rewrite !doubleS in H.
+  move/ltn_addn1r in H.
+  move/ltn_addn1r in H.
+  specialize (IHn m o H).
+  by ordered.
 Qed.
 
 Lemma ltnSSn : forall n, n < n.+2.

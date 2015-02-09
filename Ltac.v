@@ -14,14 +14,8 @@ Qed.
 
 Ltac breakup :=
   repeat match goal with
-    | [ H: is_true ((?X <  ?Y) && (?W <  ?Z)) |- _ ] => move/andP: H => [? ?]
-    | [ H: is_true ((?X <= ?Y) && (?W <  ?Z)) |- _ ] => move/andP: H => [? ?]
-    | [ H: is_true ((?X <  ?Y) && (?W <= ?Z)) |- _ ] => move/andP: H => [? ?]
-    | [ H: is_true ((?X <= ?Y) && (?W <= ?Z)) |- _ ] => move/andP: H => [? ?]
-    | [ |- is_true ((?X <  ?Y) && (?W <  ?Z)) ] => apply/andP; split
-    | [ |- is_true ((?X <= ?Y) && (?W <  ?Z)) ] => apply/andP; split
-    | [ |- is_true ((?X <  ?Y) && (?W <= ?Z)) ] => apply/andP; split
-    | [ |- is_true ((?X <= ?Y) && (?W <= ?Z)) ] => apply/andP; split
+    | [ H: is_true (_ && _) |- _ ] => move/andP: H => [? ?]
+    | [ |- is_true (_ && _) ] => apply/andP; split
     | [ H: is_true (?X <  ?Y <  ?Z) |- _ ] => move/andP: H => [? ?]
     | [ H: is_true (?X <= ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]
     | [ H: is_true (?X <  ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]

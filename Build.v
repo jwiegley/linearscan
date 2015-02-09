@@ -104,42 +104,75 @@ Proof.
 Defined.
 
 Definition RangeCursor b pos e :=
-  { r : BoundedRange b.*2.+1 e.*2.+1
-  | (rbeg r.1.1 <= pos.*2.+1) &&
-    (if ups r.1.1 is u :: _
+  { p : BoundedRange b.*2.+1 e.*2.+1
+  | let r := p.1.1 in
+    (b.*2.+1 <= pos.*2.+1) &&
+    (if ups r is u :: _
      then pos.*2.+1 <= u
-     else pos.*2.+1 < rend r.1.1) }.
+     else pos.*2.+1 <= rend r) }.
 
-Definition PendingRanges b e := IntMap (BoundedRange b.*2.+1 e.*2.+1).
+Definition emptyRangeCursor (b pos e : nat) (H : b < pos <= e) :
+  RangeCursor b pos e.
+Proof.
+  move/andP: H => [H1 H2].
+  have Hsz : b.*2.+1 < e.*2.+1.
+    apply/ltn_addn1.
+    rewrite ltn_double.
+    exact: (ltn_leq_trans H1 _).
+  exists (emptyBoundedRange Hsz) => /=.
+  apply/andP; split => //.
+    apply/leq_addn1.
+    rewrite leq_double.
+    exact/ltnW.
+  apply/leq_addn1.
+  by rewrite leq_double.
+Defined.
 
-Program Definition handleOutputVar {b e} (pos : nat) (v : VarInfo) :
-  PendingRanges b e -> PendingRanges b e :=
-  (* jww (2015-02-07): Every output variable should have occurred in
-     liveOut.  This should be proven, but we assume it for now. *)
-  let f (mx : option (BoundedRange b.*2.+1 e.*2.+1)) :
-      option (BoundedRange b.*2.+1 e.*2.+1) :=
-      if mx is Some x
-      then Some (exist _ (Range_shiftup (b:=pos) x.1.2 _) _)
-      else mx in
-  IntMap_alter f (varId v).
-Obligation 1.
-  case: x => [r /= Hlt].
+Definition transportRangeCursor {b prev base e} (c : RangeCursor b prev e)
+  (Hlt : b.*2.+1 <= base.*2.+1 <= prev.*2.+1) : RangeCursor b base e.
+Proof.
+  case: c => [[r /= H1] H] in Hlt *.
+  apply: exist _ (exist _ r _) _ => /=.
+  case: (ups r.1) => /= [|u us] in H *;
+  by ordered.
+Defined.
+
+Definition PendingRanges b pos e := IntMap (RangeCursor b pos e).
+
+Definition handleOutputVar {b pos e} (v : VarInfo) :
+  PendingRanges b pos e -> PendingRanges b pos e.
+Proof.
+  apply: IntMap_alter _ (varId v).
+
+  (* jww (2015-02-08): This function should not be called for a variable
+     which was not at least seen in the live out set.  Prove this! *)
+  case=> [x|]; last exact: None.
+
+  (* jww (2015-02-08): This function cannot be called when pos == e; this
+     should be proven. *)
+  case E: (pos.*2.+1 < rend x.1.1.1); last exact: Some x.
+
+  case: x => [[r /= ?] Hx] in E *.
+  have H: match ups r.1 with
+          | [::] => pos.*2.+1 < rend r.1
+          | u :: _ => pos.*2 < u
+          end.
+    by case: (ups r.1) => [|u us] in Hx *; ordered.
+  pose r' := Range_shiftup (b:=pos.*2.+1) r.2 H.
+  by apply: (Some (exist _ (exist _ r' _) _)); ordered.
+Defined.
+
+Program Definition handleTempVar {b pos e} (v : VarInfo) :
+  PendingRanges b pos e -> PendingRanges b pos e.
 Admitted.
-Obligation 2.
-  case: x => [r /= Hlt].
+
+Program Definition handleInputVar {b pos e} (v : VarInfo) :
+  PendingRanges b pos e -> PendingRanges b pos e.
 Admitted.
 
-Program Definition handleTempVar {b e} (pos : nat) (v : VarInfo) :
-  PendingRanges b e -> PendingRanges b e.
-Admitted.
-
-Program Definition handleInputVar {b e} (pos : nat) (v : VarInfo) :
-  PendingRanges b e -> PendingRanges b e.
-Admitted.
-
-Definition reduceOp {pos b e} (block : blockType1) (op : opType1)
-  (ranges : PendingRanges b e) (bs : BuildState (pos.+1) e) :
-  (PendingRanges b e * BuildState pos e) :=
+Program Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
+  (ranges : PendingRanges b pos.+1 e) (bs : BuildState pos.+1 e)
+  (hlt : b.*2.+1 <= pos.*2.+1) : PendingRanges b pos e * BuildState pos e :=
   let: (varRefs, regRefs) := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
@@ -152,32 +185,38 @@ Definition reduceOp {pos b e} (block : blockType1) (op : opType1)
 
   (* First consider the output variables. *)
   let outputs := [seq v <- varRefs | varKind v == Output] in
-  let v0 := forFold ranges outputs (flip (handleOutputVar pos)) in
+  let v0 := forFold ranges outputs (flip handleOutputVar) in
 
   (* Next, consider the temp variables. *)
   let temps := [seq v <- varRefs | varKind v == Temp] in
-  let v1 := forFold v0 temps (flip (handleTempVar pos)) in
+  let v1 := forFold v0 temps (flip handleTempVar) in
 
   (* Last, consider the input variables. *)
   let inputs := [seq v <- varRefs | varKind v == Input] in
-  let v2 := forFold v1 inputs (flip (handleInputVar pos)) in
+  let v2 := forFold v1 inputs (flip handleInputVar) in
 
-  (v2, {| bsVars := bsVars bs
-        ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
+  (IntMap_map (fun x => transportRangeCursor x _) v2,
+   {| bsVars := bsVars bs
+    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
+Obligation 5. by ordered. Qed.
 
-Definition reduceBlock (block : blockType1) :
+Definition reduceBlock {pos} (block : blockType1) :
   let sz := size (blockOps binfo block) in
-  forall {pos b e} (ranges : PendingRanges b e)
-    (bs : BuildState (pos + sz) e),
-      (PendingRanges b e * BuildState pos e).
+  let b := pos in
+  let e := pos + sz in
+  forall (ranges : PendingRanges b (pos + sz) e)
+         (bs : BuildState (pos + sz) e),
+    (PendingRanges b pos e * BuildState pos e).
 Proof.
-  move=> sz pos b e.
-  rewrite {}/sz.
+  move=> sz b e.
+  rewrite /sz.
   elim: (blockOps binfo block) => [|o os IHos] /=.
     by rewrite !addn0.
   rewrite !addnS.
   move=> ranges bs.
   case: (reduceOp block o ranges bs).
+    rewrite /b.
+    exact: ltn_Sdouble_nm.
   exact: IHos.
 Defined.
 
@@ -194,27 +233,29 @@ Proof.
                else blockLiveOut ls.
 
   pose sz := size (blockOps binfo b).
-  case E: (0 < sz); last exact: IHbs pos.
+  case E: (0 < sz);
+    last exact: IHbs pos.
 
   (* For every variable in the live out set, create an empty range covering
      the entire span. *)
   pose endpos := pos + sz.
-  have Hsz : pos.*2.+1 < endpos.*2.+1.
+  have Hsz : pos < endpos <= endpos.
     rewrite /endpos.
-    apply/ltn_addn1.
-    rewrite ltn_double addnC.
-    exact: ltn_plus.
-  have empty    := emptyBoundedRange Hsz.
+    apply/andP; split.
+      rewrite addnC.
+      exact: ltn_plus.
+    exact: leqnn.
+  have empty    := emptyRangeCursor Hsz.
   have f xs vid := IntMap_insert vid empty xs.
   have pending  := IntSet_foldl f emptyIntMap outs.
 
   have bs := IHbs endpos.
-  rewrite /endpos /sz in bs.
+  rewrite /endpos /sz in pending bs.
   case: (reduceBlock pending bs) => [ranges bs'].
 
-  exact: {| bsVars :=
-              mergePendingRanges (ltn_Sdouble_nn _ _) ranges
-                                 (bsVars bs')
+  exact {| bsVars := mergePendingRanges (leq_Sdouble_nn _ _)
+                                        (IntMap_map sval ranges)
+                                        (bsVars bs')
           ; bsRegs := bsRegs bs' |}.
 Defined.
 

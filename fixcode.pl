@@ -40,6 +40,7 @@ import qualified LinearScan.Utils
     s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
 
     s/\(Prelude\.map  \( rs\)\)/rs/;
+    s/\(Data\.IntMap\.map  ranges\)/ranges/;
 
     print;
 }
