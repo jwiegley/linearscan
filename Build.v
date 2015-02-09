@@ -132,21 +132,30 @@ Proof.
   by ordered.
 Defined.
 
-Definition PendingRanges b pos mid e := IntMap (RangeCursor b pos mid e).
+Definition PendingRanges b pos mid e :=
+  { _ : IntMap (RangeCursor b pos mid e)
+  | (b.*2.+1 <= pos.*2.+1 <= mid.*2.+1) && (mid.*2.+1 <= e.*2.+1) }.
 
-Definition mergePendingRanges `(cursor : RangeCursor b pos mid e) :
-  SortedRanges b.*2.+1 :=
-  let: exist (r, rs) _ := cursor in (prependRange r rs).1.
-
-Lemma leq_leq_ltn : forall n m o p, (n <= m) && (o <= p) -> m < o -> n <= p.
-Proof. by ordered. Qed.
+Definition emptyPendingRanges (b e : nat) (H : b < e) (liveOuts : IntSet) :
+  PendingRanges b e e e.
+Proof.
+  have empty    := emptyRangeCursor H.
+  have f xs vid := IntMap_insert vid empty xs.
+  have cursors  := IntSet_foldl f emptyIntMap liveOuts.
+  exists cursors.
+  apply/andP; split=> //.
+  apply/andP; split=> //.
+  apply/leq_addn1.
+  rewrite leq_double.
+  exact/ltnW.
+Defined.
 
 Definition mergeIntoSortedRanges `(H : b <= pos)
   `(pmap : PendingRanges b b mid pos)
   (rmap : IntMap (SortedRanges pos.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
 Proof.
-  apply: (IntMap_mergeWithKey _ _ _ pmap rmap).
+  apply: (IntMap_mergeWithKey _ _ _ pmap.1 rmap).
   - (* The combining function, when entries are present in both maps. *)
     move=> _ [[br ps] /= Hlt] rs.
     move/andP: Hlt => [H1 /andP [H2 H3]].
@@ -165,9 +174,12 @@ Proof.
       move: (Range_bounded r.2) => ?.
       by ordered.
     exact: last_leq p H5.
+
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-    exact: mergePendingRanges.
+    case=> [[r rs] _].
+    exact: (prependRange r rs).1.
+
   - (* When no pmap entry is present. *)
     apply: IntMap_map _.
     apply: transportSortedRanges.
@@ -175,8 +187,9 @@ Proof.
     by rewrite leq_double.
 Defined.
 
+(*
 Definition handleOutputVar {b pos mid e} (v : VarInfo) :
-  PendingRanges b pos mid e -> PendingRanges b pos mid e.
+  PendingRanges b pos.+1 mid e -> PendingRanges b pos.+1 mid e.
 Proof.
   apply: IntMap_alter _ (varId v).
 
@@ -209,20 +222,72 @@ Proof.
     by case: (ups r.2) => /= [|u us] in Hlt H E *; ordered.
   pose r2 := Range_cons Hodd r1.2 H2.
 
-  by apply: (Some (exist _ (exist _ r2 _, rs) _)); ordered.
+  apply: (Some (exist _ (exist _ r2 _, rs) _)).
+  admit.
+  admit.
 Defined.
 
-Program Definition handleTempVar {b pos mid e} (v : VarInfo) :
+Definition handleTempVar
+  `(Hlt1 : b.*2.+1 < (pos.+1).*2.+1 <= mid.*2.+1)
+  `(Hlt2 : mid.*2.+1 <= e.*2.+1) (v : VarInfo) :
   PendingRanges b pos mid e -> PendingRanges b pos mid e.
+Proof.
+  apply: IntMap_alter _ (varId v).
+
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := true |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+
+  case=> [x|]; last first.
+    pose rd := {| rbeg := uloc upos
+                ; rend := (uloc upos).+1
+                ; ups  := [:: upos] |}.
+    apply: Some (exist _ (exist _ (exist _ rd _) _,
+                          emptySortedRanges) _) => //=.
+    - constructor=> //=.
+        by constructor; constructor.
+      by apply/andP; split.
+    - move=> r.
+      move/andP: Hlt1 => [H1 H2].
+      rewrite doubleS in H1 H2.
+      admit.
+    - admit.
 Admitted.
 
-Program Definition handleInputVar {b pos mid e} (v : VarInfo) :
+Definition handleInputVar
+  `(Hlt1 : b.*2.+1 <= pos.*2.+1 < mid.*2.+1)
+  `(Hlt2 : mid.*2.+1 <= e.*2.+1) (v : VarInfo) :
   PendingRanges b pos mid e -> PendingRanges b pos mid e.
 Admitted.
+*)
 
-Program Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
+Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
+  `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
+  let v0 := exist _ emptyIntMap _ in
+
+  (* First consider the output variables. *)
+  let outputs := [seq v <- varRefs | varKind v == Output] in
+  let v1 := forFold v0 outputs undefined in
+
+  (* Next, consider the temp variables. *)
+  let temps := [seq v <- varRefs | varKind v == Temp] in
+  let v2 := forFold v1 temps undefined in
+
+  (* Last, consider the input variables. *)
+  let inputs := [seq v <- varRefs | varKind v == Input] in
+  let v3 := forFold v2 inputs undefined in
+
+  v3.
+Obligation 1.
+  case: ranges => [ranges H0].
+  move/andP: H0 => [/andP [H1 H2] H3].
+  rewrite doubleS in H1 H2.
+  admit.
+Qed.
+
+Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
   (ranges : PendingRanges b pos.+1 mid e) (bs : BuildState pos.+1 e)
-  (hlt : b.*2.+1 <= pos.*2.+1) :
+  (Hlt : b <= pos) :
   PendingRanges b pos mid e * BuildState pos e :=
   let: (varRefs, regRefs) := opRefs oinfo op in
 
@@ -234,22 +299,9 @@ Program Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
                   then enum 'I_maxReg
                   else regRefs in
 
-  (* First consider the output variables. *)
-  let outputs := [seq v <- varRefs | varKind v == Output] in
-  let v0 := forFold ranges outputs (flip handleOutputVar) in
-
-  (* Next, consider the temp variables. *)
-  let temps := [seq v <- varRefs | varKind v == Temp] in
-  let v1 := forFold v0 temps (flip handleTempVar) in
-
-  (* Last, consider the input variables. *)
-  let inputs := [seq v <- varRefs | varKind v == Input] in
-  let v2 := forFold v1 inputs (flip handleInputVar) in
-
-  (IntMap_map (fun x => transportRangeCursor x _) v2,
+  (handleVars varRefs Hlt ranges,
    {| bsVars := bsVars bs
     ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
-Obligation 5. by ordered. Qed.
 
 Definition reduceBlock {pos mid} (block : blockType1) :
   let sz := size (blockOps binfo block) in
@@ -265,9 +317,8 @@ Proof.
     by rewrite !addn0.
   rewrite !addnS.
   move=> ranges bs.
-  case: (reduceOp block o ranges bs).
-    rewrite /b.
-    exact: ltn_Sdouble_nm.
+  case: (reduceOp block o ranges bs _).
+    exact: leq_plus.
   exact: IHos.
 Defined.
 
@@ -290,12 +341,8 @@ Proof.
      the entire span. *)
   pose endpos := pos + sz.
   have Hsz : pos < endpos.
-    rewrite /endpos.
-    rewrite addnC.
     exact: ltn_plus.
-  have empty    := emptyRangeCursor Hsz.
-  have f xs vid := IntMap_insert vid empty xs.
-  have pending  := IntSet_foldl f emptyIntMap outs.
+  have pending := emptyPendingRanges Hsz outs.
 
   have bs := IHbs endpos.
   rewrite /endpos /sz in pending bs.

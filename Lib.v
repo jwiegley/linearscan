@@ -436,6 +436,9 @@ Proof.
   by rewrite odd_double.
 Qed.
 
+Lemma leq_leq_ltn : forall n m o p, (n <= m) && (o <= p) -> m < o -> n <= p.
+Proof. by ordered. Qed.
+
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
@@ -497,11 +500,11 @@ Qed.
 Lemma le_Sn_le : forall n m : nat, n.+1 <= m -> n <= m.
 Proof. exact: ltnW. Qed.
 
-Lemma ltn_plus : forall m n, 0 < n -> m < n + m.
-  elim=> [|m IHm] // n H;
-    first by rewrite addn0.
-  rewrite addnS; exact: IHm.
-Qed.
+Lemma ltn_plus : forall m n, 0 < n -> m < m + n.
+Proof. by elim. Qed.
+
+Lemma leq_plus : forall m n, m <= m + n.
+Proof. by elim. Qed.
 
 Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
 Proof. by []. Qed.
@@ -522,7 +525,7 @@ Proof.
     apply/ltn_addn1.
     by rewrite ltn_double.
   apply/ltn_addn1.
-  rewrite ltn_double addnC.
+  rewrite ltn_double.
   exact: ltn_plus.
 Qed.
 
