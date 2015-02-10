@@ -287,11 +287,11 @@ Definition handleVars_combine {b pos mid e} (vid : nat)
   option (RangeCursor b pos mid e).
 Admitted.
 
-Definition handleVars_onlyRanges
-  `(Hlt : b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1)
-  `(ranges : IntMap (RangeCursor b pos.+1 mid e)) :
-  IntMap (RangeCursor b pos mid e) :=
-  IntMap_map (transportRangeCursor Hlt) ranges.
+Definition handleVars_onlyRanges {b pos mid e} :
+  b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1
+    -> IntMap (RangeCursor b pos.+1 mid e)
+    -> IntMap (RangeCursor b pos mid e) :=
+  IntMap_map \o transportRangeCursor.
 
 Program Definition handleVars_onlyVars {b pos mid e}
   (H1 : b <= pos < mid) (H2 : mid <= e) :
