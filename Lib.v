@@ -507,16 +507,7 @@ Proof. by elim. Qed.
 Lemma leq_plus : forall m n, m <= m + n.
 Proof. by elim. Qed.
 
-Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
-Proof. by []. Qed.
-
 Lemma ltn_addn1r : forall n m, n.+1 < m.+1 -> n < m.
-Proof. by []. Qed.
-
-Lemma leq_addn1 : forall n m, n <= m -> n.+1 <= m.+1.
-Proof. by []. Qed.
-
-Lemma leq_addn1r : forall n m, n.+1 <= m.+1 -> n <= m.
 Proof. by []. Qed.
 
 Lemma ltn_Sdouble_nn : forall n m, m > 0 -> n.*2.+1 < (n + m).*2.+1.

@@ -44,8 +44,7 @@ Proof.
   have regs' := regs.
   move/(vmap (option_map (transportBoundedInterval _))) in regs'.
   have Hleq : pos.*2.+1 <= (pos.+1).*2.+1.
-    rewrite doubleS.
-    exact/ltnW/ltnW.
+    by ordered.
   specialize (regs' pos.*2.+1 Hleq).
   apply: foldl _ regs' regRefs => regs' reg.
 
@@ -96,8 +95,7 @@ Proof.
   exists ((upos, knd) :: us) => //=.
   constructor=> //.
   case: us => //= [u us] in Hsort H *.
-  constructor=> //;
-  rewrite doubleS in H.
+  constructor=> //.
     by ordered.
   inversion Hsort; subst.
   by match_all.
@@ -110,44 +108,36 @@ Definition RangeCursor b pos mid e :=
     ,   b.*2.+1 <= pos.*2.+1
     &   pos.*2.+1 <= head_or_end r ] }.
 
-Definition emptyRangeCursor (b e : nat) (H : b < e) :
-  RangeCursor b e e e.
+Definition emptyRangeCursor (b pos e : nat) (H : b < pos <= e) :
+  RangeCursor b pos pos e.
 Proof.
-  have Hsz : b.*2.+1 < e.*2.+1.
-    apply/ltn_addn1.
-    by rewrite ltn_double.
+  have Hsz : b.*2.+1 < pos.*2.+1 by undoubled.
   exists (emptyBoundedRange Hsz, emptySortedRanges) => /=.
-  apply/andP; split => //.
-  apply/andP; split => //.
-  exact/ltnW.
+  by undoubled.
 Defined.
 
 Definition transportRangeCursor {b prev base mid e}
-  (c : RangeCursor b prev mid e)
-  (Hlt : b.*2.+1 <= base.*2.+1 <= prev.*2.+1) : RangeCursor b base mid e.
+  (Hlt : b.*2.+1 <= base.*2.+1 <= prev.*2.+1)
+  (c : RangeCursor b prev mid e) :
+  RangeCursor b base mid e.
 Proof.
   case: c => [[r /= rs] H1] in Hlt *.
   apply: (exist _ (r, rs) _) => /=.
-  case: (ups r.1.1) => /= [|u us] in H1 *;
-  by ordered.
+  by case: (ups r.1.1) => /= [|u us] in H1 *; ordered.
 Defined.
 
 Definition PendingRanges b pos mid e :=
   { _ : IntMap (RangeCursor b pos mid e)
   | (b.*2.+1 <= pos.*2.+1 <= mid.*2.+1) && (mid.*2.+1 <= e.*2.+1) }.
 
-Definition emptyPendingRanges (b e : nat) (H : b < e) (liveOuts : IntSet) :
-  PendingRanges b e e e.
+Definition emptyPendingRanges (b pos e : nat) (H : b < pos <= e)
+  (liveOuts : IntSet) : PendingRanges b pos pos e.
 Proof.
   have empty    := emptyRangeCursor H.
   have f xs vid := IntMap_insert vid empty xs.
   have cursors  := IntSet_foldl f emptyIntMap liveOuts.
   exists cursors.
-  apply/andP; split=> //.
-  apply/andP; split=> //.
-  apply/leq_addn1.
-  rewrite leq_double.
-  exact/ltnW.
+  by undoubled.
 Defined.
 
 Definition mergeIntoSortedRanges `(H : b <= pos)
@@ -183,8 +173,7 @@ Proof.
   - (* When no pmap entry is present. *)
     apply: IntMap_map _.
     apply: transportSortedRanges.
-    apply/leq_addn1.
-    by rewrite leq_double.
+    by undoubled.
 Defined.
 
 (*
@@ -261,18 +250,20 @@ Definition handleInputVar
 Admitted.
 *)
 
+Definition varKindLtn (x y : VarKind) : bool :=
+  match x, y with
+  | Input, Input => false
+  | Temp, Input  => false
+  | Temp, Temp   => false
+  | Output, _    => false
+  | _, _         => true
+  end.
+
 Definition compareVars (x y : VarInfo) : bool :=
   match ltngtP (varId x) (varId y) with
   | CompareNatLt _ => true
   | CompareNatGt _ => false
-  | CompareNatEq _ =>
-      match varKind x, varKind y with
-      | Input, Input => false
-      | Temp, Input  => false
-      | Temp, Temp   => false
-      | Output, _    => false
-      | _, _         => true
-      end
+  | CompareNatEq _ => varKindLtn (varKind x) (varKind y)
   end.
 
 Definition varIdEq (x y : VarInfo) : bool := varId x == varId y.
@@ -292,34 +283,56 @@ Definition varIdEq (x y : VarInfo) : bool := varId x == varId y.
 *)
 
 Definition handleVars_combine {b pos mid e} (vid : nat)
-  (range : RangeCursor b pos.+1 mid e) (vars : seq VarInfo) :
+  (range : RangeCursor b pos.+1 mid e) (vars : bool * seq VarKind) :
   option (RangeCursor b pos mid e).
 Admitted.
 
 Definition handleVars_onlyRanges
+  `(Hlt : b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1)
   `(ranges : IntMap (RangeCursor b pos.+1 mid e)) :
-  IntMap (RangeCursor b pos mid e).
-Admitted.
+  IntMap (RangeCursor b pos mid e) :=
+  IntMap_map (transportRangeCursor Hlt) ranges.
 
-Definition handleVars_onlyVars {b pos mid e} (vars : IntMap (seq VarInfo)) :
-  IntMap (RangeCursor b pos mid e).
-Admitted.
+Program Definition handleVars_onlyVars {b pos mid e}
+  (H1 : b <= pos < mid) (H2 : mid <= e) :
+  IntMap (bool * seq VarKind) -> IntMap (RangeCursor b pos mid e) :=
+  let H1' : b < pos.+1 <= mid := _ in
+  let Hlt : b < mid <= e := _ in
+  IntMap_map $ fun x => let: (regReq, kinds) := x in
+    if (Input \in kinds) && (Output \in kinds)
+    then transportRangeCursor _ $ emptyRangeCursor Hlt
+    else transportRangeCursor _ $ emptyRangeCursor Hlt.
+Obligation 2. by ordered. Qed.
+Obligation 3. by undoubled. Qed.
+Obligation 4. by undoubled. Qed.
+
+Definition extractVarInfo (xs : seq VarInfo) : bool * seq VarKind :=
+  (find regRequired xs != size xs,
+   sortBy varKindLtn [seq varKind v | v <- xs]).
 
 Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
   `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
-  let vars := IntMap_map (sortBy compareVars) $
+  let vars := IntMap_map extractVarInfo $
               IntMap_groupOn varId varRefs in
-  IntMap_mergeWithKey handleVars_combine handleVars_onlyRanges
-                      handleVars_onlyVars ranges.1 vars.
-Obligation 1.
+  IntMap_mergeWithKey handleVars_combine (handleVars_onlyRanges _)
+                      (handleVars_onlyVars _ _) ranges.1 vars.
+Obligation 1. by undoubled. Qed.
+Obligation 2.
   case: ranges => [ranges H0].
   move/andP: H0 => [/andP [H1 H2] H3].
-  rewrite doubleS in H1 H2.
   apply/andP; split=> //.
-  apply/andP; split=> /=.
-    apply/leq_addn1.
-    by rewrite leq_double.
-  exact/ltnW/ltnW.
+  move/ltnW: H2.
+  by rewrite doubleS ltnS ltn_double.
+Qed.
+Obligation 3.
+  case: ranges => [ranges H0].
+  move/andP: H0 => [/andP [H1 H2] H3].
+  rewrite ltnS in H3.
+  by rewrite leq_double in H3.
+Qed.
+Obligation 4.
+  case: ranges => [ranges H0].
+  by apply/andP; split; undoubled.
 Qed.
 
 Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
@@ -379,7 +392,9 @@ Proof.
   pose endpos := pos + sz.
   have Hsz : pos < endpos.
     exact: ltn_plus.
-  have pending := emptyPendingRanges Hsz outs.
+  have Hsze : pos < endpos <= endpos.
+    by apply/andP; split.
+  have pending := emptyPendingRanges Hsze outs.
 
   have bs := IHbs endpos.
   rewrite /endpos /sz in pending bs.

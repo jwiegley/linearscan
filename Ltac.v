@@ -47,19 +47,40 @@ Ltac breakup :=
         | _ => move: (leq_trans H1 H2) => ?
         end
     end;
-  intuition;
-  repeat match goal with
-    | [ H: is_true (?X <  ?Y) |- _ ] => move/ltP in H
-    | [ H: is_true (?X <= ?Y) |- _ ] => move/leP in H
-    | [ H: is_true (?X == ?Y) |- _ ] => move/eqP in H
-    | [ H: is_true (?X != ?Y) |- _ ] => move/eqP in H
-    | [ |- is_true (?X <  ?Y) ] => apply/ltP
-    | [ |- is_true (?X <= ?Y) ] => apply/leP
-    | [ |- is_true (?X == ?Y) ] => apply/eqP
-    | [ |- is_true (?X != ?Y) ] => apply/eqP
-    end.
+  intuition.
 
-Ltac ordered := abstract (intuition; breakup; omega).
+Ltac ordered := abstract (
+  intuition;
+  breakup;
+  repeat match goal with
+  | [ H: is_true (?X <  ?Y) |- _ ] => move/ltP in H
+  | [ H: is_true (?X <= ?Y) |- _ ] => move/leP in H
+  | [ H: is_true (?X == ?Y) |- _ ] => move/eqP in H
+  | [ H: is_true (?X != ?Y) |- _ ] => move/eqP in H
+  | [ |- is_true (?X <  ?Y) ] => apply/ltP
+  | [ |- is_true (?X <= ?Y) ] => apply/leP
+  | [ |- is_true (?X == ?Y) ] => apply/eqP
+  | [ |- is_true (?X != ?Y) ] => apply/eqP
+  end;
+  omega).
+
+Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
+Proof. by []. Qed.
+
+Lemma leq_addn1 : forall n m, n <= m -> n.+1 <= m.+1.
+Proof. by []. Qed.
+
+Ltac undoubled :=
+  breakup;
+  do [ apply/ltn_addn1; rewrite ltn_double
+     | apply/leq_addn1; rewrite leq_double
+     | rewrite doubleS ];
+  do [ ordered
+     | do [ exact/ltnW/ltnW
+          | exact/ltnW
+          | exact/leqW/leqW
+          | exact/leqW ];
+       ordered ].
 
 Lemma Forall_all : forall (T : Type) (a : pred T) (s : seq T),
   reflect (List.Forall a s) (all a s).
