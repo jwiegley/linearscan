@@ -261,10 +261,23 @@ Definition handleInputVar
 Admitted.
 *)
 
-Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
-  `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
-  let v0 := exist _ emptyIntMap _ in
+Definition compareVars (x y : VarInfo) : bool :=
+  match ltngtP (varId x) (varId y) with
+  | CompareNatLt _ => true
+  | CompareNatGt _ => false
+  | CompareNatEq _ =>
+      match varKind x, varKind y with
+      | Input, Input => false
+      | Temp, Input  => false
+      | Temp, Temp   => false
+      | Output, _    => false
+      | _, _         => true
+      end
+  end.
 
+Definition varIdEq (x y : VarInfo) : bool := varId x == varId y.
+
+(*
   (* First consider the output variables. *)
   let outputs := [seq v <- varRefs | varKind v == Output] in
   let v1 := forFold v0 outputs undefined in
@@ -276,13 +289,37 @@ Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
   (* Last, consider the input variables. *)
   let inputs := [seq v <- varRefs | varKind v == Input] in
   let v3 := forFold v2 inputs undefined in
+*)
 
-  v3.
+Definition handleVars_combine {b pos mid e} (vid : nat)
+  (range : RangeCursor b pos.+1 mid e) (vars : seq VarInfo) :
+  option (RangeCursor b pos mid e).
+Admitted.
+
+Definition handleVars_onlyRanges
+  `(ranges : IntMap (RangeCursor b pos.+1 mid e)) :
+  IntMap (RangeCursor b pos mid e).
+Admitted.
+
+Definition handleVars_onlyVars {b pos mid e} (vars : IntMap (seq VarInfo)) :
+  IntMap (RangeCursor b pos mid e).
+Admitted.
+
+Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
+  `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
+  let vars := IntMap_map (sortBy compareVars) $
+              IntMap_groupOn varId varRefs in
+  IntMap_mergeWithKey handleVars_combine handleVars_onlyRanges
+                      handleVars_onlyVars ranges.1 vars.
 Obligation 1.
   case: ranges => [ranges H0].
   move/andP: H0 => [/andP [H1 H2] H3].
   rewrite doubleS in H1 H2.
-  admit.
+  apply/andP; split=> //.
+  apply/andP; split=> /=.
+    apply/leq_addn1.
+    by rewrite leq_double.
+  exact/ltnW/ltnW.
 Qed.
 
 Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)

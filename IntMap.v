@@ -29,8 +29,10 @@ Definition IntMap_map {a b} (f : a -> b) (m : IntMap a) : IntMap b :=
 
 Definition IntMap_mergeWithKey {a b c} (combine : nat -> a -> b -> option c)
   (only1 : IntMap a -> IntMap c) (only2 : IntMap b -> IntMap c)
-  (m1 : IntMap a) (m2 : IntMap b) : IntMap c :=
-  only1 m1.
+  (m1 : IntMap a) (m2 : IntMap b) : IntMap c := only1 m1.
+
+Definition IntMap_mapWithKey {a b} (f : nat -> a -> b) (m : IntMap a) : IntMap b :=
+  emptyIntMap.
 
 Definition IntMap_foldlWithKey
   {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a := z.
@@ -63,6 +65,7 @@ Arguments getIntSet _.
    [Data.IntMap]. *)
 Definition IntSet_member     : nat -> IntSet -> bool      := fun _ _ => false.
 Definition IntSet_insert     : nat -> IntSet -> IntSet    := fun _ x => x.
+Definition IntSet_delete     : nat -> IntSet -> IntSet    := fun _ x => x.
 Definition IntSet_union      : IntSet -> IntSet -> IntSet := fun _ x => x.
 Definition IntSet_difference : IntSet -> IntSet -> IntSet := fun _ x => x.
 
@@ -77,6 +80,23 @@ Extract Inductive IntSet => "Data.IntSet.IntSet"
 
 Extract Inlined Constant IntSet_member     => "Data.IntSet.member".
 Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
+Extract Inlined Constant IntSet_delete     => "Data.IntSet.delete".
 Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
 Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
 Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
+
+Definition IntMap_mapKeysAgainst {a b} (f : nat -> option a -> bool -> b)
+  (s : IntSet) (m : IntMap a) : IntMap b :=
+  let h acc n x := let: (s', m') := acc in
+      (IntSet_delete n s',
+       IntMap_insert n (f n (Some x) (IntSet_member n s')) m') in
+  let: (s', m') := IntMap_foldlWithKey h (s, emptyIntMap) m in
+  let k acc n   := IntMap_insert n (f n None true) acc in
+  IntSet_foldl k m' s'.
+
+Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) : IntMap (seq a) :=
+  forFold emptyIntMap l $ fun acc x =>
+    let n := p x in
+    IntMap_alter (fun mxs => if mxs is Some xs
+                             then Some (x :: xs)
+                             else Some [:: x]) n acc.

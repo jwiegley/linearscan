@@ -4,6 +4,7 @@ Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 
 Require Export Coq.Classes.RelationClasses.
+Require Export Coq.Program.Wf.
 
 Generalizable All Variables.
 Set Implicit Arguments.
@@ -750,6 +751,33 @@ Example span_ex1 :
   span (fun x => x < 10) [:: 1; 5; 10; 15] = ([:: 1; 5], [:: 10; 15]).
 Proof. reflexivity. Qed.
 
+Program Fixpoint groupBy {a} (p : a -> a -> bool) (l : seq a) {measure (size l)} :
+  seq (seq a) :=
+  match l with
+  | [::] => nil
+  | x :: xs => let: (ys, zs) := span (p x) xs in
+               (x :: ys) :: groupBy p zs
+  end.
+Obligation 1.
+  clear groupBy.
+  rename Heq_anonymous into Heqe.
+  move: ys zs Heqe.
+  elim: xs => [|w ws /= IHws] ys zs /=.
+    by invert.
+  case: (p x w) => /=; last by invert.
+  case: (span (p x) ws) => [bs cs] in IHws *.
+  invert; subst.
+  specialize (IHws bs cs refl_equal).
+  move/ltP in IHws.
+  apply/ltP.
+  exact/leqW.
+Qed.
+
+Example groupBy_ex1 :
+  groupBy eq_op [:: 1; 3; 3; 4; 5; 5; 9; 6; 8]
+    = [:: [:: 1]; [:: 3; 3]; [:: 4]; [:: 5; 5]; [:: 9]; [:: 6]; [:: 8]].
+Proof. reflexivity. Qed.
+
 Lemma lt_size_rev : forall a (xs : seq a),
   0 < size xs -> 0 < size (rev xs).
 Proof.
@@ -858,6 +886,20 @@ Fixpoint insert {a} (P : rel a) (z : a) (l : list a) : list a :=
   else [:: z].
 
 Arguments insert {a} P z l : simpl never.
+
+Fixpoint sortBy {a} (p : a -> a -> bool) (l : seq a) : seq a :=
+  match l with
+  | [::] => nil
+  | x :: xs => insert p x (sortBy p xs)
+  end.
+
+Example sortBy_ex1 :
+  sortBy ltn [:: 1; 3; 5; 7; 9; 2; 4; 6; 8] = [:: 1; 2; 3; 4; 5; 6; 7; 8; 9].
+Proof. reflexivity. Qed.
+
+Example sortBy_ex2 :
+  sortBy gtn [:: 1; 3; 5; 7; 9; 2; 4; 6; 8] = [:: 9; 8; 7; 6; 5; 4; 3; 2; 1].
+Proof. reflexivity. Qed.
 
 Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq_predType T),
   perm_eql (x :: y :: xs) (y :: x :: xs).
