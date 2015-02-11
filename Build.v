@@ -189,36 +189,71 @@ Definition handleVars_combine {b pos mid e} (H : b <= pos) (vid : nat)
   (range : RangeCursor b pos.+1 mid e) (vars : bool * seq VarKind) :
   option (RangeCursor b pos mid e).
 Proof.
-  move: range => [[[r Hr] [rs Hsort Hlt]] /= /andP [H1 /andP [H2 H3]]].
+  move: range => [[br srs] /= /andP [H1 /andP [H2 H3]]].
   move: vars => [req kinds].
+
+  have srs' := prependRange br srs.
+  move: br srs => [r Hr] [rs Hsort Hlt] in H1 H3 srs' *.
 
   set upos := {| uloc   := pos.*2.+1
                ; regReq := req |}.
   have Hodd : odd upos by rewrite /= odd_double.
 
-  (* jww (2015-02-08): This function cannot be called when pos == e; this
-     should be proven. *)
-  case E: (upos < head_or_end r.1); last exact: None.
+  have E: (upos < head_or_end r.1).
+    rewrite /=.
+    by case: (ups r.1) => /= [|u us] in H3 *; undoubled.
 
   have Hupos: match ups r.1 with
-          | [::]   => upos < rend r.1
-          | u :: _ => upos <= u
-          end.
+      | [::]   => upos < rend r.1
+      | u :: _ => upos <= u
+      end.
     by case: (ups r.1) => /= [|u us] in H3 E *; undoubled.
-  pose r1 := Range_shiftup (b:=upos) r.2 Hupos.
 
-  have Hloc: rbeg r1.1 <= upos < head_or_end r1.1.
-    have Hsh: r1 = Range_shiftup r.2 Hupos by [].
-    rewrite /head_or_end /head_or.
-    move: (Range_shiftup_spec Hsh) => [-> -> ->].
-    clear Hsh r1.
-    by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled.
-  pose r2 := Range_cons Hodd r1.2 Hloc.
+  case K: ((Output \in kinds) && (Input \notin kinds)).
+  - (* If this is an output variable that is not also used as an input
+       variable, then rather than creating a new range, we simply insert the
+       use position into that range.  We also shift up the beginning of the
+       range, since it may begin here.  By doing this iteratively for each
+       variable, we determine when the range truly starts. *)
+    pose r1 := Range_shiftup (b:=upos) r.2 Hupos.
 
-  apply: Some (exist _ (exist _ r2 _, exist2 _ _ rs _ _) _) => /=.
-    rewrite /r2 /r1 /=.
-    by apply/andP; split; undoubled.
-  by ordered.
+    have Hloc: rbeg r1.1 <= upos < head_or_end r1.1.
+      have Hsh: r1 = Range_shiftup r.2 Hupos by [].
+      rewrite /head_or_end /head_or.
+      move: (Range_shiftup_spec Hsh) => [-> -> ->].
+      clear Hsh r1.
+      by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled.
+    pose r2 := Range_cons Hodd r1.2 Hloc.
+
+    apply: Some (exist _ (exist _ r2 _, exist2 _ _ rs _ _) _) => /=.
+      clear -H Hr.
+      by apply/andP; split; undoubled.
+    by ordered.
+
+  - (* Otherwise, we must create a new [BoundedRange], and merge the previous
+       one into the [SortedRanges]. *)
+    pose r1 := r.
+               (*   if Input \in kinds *)
+               (* then Range_shiftdown (e:=upos) r.2 Hupos. *)
+
+    (* have Hloc: rbeg r1.1 <= upos < head_or_end r1.1. *)
+    (*   have Hsh: r1 = Range_shiftup r.2 Hupos by []. *)
+    (*   rewrite /head_or_end /head_or. *)
+    (*   move: (Range_shiftup_spec Hsh) => [-> -> ->]. *)
+    (*   clear Hsh r1. *)
+    (*   by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled. *)
+    (* pose r2 := Range_cons Hodd r1.2 Hloc. *)
+    pose r2 := undefined.
+
+    rewrite /= in srs'.
+    apply: Some _.
+    rewrite /RangeCursor.
+
+    admit.
+    (* apply (Some (exist _ (exist _ r2 _, srs') _)) => /=. *)
+    (*   rewrite /r2 /r1 /=. *)
+    (*   by apply/andP; split; undoubled. *)
+    (* by ordered. *)
 Defined.
 
 Definition handleVars_onlyRanges {b pos mid e} :

@@ -260,10 +260,7 @@ Definition SortedRanges bound :=
   & bound <= head bound [seq rbeg r.1 | r <- rs] }.
 
 Definition emptySortedRanges {b} : SortedRanges b.
-Proof.
-  exists [::] => //.
-  by constructor.
-Defined.
+Proof. by exists [::] => //; constructor. Defined.
 
 (* [prependRange] takes a [RangePair] and merges in the range under
    construction, resulting in a new [SortedRanges] whose initial bound
