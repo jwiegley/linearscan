@@ -268,19 +268,15 @@ Definition compareVars (x y : VarInfo) : bool :=
 
 Definition varIdEq (x y : VarInfo) : bool := varId x == varId y.
 
-(*
-  (* First consider the output variables. *)
-  let outputs := [seq v <- varRefs | varKind v == Output] in
-  let v1 := forFold v0 outputs undefined in
+Definition handleVar {b pos mid} (vid : nat) (H : b.*2.+1 < (pos.+1).*2.+1)
+  (range : option (BoundedRange b.*2.+1 mid.*2.+1)) (upos : UsePos) :
+  BoundedRange b.*2.+1 mid.*2.+1 * option (BoundedRange b.*2.+1 mid.*2.+1).
+Admitted.
 
-  (* Next, consider the temp variables. *)
-  let temps := [seq v <- varRefs | varKind v == Temp] in
-  let v2 := forFold v1 temps undefined in
-
-  (* Last, consider the input variables. *)
-  let inputs := [seq v <- varRefs | varKind v == Input] in
-  let v3 := forFold v2 inputs undefined in
-*)
+Lemma handleVar_spec {b pos mid} (vid : nat) (H : b.*2.+1 < (pos.+1).*2.+1)
+  (range : option (BoundedRange b.*2.+1 mid.*2.+1)) (upos : UsePos) :
+  forall x, handleVar (mid:=mid) vid H None upos = (x, None).
+Admitted.
 
 Definition handleVars_combine {b pos mid e} (vid : nat)
   (range : RangeCursor b pos.+1 mid e) (vars : bool * seq VarKind) :
@@ -293,18 +289,45 @@ Definition handleVars_onlyRanges {b pos mid e} :
     -> IntMap (RangeCursor b pos mid e) :=
   IntMap_map \o transportRangeCursor.
 
-Program Definition handleVars_onlyVars {b pos mid e}
+Definition handleVars_onlyVars {b pos mid e}
   (H1 : b <= pos < mid) (H2 : mid <= e) :
-  IntMap (bool * seq VarKind) -> IntMap (RangeCursor b pos mid e) :=
-  let H1' : b < pos.+1 <= mid := _ in
-  let Hlt : b < mid <= e := _ in
-  IntMap_map $ fun x => let: (regReq, kinds) := x in
-    if (Input \in kinds) && (Output \in kinds)
-    then transportRangeCursor _ $ emptyRangeCursor Hlt
-    else transportRangeCursor _ $ emptyRangeCursor Hlt.
-Obligation 2. by ordered. Qed.
-Obligation 3. by undoubled. Qed.
-Obligation 4. by undoubled. Qed.
+  IntMap (bool * seq VarKind) -> IntMap (RangeCursor b pos mid e).
+Proof.
+  (* let H1' : b < pos.+1 <= mid := _ in *)
+  (* let Hlt : b < mid <= e := _ in *)
+  (* let mk : RangeDesc -> RangeCursor b pos mid e := _ in *)
+  apply: IntMap_map _.
+  move=> [req kinds].
+  (* If the variable is both [Input] and [Output] in the same instruction,
+     assume it persists for the entire block (this will be adjusted later, if
+     necessary).  If it is only [Input], assume it starts from the beginning;
+     and if [Output], that it persists until the end.  Only [Temp] variables
+     are simply handled using a single-instruction [Range]. *)
+  pose rd :=
+    {| rbeg := if Input \in kinds
+               then b.*2.+1
+               else pos.*2.+1
+     ; rend := if Output \in kinds
+               then mid.*2.+1
+               else pos.*2.+2
+     ; ups  := [:: {| uloc   := pos.*2.+1
+                    ; regReq := req |} ]
+     |}.
+  apply: exist _ (exist _ (exist _ rd _) _, _) _ => /=.
+  - constructor=> /=.
+    + case: (Input \in kinds); by undoubled.
+    + case: (Output \in kinds); by undoubled.
+    + by constructor; constructor.
+    + by rewrite odd_double.
+  - move=> r.
+    case: (Input \in kinds);
+    case: (Output \in kinds);
+    by undoubled.
+  - exists [::] => //.
+    by constructor.
+  - move=> r H /=.
+    by undoubled.
+Defined.
 
 Definition extractVarInfo (xs : seq VarInfo) : bool * seq VarKind :=
   (find regRequired xs != size xs,

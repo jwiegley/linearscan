@@ -106,3 +106,5 @@ test-suite test
       , hoopl              >= 3.10.0.1
       , lens               >= 4.2
       , free
+      , tasty
+      , tasty-hspec

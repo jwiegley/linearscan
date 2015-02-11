@@ -13,9 +13,14 @@ Haskell code that was extracted from Coq.
 
 import Tempest
 import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Hspec
 
 main :: IO ()
-main = hspec $ do
+main = makeTests >>= defaultMain
+
+makeTests :: IO TestTree
+makeTests = testSpec "Main tests" $ do
   describe "Sanity tests" $ do
     it "Single instruction" $ asmTest
         (label "entry"

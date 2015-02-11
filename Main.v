@@ -61,8 +61,8 @@ Extract Inductive comparison =>
 
 Extract Inlined Constant safe_hd => "Prelude.head".
 Extract Inlined Constant sumlist => "Data.List.sum".
-Extract Inlined Constant lebf    => "Data.Ord.comparing".
-Extract Inlined Constant insert  => "Data.List.insertBy".
+(* Extract Inlined Constant lebf    => "Data.Ord.comparing". *)
+(* Extract Inlined Constant insert  => "Data.List.insertBy". *)
 
 Extract Inlined Constant Arith.Plus.tail_plus => "(Prelude.+)".
 
