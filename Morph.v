@@ -21,7 +21,9 @@ Inductive SSError : Set :=
   | ERegisterAlreadyAssigned : nat -> SSError
   | ERegisterAssignmentsOverlap : nat -> SSError
   | EFuelExhausted : SSError
-  | EUnexpectedNoMoreUnhandled : SSError.
+  | EOutputVarMissingInput : SSError
+  | EUnexpectedNoMoreUnhandled : SSError
+  | EUnexpectedMissingOps : SSError.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :

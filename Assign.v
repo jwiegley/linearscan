@@ -72,22 +72,26 @@ Definition savesAndRestores (opid : OpId) vid reg int :
     end.
 
 Definition collectAllocs opid ints acc v :=
-  let vid := varId v in
-  let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
-  if v_ints is (int, reg) :: _
-  return AssnState (seq (VarId * PhysReg) *
-                    seq opType2 * seq opType2)
-  then
-    let: (allocs', restores', saves') := acc in
-    res <-- savesAndRestores opid vid reg int ;;
-    let: (rs, ss) := res in
-    pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
-  else pure acc.
+  let avid := varId v in
+  if avid < maxReg
+  then pure acc
+  else
+    let vid := avid - maxReg in
+    let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
+    if v_ints is (int, reg) :: _
+    return AssnState (seq (VarId * PhysReg) *
+                      seq opType2 * seq opType2)
+    then
+      let: (allocs', restores', saves') := acc in
+      res <-- savesAndRestores opid vid reg int ;;
+      let: (rs, ss) := res in
+      pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
+    else pure acc.
 
 Definition doAllocations ints op : AssnState (seq opType2) :=
   assn <-- get ;;
   let opid := assnOpId assn in
-  let vars := fst (opRefs oinfo op) in
+  let vars := opRefs oinfo op in
   res <-- forFoldM ([::], [::], [::]) vars $ collectAllocs opid ints ;;
   let: (allocs, restores, saves) := res in
   let op' := applyAllocs oinfo op allocs in

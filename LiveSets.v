@@ -64,7 +64,7 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
       forFold (idx, liveSet) (blockOps binfo b) $ fun acc o =>
         let: (lastIdx, liveSet1) := acc in
         (lastIdx.+2,
-         forFold liveSet1 (fst (opRefs oinfo o)) $ fun liveSet2 v =>
+         forFold liveSet1 (opRefs oinfo o) $ fun liveSet2 v =>
            let vid := varId v in
            if varKind v is Input
            then

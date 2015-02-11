@@ -94,6 +94,16 @@ Proof.
   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
 Defined.
 
+Definition newRange (upos : UsePos) (Hodd : odd upos) : RangeSig.
+Proof.
+  exists {| rbeg := uloc upos
+          ; rend := (uloc upos).+1
+          ; ups  := [:: upos] |}.
+  constructor=> //=.
+    by constructor; constructor.
+  by apply/andP; split.
+Defined.
+
 Definition Range_cons (upos : UsePos) (Hodd : odd upos) `(r : Range rd)
   `(H : rbeg rd <= upos < head_or_end rd) : RangeSig.
 Proof.
@@ -118,6 +128,7 @@ Proof.
   - by apply/andP; split.
 Defined.
 
+(*
 Definition BoundedRange (b e : nat) :=
   { r : RangeSig | (b <= rbeg r.1) && (rend r.1 <= e) }.
 
@@ -143,6 +154,7 @@ Definition transportBoundedRange {e} `(Hlt : a <= b)
   apply/andP; split=> //.
   by ordered.
 Defined.
+*)
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
@@ -198,15 +210,18 @@ Proof.
 Defined.
 
 Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
-Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
+(* Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1. *)
 
+(*
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.
   rewrite /range_ltn /= in H H0 *.
   move: (Range_bounded H2).
   by ordered.
 Qed.
+*)
 
+(*
 Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
   rend rd1 == rbeg rd2
   -> Range {| rbeg := rbeg r1
@@ -250,6 +265,7 @@ Proof.
     rewrite all_cat.
     apply/andP; split=> //.
 Defined.
+*)
 
 (* A [SortedRanges] is a list of non-contiguous, ordered ranges, for which we
    know that the parameter [bound] is less than or equal to the beginning of
@@ -262,6 +278,7 @@ Definition SortedRanges bound :=
 Definition emptySortedRanges {b} : SortedRanges b.
 Proof. by exists [::] => //; constructor. Defined.
 
+(*
 (* [prependRange] takes a [RangePair] and merges in the range under
    construction, resulting in a new [SortedRanges] whose initial bound
    is the beginning of the range that was merged in. *)
@@ -406,6 +423,7 @@ Proof.
   inv H.
   exact: NE_Forall_from_list.
 Qed.
+*)
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x < rbeg y

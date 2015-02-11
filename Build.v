@@ -5,6 +5,7 @@ Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.
+Require Import LinearScan.Morph.
 Require Import LinearScan.ScanState.
 
 Require Import Coq.Sorting.Sorted.
@@ -101,6 +102,32 @@ Proof.
   by match_all.
 Defined.
 
+(*
+
+block   range   first    last      range   ranges   ranges   block
+beg     beg     use pos  use pos   end     beg      end      end
+|       |       |              |       |   |             |       |
+|       |       |              |       |   |             |       |
+
+"block beg" and "block end" are fixed at the beginning of processing of the
+block.
+
+"ranges beg" and "ranges end" are fixed whenever a new range is added to that
+list.
+
+"range beg" and "range end" start out equal to "block beg" and "ranges beg",
+but can contract during the processing of variables.  They may only contract
+inward, and only as far as the "first use pos" and "last use pos".
+
+When a [UsePos] is found before "range beg", that range is prepended to
+"ranges" and a new range is created.  It extends to "block beg" if it is an
+[Input] variable, otherwise it is equal to "first use pos".
+
+When complete, the variable's liveness within the block extends from "range
+beg" to "ranges end".
+
+*)
+
 Definition RangeCursor b pos mid e :=
   { p : BoundedRange b.*2.+1 mid.*2.+1 * SortedRanges mid.*2.+1
   | let r := (fst p).1.1 in
@@ -124,6 +151,18 @@ Proof.
   case: c => [[r /= rs] H1] in Hlt *.
   apply: (exist _ (r, rs) _) => /=.
   by case: (ups r.1.1) => /= [|u us] in H1 *; ordered.
+Defined.
+
+Definition RangeCursor_shiftup {b b' pos mid e}
+  (c : RangeCursor b pos mid e)
+  (Hlt : b.*2.+1 <= b'.*2.+1 <= pos.*2.+1) : RangeCursor b' pos mid e.
+Proof.
+  move: c => [[[r H] /= rs] /andP [H1 /andP [H2 H3]]] in Hlt *.
+  have Hsh: if ups r.1 is u :: _
+            then b'.*2.+1 <= u
+            else b'.*2.+1 < rend r.1 by admit.
+  pose r' := Range_shiftup r.2 Hsh.
+  by apply: exist _ (exist _ r' _, rs) _; ordered.
 Defined.
 
 Definition PendingRanges b pos mid e :=
@@ -232,9 +271,20 @@ Proof.
 
   - (* Otherwise, we must create a new [BoundedRange], and merge the previous
        one into the [SortedRanges]. *)
-    pose r1 := r.
-               (*   if Input \in kinds *)
-               (* then Range_shiftdown (e:=upos) r.2 Hupos. *)
+    case U: (upos < rbeg r.1).
+      pose r1  := newRange Hodd.
+      pose br  : BoundedRange b.*2.+1 mid.*2.+1 := exist _ r Hr.
+      pose br' : BoundedRange b.*2.+1 mid.*2.+1 := exist _ r Hr.
+      (* pose rs' := prependRange () (exist2 _ _ rs Hsort Hlt). *)
+      (* have Hloc: b.*2 < pos.*2.+1 < mid.*2.+1 by admit. *)
+      (* pose p   := (exist (fun r0 => (b.*2 < rbeg r0.1) && *)
+      (*                               (rend r0.1 <= mid.*2.+1)) r1 Hloc, rs'). *)
+      (* apply: Some _. *)
+      (* rewrite /RangeCursor. *)
+      (* rewrite /BoundedRange. simpl in p. *)
+      (* apply (exist _ p _) => /=. *)
+      admit.
+    (* apply (Some (exist _ p _)) => /=. *)
 
     (* have Hloc: rbeg r1.1 <= upos < head_or_end r1.1. *)
     (*   have Hsh: r1 = Range_shiftup r.2 Hupos by []. *)
@@ -331,19 +381,19 @@ Qed.
 
 Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
   (ranges : PendingRanges b pos.+1 mid e) (bs : BuildState pos.+1 e)
-  (Hlt : b <= pos) :
-  PendingRanges b pos mid e * BuildState pos e :=
-  let: (varRefs, regRefs) := opRefs oinfo op in
+  (Hlt : b <= pos) : PendingRanges b pos mid e * BuildState pos e :=
+  let: refs := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
      register.
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
-  let regRefs' := if opKind oinfo op is IsCall
-                  then enum 'I_maxReg
-                  else regRefs in
+  let regRefs' := undefined in
+      (* if opKind oinfo op is IsCall *)
+      (* then enum 'I_maxReg *)
+      (* else regRefs in *)
 
-  (handleVars varRefs Hlt ranges,
+  (handleVars undefined Hlt ranges,
    {| bsVars := bsVars bs
     ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
 
@@ -366,41 +416,8 @@ Proof.
   exact: IHos.
 Defined.
 
-Definition reduceBlocks (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) pos : BuildState pos pos.
-Proof.
-  elim: blocks => [|b blocks IHbs] in pos *.
-    exact: newBuildState.
-
-  have bid  := blockId binfo b.
-  have outs := if IntMap_lookup bid liveSets isn't Some ls
-               then emptyIntSet
-               else blockLiveOut ls.
-
-  pose sz := size (blockOps binfo b).
-  case E: (0 < sz);
-    last exact: IHbs pos.
-
-  (* For every variable in the live out set, create an empty range covering
-     the entire span. *)
-  pose endpos := pos + sz.
-  have Hsz : pos < endpos.
-    exact: ltn_plus.
-  have Hsze : pos < endpos <= endpos.
-    by apply/andP; split.
-  have pending := emptyPendingRanges Hsze outs.
-
-  have bs := IHbs endpos.
-  rewrite /endpos /sz in pending bs.
-  case: (reduceBlock pending bs) => [ranges bs'].
-
-  exact {| bsVars :=
-             mergeIntoSortedRanges (ltnW Hsz) ranges (bsVars bs')
-          ; bsRegs := bsRegs bs' |}.
-Defined.
-
-Definition buildIntervals (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : ScanStateSig maxReg InUse :=
+Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
+  SSError + IntMap (seq (nat * nat) * seq (nat * bool)) :=
   (* for each block b in blocks in reverse order do
        int block_from = b.first_op.id
        int block_to = b.last_op.id + 2
@@ -434,6 +451,96 @@ Definition buildIntervals (blocks : seq blockType1)
          end for
        end for
      end for *)
+  let endb := b + size (blockOps binfo block) in
+
+  let m := IntSet_forFold emptyIntMap liveOuts $ fun m vid =>
+    IntMap_insert (maxReg + vid) ([:: (b, endb)], [::]) m in
+
+  let go n op rest := if rest isn't inr m1 then rest else
+    let pos := (b + n).*2.+1 in
+    let: refs := opRefs oinfo op in
+
+    let recordPosRange vid m :=
+      let consRange x mxs :=
+        if mxs is Some (xs, ys)
+        then Some (x :: xs, ys)
+        else Some ([:: x], [::]) in
+      IntMap_alter (consRange (pos, pos.+1)) vid m in
+
+    (* If this is a call operation, block every register. *)
+    let m2 :=
+      if opKind oinfo op is IsCall
+      then let fix go m n := match n with
+        | O => m
+        | S n => recordPosRange n (go m n)
+        end in
+        go m1 maxReg
+      else m1 in
+
+    (* First consider the output variables. *)
+    let outputs := [seq v <- refs | varKind v == Output] in
+    let m3 := forFold (inr m2) outputs $ fun acc v =>
+      if acc isn't inr m3 then acc else
+      match IntMap_lookup (varId v) m3 with
+      | None => inl EOutputVarMissingInput
+      | Some (nil, _) => inl EOutputVarMissingInput
+      | Some ((b, e) :: ranges, uses) =>
+        let x := ((pos, e) :: ranges, (pos, regRequired v) :: uses) in
+        inr (IntMap_insert (varId v) x m3)
+      end in
+    if m3 isn't inr m3 then m3 else
+
+    let record vid x y m :=
+      let go x y ms :=
+        if ms is Some (xs, ys)
+        then Some (x :: xs, y :: ys)
+        else Some ([:: x], [:: y]) in
+      IntMap_alter (go x y) vid m in
+
+    (* Next, consider the temp variables. *)
+    let temps := [seq v <- refs | varKind v == Temp] in
+    let m4 := forFold (inr m3) temps $ fun acc v =>
+      if acc isn't inr m4 then acc else
+      inr $ record (varId v) (pos, pos.+1) (pos, regRequired v) m4 in
+    if m4 isn't inr m4 then m4 else
+
+    (* Last, consider the input variables. *)
+    let inputs := [seq v <- refs | varKind v == Input] in
+    forFold (inr m4) inputs $ fun acc v =>
+      if acc isn't inr m5 then acc else
+      inr $ record (varId v) (b, pos) (pos, regRequired v) m5 in
+
+  foldr_with_index go (inr m) (blockOps binfo block).
+
+Definition compileRanges `(bs : BuildState (pos + sz) (pos + sz))
+  (info : IntMap (seq (nat * nat) * seq (nat * bool))) : BuildState pos pos.
+Proof.
+Admitted.
+
+Definition reduceBlocks (blocks : seq blockType1)
+  (liveSets : IntMap BlockLiveSets) {pos} : SSError + BuildState pos pos.
+Proof.
+  elim: blocks => [|b blocks IHbs] in pos *.
+    exact: inr newBuildState.
+
+  have bid  := blockId binfo b.
+  have outs := if IntMap_lookup bid liveSets isn't Some ls
+               then emptyIntSet
+               else blockLiveOut ls.
+
+  pose sz := size (blockOps binfo b).
+  case E: (0 < sz);
+    last exact: IHbs pos.
+
+  move: (IHbs (pos + sz)) => [err|bs'].
+    exact: inl err.
+  move: (computeRanges pos b outs) => [err|res].
+    exact: inl err.
+  exact: inr (compileRanges bs' res).
+Defined.
+
+Definition buildIntervals (blocks : seq blockType1)
+  (liveSets : IntMap BlockLiveSets) : SSError + ScanStateSig maxReg InUse :=
   let mkint
         (vid : VarId)
         (ss  : ScanStateSig maxReg Pending)
@@ -453,16 +560,20 @@ Definition buildIntervals (blocks : seq blockType1)
 
   let s0 := ScanState_nil maxReg in
   if blocks isn't b :: bs
-  then packScanState (ScanState_finalize s0)
+  then inr $ packScanState (ScanState_finalize s0)
   else
-    (fun (bs : BuildState 0 0) =>
-       let f mx := if mx is Some x then Some x.1 else None in
-       let regs := vmap f (bsRegs bs) in
-       let s1 := ScanState_setFixedIntervals s0 regs in
-       let s2 := packScanState s1 in
-       let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
-       let s4 := ScanState_finalize s3.2 in
-       packScanState s4)
-    (reduceBlocks bs liveSets 0).
+    (fun (res : SSError + BuildState 0 0) =>
+       match res with
+       | inl err => inl err
+       | inr bs =>
+         let f mx := if mx is Some x then Some x.1 else None in
+         let regs := vmap f (bsRegs bs) in
+         let s1 := ScanState_setFixedIntervals s0 regs in
+         let s2 := packScanState s1 in
+         let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
+         let s4 := ScanState_finalize s3.2 in
+         inr $ packScanState s4
+       end)
+    (reduceBlocks bs liveSets).
 
 End Build.

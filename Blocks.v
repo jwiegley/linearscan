@@ -39,9 +39,6 @@ Canonical VarKind_eqType :=
 
 Lemma eqVarKindE : eqVarKind = eq_op. Proof. by []. Qed.
 
-Definition UsePos_eqType (A : eqType) :=
-  Equality.Pack VarKind_eqMixin VarKind.
-
 End EqVarKind.
 
 Definition VarId := nat.
@@ -62,7 +59,7 @@ Inductive OpKind : Set :=
    side. *)
 Record OpInfo (accType opType1 opType2 : Set) := {
   opKind      : opType1 -> OpKind;
-  opRefs      : opType1 -> seq VarInfo * seq PhysReg;
+  opRefs      : opType1 -> seq VarInfo;
   moveOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
   swapOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
   saveOp      : PhysReg -> option VarId -> accType -> seq opType2 * accType;
