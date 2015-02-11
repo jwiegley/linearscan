@@ -176,80 +176,6 @@ Proof.
     by undoubled.
 Defined.
 
-(*
-Definition handleOutputVar {b pos mid e} (v : VarInfo) :
-  PendingRanges b pos.+1 mid e -> PendingRanges b pos.+1 mid e.
-Proof.
-  apply: IntMap_alter _ (varId v).
-
-  (* jww (2015-02-08): This function should not be called for a variable
-     which was not at least seen in the live out set.  Prove this! *)
-  case=> [x|]; last exact: None.
-
-  set upos := {| uloc   := pos.*2.+1
-               ; regReq := true |}.
-  have Hodd : odd upos by rewrite /= odd_double.
-
-  (* jww (2015-02-08): This function cannot be called when pos == e; this
-     should be proven. *)
-  case E: (upos < head_or_end (fst x.1).1.1); last exact: Some x.
-
-  case: x => [[[r Hx] /= rs] Hlt] in E *.
-  have H: match ups r.1 with
-          | [::]   => upos < rend r.1
-          | u :: _ => upos <= u
-          end.
-    case: (ups r.1) => //= [u us] in Hlt E *.
-    by ordered.
-  pose r1 := Range_shiftup (b:=upos) r.2 H.
-
-  have H2: rbeg r1.1 <= upos < head_or_end r1.1.
-    have H3: r1 = Range_shiftup r.2 H by [].
-    rewrite /head_or_end /head_or.
-    move: (Range_shiftup_spec H3) => [-> -> ->].
-    clear H3 r1.
-    by case: (ups r.2) => /= [|u us] in Hlt H E *; ordered.
-  pose r2 := Range_cons Hodd r1.2 H2.
-
-  apply: (Some (exist _ (exist _ r2 _, rs) _)).
-  admit.
-  admit.
-Defined.
-
-Definition handleTempVar
-  `(Hlt1 : b.*2.+1 < (pos.+1).*2.+1 <= mid.*2.+1)
-  `(Hlt2 : mid.*2.+1 <= e.*2.+1) (v : VarInfo) :
-  PendingRanges b pos mid e -> PendingRanges b pos mid e.
-Proof.
-  apply: IntMap_alter _ (varId v).
-
-  set upos := {| uloc   := pos.*2.+1
-               ; regReq := true |}.
-  have Hodd : odd upos by rewrite /= odd_double.
-
-  case=> [x|]; last first.
-    pose rd := {| rbeg := uloc upos
-                ; rend := (uloc upos).+1
-                ; ups  := [:: upos] |}.
-    apply: Some (exist _ (exist _ (exist _ rd _) _,
-                          emptySortedRanges) _) => //=.
-    - constructor=> //=.
-        by constructor; constructor.
-      by apply/andP; split.
-    - move=> r.
-      move/andP: Hlt1 => [H1 H2].
-      rewrite doubleS in H1 H2.
-      admit.
-    - admit.
-Admitted.
-
-Definition handleInputVar
-  `(Hlt1 : b.*2.+1 <= pos.*2.+1 < mid.*2.+1)
-  `(Hlt2 : mid.*2.+1 <= e.*2.+1) (v : VarInfo) :
-  PendingRanges b pos mid e -> PendingRanges b pos mid e.
-Admitted.
-*)
-
 Definition varKindLtn (x y : VarKind) : bool :=
   match x, y with
   | Input, Input => false
@@ -259,29 +185,41 @@ Definition varKindLtn (x y : VarKind) : bool :=
   | _, _         => true
   end.
 
-Definition compareVars (x y : VarInfo) : bool :=
-  match ltngtP (varId x) (varId y) with
-  | CompareNatLt _ => true
-  | CompareNatGt _ => false
-  | CompareNatEq _ => varKindLtn (varKind x) (varKind y)
-  end.
-
-Definition varIdEq (x y : VarInfo) : bool := varId x == varId y.
-
-Definition handleVar {b pos mid} (vid : nat) (H : b.*2.+1 < (pos.+1).*2.+1)
-  (range : option (BoundedRange b.*2.+1 mid.*2.+1)) (upos : UsePos) :
-  BoundedRange b.*2.+1 mid.*2.+1 * option (BoundedRange b.*2.+1 mid.*2.+1).
-Admitted.
-
-Lemma handleVar_spec {b pos mid} (vid : nat) (H : b.*2.+1 < (pos.+1).*2.+1)
-  (range : option (BoundedRange b.*2.+1 mid.*2.+1)) (upos : UsePos) :
-  forall x, handleVar (mid:=mid) vid H None upos = (x, None).
-Admitted.
-
-Definition handleVars_combine {b pos mid e} (vid : nat)
+Definition handleVars_combine {b pos mid e} (H : b <= pos) (vid : nat)
   (range : RangeCursor b pos.+1 mid e) (vars : bool * seq VarKind) :
   option (RangeCursor b pos mid e).
-Admitted.
+Proof.
+  move: range => [[[r Hr] [rs Hsort Hlt]] /= /andP [H1 /andP [H2 H3]]].
+  move: vars => [req kinds].
+
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := req |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+
+  (* jww (2015-02-08): This function cannot be called when pos == e; this
+     should be proven. *)
+  case E: (upos < head_or_end r.1); last exact: None.
+
+  have Hupos: match ups r.1 with
+          | [::]   => upos < rend r.1
+          | u :: _ => upos <= u
+          end.
+    by case: (ups r.1) => /= [|u us] in H3 E *; undoubled.
+  pose r1 := Range_shiftup (b:=upos) r.2 Hupos.
+
+  have Hloc: rbeg r1.1 <= upos < head_or_end r1.1.
+    have Hsh: r1 = Range_shiftup r.2 Hupos by [].
+    rewrite /head_or_end /head_or.
+    move: (Range_shiftup_spec Hsh) => [-> -> ->].
+    clear Hsh r1.
+    by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled.
+  pose r2 := Range_cons Hodd r1.2 Hloc.
+
+  apply: Some (exist _ (exist _ r2 _, exist2 _ _ rs _ _) _) => /=.
+    rewrite /r2 /r1 /=.
+    by apply/andP; split; undoubled.
+  by ordered.
+Defined.
 
 Definition handleVars_onlyRanges {b pos mid e} :
   b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1
@@ -298,11 +236,9 @@ Proof.
   (* let mk : RangeDesc -> RangeCursor b pos mid e := _ in *)
   apply: IntMap_map _.
   move=> [req kinds].
-  (* If the variable is both [Input] and [Output] in the same instruction,
-     assume it persists for the entire block (this will be adjusted later, if
-     necessary).  If it is only [Input], assume it starts from the beginning;
-     and if [Output], that it persists until the end.  Only [Temp] variables
-     are simply handled using a single-instruction [Range]. *)
+  (* If the variable is only [Input], assume it starts from the beginning; and
+     if [Output], that it persists until the end.  Only [Temp] variables are
+     simply handled using a single-instruction [Range]. *)
   pose rd :=
     {| rbeg := if Input \in kinds
                then b.*2.+1
@@ -337,7 +273,7 @@ Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
   `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
   let vars := IntMap_map extractVarInfo $
               IntMap_groupOn varId varRefs in
-  IntMap_mergeWithKey handleVars_combine (handleVars_onlyRanges _)
+  IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyRanges _)
                       (handleVars_onlyVars _ _) ranges.1 vars.
 Obligation 1. by undoubled. Qed.
 Obligation 2.
@@ -350,8 +286,8 @@ Qed.
 Obligation 3.
   case: ranges => [ranges H0].
   move/andP: H0 => [/andP [H1 H2] H3].
-  rewrite ltnS in H3.
-  by rewrite leq_double in H3.
+  move: H3.
+  by rewrite ltnS leq_double.
 Qed.
 Obligation 4.
   case: ranges => [ranges H0].

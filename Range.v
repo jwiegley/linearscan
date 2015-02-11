@@ -121,6 +121,10 @@ Defined.
 Definition BoundedRange (b e : nat) :=
   { r : RangeSig | (b <= rbeg r.1) && (rend r.1 <= e) }.
 
+Definition newBoundedRange {b e} (r : RangeSig) :
+  (b <= rbeg r.1) && (rend r.1 <= e) -> BoundedRange b e := exist _ r.
+Arguments newBoundedRange [b e] r _ /.
+
 Definition emptyBoundedRange (b e : nat) (H : b < e) : BoundedRange b e.
 Proof.
   apply: exist _ (exist _ {| rbeg := b; rend := e; ups := [::] |} _) _.
