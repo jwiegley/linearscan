@@ -23,7 +23,7 @@ Proof.
   (* Splitting is not possible if we have nothing to process.
      jww (2015-01-22): This should be provably unreachable code. *)
   case: unh => [|[u beg] us] in st uid int *.
-    exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+    exact: inl (ECannotSplitSingleton1 uid). (* ERROR *)
 
   case: (splitPosition int.2 pos) => [[splitPos Hodd] |]; last first.
     exact: inr None.            (* could not split, but benign *)
@@ -32,7 +32,7 @@ Proof.
      action can have no effect.
      jww (2015-01-22): This should be provably impossible. *)
   case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
-    exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+    exact: inl (ECannotSplitSingleton2 uid). (* ERROR *)
   move/andP: Hmid => [Hmid1 Hmid2].
 
   have Hset := ScanState_setInterval st.
@@ -51,7 +51,7 @@ Proof.
       (* It is not allowable to inject new unhandled intervals for the current
          position.
          jww (2015-01-22): This should be provably impossible. *)
-      exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+      exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
 
     rewrite eq_sym in H2.
     move: Hset.
@@ -83,7 +83,7 @@ Proof.
 
     (* jww (2015-01-22): This should be provably impossible. *)
     case: forCurrent.
-      exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+      exact: inl (ECannotSplitSingleton4 uid). (* ERROR *)
 
     rewrite eq_sym in H2.
     move: Hset.
@@ -111,7 +111,7 @@ Proof.
       (* It is not allowable to inject new unhandled intervals for the current
          position.
          jww (2015-01-22): This should be provably impossible. *)
-      exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+      exact: inl (ECannotSplitSingleton5 uid). (* ERROR *)
 
     have := ScanState_newUnhandled st i1.
     rewrite /= => {st}.
@@ -145,7 +145,7 @@ Proof.
 
   move/splitInterval/(_ uid pos true).
   case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton uid). (* ERROR *)
+  - exact: inl (ECannotSplitSingleton6 uid). (* ERROR *)
   - apply: (inr (tt, _)).
     apply: (Build_SSInfo _ st).
     apply Build_SSMorphHasLen;
@@ -193,7 +193,7 @@ Proof.
   move: st.
   move/splitInterval/(_ aid pos false).
   case=> [err|[[[sd st] [[/= Hincr H]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton aid). (* ERROR *)
+  - exact: inl (ECannotSplitSingleton7 aid). (* ERROR *)
   - apply: (inr (tt, _)).
 
     (* When splitting an active interval, we must move the first half over to

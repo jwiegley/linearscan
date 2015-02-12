@@ -117,10 +117,20 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     eres <- gets (LS.linearScan maxReg binfo oinfo blocks)
     case eres of
         Left x -> return $ Left $ case x of
-            LS.ECannotSplitSingleton n ->
-                "Current interval is a singleton (" ++ show n ++ ")"
-            LS.ECannotSplitAssignedSingleton n ->
-                "Current interval is an assigned singleton (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton1 n ->
+                "Current interval is a singleton (err#1) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton2 n ->
+                "Current interval is a singleton (err#2) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton3 n ->
+                "Current interval is a singleton (err#3) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton4 n ->
+                "Current interval is a singleton (err#4) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton5 n ->
+                "Current interval is a singleton (err#5) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton6 n ->
+                "Current interval is a singleton (err#6) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton7 n ->
+                "Current interval is a singleton (err#7) (" ++ show n ++ ")"
             LS.ENoIntervalsToSplit ->
                 "There are no intervals to split"
             LS.ERegisterAlreadyAssigned n ->

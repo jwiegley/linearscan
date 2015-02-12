@@ -15,8 +15,13 @@ Definition PhysReg : predArgType := 'I_maxReg.
 Open Scope nat_scope.
 
 Inductive SSError : Set :=
-  | ECannotSplitSingleton : nat -> SSError
-  | ECannotSplitAssignedSingleton : nat -> SSError
+  | ECannotSplitSingleton1 : nat -> SSError
+  | ECannotSplitSingleton2 : nat -> SSError
+  | ECannotSplitSingleton3 : nat -> SSError
+  | ECannotSplitSingleton4 : nat -> SSError
+  | ECannotSplitSingleton5 : nat -> SSError
+  | ECannotSplitSingleton6 : nat -> SSError
+  | ECannotSplitSingleton7 : nat -> SSError
   | ENoIntervalsToSplit
   | ERegisterAlreadyAssigned : nat -> SSError
   | ERegisterAssignmentsOverlap : nat -> SSError
