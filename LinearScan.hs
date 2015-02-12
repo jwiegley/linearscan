@@ -44,7 +44,7 @@ data VarInfo = VarInfo
     }
 
 deriving instance Eq VarKind
-deriving instance Show VarKind
+-- deriving instance Show VarKind
 
 fromVarInfo :: VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c

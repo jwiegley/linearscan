@@ -4,6 +4,7 @@ while (<>) {
     s/import qualified (.*)/import qualified LinearScan.\1 as \1/;
     s/import qualified LinearScan\.GHC/import qualified GHC/;
     s{import qualified LinearScan\.Prelude as Prelude}{
+import Debug.Trace (trace, traceShow)
 import qualified Prelude
 import qualified Data.IntMap
 import qualified Data.IntSet

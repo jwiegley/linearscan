@@ -290,18 +290,20 @@ Proof. by exists [::] => //; constructor. Defined.
 Definition prependRange `(rp : BoundedRange b e)
   `(ranges : SortedRanges e) `(H : b <= pos <= rbeg rp.1.1) :
   { ranges' : SortedRanges pos
-  | forall x, last x [seq rend i.1 | i <- ranges.1] =
-              last x [seq rend i.1 | i <- ranges'.1] }.
+  | last (rend rp.1.1) [seq rend i.1 | i <- ranges.1] =
+    last (rend rp.1.1) [seq rend i.1 | i <- ranges'.1] }.
 Proof.
   case: ranges => [rs Hsort Hbound].
+  case: rp => [r /= Hlt] in H *.
   case: rs => [|x xs] in Hsort Hbound *.
-    exact: exist _ (exist2 _ _ [::] _ _) _.
-  case: rp => [[rd r] /= Hlt] in H *.
-  move: (Range_bounded r).
+    apply: exist _ (exist2 _ _ [:: r] _ _) _ => //=.
+    - by constructor; constructor.
+    - by ordered.
+  move: (Range_bounded r.2).
   move/andP: Hlt => [Hlt1 Hlt2].
   rewrite /= in Hbound.
-  case Heqe: (rend rd == rbeg x.1); move=> ?.
-    pose r' := packRange (Range_cat r x.2 Heqe).
+  case Heqe: (rend r.1 == rbeg x.1); move=> ?.
+    pose r' := packRange (Range_cat r.2 x.2 Heqe).
     apply: exist _ (exist2 _ _ [:: r' & xs] _ _) _ => /=.
     - by constructor; inv Hsort.
     - by ordered.
@@ -309,7 +311,7 @@ Proof.
       by case: xs => //= in H2 H3 H4 H5 *.
   move: (leq_trans Hlt2 Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
-  apply: exist _ (exist2 _ _ [:: (rd; r), x & xs] _ _) _ => /=;
+  apply: exist _ (exist2 _ _ [:: r, x & xs] _ _) _ => /=;
     try by ordered.
   constructor=> //.
   constructor=> //.

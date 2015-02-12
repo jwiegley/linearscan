@@ -187,8 +187,7 @@ Proof.
 Defined.
 
 Definition mergeIntoSortedRanges `(H : b <= pos)
-  `(pmap : PendingRanges b b pos)
-  (rmap : IntMap (SortedRanges pos.*2.+1)) :
+  (pmap : PendingRanges b b pos) (rmap : IntMap (SortedRanges pos.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
 Proof.
   apply: (IntMap_mergeWithKey _ _ _ pmap.1 rmap).
@@ -207,20 +206,20 @@ Proof.
     have H4: rend r.1 <= mid.*2.+1.
       have Hlt' := Hlt.
       by ordered.
-    have p := last_leq H1 H4.
     have H5: b.*2.+1 <= rend r.1.
       have Hlt' := Hlt.
       move: (Range_bounded r.2) => ?.
       by ordered.
-    rewrite -spec.
+    have p := last_leq H1 H4.
+    rewrite spec /= in p.
     exact: (last_leq p H5).
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-    case=> [[mid Hmid] /= [[br rs] _]].
+    case=> [[? _] /= [[br rs] _]].
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
       move: (Range_beg_bounded br.1.2).
-      move: br => [r Hr] /=.
+      move: br => [r ?] /=.
       by case: (ups r.1); ordered.
     exact: (prependRange rs H0).1.
 
@@ -345,10 +344,17 @@ Proof.
         case: (prependRange srs Hspan) => [p /= spec].
         apply/andP; split=> /=;
           last by undoubled.
-        rewrite -spec.
         have Hmid': (pos.+1).*2.+1 <= mid.*2.+1.
           by undoubled.
-        exact: (last_leq H1 Hmid').
+        move: br => [r Hlt] in H3 spec E Hupos Hloc Hspan *.
+        have H4: rend r.1 <= mid.*2.+1.
+          pose Hlt' := Hlt.
+          by ordered.
+        have Hleq := last_leq H1 H4.
+        rewrite spec /= in Hleq.
+        apply: (last_leq Hleq _).
+        move: (Range_bounded r.2).
+        by ordered.
 Defined.
 
 Definition handleVars_onlyRanges {b pos e}
@@ -441,7 +447,7 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
     then [seq {| varId       := inl n
                ; varKind     := Temp
                ; regRequired := true
-               |} | n in ord_enum maxReg]
+               |} | n in ord_enum maxReg] ++ refs
     else refs in
 
   handleVars refs' Hlt ranges.
@@ -698,30 +704,18 @@ Proof.
   apply: IntMap_foldlWithKey _ (vconst None, emptyIntMap) (bsVars bs).
   move=> [regs vars] vid rs.
   case E: rs.1 => [|? ?]; first by exact: (regs, vars).
-  move: (Interval_fromRanges vid E) => /= i.
   case V: (vid < maxReg).
+    move: (Interval_fromRanges vid E) => /= i.
     exact: (vreplace regs (Ordinal V) (Some (packInterval i)), vars).
-  exact: (regs, IntMap_insert (vid - maxReg) (packInterval i) vars).
+  have vid' := vid - maxReg.
+  move: (Interval_fromRanges vid' E) => /= i.
+  exact: (regs, IntMap_insert vid' (packInterval i) vars).
 Defined.
 
 Definition buildIntervals (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : SSError + ScanStateSig maxReg InUse :=
-  let mkint
-        (vid : VarId)
-        (ss  : ScanStateSig maxReg Pending)
-        (pos : nat)
-        (mrs : SortedRanges pos.*2.+1)
-        (f   : forall sd, ScanState Pending sd
-                 -> forall d, Interval d -> ScanStateSig maxReg Pending) :=
-      match List.destruct_list mrs.1 with
-      | inright _ => ss
-      | inleft (existT _ (exist _ H)) =>
-          f _ ss.2 _ (Interval_fromRanges vid H)
-      end in
-
-  let handleVar pos ss vid mrs :=
-      mkint vid ss pos mrs $ fun _ st _ i =>
-        packScanState (ScanState_newUnhandled st i I) in
+  let handleVar (ss  : ScanStateSig maxReg Pending) i :=
+        packScanState (ScanState_newUnhandled ss.2 i.2 I) in
 
   let s0 := ScanState_nil maxReg in
   if blocks isn't b :: bs
@@ -743,9 +737,9 @@ Definition buildIntervals (blocks : seq blockType1)
        let: (regs, vars) := compileIntervals bs in
        let s1 := ScanState_setFixedIntervals s0 regs in
        let s2 := packScanState s1 in
-       let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
+       let s3 := IntMap_foldl handleVar s2 vars in
        let s4 := ScanState_finalize s3.2 in
        inr $ packScanState s4)
-    (reduceBlocks bs liveSets).
+    (reduceBlocks (b :: bs) liveSets).
 
 End Build.

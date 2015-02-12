@@ -31,7 +31,7 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (add r2 r1 r0)
+        (add r0 r1 r2)
         return_
 
   it "Single, repeated instruction" $ asmTest
@@ -42,9 +42,9 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0)
+        (do add r0 r1 r2
+            add r0 r1 r2
+            add r0 r1 r2)
         return_
 
   it "Multiple instructions" $ asmTest
@@ -55,9 +55,9 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r2 r1 r3
-            add r2 r1 r0)
+        (do add r0 r1 r2
+            add r0 r1 r3
+            add r0 r1 r2)
         return_
 
   it "More variables used than registers" $ asmTest

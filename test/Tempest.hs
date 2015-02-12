@@ -29,8 +29,6 @@ import           Data.Monoid
 import           LinearScan
 import           Test.Hspec
 
-import           Debug.Trace
-
 ------------------------------------------------------------------------------
 -- The input from the Tempest compiler has the following shape: 'Procedure a
 -- IRVar', which means that instructions ultimately refer to either physical
@@ -264,14 +262,14 @@ blockInfo getBlockId = BlockInfo
 
     , blockOps = \(BlockCC a b z) ->
         NodeCO a :
-        NodeOC z :
-        Prelude.map NodeOO (blockToList b)
+        Prelude.map NodeOO (blockToList b) ++
+        [NodeOC z]
 
     , setBlockOps = \_ ops ->
         BlockCC
             (getNodeCO (head ops))
-            (blockFromList (Prelude.map getNodeOO (tail (tail ops))))
-            (getNodeOC (ops !! 1))
+            (blockFromList (Prelude.map getNodeOO (init (tail ops))))
+            (getNodeOC (last ops))
     }
 
 data StackInfo = StackInfo
@@ -353,7 +351,7 @@ opInfo = OpInfo
     setRegister _ (IRVar (PhysicalIV r) _) = r
     setRegister m (IRVar (VirtualIV n _) _) =
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
-                  (Data.List.lookup n (traceShow m m))
+                  (Data.List.lookup n m)
 
 mkSaveOp r vid = do
     stack <- get
