@@ -279,78 +279,74 @@ Proof.
     exact: has_size.
 Qed.
 
-(*
-Lemma in_rem : forall (a : eqType) (y x : a) xs,
-  y \in rem x xs -> x != y -> y \in xs.
-Proof.
-  move=> a y x.
-  elim=> // [z zs IHzs] Hrem Hneq.
-  rewrite in_cons.
-  apply/orP.
-  case Heq: (y == z).
-    by left.
-  right.
-  apply: IHzs; last by [].
-  have: y != z.
-    apply/eqP.
-    by move/eqP in Heq.
-  by [].
-Qed.
+(* Lemma in_rem : forall (a : eqType) (y x : a) xs, *)
+(*   y \in rem x xs -> x != y -> y \in xs. *)
+(* Proof. *)
+(*   move=> a y x. *)
+(*   elim=> // [z zs IHzs] Hrem Hneq. *)
+(*   rewrite in_cons. *)
+(*   apply/orP. *)
+(*   case Heq: (y == z). *)
+(*     by left. *)
+(*   right. *)
+(*   apply: IHzs; last by []. *)
+(*   have: y != z. *)
+(*     apply/eqP. *)
+(*     by move/eqP in Heq. *)
+(*   by []. *)
+(* Qed. *)
 
-Lemma no_overlapping_intervals `(st : ScanState sd) : forall x y,
-  x \in active sd -> y \in inactive sd ->
-    ~~ (intervalsIntersect (getInterval (fst x))
-                           (getInterval (fst y))).
-Proof.
-  move=> x y Hinx Hiny.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". by [].
-  - Case "ScanState_newUnhandled".
-    have Hinx' := Hinx.
-    move: Hinx' => /mapP. case=> x0 _ Heqx.
-    have Hiny' := Hiny.
-    move: Hiny' => /mapP. case=> y0 _ Heqy.
-    subst.
-    rewrite !vnth_vshiftin.
-    move: Hinx Hiny.
-    rewrite !mem_map.
-    - exact: IHst.
-    - exact: widen_fst_inj.
-    - exact: widen_fst_inj.
-  - Case "ScanState_setInterval". by [].
-  - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive". by [].
-  - Case "ScanState_moveActiveToInactive".
-    apply: IHst.
-    + case Heqe: (x == x0).
-        by move/eqP: Heqe => ->.
-      apply: (in_rem (y:=x) (x:=x0)).
-        by [].
-      apply: neq_sym.
-      move/eqP in Heqe.
-      by apply/eqP.
-    + by [].
-  - Case "ScanState_moveActiveToHandled". by [].
-  - Case "ScanState_moveInactiveToActive". by [].
-  - Case "ScanState_moveInactiveToHandled". by [].
-Qed.
-*)
+(* Lemma no_overlapping_intervals `(st : ScanState sd) : forall x y, *)
+(*   x \in active sd -> y \in inactive sd -> *)
+(*     ~~ (intervalsIntersect (getInterval (fst x)) *)
+(*                            (getInterval (fst y))). *)
+(* Proof. *)
+(*   move=> x y Hinx Hiny. *)
+(*   ScanState_cases (induction st) Case; simpl in *. *)
+(*   - Case "ScanState_nil". by []. *)
+(*   - Case "ScanState_newUnhandled". *)
+(*     have Hinx' := Hinx. *)
+(*     move: Hinx' => /mapP. case=> x0 _ Heqx. *)
+(*     have Hiny' := Hiny. *)
+(*     move: Hiny' => /mapP. case=> y0 _ Heqy. *)
+(*     subst. *)
+(*     rewrite !vnth_vshiftin. *)
+(*     move: Hinx Hiny. *)
+(*     rewrite !mem_map. *)
+(*     - exact: IHst. *)
+(*     - exact: widen_fst_inj. *)
+(*     - exact: widen_fst_inj. *)
+(*   - Case "ScanState_setInterval". by []. *)
+(*   - Case "ScanState_setFixedIntervals". exact: IHst. *)
+(*   - Case "ScanState_moveUnhandledToActive". by []. *)
+(*   - Case "ScanState_moveActiveToInactive". *)
+(*     apply: IHst. *)
+(*     + case Heqe: (x == x0). *)
+(*         by move/eqP: Heqe => ->. *)
+(*       apply: (in_rem (y:=x) (x:=x0)). *)
+(*         by []. *)
+(*       apply: neq_sym. *)
+(*       move/eqP in Heqe. *)
+(*       by apply/eqP. *)
+(*     + by []. *)
+(*   - Case "ScanState_moveActiveToHandled". by []. *)
+(*   - Case "ScanState_moveInactiveToActive". by []. *)
+(*   - Case "ScanState_moveInactiveToHandled". by []. *)
+(* Qed. *)
 
-(*
-Lemma beginnings `(st : ScanState b sd) : forall uid beg,
-  (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg.
-Proof.
-  move=> uid beg Hin.
-  ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". by [].
-  - Case "ScanState_newUnhandled". ??
-  - Case "ScanState_finalize". exact: IHst.
-  - Case "ScanState_setInterval". ??
-  - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive". ??
-  - Case "ScanState_moveActiveToInactive". exact: IHst.
-  - Case "ScanState_moveActiveToHandled". exact: IHst.
-  - Case "ScanState_moveInactiveToActive". exact: IHst.
-  - Case "ScanState_moveInactiveToHandled". exact: IHst.
-Qed.
-*)
+(* Lemma beginnings `(st : ScanState b sd) : forall uid beg, *)
+(*   (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg. *)
+(* Proof. *)
+(*   move=> uid beg Hin. *)
+(*   ScanState_cases (induction st) Case; simpl in *. *)
+(*   - Case "ScanState_nil". by []. *)
+(*   - Case "ScanState_newUnhandled". ?? *)
+(*   - Case "ScanState_finalize". exact: IHst. *)
+(*   - Case "ScanState_setInterval". ?? *)
+(*   - Case "ScanState_setFixedIntervals". exact: IHst. *)
+(*   - Case "ScanState_moveUnhandledToActive". ?? *)
+(*   - Case "ScanState_moveActiveToInactive". exact: IHst. *)
+(*   - Case "ScanState_moveActiveToHandled". exact: IHst. *)
+(*   - Case "ScanState_moveInactiveToActive". exact: IHst. *)
+(*   - Case "ScanState_moveInactiveToHandled". exact: IHst. *)
+(* Qed. *)

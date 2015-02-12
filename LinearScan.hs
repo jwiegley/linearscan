@@ -14,18 +14,19 @@ module LinearScan
     , OpInfo(..)
     , OpKind(..)
       -- * Variables
+    , VarId
     , VarInfo(..)
     , VarKind(..)
     , PhysReg
     ) where
 
-import Control.Arrow (first)
 import Control.Monad.Trans.State
 import qualified LinearScan.Blocks as LS
 import qualified LinearScan.Main as LS
 import qualified LinearScan.Morph as LS
 import LinearScan.Blocks
-    ( VarKind(..)
+    ( VarId
+    , VarKind(..)
     , OpKind(..)
     , PhysReg
     )
@@ -37,7 +38,7 @@ import LinearScan.Blocks
 --   basic block until the first point of use, while the lifetime of input
 --   variables extends until their final use.
 data VarInfo = VarInfo
-    { varId       :: Int
+    { varId       :: Either PhysReg VarId
     , varKind     :: VarKind
     , regRequired :: Bool
     }
@@ -61,7 +62,7 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 --   loop bodies.
 data OpInfo accType op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
-    , opRefs      :: op1 -> ([VarInfo], [PhysReg])
+    , opRefs      :: op1 -> [VarInfo]
     , moveOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , swapOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
@@ -75,7 +76,7 @@ deriving instance Show OpKind
 fromOpInfo :: OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
 fromOpInfo (OpInfo a b c d e f g) =
     LS.Build_OpInfo a
-        (first (map fromVarInfo) . b)
+        (map fromVarInfo . b)
         ((runState .) . c)
         ((runState .) . d)
         ((runState .) . e)

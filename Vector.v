@@ -29,11 +29,11 @@ Proof.
   elim: m => [|m IHm] in H *; [ exact: Hz | exact/HSn/IHm ].
 Defined.
 
-Definition fin_rec {n} : forall (P : 'I_n.+1 -> Set),
-  (forall {H}, P (@Ordinal n.+1 0 H))
-    -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H))
-          -> P (@Ordinal n.+1 m.+1 H))
-    -> forall (x : 'I_n.+1), P x := [eta fin_rect].
+(* Definition fin_rec {n} : forall (P : 'I_n.+1 -> Set), *)
+(*   (forall {H}, P (@Ordinal n.+1 0 H)) *)
+(*     -> (forall {m H}, P (@Ordinal n.+1 m (ltnW H)) *)
+(*           -> P (@Ordinal n.+1 m.+1 H)) *)
+(*     -> forall (x : 'I_n.+1), P x := [eta fin_rect]. *)
 
 Definition fin_ind {n} : forall (P : 'I_n.+1 -> Prop),
   (forall {H}, P (@Ordinal n.+1 0 H))
@@ -52,10 +52,10 @@ Proof.
   case: v => *; exact/Hcons/IHn.
 Defined.
 
-Definition vec_rec : forall (P : forall {n}, Vec n -> Set),
-  P vnil
-    -> (forall {n} (x : A) (v : Vec n), P v -> P (vcons x v))
-    -> forall {n} (v : Vec n), P v := [eta vec_rect].
+(* Definition vec_rec : forall (P : forall {n}, Vec n -> Set), *)
+(*   P vnil *)
+(*     -> (forall {n} (x : A) (v : Vec n), P v -> P (vcons x v)) *)
+(*     -> forall {n} (v : Vec n), P v := [eta vec_rect]. *)
 
 Definition vec_ind : forall (P : forall {n}, Vec n -> Prop),
   P vnil
@@ -73,10 +73,10 @@ Proof.
   case: v => *; exact/Hcons/IHn.
 Defined.
 
-Definition vecn_rec : forall (P : forall {n}, Vec n -> Set),
-  (forall x : A, P (vsing x))
-    -> (forall {n} (x : A) (v : Vec n.+1), P v -> P (vcons x v))
-    -> forall {n} (v : Vec n.+1), P v := [eta vecn_rect].
+(* Definition vecn_rec : forall (P : forall {n}, Vec n -> Set), *)
+(*   (forall x : A, P (vsing x)) *)
+(*     -> (forall {n} (x : A) (v : Vec n.+1), P v -> P (vcons x v)) *)
+(*     -> forall {n} (v : Vec n.+1), P v := [eta vecn_rect]. *)
 
 Definition vecn_ind : forall (P : forall {n}, Vec n -> Prop),
   (forall x : A, P (vsing x))
@@ -146,25 +146,25 @@ Lemma vnth_consn : forall n i (v : Vec n) m, forall H: m < n,
   vnth (vcons i v) (@Ordinal n.+1 m.+1 H) = vnth v (@Ordinal n m H).
 Proof. by move=> n i; elim/vec_ind. Qed.
 
-Lemma vrcons_cons : forall n z (v : Vec n) i,
-  vrcons (vcons z v) i = vcons z (vrcons v i).
-Proof. by move=> n i; elim/vec_ind. Qed.
+(* Lemma vrcons_cons : forall n z (v : Vec n) i, *)
+(*   vrcons (vcons z v) i = vcons z (vrcons v i). *)
+(* Proof. by move=> n i; elim/vec_ind. Qed. *)
 
 Lemma vshiftin_cons : forall n z (v : Vec n) i,
   vshiftin (vcons z v) i = vcons z (vshiftin v i).
 Proof. by move=> n z; elim/vec_ind. Qed.
 
-Lemma vnth_last : forall n (i : A) (v : Vec n),
-  vnth (vshiftin v i) ord_max = i.
-Proof.
-  move=> n i.
-  elim/vec_ind=> // [sz x xs IHxs].
-  rewrite vshiftin_cons vnth_consn.
-  have ->: Ordinal (n:=sz.+1) (m:=sz) (ltnSn sz.+1) = ord_max.
-    congr (Ordinal _).
-    exact: eq_irrelevance.
-  exact: IHxs.
-Qed.
+(* Lemma vnth_last : forall n (i : A) (v : Vec n), *)
+(*   vnth (vshiftin v i) ord_max = i. *)
+(* Proof. *)
+(*   move=> n i. *)
+(*   elim/vec_ind=> // [sz x xs IHxs]. *)
+(*   rewrite vshiftin_cons vnth_consn. *)
+(*   have ->: Ordinal (n:=sz.+1) (m:=sz) (ltnSn sz.+1) = ord_max. *)
+(*     congr (Ordinal _). *)
+(*     exact: eq_irrelevance. *)
+(*   exact: IHxs. *)
+(* Qed. *)
 
 Lemma vreplace_cons0 n (k : 'I_n.+1) : forall i (v : Vec n) z,
   k == ord0 -> vreplace (vcons i v) k z = vcons z v.
@@ -179,18 +179,18 @@ Lemma vreplace_consn : forall n m i (v : Vec n) z, forall H: m < n,
     = vcons i (vreplace v (@Ordinal n m H) z).
 Proof. by move=> n m i; elim/vec_ind. Qed.
 
-Lemma vnth_vreplace : forall n (v : Vec n) k z,
-  vnth (vreplace v k z) k = z.
-Proof.
-  move=> n v k z.
-  case: n => [|n] in k v *;
-    first exact: fin_contra.
-  elim/vecn_ind: v => // [sz x xs IHxs] in k *.
-  elim/@fin_ind: k => [H|k ? IHk].
-    rewrite vreplace_cons0; last by [].
-    by rewrite vnth_cons0.
-  by rewrite vreplace_consn vnth_consn IHxs.
-Qed.
+(* Lemma vnth_vreplace : forall n (v : Vec n) k z, *)
+(*   vnth (vreplace v k z) k = z. *)
+(* Proof. *)
+(*   move=> n v k z. *)
+(*   case: n => [|n] in k v *; *)
+(*     first exact: fin_contra. *)
+(*   elim/vecn_ind: v => // [sz x xs IHxs] in k *. *)
+(*   elim/@fin_ind: k => [H|k ? IHk]. *)
+(*     rewrite vreplace_cons0; last by []. *)
+(*     by rewrite vnth_cons0. *)
+(*   by rewrite vreplace_consn vnth_consn IHxs. *)
+(* Qed. *)
 
 Lemma fin1_eq : forall (j k : 'I_1), j == k.
 Proof.
@@ -199,20 +199,20 @@ Proof.
   discriminate.
 Qed.
 
-Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : 'I_n) (z : A),
-  k != j -> vnth (vreplace v k z) j = vnth v j.
-Proof.
-  move=> n v k j z.
-  case: n => [|n] in k j v *;
-    first exact: fin_contra.
-  elim/vecn_ind: v => // [x|sz x xs IHxs] in k j *.
-    by move: (fin1_eq k j) => /eqP ? /eqP ?.
-  elim/@fin_ind: k; elim/@fin_ind: j;
-    try by elim: sz => // in xs IHxs *.
-  move=> ? ? _ ? ? _ Hneg.
-  rewrite vreplace_consn !vnth_consn IHxs; first by [].
-  exact: Hneg.
-Qed.
+(* Lemma vnth_vreplace_neq : forall n (v : Vec n) (k j : 'I_n) (z : A), *)
+(*   k != j -> vnth (vreplace v k z) j = vnth v j. *)
+(* Proof. *)
+(*   move=> n v k j z. *)
+(*   case: n => [|n] in k j v *; *)
+(*     first exact: fin_contra. *)
+(*   elim/vecn_ind: v => // [x|sz x xs IHxs] in k j *. *)
+(*     by move: (fin1_eq k j) => /eqP ? /eqP ?. *)
+(*   elim/@fin_ind: k; elim/@fin_ind: j; *)
+(*     try by elim: sz => // in xs IHxs *. *)
+(*   move=> ? ? _ ? ? _ Hneg. *)
+(*   rewrite vreplace_consn !vnth_consn IHxs; first by []. *)
+(*   exact: Hneg. *)
+(* Qed. *)
 
 Definition vnth_vshiftin {n} : forall k (z : A) (v : Vec n),
   vnth (vshiftin v z) (widen_id k) = vnth v k.

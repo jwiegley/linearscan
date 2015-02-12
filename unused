@@ -2,10 +2,11 @@
 
 for i in $(perl -ne 'print $2, "\n" if /^(Theorem|Lemma|Program [^ ]+ |Fixpoint|Definition|Remark|Function|Axiom|Hypothesis|Corollary) (\w+)/' *.v | sort | uniq)
 do
-    echo $(cat *.v | egrep -c "\\<$i\\>") $i
+    echo $(cat *.v | egrep "\\<$i\\>" | egrep -c -v "^\\(\\*") $i
 done | sort -n | egrep '^1 ' | awk '{print $2}' | \
 while read i; do
-  egrep -n "\\<$i\\>" *.v
+  egrep -n "\\<$i\\>" *.v | egrep -v ":[0-9]+:\\(\\*"
+
 done | egrep -v 'Spec\.v:[0-9]*:(Theorem|Corollary)' \
      | egrep -v 'Lib\.v:[0-9]*:(Theorem|Corollary)'  \
      | egrep -v ':(Theorem|Lemma) [a-zA-Z_]*_spec'   \

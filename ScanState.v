@@ -58,15 +58,15 @@ Arguments getInterval [sd] i /.
     The worst case scenario is that every register has [Some n] with the same
     n, in which case register 0 is selected. *)
 Definition registerWithHighestPos :
-  Vec (option nat) maxReg -> 'I_maxReg * option nat :=
+  Vec (option oddnum) maxReg -> 'I_maxReg * option oddnum :=
   vfoldl_with_index
-    (fun reg (res : 'I_maxReg * option nat) x =>
+    (fun reg (res : 'I_maxReg * option oddnum) x =>
        match (res, x) with
        | ((r, None), _) => (r, None)
        | (_, None) => (reg, None)
        | ((r, Some n), Some m) =>
-         if n < m then (reg, Some m) else (r, Some n)
-       end) (Ordinal registers_exist, Some 0).
+         if n.1 < m.1 then (reg, Some m) else (r, Some n)
+       end) (Ordinal registers_exist, Some odd1).
 
 Definition isWithin (int : IntervalDesc) (vid : nat) (opid : nat) : bool :=
   (ivar int == vid) && (ibeg int <= opid < iend int).

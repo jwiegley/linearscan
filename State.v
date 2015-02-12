@@ -52,8 +52,8 @@ Fixpoint mapM {S A B} (f : A -> State S B) (l : list A) : State S (list B) :=
   | cons x xs => liftA2 (@cons _) (f x) (mapM f xs)
   end.
 
-Definition forM {S A B} (l : list A) (f : A -> State S B) :
-  State S (list B) := mapM f l.
+(* Definition forM {S A B} (l : list A) (f : A -> State S B) : *)
+(*   State S (list B) := mapM f l. *)
 
 Definition foldM {S A B}
   (f : A -> B -> State S A) (s : A) (l : list B) : State S A :=
@@ -77,11 +77,11 @@ Definition concatMapM {S A B}
   (f : A -> State S (list B)) (l : list A) : State S (list B) :=
   fmap concat (mapM f l).
 
-Definition mapMaybeM {S A B}
-  (f : A -> State S (option B)) : list A -> State S (list B) :=
-  foldM (fun acc x =>
-           mx' <-- f x ;;
-           pure (match mx' with
-             | None => acc
-             | Some x' => cons x' acc
-             end)) nil.
+(* Definition mapMaybeM {S A B} *)
+(*   (f : A -> State S (option B)) : list A -> State S (list B) := *)
+(*   foldM (fun acc x => *)
+(*            mx' <-- f x ;; *)
+(*            pure (match mx' with *)
+(*              | None => acc *)
+(*              | Some x' => cons x' acc *)
+(*              end)) nil. *)

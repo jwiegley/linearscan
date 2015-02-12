@@ -37,7 +37,7 @@ Canonical VarKind_eqMixin := EqMixin eqVarKindP.
 Canonical VarKind_eqType :=
   Eval hnf in EqType VarKind VarKind_eqMixin.
 
-Lemma eqVarKindE : eqVarKind = eq_op. Proof. by []. Qed.
+(* Lemma eqVarKindE : eqVarKind = eq_op. Proof. by []. Qed. *)
 
 End EqVarKind.
 
@@ -98,10 +98,10 @@ Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
 Definition countOps : seq blockType1 -> nat :=
   foldOps (fun acc _ => acc.+1) 0.
 
-Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a)
-  (blocks : seq blockType1) : a :=
-  foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk)))
-        z (rev blocks).
+(* Definition foldOpsRev {a} (f : a -> opType1 -> a) (z : a) *)
+(*   (blocks : seq blockType1) : a := *)
+(*   foldl (fun bacc blk => foldl f bacc (rev (blockOps binfo blk))) *)
+(*         z (rev blocks). *)
 
 (* This function not only numbers all operations for us, but adds any extra
    administrative information that we need to process the algorithm on this

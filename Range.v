@@ -45,6 +45,7 @@ Record Range (rd : RangeDesc) : Prop := {
                       else rbeg rd < rend rd;
   Range_end_bounded : last_or_beg rd < rend rd;
   Range_sorted      : StronglySorted upos_lt (ups rd);
+  Range_beg_odd     : odd (rbeg rd);
   Range_all_odd     : all (odd \o uloc) (ups rd)
 }.
 
@@ -58,7 +59,7 @@ Arguments packRange [d] r /.
 
 Notation RangeSig := { rd : RangeDesc | Range rd }.
 
-Definition Range_shiftup `(r : Range rd)
+Definition Range_shiftup `(r : Range rd) `(Hodd : odd b)
   `(H : if ups rd is u :: _
         then b <= u
         else b < rend rd) : RangeSig.
@@ -72,27 +73,27 @@ Proof.
   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
 Defined.
 
-Definition Range_shiftup_spec `(r : Range rd)
+Definition Range_shiftup_spec `(r : Range rd) `(Hodd : odd b)
   `(H : if ups rd is u :: _
         then b <= u
         else b < rend rd) :
-  forall r1, r1 = Range_shiftup r H
+  forall r1, r1 = Range_shiftup r Hodd H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
        &   ups  r1.1 = ups r ].
 Proof. by move=> r1; invert. Qed.
 
-Definition Range_shiftdown `(r : Range rd) `(H : last_or_beg rd < e) :
-  RangeSig.
-Proof.
-  exists {| rbeg := rbeg rd
-          ; rend := e
-          ; ups  := ups rd |}.
-  case: r => [Hbeg Hend Hsort ?].
-  constructor=> //=.
-  rewrite /last_or_beg /last_or in H.
-  by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *.
-Defined.
+(* Definition Range_shiftdown `(r : Range rd) `(H : last_or_beg rd < e) : *)
+(*   RangeSig. *)
+(* Proof. *)
+(*   exists {| rbeg := rbeg rd *)
+(*           ; rend := e *)
+(*           ; ups  := ups rd |}. *)
+(*   case: r => [Hbeg Hend Hsort ?]. *)
+(*   constructor=> //=. *)
+(*   rewrite /last_or_beg /last_or in H. *)
+(*   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *. *)
+(* Defined. *)
 
 Definition newRange (upos : UsePos) (Hodd : odd upos) : RangeSig.
 Proof.
@@ -116,9 +117,9 @@ Proof.
   move: (Range_end_bounded r) => Hend.
   rewrite /last_or_beg /last_or in Hend.
   move: (Range_sorted r) => Hsort.
+  move: (Range_beg_odd r) => Hbegodd.
   move: (Range_all_odd r) => Hall.
-  constructor=> /=.
-  - by case: (ups rd) => //= in H2 *.
+  constructor=> //=.
   - by case: (ups rd) => //= in H2 Hend Hsort *.
   - constructor=> //.
     case: (ups rd) => //= [u us] in H2 Hsort *.
@@ -135,7 +136,8 @@ Definition newBoundedRange {b e} (r : RangeSig) :
   (b <= rbeg r.1) && (rend r.1 <= e) -> BoundedRange b e := exist _ r.
 Arguments newBoundedRange [b e] r _ /.
 
-Definition emptyBoundedRange (b e : nat) (H : b < e) : BoundedRange b e.
+Definition emptyBoundedRange (b e : nat) (H : b < e) (Hodd : odd b) :
+  BoundedRange b e.
 Proof.
   apply: exist _ (exist _ {| rbeg := b; rend := e; ups := [::] |} _) _.
     constructor=> //=.
@@ -144,23 +146,23 @@ Proof.
   by apply/andP; split.
 Defined.
 
-Definition transportBoundedRange {e} `(Hlt : a <= b)
-  (x : BoundedRange b e) : BoundedRange a e.
-  case: x => [r H].
-  apply: exist.
-  apply: r.
-  move/andP: H => [? ?].
-  apply/andP; split=> //.
-  by ordered.
-Defined.
+(* Definition transportBoundedRange {e} `(Hlt : a <= b) *)
+(*   (x : BoundedRange b e) : BoundedRange a e. *)
+(*   case: x => [r H]. *)
+(*   apply: exist. *)
+(*   apply: r. *)
+(*   move/andP: H => [? ?]. *)
+(*   apply/andP; split=> //. *)
+(*   by ordered. *)
+(* Defined. *)
 
-Definition BoundedRange_shiftup {b b' e} (c : BoundedRange b e)
-  (Hlt : b <= b' <= rbeg c.1.1) : BoundedRange b' e.
-Proof.
-  move: c => [r /= H] in Hlt *.
-  exists r.
-  by ordered.
-Defined.
+(* Definition BoundedRange_shiftup {b b' e} (c : BoundedRange b e) *)
+(*   (Hlt : b <= b' <= rbeg c.1.1) : BoundedRange b' e. *)
+(* Proof. *)
+(*   move: c => [r /= H] in Hlt *. *)
+(*   exists r. *)
+(*   by ordered. *)
+(* Defined. *)
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
@@ -177,7 +179,8 @@ Definition Range_split
   `(r : Range {| rbeg := rbeg0
                ; rend := rend0
                ; ups  := l1 ++ l2 |}) :
-  forall before, last_or rbeg0 l1 < before
+  forall before, odd before
+    -> last_or rbeg0 l1 < before
     -> (if l2 is u :: _
         then before <= u
         else before < rend0)
@@ -188,12 +191,13 @@ Definition Range_split
                ; rend := rend0
                ; ups  := l2 |}).
 Proof.
-  move=> before Hlt1 Hlt2.
+  move=> before Hbeforeodd Hlt1 Hlt2.
   move/StronglySorted_inv_app: (Range_sorted r) => [Hsortedl Hsortedr].
   move/Forall_all/Forall_append: (Range_all_odd r) => /= [Hoddl Hoddr].
   move: (Range_bounded r) => /= Hbound.
   move: (Range_beg_bounded r) => /= Hbeg.
   move: (Range_end_bounded r) => /= Hend.
+  move: (Range_beg_odd r) => /= Hbegodd.
   split.
     clear Hsortedr Hoddr Hend.
     elim: l1 {r} => /= [|x xs IHxs] in Hlt1 Hsortedl Hoddl Hbeg *.
@@ -235,9 +239,9 @@ Proof.
   pose rd' := {| rbeg := rbeg rd1
                ; rend := rend rd2
                ; ups  := ups rd1 ++ ups rd2 |}.
-  case: r1 => [/= Hr1a Hr1b Hr1c Hr1d].
-  case: r2 => [/= Hr2a Hr2b Hr2c Hr2d].
-  constructor=> /=.
+  case: r1 => [/= Hr1a Hr1b Hr1c Hr1d Hr1e].
+  case: r2 => [/= Hr2a Hr2b Hr2c Hr2d Hr2e].
+  constructor=> //=.
   - case: (ups rd1) => [|? ?] //= in Hr1a *.
     case: (ups rd2) => [|? ?] /= in Hr2a *.
       by ordered.
@@ -260,13 +264,13 @@ Proof.
     rewrite -last_map.
     by ordered.
 
-  - case: (ups rd1) => //= [? ?] in Hr1d *.
-    case: (ups rd2) => /= [|? ?] in Hr2d *.
+  - case: (ups rd1) => //= [? ?] in Hr1d Hr1e *.
+    case: (ups rd2) => /= [|? ?] in Hr2d Hr2e *.
       by rewrite cats0.
-    move/andP: Hr1d => [? ?].
-    apply/andP; split=> //.
+    move/andP: Hr1e => [? ?].
+    apply/andP; split=> //=.
     rewrite all_cat.
-    apply/andP; split=> //.
+    apply/andP; split=> //=.
 Defined.
 
 (* A [SortedRanges] is a list of non-contiguous, ordered ranges, for which we
@@ -464,19 +468,32 @@ Definition rangesIntersect `(Range x) `(Range y) : bool :=
   else rbeg x < rend y.
 
 Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
-  option nat :=
+  option oddnum :=
   if rangesIntersect xr yr
-  then Some (minn (rbeg x) (rbeg y))
+  then Some (if rbeg x < rbeg y
+             then exist _ (rbeg x) (Range_beg_odd xr)
+             else exist _ (rbeg y) (Range_beg_odd yr))
   else None.
 
-Definition findRangeUsePos `(Range r) (f : UsePos -> bool) : option UsePos :=
-  let fix go xs := match xs with
-      | [::] => None
-      | x :: xs => if f x then Some x else go xs
-      end in
-  go (ups r).
+Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
+  option { u : UsePos | u \in ups rd }.
+Proof.
+  elim: (ups r) => [|u us IHxs];
+    first by exact: None.
+  case: (f u).
+    apply: Some _.
+    exists u.
+    exact: mem_head.
+  move: IHxs => [[u' Hu']|];
+    last by exact: None.
+  apply: Some _.
+  exists u'.
+  rewrite in_cons.
+  apply/orP.
+  by right.
+Defined.
 
-Definition rangeSpan (before : nat) `(r : Range rd) :
+Definition rangeSpan (before : nat) (Hodd : odd before) `(r : Range rd) :
   { p : option RangeSig * option RangeSig
   | match p with
     | (Some r0, Some r1) =>
@@ -514,7 +531,7 @@ Proof.
             else before < rend0).
     case: l2 => //= [y ys] in E r H2 *.
     by move/andP: H2; ordered.
-  move: (Range_split r H3 H4) => [r1 r2].
+  move: (Range_split r Hodd H3 H4) => [r1 r2].
   exists (Some (packRange r1), Some (packRange r2)).
   by repeat (apply/andP; split=> //=).
 Defined.

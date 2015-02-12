@@ -1,4 +1,5 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
@@ -34,9 +35,18 @@ Arguments curIntDetails {sd} _.
 
 Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
 Arguments curInterval [sd] cur /.
-Definition curPosition `(cur : ScanStateCursor sd) :=
+
+Definition curPosition `(cur : ScanStateCursor sd) : nat :=
   intervalStart (curInterval cur).
 Arguments curPosition [sd] cur /.
+
+Lemma curPosition_odd `(cur : ScanStateCursor sd) :
+  odd (curPosition cur).
+Proof.
+  rewrite /curPosition.
+  case: (curInterval cur) => [? ? ? r|? ? ? ? [? r] ?] /=;
+  exact: (Range_beg_odd r).
+Qed.
 
 Definition withCursor {Q a pre}
   (f : forall sd : ScanStateDesc maxReg, ScanStateCursor sd

@@ -325,25 +325,25 @@ opInfo = OpInfo
     , applyAllocs = \node m -> [fmap (setRegister m) node]
     }
   where
-    go :: Instruction IRVar -> ([VarInfo], [PhysReg])
+    go :: Instruction IRVar -> [VarInfo]
     go Nop = mempty
     go (Add s1 s2 d1) =
         mkv Input s1 <> mkv Input s2 <> mkv Output d1
       where
-        mkv :: VarKind -> IRVar -> ([VarInfo], [PhysReg])
-        mkv _ (IRVar (PhysicalIV n) _)    = ([], [n])
-        mkv k (IRVar (VirtualIV n _) _) = ([vinfo], [])
-          where
-            vinfo = VarInfo
-                { varId   = n
-                , varKind = k
-                  -- If there are variables which can be used directly from
-                  -- memory, then this can be False, which relaxes some
-                  -- requirements.
-                , regRequired = True
-                }
+        mkv :: VarKind -> IRVar -> [VarInfo]
+        mkv k (IRVar (PhysicalIV n) _)  = [vinfo k (Left n)]
+        mkv k (IRVar (VirtualIV n _) _) = [vinfo k (Right n)]
 
-    getReferences :: Node a IRVar e x -> ([VarInfo], [PhysReg])
+        vinfo k en = VarInfo
+            { varId   = en
+            , varKind = k
+              -- If there are variables which can be used directly from
+              -- memory, then this can be False, which relaxes some
+              -- requirements.
+            , regRequired = True
+            }
+
+    getReferences :: Node a IRVar e x -> [VarInfo]
     getReferences (Node (Label _) _) = mempty
     getReferences (Node (Instr i) _) = go i
     getReferences (Node (ReturnInstr _ i) _) = go i

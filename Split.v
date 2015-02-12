@@ -25,7 +25,7 @@ Proof.
   case: unh => [|[u beg] us] in st uid int *.
     exact: inl (ECannotSplitSingleton uid). (* ERROR *)
 
-  case: (splitPosition int.2 pos) => [splitPos |]; last first.
+  case: (splitPosition int.2 pos) => [[splitPos Hodd] |]; last first.
     exact: inr None.            (* could not split, but benign *)
 
   (* Ensure that the [splitPos] falls within the interval, otherwise our
@@ -40,7 +40,7 @@ Proof.
   case: d => iv ib ie ? rds in i Hint Hmid1 Hmid2 *.
   rewrite /= in Hset.
 
-  case: (intervalSpan splitPos i) => /= [[[[id0 i0] |] [[id1 i1] |]]].
+  case: (intervalSpan Hodd i) => /= [[[[id0 i0] |] [[id1 i1] |]]].
   (* The interval was split into two parts, each containing use positions.
      The second part always goes back onto the unhandled list for processing
      later. *)
@@ -222,7 +222,7 @@ Proof.
   - exact: inl err.
 Defined.
 
-Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
+Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
   splitAssignedIntervalForReg reg (BeforePos pos) true.
 
