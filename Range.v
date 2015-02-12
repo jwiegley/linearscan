@@ -155,15 +155,11 @@ Definition transportBoundedRange {e} `(Hlt : a <= b)
 Defined.
 
 Definition BoundedRange_shiftup {b b' e} (c : BoundedRange b e)
-  (Hlt : b.*2.+1 <= b'.*2.+1 <= head_or_end c.1.1) : BoundedRange b' e.
+  (Hlt : b <= b' <= rbeg c.1.1) : BoundedRange b' e.
 Proof.
   move: c => [r /= H] in Hlt *.
   exists r.
-  have Hsh: if ups r.1 is u :: _
-            then b'.*2.+1 <= u
-            else b'.*2.+1 < rend r.1 by admit.
-  pose r' := Range_shiftup r.2 Hsh.
-  by apply: exist _ (exist _ r' _, rs) _; ordered.
+  by ordered.
 Defined.
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
@@ -290,7 +286,8 @@ Proof. by exists [::] => //; constructor. Defined.
 Definition prependRange `(rp : BoundedRange b e)
   `(ranges : SortedRanges e) `(H : b <= pos <= rbeg rp.1.1) :
   { ranges' : SortedRanges pos
-  | rend (last rp.1 ranges.1).1 = rend (last rp.1 ranges'.1).1 }.
+  | forall x, last x [seq rend i.1 | i <- ranges.1] =
+              last x [seq rend i.1 | i <- ranges'.1] }.
 Proof.
   case: ranges => [rs Hsort Hbound].
   case: rs => [|x xs] in Hsort Hbound *.

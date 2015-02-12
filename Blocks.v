@@ -46,7 +46,7 @@ Definition VarId := nat.
 (* [VarInfo] abstracts information about the caller's notion of variables
    associated with an operation. *)
 Record VarInfo := {
-  varId       : VarId;     (* from 0 to highest var index *)
+  varId       : PhysReg + VarId;   (* from 0 to highest var index *)
   varKind     : VarKind;
   regRequired : bool
 }.

@@ -20,11 +20,6 @@ Section Build.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Record BuildState' (b e : nat) := {
-  bsVars' : IntMap (SortedRanges e.*2.+1);
-  bsRegs' : Vec (option (BoundedInterval b.*2.+1)) maxReg
-}.
-
 Record BuildState (b : nat) := {
   bsVars : IntMap (SortedRanges b.*2.+1)
 }.
@@ -37,6 +32,7 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
+(*
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
    one-position wide ranges. *)
@@ -81,7 +77,9 @@ Proof.
   rewrite /BoundedInterval.
   by exists (exist _ _ (I_Cons (r:=packRange r) i Hrds)).
 Defined.
+*)
 
+(*
 Definition UsePosList (pos : nat) :=
   { us : seq (UsePos * VarKind)
   | StronglySorted (fun x y => upos_lt (fst x) (fst y)) us
@@ -104,6 +102,7 @@ Proof.
   inversion Hsort; subst.
   by match_all.
 Defined.
+*)
 
 (*
 
@@ -175,28 +174,31 @@ Proof.
   by apply: exist _ (exist _ r' _, rs) _; ordered.
 Defined.
 
-Definition PendingRanges b pos mid e :=
-  { _ : IntMap (RangeCursor b pos mid e)
-  | (b.*2.+1 <= pos.*2.+1 <= mid.*2.+1) && (mid.*2.+1 <= e.*2.+1) }.
+Definition FloatingCursor b pos e :=
+  { p : { n : nat | pos <= n } & RangeCursor b pos p.1 e }.
+
+Definition PendingRanges b pos e :=
+  { _ : IntMap (FloatingCursor b pos e) | b.*2.+1 <= pos.*2.+1 <= e.*2.+1 }.
 
 Definition emptyPendingRanges (b pos e : nat) (H : b < pos <= e)
-  (liveOuts : IntSet) : PendingRanges b pos pos e.
+  (liveOuts : IntSet) : PendingRanges b pos e.
 Proof.
-  have empty    := emptyRangeCursor H.
-  have f xs vid := IntMap_insert vid empty xs.
-  have cursors  := IntSet_foldl f emptyIntMap liveOuts.
-  exists cursors.
+  have empty  := emptyRangeCursor H.
+  have empty' : FloatingCursor b pos e :=
+    (existT _ (exist _ pos (leqnn pos)) empty).
+  have f xs vid := IntMap_insert vid empty' xs.
+  exists (IntSet_foldl f emptyIntMap liveOuts).
   by undoubled.
 Defined.
 
 Definition mergeIntoSortedRanges `(H : b <= pos)
-  `(pmap : PendingRanges b b mid pos)
+  `(pmap : PendingRanges b b pos)
   (rmap : IntMap (SortedRanges pos.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
 Proof.
   apply: (IntMap_mergeWithKey _ _ _ pmap.1 rmap).
   - (* The combining function, when entries are present in both maps. *)
-    move=> _ [[br ps] /= Hlt] rs.
+    move=> _ [[mid Hmid] /= [[br ps] /= Hlt]] rs.
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
       move: (Range_beg_bounded br.1.2).
       move: br => [r Hr] /= in Hlt *.
@@ -211,17 +213,16 @@ Proof.
       have Hlt' := Hlt.
       by ordered.
     have p := last_leq H1 H4.
-    rewrite /= -2!last_map -map_comp in spec.
-    rewrite spec -2!last_map -map_comp in p.
     have H5: b.*2.+1 <= rend r.1.
       have Hlt' := Hlt.
       move: (Range_bounded r.2) => ?.
       by ordered.
-    exact: last_leq p H5.
+    rewrite -spec.
+    exact: (last_leq p H5).
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-    case=> [[br rs] _].
+    case=> [[mid Hmid] /= [[br rs] _]].
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
       move: (Range_beg_bounded br.1.2).
       move: br => [r Hr] /=.
@@ -243,11 +244,27 @@ Definition varKindLtn (x y : VarKind) : bool :=
   | _, _         => true
   end.
 
-Definition handleVars_combine {b pos mid e} (H : b <= pos) (vid : nat)
-  (range : RangeCursor b pos.+1 mid e) (vars : bool * seq VarKind) :
-  option (RangeCursor b pos mid e).
+Lemma RangeCursor_pos_mid {b pos mid e} : RangeCursor b pos mid e -> pos <= mid.
 Proof.
-  move: range => [[br srs] /= /andP [H1 /andP [H2 H3]]].
+  move=> [[[r Hr] [rs Hsort Hlt]] /= /andP [H1 /andP [H2 H3]]].
+  move: (Range_end_bounded r.2) => /= Hbound.
+  move: (Range_sorted r.2) => /= Hsorted.
+  rewrite -leq_double.
+  apply/leq_addn1r.
+  case: (ups r.1) => /= [|u us] in H3 Hbound Hsorted *.
+    by ordered.
+  move/andP: Hr => [Hr1 Hr2].
+  apply: leq_trans _ Hr2.
+  inv Hsorted.
+  move: (Forall_last_ltn Hbound H5) => H6.
+  by ordered.
+Qed.
+
+Definition handleVars_combine {b pos e} (H : b <= pos) (vid : nat)
+  (range : FloatingCursor b pos.+1 e) (vars : bool * seq VarKind) :
+  option (FloatingCursor b pos e).
+Proof.
+  move: range => [[mid Hmid] [[br srs] /= /andP [H1 /andP [H2 H3]]]].
   move: vars => [req kinds].
 
   set upos := {| uloc   := pos.*2.+1
@@ -281,54 +298,69 @@ Proof.
       by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled.
     pose r2 := Range_cons Hodd r1.2 Hloc.
 
-    apply: Some (exist _ (exist _ r2 _, exist2 _ _ rs _ _) _) => /=.
-      clear -H Hr.
-      by apply/andP; split; undoubled.
-    by ordered.
+    rewrite /= in H1 Hloc r2.
+    clear H3 E r1; simpl in *.
+    apply: Some (existT _ (exist _ mid (ltnW Hmid))
+                   (exist _
+                      (exist _ r2 _,
+                       exist2 _ _ rs _ _) _)) => /=.
+    + apply/andP; split.
+        by undoubled.
+      clear -Hr.
+      by ordered.
+    + move/andP=> [? ?].
+      by ordered.
 
   - (* Otherwise, we must create a new [BoundedRange], and merge the previous
        one into the [SortedRanges]. *)
-    case U: (upos < rbeg br.1.1).
+    case U: ((pos.+1).*2.+1 <= rbeg br.1.1).
       pose r1 := newRange Hodd.
-      (* have Hloc: b.*2 < pos.*2.+1 < mid.*2.+1. *)
-      (*   destruct br; destruct srs. *)
-      (*   simpl in *. *)
-      apply: Some (exist _ (_, _) _).
-      + exists r1.
-        admit.
-      + pose p := prependRange srs.
-        * 
-    (* apply (Some (exist _ p _)) => /=. *)
 
-    (* have Hloc: rbeg r1.1 <= upos < head_or_end r1.1. *)
-    (*   have Hsh: r1 = Range_shiftup r.2 Hupos by []. *)
-    (*   rewrite /head_or_end /head_or. *)
-    (*   move: (Range_shiftup_spec Hsh) => [-> -> ->]. *)
-    (*   clear Hsh r1. *)
-    (*   by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled. *)
-    (* pose r2 := Range_cons Hodd r1.2 Hloc. *)
-    pose r2 := undefined.
+      have Hloc: b.*2.+1 <= (pos.+1).*2.+1 <= rbeg br.1.1.
+        by ordered.
 
-    rewrite /= in srs'.
+      apply: Some (existT _ (exist _ pos.+1 _)
+                     (exist _
+                        (exist _ r1 _, _) _)) => //= _.
+      + by undoubled.
+      + exact: (prependRange srs Hloc).1.
+      + move=> _.
+        case: (prependRange srs Hloc) => [p /= spec].
+        apply/andP; split=> /=;
+          last by undoubled.
+        rewrite -spec.
+        have Hmid': (pos.+1).*2.+1 <= mid.*2.+1 by admit.
+        exact: (last_leq H1 Hmid').
+
+    have Hloc: rbeg br.1.1 <= upos < head_or_end br.1.1.
+      admit.
+    pose r2 := Range_cons Hodd br.1.2 Hloc.
+
+    rewrite /= in br H3 E Hupos U Hloc r2 srs H1.
     apply: Some _.
-    rewrite /RangeCursor.
-
-    admit.
-    (* apply (Some (exist _ (exist _ r2 _, srs') _)) => /=. *)
-    (*   rewrite /r2 /r1 /=. *)
-    (*   by apply/andP; split; undoubled. *)
-    (* by ordered. *)
+    apply: existT _ (exist _ mid _) _ => //=.
+      by ordered.
+    move=> _.
+    apply: exist _ (exist _ r2 _, srs) _ => /=.
+    + clear -br.
+      move: br => [? Hr].
+      exact: Hr.
+    + move=> Hr.
+      by undoubled.
 Defined.
 
-Definition handleVars_onlyRanges {b pos mid e} :
-  b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1
-    -> IntMap (RangeCursor b pos.+1 mid e)
-    -> IntMap (RangeCursor b pos mid e) :=
-  IntMap_map \o transportRangeCursor.
+Definition handleVars_onlyRanges {b pos e}
+  (Hlt : b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1) :
+  IntMap (FloatingCursor b pos.+1 e) -> IntMap (FloatingCursor b pos e).
+Proof.
+  apply: IntMap_map _.
+  move=> [[mid Hmid] cursor].
+  move: (transportRangeCursor Hlt cursor) => cursor'.
+  exact: existT _ (exist _ mid (ltnW Hmid)) _.
+Defined.
 
-Definition handleVars_onlyVars {b pos mid e}
-  (H1 : b <= pos < mid) (H2 : mid <= e) :
-  IntMap (bool * seq VarKind) -> IntMap (RangeCursor b pos mid e).
+Definition handleVars_onlyVars {b pos e} (H1 : b <= pos < e) :
+  IntMap (bool * seq VarKind) -> IntMap (FloatingCursor b pos e).
 Proof.
   (* let H1' : b < pos.+1 <= mid := _ in *)
   (* let Hlt : b < mid <= e := _ in *)
@@ -343,11 +375,15 @@ Proof.
                then b.*2.+1
                else pos.*2.+1
      ; rend := if Output \in kinds
-               then mid.*2.+1
+               then e.*2.+1
                else pos.*2.+2
      ; ups  := [:: {| uloc   := pos.*2.+1
                     ; regReq := req |} ]
      |}.
+  apply: existT _ (exist _ e _) _ => /=.
+    by ordered.
+  move=> Hmid.
+
   apply: exist _ (exist _ (exist _ rd _) _, _) _ => /=.
   - constructor=> /=.
     + case: (Input \in kinds); by undoubled.
@@ -364,69 +400,66 @@ Proof.
     by undoubled.
 Defined.
 
-Definition extractVarInfo (xs : seq VarInfo) : bool * seq VarKind :=
-  (find regRequired xs != size xs,
+Definition extractVarInfo (xs : seq (VarInfo maxReg)) : bool * seq VarKind :=
+  (find (@regRequired maxReg) xs != size xs,
    sortBy varKindLtn [seq varKind v | v <- xs]).
 
-Program Definition handleVars (varRefs : seq VarInfo) `(Hlt : b <= pos)
-  `(ranges : PendingRanges b pos.+1 mid e) : PendingRanges b pos mid e :=
+Program Definition handleVars (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos)
+  `(ranges : PendingRanges b pos.+1 e) : PendingRanges b pos e :=
+  let getVarId v := match varId v with
+    | inl n => nat_of_ord n
+    | inr v => v + maxReg
+    end in
   let vars := IntMap_map extractVarInfo $
-              IntMap_groupOn varId varRefs in
+              IntMap_groupOn getVarId varRefs in
   IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyRanges _)
-                      (handleVars_onlyVars _ _) ranges.1 vars.
+                      (handleVars_onlyVars _) ranges.1 vars.
 Obligation 1. by undoubled. Qed.
 Obligation 2.
   case: ranges => [ranges H0].
-  move/andP: H0 => [/andP [H1 H2] H3].
+  move/andP: H0 => [H1 H2].
   apply/andP; split=> //.
   move/ltnW: H2.
   by rewrite doubleS ltnS ltn_double.
 Qed.
 Obligation 3.
   case: ranges => [ranges H0].
-  move/andP: H0 => [/andP [H1 H2] H3].
-  move: H3.
-  by rewrite ltnS leq_double.
-Qed.
-Obligation 4.
-  case: ranges => [ranges H0].
-  by apply/andP; split; undoubled.
+  move/andP: H0 => [H1 H2].
+  by undoubled.
 Qed.
 
-Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
-  (ranges : PendingRanges b pos.+1 mid e) (bs : BuildState' pos.+1 e)
-  (Hlt : b <= pos) : PendingRanges b pos mid e * BuildState' pos e :=
+Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
+  (ranges : PendingRanges b pos.+1 e) (Hlt : b <= pos) :
+  PendingRanges b pos e :=
   let: refs := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
      register.
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
-  let regRefs' := undefined in
-      (* if opKind oinfo op is IsCall *)
-      (* then enum 'I_maxReg *)
-      (* else regRefs in *)
+  let refs' :=
+    if opKind oinfo op is IsCall
+    then [seq {| varId       := inl n
+               ; varKind     := Temp
+               ; regRequired := true
+               |} | n in ord_enum maxReg]
+    else refs in
 
-  (handleVars undefined Hlt ranges,
-   {| bsVars' := bsVars' bs
-    ; bsRegs' := setIntervalsForRegs (bsRegs' bs) regRefs' |}).
+  handleVars refs' Hlt ranges.
 
-Definition reduceBlock {pos mid} (block : blockType1) :
+Definition reduceBlock {pos} (block : blockType1) :
   let sz := size (blockOps binfo block) in
   let b := pos in
   let e := pos + sz in
-  forall (ranges : PendingRanges b (pos + sz) mid e)
-         (bs : BuildState' (pos + sz) e),
-    (PendingRanges b pos mid e * BuildState' pos e).
+  PendingRanges b (pos + sz) e -> PendingRanges b pos e.
 Proof.
   move=> sz b e.
   rewrite /sz.
   elim: (blockOps binfo block) => [|o os IHos] /=.
     by rewrite !addn0.
   rewrite !addnS.
-  move=> ranges bs.
-  case: (reduceOp block o ranges bs _).
-    exact: leq_plus.
+  move=> ranges.
+  move: (reduceOp block o ranges (leq_plus _ _)).
   exact: IHos.
 Defined.
 
@@ -610,16 +643,48 @@ Proof.
     exact: transportSortedRanges.
 Defined.
 
-Definition compileIntervals `(bs : BuildState pos) : IntMap IntervalSig.
+Definition compileIntervals `(bs : BuildState pos) :
+  (* Return the set of fixed intervals, and the set of variable intervals,
+     respectively. *)
+  FixedIntervalsType maxReg * IntMap IntervalSig.
 Proof.
-Admitted.
-
-Definition extractFixedIntervals (intervals : IntMap IntervalSig) :
-  FixedIntervalsType maxReg.
-Proof.
-Admitted.
+  apply: IntMap_foldlWithKey _ (vconst None, emptyIntMap) (bsVars bs).
+  move=> [regs vars] vid rs.
+  case E: rs.1 => [|? ?]; first by exact: (regs, vars).
+  move: (Interval_fromRanges vid E) => /= i.
+  case V: (vid < maxReg).
+    exact: (vreplace regs (Ordinal V) (Some (packInterval i)), vars).
+  exact: (regs, IntMap_insert (vid - maxReg) (packInterval i) vars).
+Defined.
 
 Definition reduceBlocks (blocks : seq blockType1)
+  (liveSets : IntMap BlockLiveSets) {pos} : BuildState pos.
+Proof.
+  elim: blocks => [|b blocks IHbs] in pos *.
+    exact: newBuildState.
+
+  have bid  := blockId binfo b.
+  have outs := if IntMap_lookup bid liveSets isn't Some ls
+               then emptyIntSet
+               else blockLiveOut ls.
+
+  pose sz := size (blockOps binfo b).
+  case E: (0 < sz);
+    last exact: IHbs pos.
+
+  (* For every variable in the live out set, create an empty range covering
+     the entire span. *)
+  pose endpos := pos + sz.
+  have Hsz  : pos < endpos by exact: ltn_plus.
+  have Hsze : pos < endpos <= endpos by ordered.
+
+  have pending := reduceBlock (emptyPendingRanges Hsze outs).
+  exact: {| bsVars :=
+              mergeIntoSortedRanges (ltnW Hsz) pending
+                                    (bsVars (IHbs endpos)) |}.
+Defined.
+
+Definition newReduceBlocks (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) {pos} : SSError + BuildState pos.
 Proof.
   elim: blocks => [|b blocks IHbs] in pos *.
@@ -664,18 +729,25 @@ Definition buildIntervals (blocks : seq blockType1)
   if blocks isn't b :: bs
   then inr $ packScanState (ScanState_finalize s0)
   else
-    (fun (res : SSError + BuildState 0) =>
-       match res with
-       | inl err => inl err
-       | inr bs =>
-         let vars := compileIntervals bs in
-         let regs := extractFixedIntervals vars in
-         let s1   := ScanState_setFixedIntervals s0 regs in
-         let s2   := packScanState s1 in
-         let s3   := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
-         let s4   := ScanState_finalize s3.2 in
-         inr $ packScanState s4
-       end)
+    (* (fun (res : SSError + BuildState 0) => *)
+    (*    match res with *)
+    (*    | inl err => inl err *)
+    (*    | inr bs => *)
+    (*      let vars := compileIntervals bs in *)
+    (*      let regs := extractFixedIntervals vars in *)
+    (*      let s1   := ScanState_setFixedIntervals s0 regs in *)
+    (*      let s2   := packScanState s1 in *)
+    (*      let s3   := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in *)
+    (*      let s4   := ScanState_finalize s3.2 in *)
+    (*      inr $ packScanState s4 *)
+    (*    end) *)
+    (fun (bs : BuildState 0) =>
+       let: (regs, vars) := compileIntervals bs in
+       let s1   := ScanState_setFixedIntervals s0 regs in
+       let s2   := packScanState s1 in
+       let s3   := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
+       let s4   := ScanState_finalize s3.2 in
+       inr $ packScanState s4)
     (reduceBlocks bs liveSets).
 
 End Build.

@@ -510,6 +510,9 @@ Proof. by elim. Qed.
 Lemma ltn_addn1r : forall n m, n.+1 < m.+1 -> n < m.
 Proof. by []. Qed.
 
+Lemma leq_addn1r : forall n m, n.+1 <= m.+1 -> n <= m.
+Proof. by []. Qed.
+
 Lemma ltn_Sdouble_nn : forall n m, m > 0 -> n.*2.+1 < (n + m).*2.+1.
 Proof.
   elim=> [|n IHn] m H /=.
