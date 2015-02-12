@@ -128,7 +128,6 @@ Proof.
   - by apply/andP; split.
 Defined.
 
-(*
 Definition BoundedRange (b e : nat) :=
   { r : RangeSig | (b <= rbeg r.1) && (rend r.1 <= e) }.
 
@@ -154,7 +153,18 @@ Definition transportBoundedRange {e} `(Hlt : a <= b)
   apply/andP; split=> //.
   by ordered.
 Defined.
-*)
+
+Definition BoundedRange_shiftup {b b' e} (c : BoundedRange b e)
+  (Hlt : b.*2.+1 <= b'.*2.+1 <= head_or_end c.1.1) : BoundedRange b' e.
+Proof.
+  move: c => [r /= H] in Hlt *.
+  exists r.
+  have Hsh: if ups r.1 is u :: _
+            then b'.*2.+1 <= u
+            else b'.*2.+1 < rend r.1 by admit.
+  pose r' := Range_shiftup r.2 Hsh.
+  by apply: exist _ (exist _ r' _, rs) _; ordered.
+Defined.
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
@@ -210,7 +220,7 @@ Proof.
 Defined.
 
 Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
-(* Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1. *)
+Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
 
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.
@@ -274,50 +284,49 @@ Definition SortedRanges bound :=
 Definition emptySortedRanges {b} : SortedRanges b.
 Proof. by exists [::] => //; constructor. Defined.
 
-(*
 (* [prependRange] takes a [RangePair] and merges in the range under
    construction, resulting in a new [SortedRanges] whose initial bound
    is the beginning of the range that was merged in. *)
-Definition prependRange `(rp : BoundedRange b pos)
-  `(ranges : SortedRanges pos) :
-  { ranges' : SortedRanges b
+Definition prependRange `(rp : BoundedRange b e)
+  `(ranges : SortedRanges e) `(H : b <= pos <= rbeg rp.1.1) :
+  { ranges' : SortedRanges pos
   | rend (last rp.1 ranges.1).1 = rend (last rp.1 ranges'.1).1 }.
 Proof.
   case: ranges => [rs Hsort Hbound].
   case: rs => [|x xs] in Hsort Hbound *.
     exact: exist _ (exist2 _ _ [::] _ _) _.
-  case: rp => [[rd r] /= Hlt].
+  case: rp => [[rd r] /= Hlt] in H *.
   move: (Range_bounded r).
   move/andP: Hlt => [Hlt1 Hlt2].
   rewrite /= in Hbound.
   case Heqe: (rend rd == rbeg x.1); move=> ?.
     pose r' := packRange (Range_cat r x.2 Heqe).
     apply: exist _ (exist2 _ _ [:: r' & xs] _ _) _ => /=.
-      by constructor; inv Hsort.
-    inv Hsort; invert; subst.
-    by case: xs => //= in H1 H2 H3 H4 *.
+    - by constructor; inv Hsort.
+    - by ordered.
+    - inv Hsort; invert; subst.
+      by case: xs => //= in H2 H3 H4 H5 *.
   move: (leq_trans Hlt2 Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
   apply: exist _ (exist2 _ _ [:: (rd; r), x & xs] _ _) _ => /=;
-    last by ordered.
+    try by ordered.
   constructor=> //.
   constructor=> //.
   inv Hsort.
   move: (Range_bounded x.2) => Hb.
-  rewrite /range_ltn /= in H1 H2 *.
-  case: xs => //= [y ys] in H1 H2 *.
+  rewrite /range_ltn /= in H2 H3 *.
+  case: xs => //= [y ys] in H2 H3 *.
   constructor.
-    inv H2.
-    rewrite /range_leq in H4.
+    inv H3.
+    rewrite /range_leq in H5.
     by ordered.
-  inv H2.
-  move/Forall_all in H4.
+  inv H3.
+  move/Forall_all in H5.
   apply/Forall_all.
-  rewrite -all_map in H4.
+  rewrite -all_map in H5.
   rewrite -all_map.
   by match_all.
 Defined.
-*)
 
 Definition consRange `(r : Range rd) `(ranges : SortedRanges pos)
   (Hlt : rend rd < pos) : SortedRanges (rbeg rd).

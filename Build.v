@@ -20,6 +20,11 @@ Section Build.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
+Record BuildState' (b e : nat) := {
+  bsVars' : IntMap (SortedRanges e.*2.+1);
+  bsRegs' : Vec (option (BoundedInterval b.*2.+1)) maxReg
+}.
+
 Record BuildState (b : nat) := {
   bsVars : IntMap (SortedRanges b.*2.+1)
 }.
@@ -32,7 +37,6 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
-(*
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
    one-position wide ranges. *)
@@ -108,22 +112,29 @@ beg     beg     use pos  use pos   end     beg      end      end
 |       |       |              |       |   |             |       |
 |       |       |              |       |   |             |       |
 
-"block beg" and "block end" are fixed at the beginning of processing of the
+"block beg" and "block end" are fixed at the beginning of processing each
 block.
 
-"ranges beg" and "ranges end" are fixed whenever a new range is added to that
-list.
-
 "range beg" and "range end" start out equal to "block beg" and "ranges beg",
-but can contract during the processing of variables.  They may only contract
-inward, and only as far as the "first use pos" and "last use pos".
+but may contract during processing of variables.  They may only contract
+inward, and only as far as "first use pos" and "last use pos".
 
 When a [UsePos] is found before "range beg", that range is prepended to
-"ranges" and a new range is created.  It extends to "block beg" if it is an
-[Input] variable, otherwise it is equal to "first use pos".
+"ranges" and a new range is created to hold the [UsePos].  It extends to
+"block beg" if it is an [Input] variable, otherwise it is equal to "first use
+pos".
 
 When complete, the variable's liveness within the block extends from "range
 beg" to "ranges end".
+
+"ranges" is sorted such no range is either overlapping or contiguous with
+another range.
+
+However, "range end" may equal "ranges beg", which means that when the range
+is appended to the beginning of ranges, two scenarios may occur: if "range end
+== ranges beg", then the first range in ranges simply extend to include the
+range; otherwise, the new range is prepended normally into the sorted list of
+ranges.
 
 *)
 
@@ -186,9 +197,14 @@ Proof.
   apply: (IntMap_mergeWithKey _ _ _ pmap.1 rmap).
   - (* The combining function, when entries are present in both maps. *)
     move=> _ [[br ps] /= Hlt] rs.
+    have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
+      move: (Range_beg_bounded br.1.2).
+      move: br => [r Hr] /= in Hlt *.
+      by case: (ups r.1); ordered.
     move/andP: Hlt => [H1 /andP [H2 H3]].
-    pose ps' := prependRange br ps.
+    pose ps' := prependRange ps H0.
     move: ps' => [ps' spec].
+    clear H0.
     apply: (Some (@SortedRanges_cat _ ps' _ rs _)) => /=.
     move: br => [r Hlt] in H3 ps' spec *.
     have H4: rend r.1 <= mid.*2.+1.
@@ -205,8 +221,12 @@ Proof.
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-    case=> [[r rs] _].
-    exact: (prependRange r rs).1.
+    case=> [[br rs] _].
+    have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
+      move: (Range_beg_bounded br.1.2).
+      move: br => [r Hr] /=.
+      by case: (ups r.1); ordered.
+    exact: (prependRange rs H0).1.
 
   - (* When no pmap entry is present. *)
     apply: IntMap_map _.
@@ -230,22 +250,19 @@ Proof.
   move: range => [[br srs] /= /andP [H1 /andP [H2 H3]]].
   move: vars => [req kinds].
 
-  have srs' := prependRange br srs.
-  move: br srs => [r Hr] [rs Hsort Hlt] in H1 H3 srs' *.
-
   set upos := {| uloc   := pos.*2.+1
                ; regReq := req |}.
   have Hodd : odd upos by rewrite /= odd_double.
 
-  have E: (upos < head_or_end r.1).
+  have E: (upos < head_or_end br.1.1).
     rewrite /=.
-    by case: (ups r.1) => /= [|u us] in H3 *; undoubled.
+    by case: (ups br.1.1) => /= [|u us] in H3 *; undoubled.
 
-  have Hupos: match ups r.1 with
-      | [::]   => upos < rend r.1
+  have Hupos: match ups br.1.1 with
+      | [::]   => upos < rend br.1.1
       | u :: _ => upos <= u
       end.
-    by case: (ups r.1) => /= [|u us] in H3 E *; undoubled.
+    by case: (ups br.1.1) => /= [|u us] in H3 E *; undoubled.
 
   case K: ((Output \in kinds) && (Input \notin kinds)).
   - (* If this is an output variable that is not also used as an input
@@ -253,6 +270,7 @@ Proof.
        use position into that range.  We also shift up the beginning of the
        range, since it may begin here.  By doing this iteratively for each
        variable, we determine when the range truly starts. *)
+    move: br srs => [r Hr] [rs Hsort Hlt] in H1 H3 E Hupos *.
     pose r1 := Range_shiftup (b:=upos) r.2 Hupos.
 
     have Hloc: rbeg r1.1 <= upos < head_or_end r1.1.
@@ -270,19 +288,16 @@ Proof.
 
   - (* Otherwise, we must create a new [BoundedRange], and merge the previous
        one into the [SortedRanges]. *)
-    case U: (upos < rbeg r.1).
-      pose r1  := newRange Hodd.
-      pose br  : BoundedRange b.*2.+1 mid.*2.+1 := exist _ r Hr.
-      pose br' : BoundedRange b.*2.+1 mid.*2.+1 := exist _ r Hr.
-      (* pose rs' := prependRange () (exist2 _ _ rs Hsort Hlt). *)
-      (* have Hloc: b.*2 < pos.*2.+1 < mid.*2.+1 by admit. *)
-      (* pose p   := (exist (fun r0 => (b.*2 < rbeg r0.1) && *)
-      (*                               (rend r0.1 <= mid.*2.+1)) r1 Hloc, rs'). *)
-      (* apply: Some _. *)
-      (* rewrite /RangeCursor. *)
-      (* rewrite /BoundedRange. simpl in p. *)
-      (* apply (exist _ p _) => /=. *)
-      admit.
+    case U: (upos < rbeg br.1.1).
+      pose r1 := newRange Hodd.
+      (* have Hloc: b.*2 < pos.*2.+1 < mid.*2.+1. *)
+      (*   destruct br; destruct srs. *)
+      (*   simpl in *. *)
+      apply: Some (exist _ (_, _) _).
+      + exists r1.
+        admit.
+      + pose p := prependRange srs.
+        * 
     (* apply (Some (exist _ p _)) => /=. *)
 
     (* have Hloc: rbeg r1.1 <= upos < head_or_end r1.1. *)
@@ -379,8 +394,8 @@ Obligation 4.
 Qed.
 
 Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
-  (ranges : PendingRanges b pos.+1 mid e) (bs : BuildState pos.+1 e)
-  (Hlt : b <= pos) : PendingRanges b pos mid e * BuildState pos e :=
+  (ranges : PendingRanges b pos.+1 mid e) (bs : BuildState' pos.+1 e)
+  (Hlt : b <= pos) : PendingRanges b pos mid e * BuildState' pos e :=
   let: refs := opRefs oinfo op in
 
   (* If the operation is a function call, assuming it makes use of every
@@ -393,16 +408,16 @@ Definition reduceOp {b pos mid e} (block : blockType1) (op : opType1)
       (* else regRefs in *)
 
   (handleVars undefined Hlt ranges,
-   {| bsVars := bsVars bs
-    ; bsRegs := setIntervalsForRegs (bsRegs bs) regRefs' |}).
+   {| bsVars' := bsVars' bs
+    ; bsRegs' := setIntervalsForRegs (bsRegs' bs) regRefs' |}).
 
 Definition reduceBlock {pos mid} (block : blockType1) :
   let sz := size (blockOps binfo block) in
   let b := pos in
   let e := pos + sz in
   forall (ranges : PendingRanges b (pos + sz) mid e)
-         (bs : BuildState (pos + sz) e),
-    (PendingRanges b pos mid e * BuildState pos e).
+         (bs : BuildState' (pos + sz) e),
+    (PendingRanges b pos mid e * BuildState' pos e).
 Proof.
   move=> sz b e.
   rewrite /sz.
@@ -414,7 +429,6 @@ Proof.
     exact: leq_plus.
   exact: IHos.
 Defined.
-*)
 
 Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
   SSError + IntMap (seq (nat * nat) * seq UsePos) :=
