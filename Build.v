@@ -364,9 +364,6 @@ Defined.
 Definition handleVars_onlyVars {b pos e} (H1 : b <= pos < e) :
   IntMap (bool * seq VarKind) -> IntMap (FloatingCursor b pos e).
 Proof.
-  (* let H1' : b < pos.+1 <= mid := _ in *)
-  (* let Hlt : b < mid <= e := _ in *)
-  (* let mk : RangeDesc -> RangeCursor b pos mid e := _ in *)
   apply: IntMap_map _.
   move=> [req kinds].
   (* If the variable is only [Input], assume it starts from the beginning; and
@@ -434,12 +431,11 @@ Qed.
 Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
   (ranges : PendingRanges b pos.+1 e) (Hlt : b <= pos) :
   PendingRanges b pos e :=
-  let: refs := opRefs oinfo op in
-
   (* If the operation is a function call, assuming it makes use of every
      register.
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
+  let refs := opRefs oinfo op in
   let refs' :=
     if opKind oinfo op is IsCall
     then [seq {| varId       := inl n
@@ -646,20 +642,6 @@ Defined.
 (*     exact: transportSortedRanges. *)
 (* Defined. *)
 
-Definition compileIntervals `(bs : BuildState pos) :
-  (* Return the set of fixed intervals, and the set of variable intervals,
-     respectively. *)
-  FixedIntervalsType maxReg * IntMap IntervalSig.
-Proof.
-  apply: IntMap_foldlWithKey _ (vconst None, emptyIntMap) (bsVars bs).
-  move=> [regs vars] vid rs.
-  case E: rs.1 => [|? ?]; first by exact: (regs, vars).
-  move: (Interval_fromRanges vid E) => /= i.
-  case V: (vid < maxReg).
-    exact: (vreplace regs (Ordinal V) (Some (packInterval i)), vars).
-  exact: (regs, IntMap_insert (vid - maxReg) (packInterval i) vars).
-Defined.
-
 Definition reduceBlocks (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) {pos} : BuildState pos.
 Proof.
@@ -682,9 +664,8 @@ Proof.
   have Hsze : pos < endpos <= endpos by ordered.
 
   have pending := reduceBlock (emptyPendingRanges Hsze outs).
-  exact: {| bsVars :=
-              mergeIntoSortedRanges (ltnW Hsz) pending
-                                    (bsVars (IHbs endpos)) |}.
+  exact: {| bsVars := mergeIntoSortedRanges (ltnW Hsz) pending
+                                            (bsVars (IHbs endpos)) |}.
 Defined.
 
 (* Definition newReduceBlocks (blocks : seq blockType1) *)
@@ -708,6 +689,20 @@ Defined.
 (*     exact: inl err. *)
 (*   exact: inr (appendBuildState bs' res). *)
 (* Defined. *)
+
+Definition compileIntervals `(bs : BuildState pos) :
+  (* Return the set of fixed intervals, and the set of variable intervals,
+     respectively. *)
+  FixedIntervalsType maxReg * IntMap IntervalSig.
+Proof.
+  apply: IntMap_foldlWithKey _ (vconst None, emptyIntMap) (bsVars bs).
+  move=> [regs vars] vid rs.
+  case E: rs.1 => [|? ?]; first by exact: (regs, vars).
+  move: (Interval_fromRanges vid E) => /= i.
+  case V: (vid < maxReg).
+    exact: (vreplace regs (Ordinal V) (Some (packInterval i)), vars).
+  exact: (regs, IntMap_insert (vid - maxReg) (packInterval i) vars).
+Defined.
 
 Definition buildIntervals (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : SSError + ScanStateSig maxReg InUse :=

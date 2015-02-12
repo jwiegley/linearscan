@@ -122,17 +122,17 @@ Proof. induction xs; intros; inversion H0; assumption. Qed.
 (*   apply IHxs. inversion H0. assumption. *)
 (* Qed. *)
 
-Lemma NE_Forall_append : forall (P : A -> Prop) xs ys,
-   NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys).
-Proof.
-  split; induction xs; intros; simpl;
-  constructor; intuition;
-  try inversion H1; auto;
-  try inversion H0; auto;
-  try constructor; auto.
-  apply IHxs. assumption.
-  intuition.
-Qed.
+(* Lemma NE_Forall_append : forall (P : A -> Prop) xs ys, *)
+(*    NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys). *)
+(* Proof. *)
+(*   split; induction xs; intros; simpl; *)
+(*   constructor; intuition; *)
+(*   try inversion H1; auto; *)
+(*   try inversion H0; auto; *)
+(*   try constructor; auto. *)
+(*   apply IHxs. assumption. *)
+(*   intuition. *)
+(* Qed. *)
 
 (* Lemma NE_Forall_impl : forall (P Q : A -> Prop), (forall a, P a -> Q a) -> *)
 (*   forall l, NE_Forall P l -> NE_Forall Q l. *)

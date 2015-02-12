@@ -33,8 +33,8 @@ Notation "p .2" := (proj2_sig p)
   (at level 2, left associativity, format "p .2").
 Notation "( x ; y )" := (exist _ x y).
 
-Definition uncurry {A B C} (f : A -> B -> C) (p : A * B) : C :=
-  match p with (x, y) => f x y end.
+(* Definition uncurry {A B C} (f : A -> B -> C) (p : A * B) : C := *)
+(*   match p with (x, y) => f x y end. *)
 
 (* Definition uncurry_sig {A C} {B : A -> Prop} *)
 (*   (f : forall x : A, B x -> C) (p : { x : A | B x }) : C := *)
@@ -46,11 +46,11 @@ Definition uncurry {A B C} (f : A -> B -> C) (p : A * B) : C :=
 (*     | None => d *)
 (*   end. *)
 
-Definition option_map `(f : a -> b) (x : option a) : option b :=
-  match x with
-  | None => None
-  | Some x => Some (f x)
-  end.
+(* Definition option_map `(f : a -> b) (x : option a) : option b := *)
+(*   match x with *)
+(*   | None => None *)
+(*   | Some x => Some (f x) *)
+(*   end. *)
 
 Definition option_choose {a} (x y : option a) : option a :=
   match x with
@@ -100,9 +100,9 @@ Proof. by []. Qed.
 Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
 Proof. by []. Qed.
 
-Lemma maybeLast_cons2 {a} (x : a) z zs :
-  maybeLast [:: x, z & zs] = maybeLast (z :: zs).
-Proof. elim: zs => //. Qed.
+(* Lemma maybeLast_cons2 {a} (x : a) z zs : *)
+(*   maybeLast [:: x, z & zs] = maybeLast (z :: zs). *)
+(* Proof. elim: zs => //. Qed. *)
 
 (* Lemma maybeLast_cons {a} (x : a) xs : *)
 (*   maybeLast (x :: xs) = *)
@@ -399,14 +399,14 @@ Fixpoint apply_nth {a} (def : a) (v : seq a) i (f : a -> a) {struct i} :=
 (*   rewrite IHv; exact: fun_if. *)
 (* Qed. *)
 
-Lemma neq_sym : forall (A : eqType) (x y : A),
-  x != y -> y != x.
-Proof.
-  move=> A x y Hneq.
-  move/eqP in Hneq.
-  apply/eqP.
-  by auto.
-Qed.
+(* Lemma neq_sym : forall (A : eqType) (x y : A), *)
+(*   x != y -> y != x. *)
+(* Proof. *)
+(*   move=> A x y Hneq. *)
+(*   move/eqP in Hneq. *)
+(*   apply/eqP. *)
+(*   by auto. *)
+(* Qed. *)
 
 Definition lebf {a : Type} (f : a -> nat) (n m : a) := f n <= f m.
 
@@ -414,12 +414,12 @@ Definition oddnum := { n : nat | odd n }.
 
 Program Definition odd1 := exist odd 1 _.
 
-Lemma leqnn_double : forall n, n <= n.*2.
-Proof.
-  elim=> //= [n IHn].
-  rewrite doubleS.
-  exact/leqW/IHn.
-Qed.
+(* Lemma leqnn_double : forall n, n <= n.*2. *)
+(* Proof. *)
+(*   elim=> //= [n IHn]. *)
+(*   rewrite doubleS. *)
+(*   exact/leqW/IHn. *)
+(* Qed. *)
 
 (* Lemma leq_doubleW : forall m n, m <= n -> m <= n.*2. *)
 (* Proof. *)
@@ -462,8 +462,8 @@ Qed.
 (* Lemma even_odd_plus n : ~~ odd n -> odd n.+1. *)
 (* Proof. case: n => //. Qed. *)
 
-Lemma odd_succ_succ n : odd (n.+2) = odd n.
-Proof. by rewrite /=; apply/negPn; case: (odd n). Defined.
+(* Lemma odd_succ_succ n : odd (n.+2) = odd n. *)
+(* Proof. by rewrite /=; apply/negPn; case: (odd n). Defined. *)
 
 (* Definition odd_add_2 {n} : odd n -> odd n.+2. *)
 (* Proof. by move=> H; rewrite odd_succ_succ. Defined. *)
@@ -509,11 +509,11 @@ Proof. by elim. Qed.
 Lemma leq_plus : forall m n, m <= m + n.
 Proof. by elim. Qed.
 
-Lemma ltn_addn1r : forall n m, n.+1 < m.+1 -> n < m.
-Proof. by []. Qed.
+(* Lemma ltn_addn1r : forall n m, n.+1 < m.+1 -> n < m. *)
+(* Proof. by []. Qed. *)
 
-Lemma leq_addn1r : forall n m, n.+1 <= m.+1 -> n <= m.
-Proof. by []. Qed.
+(* Lemma leq_addn1r : forall n m, n.+1 <= m.+1 -> n <= m. *)
+(* Proof. by []. Qed. *)
 
 (* Lemma ltn_Sdouble_nn : forall n m, m > 0 -> n.*2.+1 < (n + m).*2.+1. *)
 (* Proof. *)
@@ -553,15 +553,15 @@ Proof. by []. Qed.
 (* Lemma ltnSSn : forall n, n < n.+2. *)
 (* Proof. move=> n. exact: ltnW. Qed. *)
 
-Lemma subnn0 : forall n, n - n = 0.
-Proof. by elim. Qed.
+(* Lemma subnn0 : forall n, n - n = 0. *)
+(* Proof. by elim. Qed. *)
 
-Lemma subn_leq : forall n m o, n <= m -> n - o <= m.
-Proof.
-  elim=> //= [n IHn] m o H.
-  rewrite leq_subLR.
-  by rewrite ltn_addl.
-Qed.
+(* Lemma subn_leq : forall n m o, n <= m -> n - o <= m. *)
+(* Proof. *)
+(*   elim=> //= [n IHn] m o H. *)
+(*   rewrite leq_subLR. *)
+(*   by rewrite ltn_addl. *)
+(* Qed. *)
 
 Lemma leq_eqF : forall n m, (n == m) = false -> n <= m -> n < m.
 Proof.
@@ -654,21 +654,21 @@ Proof. reflexivity. Qed.
 (*   f x (foldr f z xs) = foldr f z (x :: xs). *)
 (* Proof. move=> a b f z x; elim=> //=. Qed. *)
 
-Lemma foldl_add : forall a (f : a -> nat) xs n,
-   foldl (fun n x => n + f x) n xs =
-   foldl (fun n x => n + f x) 0 xs + n.
-Proof.
-  move=> a f; elim=> // a' ? IHxs n /=.
-  rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //.
-Qed.
+(* Lemma foldl_add : forall a (f : a -> nat) xs n, *)
+(*    foldl (fun n x => n + f x) n xs = *)
+(*    foldl (fun n x => n + f x) 0 xs + n. *)
+(* Proof. *)
+(*   move=> a f; elim=> // a' ? IHxs n /=. *)
+(*   rewrite add0n IHxs (IHxs (f a')) [n+_]addnC addnA //. *)
+(* Qed. *)
 
-Lemma foldl_cat : forall a zs xs,
-  foldl (fun acc : seq a => cons^~ acc) zs xs =
-  foldl (fun acc : seq a => cons^~ acc) [::] xs ++ zs.
-Proof.
-  move=> a zs xs; elim: xs => // a' ? IHxs /= in zs *.
-  by rewrite IHxs [in RHS]IHxs /= cats1 -cat_rcons.
-Qed.
+(* Lemma foldl_cat : forall a zs xs, *)
+(*   foldl (fun acc : seq a => cons^~ acc) zs xs = *)
+(*   foldl (fun acc : seq a => cons^~ acc) [::] xs ++ zs. *)
+(* Proof. *)
+(*   move=> a zs xs; elim: xs => // a' ? IHxs /= in zs *. *)
+(*   by rewrite IHxs [in RHS]IHxs /= cats1 -cat_rcons. *)
+(* Qed. *)
 
 (* Lemma foldl_rev {a} (xs : seq a) : *)
 (*   rev (foldl (fun acc : seq a => cons^~ acc) [::] xs) = xs. *)
@@ -680,24 +680,24 @@ Qed.
 (*   exact: foldl_cat. *)
 (* Qed. *)
 
-Definition sumf {a} f : seq a -> nat := foldl (fun n x => n + f x) 0.
+(* Definition sumf {a} f : seq a -> nat := foldl (fun n x => n + f x) 0. *)
 
 Definition sumlist : seq nat -> nat := foldl addn 0.
 
-Lemma sumf_cons : forall a f xs (x : a),
-  sumf f (x :: xs) = f x + sumf f xs.
-Proof.
-  move=> a f.
-  rewrite /sumf /= => xs x.
-  by rewrite foldl_add addnC add0n.
-Qed.
+(* Lemma sumf_cons : forall a f xs (x : a), *)
+(*   sumf f (x :: xs) = f x + sumf f xs. *)
+(* Proof. *)
+(*   move=> a f. *)
+(*   rewrite /sumf /= => xs x. *)
+(*   by rewrite foldl_add addnC add0n. *)
+(* Qed. *)
 
-Lemma sumlist_cons : forall xs (x : nat),
-  sumlist (x :: xs) = x + sumlist xs.
-Proof.
-  rewrite /sumlist /= => xs x.
-  by rewrite foldl_add addnC add0n.
-Qed.
+(* Lemma sumlist_cons : forall xs (x : nat), *)
+(*   sumlist (x :: xs) = x + sumlist xs. *)
+(* Proof. *)
+(*   rewrite /sumlist /= => xs x. *)
+(*   by rewrite foldl_add addnC add0n. *)
+(* Qed. *)
 
 Definition safe_hd {a} (xs : list a) : 0 < size xs -> a.
 Proof. case: xs => //. Defined.
@@ -845,22 +845,22 @@ Proof.
   by invert; apply ord_inj.
 Qed.
 
-Lemma widen_fst_inj : forall a n,
-  injective (widen_fst (a:=a) (n:=n)).
-Proof.
-  move=> a n.
-  rewrite /injective => x1 x2.
-  invert.
-  destruct x1.
-  destruct x2.
-  simpl in *. subst.
-  f_equal.
-  destruct o. destruct o0. subst.
-  unfold nat_of_ord in *.
-  rewrite H0 in i *.
-  have ->: i = i0 by exact: eq_irrelevance.
-  by [].
-Qed.
+(* Lemma widen_fst_inj : forall a n, *)
+(*   injective (widen_fst (a:=a) (n:=n)). *)
+(* Proof. *)
+(*   move=> a n. *)
+(*   rewrite /injective => x1 x2. *)
+(*   invert. *)
+(*   destruct x1. *)
+(*   destruct x2. *)
+(*   simpl in *. subst. *)
+(*   f_equal. *)
+(*   destruct o. destruct o0. subst. *)
+(*   unfold nat_of_ord in *. *)
+(*   rewrite H0 in i *. *)
+(*   have ->: i = i0 by exact: eq_irrelevance. *)
+(*   by []. *)
+(* Qed. *)
 
 Lemma no_ord_max : forall n (xs : seq ('I_n)),
   ord_max \notin [ seq widen_id i | i <- xs ].
@@ -922,36 +922,36 @@ Proof.
   exact/perm_eqlP/insert_perm.
 Qed.
 
-Lemma insert_foldl :
-  forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T),
-  (forall x y z, f (f z x) y = f (f z y) x)
-    -> foldl f z (insert P x xs) = foldl f z (x :: xs).
-Proof.
-  move=> T R f z P x xs.
-  rewrite /insert.
-  elim: xs z => [|y ys IHys] //= z H.
-  case E: (P y x) => //=.
-  rewrite -/insert in IHys *.
-  rewrite IHys /=; last by [].
-  by rewrite H.
-Qed.
+(* Lemma insert_foldl : *)
+(*   forall (T R : Type) (f : R -> T -> R) (z : R) P x (xs : seq T), *)
+(*   (forall x y z, f (f z x) y = f (f z y) x) *)
+(*     -> foldl f z (insert P x xs) = foldl f z (x :: xs). *)
+(* Proof. *)
+(*   move=> T R f z P x xs. *)
+(*   rewrite /insert. *)
+(*   elim: xs z => [|y ys IHys] //= z H. *)
+(*   case E: (P y x) => //=. *)
+(*   rewrite -/insert in IHys *. *)
+(*   rewrite IHys /=; last by []. *)
+(*   by rewrite H. *)
+(* Qed. *)
 
-Lemma insert_sumf : forall a f P (x : a) xs,
-  sumf f (insert P x xs) = sumf f (x :: xs).
-Proof.
-  move=> a f P x xs.
-  rewrite /sumf insert_foldl; first by [].
-  move=> x0 y0 z0.
-  by rewrite -addnA [f _ + f _]addnC addnA.
-Qed.
+(* Lemma insert_sumf : forall a f P (x : a) xs, *)
+(*   sumf f (insert P x xs) = sumf f (x :: xs). *)
+(* Proof. *)
+(*   move=> a f P x xs. *)
+(*   rewrite /sumf insert_foldl; first by []. *)
+(*   move=> x0 y0 z0. *)
+(*   by rewrite -addnA [f _ + f _]addnC addnA. *)
+(* Qed. *)
 
-Lemma sumf_sumlist : forall a f (xs : seq a),
-  sumlist [seq f i | i <- xs] = sumf f xs.
-Proof.
-  move=> a f.
-  elim=> //= [x xs IHxs].
-  by rewrite sumf_cons -IHxs sumlist_cons.
-Qed.
+(* Lemma sumf_sumlist : forall a f (xs : seq a), *)
+(*   sumlist [seq f i | i <- xs] = sumf f xs. *)
+(* Proof. *)
+(*   move=> a f. *)
+(*   elim=> //= [x xs IHxs]. *)
+(*   by rewrite sumf_cons -IHxs sumlist_cons. *)
+(* Qed. *)
 
 (* Lemma insert_f_sumlist : forall a (f : a -> nat) P (x : a) xs, *)
 (*   sumlist [seq f i | i <- insert P x xs] = *)

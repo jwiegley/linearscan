@@ -254,16 +254,16 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
   | (None, None)       => False
   end.
 
-Definition BoundedInterval (pos : nat) :=
-  { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }.
+(* Definition BoundedInterval (pos : nat) := *)
+(*   { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }. *)
 
-Definition transportBoundedInterval {base : nat} `(Hlt : base <= prev)
-  (x : BoundedInterval prev) : BoundedInterval base.
-  case: x => [i H].
-  apply: exist.
-  apply: i.
-  exact/(leq_trans _ H).
-Defined.
+(* Definition transportBoundedInterval {base : nat} `(Hlt : base <= prev) *)
+(*   (x : BoundedInterval prev) : BoundedInterval base. *)
+(*   case: x => [i H]. *)
+(*   apply: exist. *)
+(*   apply: i. *)
+(*   exact/(leq_trans _ H). *)
+(* Defined. *)
 
 Definition Interval_fromRanges (vid : nat)
   `(sr : SortedRanges b) :
