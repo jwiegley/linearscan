@@ -212,16 +212,13 @@ Defined.
 Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
 (* Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1. *)
 
-(*
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.
   rewrite /range_ltn /= in H H0 *.
   move: (Range_bounded H2).
   by ordered.
 Qed.
-*)
 
-(*
 Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
   rend rd1 == rbeg rd2
   -> Range {| rbeg := rbeg r1
@@ -265,7 +262,6 @@ Proof.
     rewrite all_cat.
     apply/andP; split=> //.
 Defined.
-*)
 
 (* A [SortedRanges] is a list of non-contiguous, ordered ranges, for which we
    know that the parameter [bound] is less than or equal to the beginning of
@@ -313,6 +309,38 @@ Proof.
   constructor.
     inv H2.
     rewrite /range_leq in H4.
+    by ordered.
+  inv H2.
+  move/Forall_all in H4.
+  apply/Forall_all.
+  rewrite -all_map in H4.
+  rewrite -all_map.
+  by match_all.
+Defined.
+*)
+
+Definition consRange `(r : Range rd) `(ranges : SortedRanges pos)
+  (Hlt : rend rd < pos) : SortedRanges (rbeg rd).
+Proof.
+  case: ranges => [rs Hsort Hbound].
+  case: rs => [|x xs] in Hsort Hbound *.
+    exact: exist2 _ _ [::] _ _.
+  move: (Range_bounded r).
+  rewrite /= in Hbound.
+  case Heqe: (rend rd == rbeg x.1); move=> ?.
+    pose r' := packRange (Range_cat r x.2 Heqe).
+    apply: exist2 _ _ [:: r' & xs] _ _ => //=.
+    by constructor; inv Hsort.
+  move: (leq_trans Hlt Hbound) => Hleq.
+  apply: exist2 _ _ [:: (rd; r), x & xs] _ _ => //=.
+  constructor=> //.
+  constructor=> //.
+  inv Hsort.
+  move: (Range_bounded x.2) => Hb.
+  rewrite /range_ltn /= in H1 H2 *.
+  case: xs => //= [y ys] in H1 H2 *.
+  constructor.
+    inv H2.
     by ordered.
   inv H2.
   move/Forall_all in H4.
@@ -423,14 +451,14 @@ Proof.
   inv H.
   exact: NE_Forall_from_list.
 Qed.
-*)
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
   if rbeg x < rbeg y
   then rbeg y < rend x
   else rbeg x < rend y.
 
-Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) : option nat :=
+Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
+  option nat :=
   if rangesIntersect xr yr
   then Some (minn (rbeg x) (rbeg y))
   else None.

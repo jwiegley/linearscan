@@ -18,8 +18,7 @@ Definition PhysReg : predArgType := 'I_maxReg.
     through the sequentialized instruction stream over which registers are
     allocated. *)
 
-Definition FixedIntervalsType :=
-  Vec (option { d : IntervalDesc | FixedInterval d }) maxReg.
+Definition FixedIntervalsType := Vec (option IntervalSig) maxReg.
 
 Record ScanStateDesc : Type := {
     nextInterval : nat;

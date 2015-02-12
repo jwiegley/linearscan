@@ -31,8 +31,14 @@ Definition IntMap_mergeWithKey {a b c} (combine : nat -> a -> b -> option c)
   (only1 : IntMap a -> IntMap c) (only2 : IntMap b -> IntMap c)
   (m1 : IntMap a) (m2 : IntMap b) : IntMap c := only1 m1.
 
-Definition IntMap_mapWithKey {a b} (f : nat -> a -> b) (m : IntMap a) : IntMap b :=
-  emptyIntMap.
+Definition IntMap_mapWithKey {a b} (f : nat -> a -> b) (m : IntMap a) :
+  IntMap b := emptyIntMap.
+
+Definition IntMap_foldl {a b} (f : a -> b -> a) (z : a) (m : IntMap b) : a :=
+  let: getIntMap xs := m in foldl f z [seq snd i | i <- xs].
+
+Definition IntMap_forFold {a b} (z : a) (m : IntMap b) (f: a -> b -> a) : a :=
+  IntMap_foldl f z m.
 
 Definition IntMap_foldlWithKey
   {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a := z.
@@ -49,6 +55,7 @@ Extract Inlined Constant IntMap_lookup       => "Data.IntMap.lookup".
 Extract Inlined Constant IntMap_insert       => "Data.IntMap.insert".
 Extract Inlined Constant IntMap_alter        => "Data.IntMap.alter".
 Extract Inlined Constant IntMap_map          => "Data.IntMap.map".
+Extract Inlined Constant IntMap_foldl        => "Data.IntMap.foldl".
 Extract Inlined Constant IntMap_foldlWithKey => "Data.IntMap.foldlWithKey".
 Extract Inlined Constant IntMap_mergeWithKey => "Data.IntMap.mergeWithKey".
 Extract Inlined Constant IntMap_toList       => "Data.IntMap.toList".

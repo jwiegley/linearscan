@@ -31,17 +31,21 @@ Definition linearScan
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks' in
   let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
-  let ssig      := buildIntervals binfo oinfo blocks liveSets' in
-
-  (* allocate registers *)
-  match walkIntervals registers_exist ssig.2 (countOps binfo blocks).+1
+  match buildIntervals binfo oinfo blocks liveSets'
   return SSError + (seq blockType2 * accType) with
   | inl err => inl err
-  | inr ssig' =>
-      let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
+  | inr ssig =>
 
-      (* replace virtual registers with physical registers *)
-      inr $ assignRegNum binfo oinfo ssig'.2 mappings blocks accum
+    (* allocate registers *)
+    match walkIntervals registers_exist ssig.2 (countOps binfo blocks).+1
+    return SSError + (seq blockType2 * accType) with
+    | inl err => inl err
+    | inr ssig' =>
+        let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
+
+        (* replace virtual registers with physical registers *)
+        inr $ assignRegNum binfo oinfo ssig'.2 mappings blocks accum
+    end
   end.
 
 Extraction Language Haskell.

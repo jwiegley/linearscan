@@ -504,5 +504,3 @@ Defined.
     Note that we do not distinguish between the two types of intervals in this
     code, and in fact make use of the use positions to track the locations of
     fixity (such as call sites) within the code. *)
-
-Definition FixedInterval := Interval.

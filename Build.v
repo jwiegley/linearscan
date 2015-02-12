@@ -20,20 +20,19 @@ Section Build.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Record BuildState (b e : nat) := {
-  bsVars : IntMap (SortedRanges e.*2.+1);
-  bsRegs : Vec (option (BoundedInterval b.*2.+1)) maxReg
+Record BuildState (b : nat) := {
+  bsVars : IntMap (SortedRanges b.*2.+1)
 }.
 
-Definition newBuildState {n} : BuildState n n :=
-  {| bsVars := emptyIntMap
-   ; bsRegs := vconst None |}.
+Definition newBuildState {n} : BuildState n :=
+  {| bsVars := emptyIntMap |}.
 
 Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
+(*
 (* For each register that is explicitly referenced by the operation, build up
    a [Interval] which excludes this register from use, but only at specific
    one-position wide ranges. *)
@@ -415,9 +414,10 @@ Proof.
     exact: leq_plus.
   exact: IHos.
 Defined.
+*)
 
 Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
-  SSError + IntMap (seq (nat * nat) * seq (nat * bool)) :=
+  SSError + IntMap (seq (nat * nat) * seq UsePos) :=
   (* for each block b in blocks in reverse order do
        int block_from = b.first_op.id
        int block_to = b.last_op.id + 2
@@ -477,6 +477,9 @@ Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
         go m1 maxReg
       else m1 in
 
+    let upos v := {| uloc   := pos
+                   ; regReq := regRequired v |} in
+
     (* First consider the output variables. *)
     let outputs := [seq v <- refs | varKind v == Output] in
     let m3 := forFold (inr m2) outputs $ fun acc v =>
@@ -485,7 +488,7 @@ Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
       | None => inl EOutputVarMissingInput
       | Some (nil, _) => inl EOutputVarMissingInput
       | Some ((b, e) :: ranges, uses) =>
-        let x := ((pos, e) :: ranges, (pos, regRequired v) :: uses) in
+        let x := ((pos, e) :: ranges, (upos v) :: uses) in
         inr (IntMap_insert (varId v) x m3)
       end in
     if m3 isn't inr m3 then m3 else
@@ -501,24 +504,109 @@ Definition computeRanges (b : nat) (block : blockType1) (liveOuts : IntSet) :
     let temps := [seq v <- refs | varKind v == Temp] in
     let m4 := forFold (inr m3) temps $ fun acc v =>
       if acc isn't inr m4 then acc else
-      inr $ record (varId v) (pos, pos.+1) (pos, regRequired v) m4 in
+      inr $ record (varId v) (pos, pos.+1) (upos v) m4 in
     if m4 isn't inr m4 then m4 else
 
     (* Last, consider the input variables. *)
     let inputs := [seq v <- refs | varKind v == Input] in
     forFold (inr m4) inputs $ fun acc v =>
       if acc isn't inr m5 then acc else
-      inr $ record (varId v) (b, pos) (pos, regRequired v) m5 in
+      inr $ record (varId v) (b, pos) (upos v) m5 in
 
   foldr_with_index go (inr m) (blockOps binfo block).
 
-Definition compileRanges `(bs : BuildState (pos + sz) (pos + sz))
-  (info : IntMap (seq (nat * nat) * seq (nat * bool))) : BuildState pos pos.
+Program Fixpoint mergeContiguousRanges (ranges : seq (nat * nat))
+  {measure (size ranges)} : seq (nat * nat) :=
+  match ranges with
+  | (xb, xe) :: (yb, ye) :: xs =>
+    if xe == yb
+    then mergeContiguousRanges ((xb, ye) :: xs)
+    else (xb, xe) :: mergeContiguousRanges ((yb, ye) :: xs)
+  | _ => ranges
+  end.
+
+Fixpoint collectUses (ranges : seq (nat * nat)) (uses : seq UsePos) :
+  seq ((nat * nat) * seq UsePos) :=
+  match ranges with
+  | [::] => [::]
+  | cons (xb, xe) xs =>
+    ((xb, xe), [seq u <- uses | xb <= uloc u < xe])
+      :: collectUses xs [seq u <- uses | ~~ (xb <= uloc u < xe)]
+  end.
+
+Definition compileRanges (ranges : seq (nat * nat)) (uses : seq UsePos) :
+  option { pos : nat & SortedRanges pos }.
+Proof.
+  case: ranges => [|[xb xe] xs].
+    exact: None.
+  pose ranges0 := (xb, xe) :: xs.
+  pose ranges1 := mergeContiguousRanges ranges0.
+  pose ranges2 := collectUses ranges1 uses.
+  apply: foldr _ (Some (existT _ xb emptySortedRanges)) ranges2.
+  move=> [[rb re] ruses].
+  case=> [[pos rest]|]; last exact: None.
+  pose rd' := {| rbeg := rb
+               ; rend := re
+               ; ups  := ruses |}.
+  have r': Range rd' by admit.
+  case E: (rend rd' < pos); last exact: None.
+  apply: Some _.
+  exists (minn pos rb).
+  move: (consRange r' rest E).
+  apply: transportSortedRanges.
+  exact: geq_minr.
+Defined.
+
+Definition appendBuildState `(bs : BuildState (pos + sz))
+  (m : IntMap (seq (nat * nat) * seq UsePos)) : BuildState pos.
+Proof.
+  apply: {| bsVars := IntMap_mergeWithKey _ _ _ (bsVars bs) m |}.
+  - move=> vid ranges [rawRanges rawUses].
+    (* jww (2015-02-11): All these uses of [None] here represent invariants
+       that should be true of [computeRanges], but which we are not taking the
+       time to prove right now.  They should at least be reported to the user,
+       although [IntMap_mergeWithKey] makes that impossible here. *)
+
+    (* The [raw] list is a list of ranges and of use positions, which we must
+       compile into a list of sorted ranges.  The first step is to join
+       contiguous ranges. *)
+    move: (compileRanges rawRanges rawUses) => [[b newRanges]|];
+      last exact: None.
+    case H1: (last b [seq rend r.1 | r <- newRanges.1] <= (pos + sz).*2.+1);
+      last exact: None.
+    case E: (pos.*2.+1 <= b); last exact: None.
+    apply: Some _.
+    move: (SortedRanges_cat ranges H1).
+    exact: transportSortedRanges.
+
+  - apply: IntMap_map _.
+    apply: transportSortedRanges.
+    rewrite ltnS leq_double.
+    exact: leq_addr.
+
+  - apply: IntMap_map _.
+    (* jww (2015-02-11): See note above about these uses of
+       [emptySortedRanges], which serve the same role as using [None]
+       there. *)
+    move/(uncurry compileRanges) => [[b]|];
+      last exact: emptySortedRanges.
+    case E: (pos.*2.+1 <= b); last first.
+      move=> _.
+      exact: emptySortedRanges.
+    exact: transportSortedRanges.
+Defined.
+
+Definition compileIntervals `(bs : BuildState pos) : IntMap IntervalSig.
+Proof.
+Admitted.
+
+Definition extractFixedIntervals (intervals : IntMap IntervalSig) :
+  FixedIntervalsType maxReg.
 Proof.
 Admitted.
 
 Definition reduceBlocks (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) {pos} : SSError + BuildState pos pos.
+  (liveSets : IntMap BlockLiveSets) {pos} : SSError + BuildState pos.
 Proof.
   elim: blocks => [|b blocks IHbs] in pos *.
     exact: inr newBuildState.
@@ -536,7 +624,7 @@ Proof.
     exact: inl err.
   move: (computeRanges pos b outs) => [err|res].
     exact: inl err.
-  exact: inr (compileRanges bs' res).
+  exact: inr (appendBuildState bs' res).
 Defined.
 
 Definition buildIntervals (blocks : seq blockType1)
@@ -562,16 +650,16 @@ Definition buildIntervals (blocks : seq blockType1)
   if blocks isn't b :: bs
   then inr $ packScanState (ScanState_finalize s0)
   else
-    (fun (res : SSError + BuildState 0 0) =>
+    (fun (res : SSError + BuildState 0) =>
        match res with
        | inl err => inl err
        | inr bs =>
-         let f mx := if mx is Some x then Some x.1 else None in
-         let regs := vmap f (bsRegs bs) in
-         let s1 := ScanState_setFixedIntervals s0 regs in
-         let s2 := packScanState s1 in
-         let s3 := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
-         let s4 := ScanState_finalize s3.2 in
+         let vars := compileIntervals bs in
+         let regs := extractFixedIntervals vars in
+         let s1   := ScanState_setFixedIntervals s0 regs in
+         let s2   := packScanState s1 in
+         let s3   := IntMap_foldlWithKey (handleVar 0) s2 (bsVars bs) in
+         let s4   := ScanState_finalize s3.2 in
          inr $ packScanState s4
        end)
     (reduceBlocks bs liveSets).
