@@ -83,18 +83,6 @@ Definition Range_shiftup_spec `(r : Range rd) `(Hodd : odd b)
        &   ups  r1.1 = ups r ].
 Proof. by move=> r1; invert. Qed.
 
-(* Definition Range_shiftdown `(r : Range rd) `(H : last_or_beg rd < e) : *)
-(*   RangeSig. *)
-(* Proof. *)
-(*   exists {| rbeg := rbeg rd *)
-(*           ; rend := e *)
-(*           ; ups  := ups rd |}. *)
-(*   case: r => [Hbeg Hend Hsort ?]. *)
-(*   constructor=> //=. *)
-(*   rewrite /last_or_beg /last_or in H. *)
-(*   by case: (ups rd) => [|u us] in H Hbeg Hend Hsort *. *)
-(* Defined. *)
-
 Definition newRange (upos : UsePos) (Hodd : odd upos) : RangeSig.
 Proof.
   exists {| rbeg := uloc upos
@@ -145,24 +133,6 @@ Proof.
   move=> /= r.
   by apply/andP; split.
 Defined.
-
-(* Definition transportBoundedRange {e} `(Hlt : a <= b) *)
-(*   (x : BoundedRange b e) : BoundedRange a e. *)
-(*   case: x => [r H]. *)
-(*   apply: exist. *)
-(*   apply: r. *)
-(*   move/andP: H => [? ?]. *)
-(*   apply/andP; split=> //. *)
-(*   by ordered. *)
-(* Defined. *)
-
-(* Definition BoundedRange_shiftup {b b' e} (c : BoundedRange b e) *)
-(*   (Hlt : b <= b' <= rbeg c.1.1) : BoundedRange b' e. *)
-(* Proof. *)
-(*   move: c => [r /= H] in Hlt *. *)
-(*   exists r. *)
-(*   by ordered. *)
-(* Defined. *)
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
 Proof.
@@ -330,37 +300,6 @@ Proof.
   rewrite -all_map.
   by match_all.
 Defined.
-
-(* Definition consRange `(r : Range rd) `(ranges : SortedRanges pos) *)
-(*   (Hlt : rend rd < pos) : SortedRanges (rbeg rd). *)
-(* Proof. *)
-(*   case: ranges => [rs Hsort Hbound]. *)
-(*   case: rs => [|x xs] in Hsort Hbound *. *)
-(*     exact: exist2 _ _ [::] _ _. *)
-(*   move: (Range_bounded r). *)
-(*   rewrite /= in Hbound. *)
-(*   case Heqe: (rend rd == rbeg x.1); move=> ?. *)
-(*     pose r' := packRange (Range_cat r x.2 Heqe). *)
-(*     apply: exist2 _ _ [:: r' & xs] _ _ => //=. *)
-(*     by constructor; inv Hsort. *)
-(*   move: (leq_trans Hlt Hbound) => Hleq. *)
-(*   apply: exist2 _ _ [:: (rd; r), x & xs] _ _ => //=. *)
-(*   constructor=> //. *)
-(*   constructor=> //. *)
-(*   inv Hsort. *)
-(*   move: (Range_bounded x.2) => Hb. *)
-(*   rewrite /range_ltn /= in H1 H2 *. *)
-(*   case: xs => //= [y ys] in H1 H2 *. *)
-(*   constructor. *)
-(*     inv H2. *)
-(*     by ordered. *)
-(*   inv H2. *)
-(*   move/Forall_all in H4. *)
-(*   apply/Forall_all. *)
-(*   rewrite -all_map in H4. *)
-(*   rewrite -all_map. *)
-(*   by match_all. *)
-(* Defined. *)
 
 Lemma Forall_ltn : forall (p r : RangeSig) rs,
   List.Forall (fun y : RangeSig => rend r.1 < rbeg y.1) rs
