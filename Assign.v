@@ -74,15 +74,16 @@ Definition savesAndRestores (opid : OpId) vid reg int :
 Definition collectAllocs opid ints acc v :=
   if @varId maxReg v isn't inr vid then pure acc else
   let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
-  if v_ints is (int, reg) :: _
-  return AssnState (seq (VarId * PhysReg) *
-                    seq opType2 * seq opType2)
-  then
-    let: (allocs', restores', saves') := acc in
-    res <-- savesAndRestores opid vid reg int ;;
-    let: (rs, ss) := res in
-    pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
-  else pure acc.
+  forFoldM acc v_ints $ fun acc' x =>
+    match x
+    return AssnState (seq (VarId * PhysReg) *
+                      seq opType2 * seq opType2) with
+    | (int, reg) =>
+      let: (allocs', restores', saves') := acc' in
+      res <-- savesAndRestores opid vid reg int ;;
+      let: (rs, ss) := res in
+      pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
+    end.
 
 Definition doAllocations ints op : AssnState (seq opType2) :=
   assn <-- get ;;

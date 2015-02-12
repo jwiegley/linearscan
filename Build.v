@@ -293,10 +293,10 @@ Proof.
 
   apply: exist _ (exist _ (exist _ rd _) _, _) _ => /=.
   - constructor=> /=.
-    + case: (Input \in kinds); by undoubled.
-    + case: (Output \in kinds); by undoubled.
+    + by case: (Input \in kinds); undoubled.
+    + by case: (Output \in kinds); undoubled.
     + by constructor; constructor.
-    + case: (Input \in kinds); by exact: odd_double_plus.
+    + by case: (Input \in kinds); exact: odd_double_plus.
     + by rewrite odd_double.
   - move=> r.
     case: (Input \in kinds);
@@ -362,7 +362,9 @@ Definition reduceBlock {pos} (block : blockType1) :
 Proof.
   move=> sz b e.
   rewrite /sz /blockSize.
-  elim: (blockOps binfo block) => [|o os IHos] /=.
+  set ops := blockOps binfo block.
+  rewrite -size_rev.
+  elim: (rev ops) => [|o os IHos] /=.
     by rewrite !addn0.
   rewrite !addnS.
   move=> ranges.

@@ -77,21 +77,21 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0)
+        (do add r0 r1 r24
+            add r2 r3 r0
+            add r4 r5 r1
+            add r6 r7 r2
+            add r8 r9 r3
+            add r10 r11 r4
+            add r12 r13 r5
+            add r14 r15 r6
+            add r16 r17 r7
+            add r18 r19 r8
+            add r20 r21 r9
+            add r22 r23 r10)
         return_
 
-  it "Single rong-lived variable" $ asmTest
+  it "Single long-lived variable" $ asmTest
     (label "entry"
         (do add v0 v1 v2
             add v0 v4 v5
@@ -100,13 +100,13 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0)
+        (do add r0 r1 r5
+            add r0 r2 r1
+            add r0 r3 r2
+            add r0 r4 r3)
         return_
 
-  it "Two rong-lived variables" $ asmTest
+  it "Two long-lived variables" $ asmTest
     (label "entry"
         (do add v0 v1 v2
             add v0 v4 v5
@@ -115,13 +115,13 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0
-            add r2 r1 r0)
+        (do add r0 r1 r3
+            add r0 r2 r1
+            add r0 r2 r4
+            add r0 r2 r5)
         return_
 
-  it "One variable with a rong interval" $ asmTest
+  it "One variable with a long interval" $ asmTest
     (label "entry"
         (do add v0   v1  v2
             add v3   v4  v5
@@ -138,21 +138,21 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r3 r1 r0
-            add r2 r1 r0)
+        (do add r0 r1 r23
+            add r2 r3 r1
+            add r4 r5 r2
+            add r6 r7 r3
+            add r8 r9 r4
+            add r10 r11 r5
+            add r12 r13 r6
+            add r14 r15 r7
+            add r16 r17 r8
+            add r18 r19 r9
+            add r20 r21 r10
+            add r0 r22 r11)
         return_
 
-  it "Many variables with rong intervals" $ asmTest
+  it "Many variables with long intervals" $ asmTest
     (label "entry"
         (do add v0   v1  v2
             add v3   v4  v5
@@ -177,26 +177,26 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do add r2 r1 r0
-            add r5 r4 r3
-            add r8 r7 r6
-            add r11 r10 r9
-            add r14 r13 r12
-            add r17 r16 r15
-            add r20 r19 r18
-            add r23 r22 r21
-            add r26 r25 r24
-            add r29 r28 r27
-            add r2 r1 r0
-            add r5 r4 r3
-            add r8 r7 r6
-            add r11 r10 r9
-            add r14 r13 r12
-            add r17 r16 r15
-            add r20 r19 r18
-            add r23 r22 r21
-            add r26 r25 r24
-            add r29 r28 r27)
+        (do add r0 r1 r20
+            add r2 r3 r21
+            add r4 r5 r22
+            add r6 r7 r23
+            add r8 r9 r24
+            add r10 r11 r25
+            add r12 r13 r26
+            add r14 r15 r27
+            add r16 r17 r28
+            add r18 r19 r29
+            add r0 r1 r20
+            add r2 r3 r21
+            add r4 r5 r22
+            add r6 r7 r23
+            add r8 r9 r24
+            add r10 r11 r25
+            add r12 r13 r26
+            add r14 r15 r27
+            add r16 r17 r28
+            add r18 r19 r29)
         return_
 
   it "Spilling one variable" $ asmTest
