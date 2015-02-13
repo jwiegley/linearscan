@@ -291,23 +291,6 @@ Proof.
   exact: (I_Cons (i:=vid) (knd:=Whole) i Hlt').
 Defined.
 
-Inductive SplitPosition :=
-  | BeforePos of oddnum
-  | BeforeFirstUsePosReqReg
-  | EndOfLifetimeHole.
-
-(* Given an interval, determine its optimal split position.  If no split
-   position can be found, it means the interval may be safely spilled, and all
-   further variable references should be accessed directly from memory. *)
-Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
-  option oddnum :=
-  match pos with
-  | BeforePos x             => Some x
-  | BeforeFirstUsePosReqReg => firstUseReqReg i
-  | EndOfLifetimeHole       => None (* jww (2015-01-22): NYI *)
-    (* This should be the same thing as splitting at the current position. *)
-  end.
-
 (* Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d. *)
 (* Proof. *)
 (*   elim: i => //= [i knd x r|i knd xs i0 H r Hlt]. *)
@@ -351,7 +334,7 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (Some, None)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    move/andP=> [H1 /andP [/eqP H2 H3]].
     exists (Some (exist _ _ (I_Sing iv knd r0.2)), None).
     by rewrite /= {}H2 {}H3.
 

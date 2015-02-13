@@ -13,6 +13,23 @@ Section Split.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
+Inductive SplitPosition :=
+  | BeforePos of oddnum
+  | BeforeFirstUsePosReqReg
+  | EndOfLifetimeHole.
+
+(* Given an interval, determine its optimal split position.  If no split
+   position can be found, it means the interval may be safely spilled, and all
+   further variable references should be accessed directly from memory. *)
+Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
+  option oddnum :=
+  match pos with
+  | BeforePos x             => Some x
+  | BeforeFirstUsePosReqReg => firstUseReqReg i
+  | EndOfLifetimeHole       => None (* jww (2015-01-22): NYI *)
+    (* This should be the same thing as splitting at the current position. *)
+  end.
+
 Definition splitInterval `(st : ScanState InUse sd)
   `(uid : IntervalId sd) (pos : SplitPosition) (forCurrent : bool) :
   SSError + option { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.

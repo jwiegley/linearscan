@@ -226,40 +226,38 @@ sanityTests = do
         return_) $
 
     label "entry"
-        (do {-  1 -} add r2 r1 r0
-            {-  3 -} add r5 r4 r3
-            {-  5 -} add r8 r7 r6
-            {-  7 -} add r11 r10 r9
-            {-  9 -} add r14 r13 r12
-            {- 11 -} add r17 r16 r15
-            {- 13 -} add r20 r19 r18
-            {- 15 -} add r23 r22 r21
-            {- 17 -} add r26 r25 r24
-            {- 19 -} add r29 r28 r27
+        (do {-  1 -} add r0 r1 r22
+            {-  3 -} add r2 r3 r23
+            {-  5 -} add r4 r5 r24
+            {-  7 -} add r6 r7 r25
+            {-  9 -} add r8 r9 r26
+            {- 11 -} add r10 r11 r27
+            {- 13 -} add r12 r13 r28
+            {- 15 -} add r14 r15 r29
+            {- 17 -} add r16 r17 r30
+            {- 19 -} add r18 r19 r31
 
             -- When we reach the 32nd variable considered (which happens
             -- to be v30), we must spill a register because there are not 32
             -- registers.  So we pick the first register, counting from 0,
             -- whose next use position is the furthest from this position.
-            -- That happens to be r27, which is next used at position 41.
-                     save 27 0
-            {- 21 -} add r27 r31 r30
-
-            {- 23 -} add r2 r1 r0
-            {- 25 -} add r5 r4 r3
-            {- 27 -} add r8 r7 r6
-            {- 29 -} add r11 r10 r9
-            {- 31 -} add r14 r13 r12
-            {- 33 -} add r17 r16 r15
-            {- 35 -} add r20 r19 r18
-            {- 37 -} add r23 r22 r21
-            {- 39 -} add r26 r25 r24
+            -- That happens to be r18, which is next used at position 41.
+                     save 18 0
+            {- 21 -} add r20 r21 r18
+            {- 23 -} add r0 r1 r22
+            {- 25 -} add r2 r3 r23
+            {- 27 -} add r4 r5 r24
+            {- 29 -} add r6 r7 r25
+            {- 31 -} add r8 r9 r26
+            {- 33 -} add r10 r11 r27
+            {- 35 -} add r12 r13 r28
+            {- 37 -} add r14 r15 r29
+            {- 39 -} add r16 r17 r30
 
             -- When it comes time to reload v29 (which had been allocated
-            -- to r27), we pick the first available register which happens
+            -- to r18), we pick the first available register which happens
             -- to be r0 in this case.
                      restore 0 0
-            {- 41 -} add r29 r28 r0
-
-            {- 43 -} add r27 r31 r30)
+            {- 41 -} add r0 r19 r31
+            {- 43 -} add r20 r21 r18)
         return_

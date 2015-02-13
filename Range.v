@@ -151,17 +151,16 @@ Definition Range_split
                ; ups  := l1 ++ l2 |}) :
   forall before, odd before
     -> last_or rbeg0 l1 < before
-    -> (if l2 is u :: _
-        then before <= u
-        else before < rend0)
+    -> forall u us, l2 = u :: us
+    -> before <= u
     -> (Range {| rbeg := rbeg0
                ; rend := before
                ; ups  := l1 |} *
-        Range {| rbeg := before
+        Range {| rbeg := u
                ; rend := rend0
                ; ups  := l2 |}).
 Proof.
-  move=> before Hbeforeodd Hlt1 Hlt2.
+  move=> before Hbeforeodd Hlt1 u us Heqe Hlt2.
   move/StronglySorted_inv_app: (Range_sorted r) => [Hsortedl Hsortedr].
   move/Forall_all/Forall_append: (Range_all_odd r) => /= [Hoddl Hoddr].
   move: (Range_bounded r) => /= Hbound.
@@ -178,12 +177,11 @@ Proof.
     move/Forall_all in H4.
     by rewrite /funcomp.
   clear Hsortedl Hoddl Hbeg.
-  elim: l2 {r} => /= [|x xs IHxs] in Hlt2 Hsortedr Hoddr Hend *.
+  case: l2 {r} => /= [|x xs] in Hlt2 Hsortedr Hoddr Hend Heqe *.
     by constructor.
-  inversion Hsortedr; subst; inv Hoddr.
+  inversion Hsortedr; subst; inv Hoddr; inv Heqe.
   constructor=> //=.
-  - case: xs => [|y ys] in IHxs Hsortedr Hend H1 H2 H4 *;
-    by rewrite last_cat_upos /= in Hend.
+  - by rewrite last_cat_upos /= in Hend.
   - apply/andP; split=> //.
     move/Forall_all in H4.
     by rewrite /funcomp.
@@ -444,7 +442,7 @@ Definition rangeSpan (before : nat) (Hodd : odd before) `(r : Range rd) :
     | (Some r0, None) =>
         [&& rend r0.1 <= before
         ,   rbeg rd == rbeg r0.1
-        &   rend rd == rend r0.1 ]
+        &   rend r0.1 <= rend rd  ]
     | (None, Some r1) =>
         [&& before <= rbeg r1.1
         ,   rbeg rd == rbeg r1.1
@@ -467,12 +465,29 @@ Proof.
   move/negbT in Hb; rewrite -ltnNge in Hb.
   move/negbT in He; rewrite -ltnNge in He.
   have H3: last_or rbeg0 l1 < before by exact: all_last.
-  have H4: (if l2 is u :: _
-            then before <= u
-            else before < rend0).
-    case: l2 => //= [y ys] in E r H2 *.
+  case Heqe: l2 => [|u us] in E r H2 *.
+    apply: exist _ (Some (packRange _), None) _ => /=.
+    - apply: {| rbeg := rbeg0
+              ; rend := before
+              ; ups  := l1 |}.
+    - move: (Range_bounded r) => Hr1.
+      move: (Range_beg_bounded r) => Hr2.
+      move: (Range_end_bounded r) => Hr3.
+      move: (Range_sorted r) => Hr4.
+      move: (Range_beg_odd r) => Hr5.
+      move: (Range_all_odd r) => Hr6.
+      simpl in *.
+      rewrite cats0 in r Hr2 Hr3 Hr4 Hr6 *.
+      constructor=> //=.
+      by case: l1 => //= [x xs]
+        in H1 H3 E r Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 *.
+    - rewrite /= => _.
+      apply/andP; split=> //.
+      apply/andP; split=> //.
+      exact/ltnW.
+  have H4: before <= u.
     by move/andP: H2; ordered.
-  move: (Range_split r Hodd H3 H4) => [r1 r2].
+  move: (Range_split r Hodd H3 refl_equal H4) => [r1 r2].
   exists (Some (packRange r1), Some (packRange r2)).
   by repeat (apply/andP; split=> //=).
 Defined.
