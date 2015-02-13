@@ -1,4 +1,6 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Vector.
+Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
@@ -334,19 +336,222 @@ Qed.
 (*   - Case "ScanState_moveInactiveToHandled". by []. *)
 (* Qed. *)
 
-(* Lemma beginnings `(st : ScanState b sd) : forall uid beg, *)
-(*   (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg. *)
-(* Proof. *)
-(*   move=> uid beg Hin. *)
-(*   ScanState_cases (induction st) Case; simpl in *. *)
-(*   - Case "ScanState_nil". by []. *)
-(*   - Case "ScanState_newUnhandled". ?? *)
-(*   - Case "ScanState_finalize". exact: IHst. *)
-(*   - Case "ScanState_setInterval". ?? *)
-(*   - Case "ScanState_setFixedIntervals". exact: IHst. *)
-(*   - Case "ScanState_moveUnhandledToActive". ?? *)
-(*   - Case "ScanState_moveActiveToInactive". exact: IHst. *)
-(*   - Case "ScanState_moveActiveToHandled". exact: IHst. *)
-(*   - Case "ScanState_moveInactiveToActive". exact: IHst. *)
-(*   - Case "ScanState_moveInactiveToHandled". exact: IHst. *)
-(* Qed. *)
+Lemma insert_in_widen_helper : forall n x y z ws,
+  (widen_id x, y) \in [seq widen_fst i | i <- ws]
+    -> (widen_id x, y) \in insert (lebf (snd (B:=nat))) (@ord_max n, z)
+                                  [seq widen_fst i | i <- ws].
+Proof.
+  move=> n x y z.
+  elim=> //= [u us IHus].
+  rewrite /insert /= -/insert.
+  case: (lebf (snd (B:=nat)) (widen_fst u) (ord_max, z)).
+    rewrite !in_cons.
+    move/orP=> [H|H].
+      by apply/orP; left.
+    apply/orP; right.
+    exact: IHus.
+  rewrite !in_cons.
+  move/orP=> [H|H].
+    apply/orP; right.
+    by apply/orP; left.
+  apply/orP; right.
+  by apply/orP; right.
+Qed.
+
+Lemma insert_in_widen : forall n x (y z : nat) xs,
+  (@widen_id n x, y) \in insert (lebf (snd (B:=nat))) (ord_max, z)
+                                [seq widen_fst i | i <- xs]
+    -> (x, y) \in xs.
+Proof.
+  move=> n x y z.
+  elim=> [|w ws IHws] /=.
+    rewrite /insert /in_mem /=.
+    move/orP=> [H|H] //.
+    move: xpair_eqE H => -> /andP [H _].
+    move: (lift_bounded x) => Hneg.
+    move/eqP in H.
+    rewrite -H in Hneg.
+    by move/eqP in Hneg.
+  rewrite /insert /in_mem /= -/insert.
+  case: (lebf (snd (B:=nat)) (widen_fst w) (ord_max, z)) => /=.
+    destruct w; simpl.
+    move/orP=> [H|H].
+      move: xpair_eqE H => -> /andP [/eqP H1 /eqP H2].
+      rewrite /widen_id in H1.
+      inv H1.
+      apply/orP; left.
+      apply/eqP.
+      f_equal.
+      destruct x; destruct o.
+      rewrite /nat_of_ord in H0.
+      subst.
+      f_equal.
+      exact: eq_irrelevance.
+    apply/orP; right.
+    exact: IHws.
+  move/orP=> [H|H].
+    move: xpair_eqE H => -> /andP [/eqP H1 _].
+    move: (lift_bounded x) => H2.
+    rewrite -H1 in H2.
+    by move/negP in H2.
+  move/orP: H => [H|H].
+    move: xpair_eqE H => -> /andP [/eqP H1 /eqP H2].
+    rewrite /widen_id in H1.
+    inv H1.
+    destruct w; simpl in *.
+    destruct x; destruct o.
+    apply/orP; left.
+    rewrite /nat_of_ord in H0.
+    subst.
+    replace (Ordinal i) with (Ordinal i0); last first.
+      f_equal.
+      exact: eq_irrelevance.
+    apply/eqP.
+    f_equal.
+  apply/orP; right.
+  exact/IHws/insert_in_widen_helper.
+Qed.
+
+Lemma leqNEltnEq : forall n m, n < m.+1 -> (n < m) = false -> n = m.
+Proof.
+  move=> n m H1 H2.
+  move/negbT in H2.
+  rewrite -leqNgt in H2.
+  by ordered.
+Qed.
+
+Lemma in_contra : forall (a : eqType) (x : a) (xs : seq a),
+  x \in xs -> x \notin xs -> False.
+Proof.
+  move=> a x.
+  elim=> //= [y ys IHys] Hin Hnotin.
+  rewrite in_cons in Hin Hnotin.
+  move/orP: Hin => [Hin|Hin].
+    rewrite negb_or in Hnotin.
+    move/andP: Hnotin => [H1 H2].
+    move/eqP in Hin.
+    rewrite Hin in H1.
+    by move/negP in H1.
+  rewrite negb_or in Hnotin.
+  move/andP: Hnotin => [H1 H2].
+  exact: IHys.
+Qed.
+
+Lemma in_projr : forall (a b : eqType) (x : a) (y : b) (xs : seq (a * b)),
+  (x, y) \in xs -> x \in [seq fst i | i <- xs] /\ y \in [seq snd i | i <- xs].
+Proof.
+  move=> a b x y.
+  elim=> //= [z zs IHzs] H.
+  split.
+    rewrite in_cons.
+    move: in_cons H => -> /orP [H|H].
+      apply/orP; left.
+      destruct z.
+      move: xpair_eqE H => -> /andP [/eqP ? /eqP ?] /=.
+      by apply/eqP.
+    apply/orP; right.
+    by move: (IHzs H) => [? ?].
+  rewrite in_cons.
+  move: in_cons H => -> /orP [H|H].
+    apply/orP; left.
+    destruct z.
+    move: xpair_eqE H => -> /andP [/eqP ? /eqP ?] /=.
+    by apply/eqP.
+  apply/orP; right.
+  by move: (IHzs H) => [? ?].
+Qed.
+
+Lemma insert_in_ord_max : forall n (y z : nat) (xs : seq ('I_n * nat)),
+  (@ord_max n, y) \in insert (lebf (snd (B:=nat))) (ord_max, z)
+                             [seq widen_fst i | i <- xs]
+    -> y == z.
+Proof.
+  move=> n y z.
+  elim=> /= [|x xs IHxs] H.
+    rewrite /insert /in_mem /= in H.
+    move/orP: H => [H|H] //.
+    by move/eqP: H; invert.
+    rewrite /insert /= -/insert in H.
+  case: (lebf (snd (B:=nat)) (widen_fst x) (ord_max, z)) in H *.
+    move: in_cons H => -> /orP [H|H].
+      move: H.
+      case: x => [x1 x2].
+      rewrite /widen_fst /= xpair_eqE.
+      move/andP => [/eqP H1 _].
+      move: (lift_bounded x1) => H2.
+      rewrite H1 in H2.
+      by move/negP in H2.
+    exact: IHxs.
+  move: in_cons H => -> /orP [H|H].
+    move/eqP in H.
+    by inv H.
+  move: in_cons H => -> /orP [H|H].
+    move: H.
+    case: x => [x1 x2].
+    rewrite /widen_fst /= xpair_eqE.
+    move/andP => [/eqP H1 _].
+    move: (lift_bounded x1) => H2.
+    rewrite H1 in H2.
+    by move/negP in H2.
+  rewrite /widen_fst /= in H.
+  move/in_projr: H => [/= H1 _].
+  rewrite -map_comp /funcomp /= in H1.
+  move: (no_ord_max [seq fst x | x <- xs]) => H2.
+  rewrite -map_comp /funcomp /= in H2.
+  exfalso.
+  exact: (in_contra H1 H2).
+Qed.
+
+Theorem beginnings `(st : @ScanState maxReg b sd) : forall uid beg,
+  (uid, beg) \in unhandled sd -> ibeg (getInterval uid) == beg.
+Proof.
+  move=> uid beg Hin.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    case: uid => [m Hm] in Hin *.
+    case E: (m < (nextInterval sd)).
+      move: Hin.
+      replace (Ordinal Hm) with (widen_id (Ordinal E)).
+        rewrite vnth_vshiftin.
+        move=> Hin.
+        apply: IHst.
+        rewrite /n in Hin.
+        exact: (@insert_in_widen _ _ _ (ibeg d)).
+      rewrite /widen_id /widen_ord /=.
+      f_equal.
+      exact: eq_irrelevance.
+    move: Hin.
+    replace (Ordinal Hm) with (@ord_max (nextInterval sd)).
+      rewrite vnth_last /= /n /unh.
+      move=> Hin.
+      rewrite eq_sym.
+      exact: (@insert_in_ord_max (nextInterval sd) _ _ (unhandled sd)).
+    clear -E.
+    move/(leqNEltnEq Hm) in E.
+    subst.
+    rewrite /ord_max /widen_id /widen_ord /=.
+    f_equal.
+    exact: eq_irrelevance.
+  - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_setInterval".
+    case E: (xid == uid).
+      move/eqP in E.
+      subst.
+      rewrite vnth_vreplace /=.
+      move/eqP: H => ->.
+      exact: IHst.
+    move/negbT in E.
+    rewrite vnth_vreplace_neq => //.
+    exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
+  - Case "ScanState_moveUnhandledToActive".
+    apply: IHst.
+    rewrite in_cons.
+    apply/orP.
+    by right.
+  - Case "ScanState_moveActiveToInactive". exact: IHst.
+  - Case "ScanState_moveActiveToHandled". exact: IHst.
+  - Case "ScanState_moveInactiveToActive". exact: IHst.
+  - Case "ScanState_moveInactiveToHandled". exact: IHst.
+Qed.
