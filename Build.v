@@ -59,13 +59,13 @@ Definition newBuildState {n} : BuildState n := emptyIntMap.
    sorted list of ranges. *)
 
 Record RangeCursor b pos e := {
-  cursorMid : nat;
-  cursorHmid : pos.*2.+1 <= cursorMid.*2.+1;
-  cursorHbeg : b.*2.+1 <= pos.*2.+1;
+  cursorMid     : nat;
+  cursorHmid    : pos.*2.+1 <= cursorMid.*2.+1;
+  cursorHbeg    : b.*2.+1 <= pos.*2.+1;
   cursorPending : BoundedRange b.*2.+1 cursorMid.*2.+1;
-  cursorHpos : pos.*2.+1 <= head_or_end cursorPending.1.1;
-  cursorRanges : SortedRanges cursorMid.*2.+1;
-  cursorHend :
+  cursorHpos    : pos.*2.+1 <= head_or_end cursorPending.1.1;
+  cursorRanges  : SortedRanges cursorMid.*2.+1;
+  cursorHend    :
     last cursorMid.*2.+1 [seq rend i.1 | i <- cursorRanges.1] <= e.*2.+1
 }.
 

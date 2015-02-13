@@ -58,16 +58,8 @@ Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
     | NE_Cons x xs => NE_Cons (f x) (NE_map f xs)
   end.
 
-(* Lemma NE_map_head : forall a b (f : a -> b) xs, *)
-(*   NE_head (NE_map f xs) = f (NE_head xs). *)
-(* Proof. by move=> a b f; elim=> [x|x xs IHxs] //=. Qed. *)
-
-(* Lemma NE_map_last : forall a b (f : a -> b) xs, *)
-(*   NE_last (NE_map f xs) = f (NE_last xs). *)
-(* Proof. by move=> a b f; elim=> [x|x xs IHxs] //=. Qed. *)
-
-Definition NE_foldl {a b : Type} (f : a -> b -> a) (z : a) (ne : NonEmpty b) : a :=
-  foldl f z ne.
+Definition NE_foldl {a b : Type} (f : a -> b -> a) (z : a)
+  (ne : NonEmpty b) : a := foldl f z ne.
 
 Fixpoint NE_mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
   (s : A) (v : NonEmpty X) : A * NonEmpty Y :=
@@ -103,7 +95,8 @@ Context `{H : Transitive A R}.
 
 Inductive NE_Forall (P : A -> Prop) : NonEmpty A -> Prop :=
  | NE_Forall_sing : forall x, P x -> NE_Forall P (NE_Sing x)
- | NE_Forall_cons : forall x l, P x -> NE_Forall P l -> NE_Forall P (NE_Cons x l).
+ | NE_Forall_cons : forall x l, P x -> NE_Forall P l
+                      -> NE_Forall P (NE_Cons x l).
 
 Hint Constructors NE_Forall.
 
@@ -113,40 +106,6 @@ Definition NE_all_false (f : A -> bool) := NE_Forall (fun x => f x = false).
 Lemma NE_Forall_head : forall P (xs : NonEmpty A),
   NE_Forall P xs -> P (NE_head xs).
 Proof. induction xs; intros; inversion H0; assumption. Qed.
-
-(* Lemma NE_Forall_last : forall P (xs : NonEmpty A), *)
-(*   NE_Forall P xs -> P (NE_last xs). *)
-(* Proof. *)
-(*   intros. induction xs; simpl in *. *)
-(*     inversion H0. assumption. *)
-(*   apply IHxs. inversion H0. assumption. *)
-(* Qed. *)
-
-(* Lemma NE_Forall_append : forall (P : A -> Prop) xs ys, *)
-(*    NE_Forall P xs /\ NE_Forall P ys <-> NE_Forall P (NE_append xs ys). *)
-(* Proof. *)
-(*   split; induction xs; intros; simpl; *)
-(*   constructor; intuition; *)
-(*   try inversion H1; auto; *)
-(*   try inversion H0; auto; *)
-(*   try constructor; auto. *)
-(*   apply IHxs. assumption. *)
-(*   intuition. *)
-(* Qed. *)
-
-(* Lemma NE_Forall_impl : forall (P Q : A -> Prop), (forall a, P a -> Q a) -> *)
-(*   forall l, NE_Forall P l -> NE_Forall Q l. *)
-(* Proof. *)
-(*   intros P Q Himp l H1. *)
-(*   induction H1; firstorder. *)
-(* Qed. *)
-
-(* Lemma NE_Forall_inv : forall (P : A -> Prop) x l, *)
-(*   NE_Forall P (NE_Cons x l) -> P x /\ NE_Forall P l. *)
-(* Proof. *)
-(*   move=> P x l Hall. *)
-(*   by inversion Hall. *)
-(* Qed. *)
 
 Section Membership.
 
@@ -174,38 +133,6 @@ Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_sing a   : NE_StronglySorted (NE_Sing a)
   | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
                             -> NE_StronglySorted (NE_Cons a l).
-
-(* Lemma NE_StronglySorted_inv : forall a l, *)
-(*   NE_StronglySorted (NE_Cons a l) *)
-(*     -> NE_StronglySorted l /\ NE_Forall (R a) l. *)
-(* Proof. intros; inversion H0; auto. Qed. *)
-
-(* Lemma NE_StronglySorted_inv_app : forall (l1 l2 : NonEmpty A), *)
-(*   NE_StronglySorted (NE_append l1 l2) *)
-(*     -> NE_StronglySorted l1 /\ NE_StronglySorted l2. *)
-(* Proof. *)
-(*   induction l1; intros; simpl; inversion H0. *)
-(*     split; [ constructor | assumption ]. *)
-(*   specialize (IHl1 l2 H3). *)
-(*   inversion IHl1. *)
-(*   split. *)
-(*     constructor. assumption. *)
-(*     apply NE_Forall_append in H4. intuition. *)
-(*   assumption. *)
-(* Qed. *)
-
-(* Lemma NE_StronglySorted_impl_app : forall (l1 l2 : NonEmpty A), *)
-(*   NE_StronglySorted (NE_append l1 l2) -> R (NE_last l1) (NE_head l2). *)
-(* Proof. *)
-(*   intros. *)
-(*   induction l1; simpl in *. *)
-(*     inversion H0; subst. *)
-(*     apply NE_Forall_head in H4. *)
-(*     assumption. *)
-(*   apply IHl1. *)
-(*   inversion H0. *)
-(*   assumption. *)
-(* Qed. *)
 
 End Sorted.
 

@@ -31,14 +31,8 @@ Definition IntMap_mergeWithKey {a b c} (combine : nat -> a -> b -> option c)
   (only1 : IntMap a -> IntMap c) (only2 : IntMap b -> IntMap c)
   (m1 : IntMap a) (m2 : IntMap b) : IntMap c := only1 m1.
 
-(* Definition IntMap_mapWithKey {a b} (f : nat -> a -> b) (m : IntMap a) : *)
-(*   IntMap b := emptyIntMap. *)
-
 Definition IntMap_foldl {a b} (f : a -> b -> a) (z : a) (m : IntMap b) : a :=
   let: getIntMap xs := m in foldl f z [seq snd i | i <- xs].
-
-(* Definition IntMap_forFold {a b} (z : a) (m : IntMap b) (f: a -> b -> a) : a := *)
-(*   IntMap_foldl f z m. *)
 
 Definition IntMap_foldlWithKey
   {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a := z.
@@ -91,15 +85,6 @@ Extract Inlined Constant IntSet_delete     => "Data.IntSet.delete".
 Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
 Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
 Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
-
-(* Definition IntMap_mapKeysAgainst {a b} (f : nat -> option a -> bool -> b) *)
-(*   (s : IntSet) (m : IntMap a) : IntMap b := *)
-(*   let h acc n x := let: (s', m') := acc in *)
-(*       (IntSet_delete n s', *)
-(*        IntMap_insert n (f n (Some x) (IntSet_member n s')) m') in *)
-(*   let: (s', m') := IntMap_foldlWithKey h (s, emptyIntMap) m in *)
-(*   let k acc n   := IntMap_insert n (f n None true) acc in *)
-(*   IntSet_foldl k m' s'. *)
 
 Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) : IntMap (seq a) :=
   forFold emptyIntMap l $ fun acc x =>

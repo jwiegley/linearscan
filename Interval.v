@@ -209,17 +209,6 @@ Definition firstUseReqReg (d : IntervalDesc) : option oddnum :=
   lookupUsePos d regReq.
 Arguments firstUseReqReg d /.
 
-(* Lemma Interval_nonempty : forall `(i : Interval d), *)
-(*   intervalStart i < intervalEnd i. *)
-(* Proof. *)
-(*   rewrite /intervalStart /intervalEnd. *)
-(*   move=> d. elim=> [rd r|iv ? rs i H [rd r] Hend] * /=; *)
-(*     first exact: Range_bounded. *)
-(*   move: (Range_bounded r). *)
-(*   move=> H0. *)
-(*   exact/(ltn_trans H0)/(ltn_trans Hend). *)
-(* Qed. *)
-
 Lemma Interval_beg_of_rds `(i : Interval d) :
   ibeg d == rbeg (NE_head (rds d)).2.
 Proof. by elim: i => * //=. Qed.
@@ -254,17 +243,6 @@ Definition SubIntervalsOf (before : nat) `(i : Interval d)
   | (None, None)       => False
   end.
 
-(* Definition BoundedInterval (pos : nat) := *)
-(*   { i : IntervalSig | pos <= rbeg (NE_head (rds i.1)).1 }. *)
-
-(* Definition transportBoundedInterval {base : nat} `(Hlt : base <= prev) *)
-(*   (x : BoundedInterval prev) : BoundedInterval base. *)
-(*   case: x => [i H]. *)
-(*   apply: exist. *)
-(*   apply: i. *)
-(*   exact/(leq_trans _ H). *)
-(* Defined. *)
-
 Definition Interval_fromRanges (vid : nat)
   `(sr : SortedRanges b) :
   forall r rs, sr.1 = r :: rs ->
@@ -290,14 +268,6 @@ Proof.
     by rewrite /range_ltn in H2.
   exact: (I_Cons (i:=vid) (knd:=Whole) i Hlt').
 Defined.
-
-(* Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d. *)
-(* Proof. *)
-(*   elim: i => //= [i knd x r|i knd xs i0 H r Hlt]. *)
-(*     exact: Range_bounded r. *)
-(*   move: (Range_bounded r.2) => H2. *)
-(*   by ordered. *)
-(* Qed. *)
 
 (** Split the current interval before the position [before].  This must
     succeed, which means there must be use positions within the interval prior

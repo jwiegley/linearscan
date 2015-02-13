@@ -65,36 +65,7 @@ Qed.
 Canonical upos_eqMixin := EqMixin equposP.
 Canonical upos_eqType := Eval hnf in EqType UsePos upos_eqMixin.
 
-(* Lemma equposE : equpos = eq_op. Proof. by []. Qed. *)
-
-(* Definition UsePos_eqType (A : eqType) := *)
-(*   Equality.Pack upos_eqMixin UsePos. *)
-
 End EqUpos.
-
-(* Lemma all_leq : forall x y xs, *)
-(*   all (fun u : UsePos => y <= u) xs -> x <= y *)
-(*     -> all (fun u : UsePos => x <= u) xs. *)
-(* Proof. *)
-(*   move=> x y. *)
-(*   elim=> [|z zs IHzs] //=. *)
-(*   move/andP => [H1 H2] H3. *)
-(*   apply/andP; split. *)
-(*     exact: (leq_trans H3 _). *)
-(*   exact: IHzs. *)
-(* Qed. *)
-
-(* Lemma all_leq_ltn : forall x y xs, *)
-(*   all (fun u : UsePos => y <= u) xs -> x < y *)
-(*     -> all (fun u : UsePos => x < u) xs. *)
-(* Proof. *)
-(*   move=> x y. *)
-(*   elim=> [|z zs IHzs] //=. *)
-(*   move/andP => [H1 H2] H3. *)
-(*   apply/andP; split. *)
-(*     exact: (leq_trans H3 _). *)
-(*   exact: IHzs. *)
-(* Qed. *)
 
 Lemma all_ltn_leq : forall x y xs,
   all (fun u : UsePos => y < u) xs -> x <= y
@@ -109,18 +80,6 @@ Proof.
   exact: IHzs.
 Qed.
 
-(* Lemma all_ltn : forall x y xs, *)
-(*   all (fun u : UsePos => u < y) xs -> y < x *)
-(*     -> all (fun u : UsePos => u < x) xs. *)
-(* Proof. *)
-(*   move=> x y. *)
-(*   elim=> [|z zs IHzs] //=. *)
-(*   move/andP => [H1 H2] H3. *)
-(*   apply/andP; split. *)
-(*     exact: (ltn_trans H1 _). *)
-(*   exact: IHzs. *)
-(* Qed. *)
-
 Lemma all_last : forall x xs before,
   x < before
     -> all (fun y : UsePos => uloc y < before) xs
@@ -131,27 +90,6 @@ Proof.
   move/andP: Hall => [H1 H2].
   exact: IHys.
 Qed.
-
-(* Lemma all_head : forall x xs before, *)
-(*   before <= x *)
-(*     -> all (fun y : UsePos => before <= uloc y) xs *)
-(*     -> before <= head_or x xs. *)
-(* Proof. *)
-(*   move=> x xs before Hlt Hall. *)
-(*   case: xs => //= [y ys] in x Hlt Hall *. *)
-(*   move/andP: Hall => [H1 H2] //. *)
-(* Qed. *)
-
-(* Lemma head_last : forall x xs before, *)
-(*   StronglySorted upos_lt (x :: xs) *)
-(*     -> last_or x xs < before *)
-(*     -> x < head_or before xs. *)
-(* Proof. *)
-(*   move=> x xs before Hsort Hlast. *)
-(*   inv Hsort. *)
-(*   elim: xs => //= [y ys IHys] in x H1 H2 Hlast *. *)
-(*   by inv H2. *)
-(* Qed. *)
 
 Lemma last_rcons_upos : forall (b : nat) x (l1 : seq UsePos),
   last b [seq uloc u | u <- rcons l1 x] = x.
@@ -166,11 +104,6 @@ Proof.
     by rewrite cats1 last_rcons_upos.
   by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
 Qed.
-
-(* Lemma last_cons_upos : forall (b : nat) x y (xs : seq UsePos), *)
-(*   last b [seq uloc u | u <- x :: y :: xs] = *)
-(*   last b [seq uloc u | u <- y :: xs]. *)
-(* Proof. by move=> b x y; elim=> //= [z zs IHzs]. Qed. *)
 
 Lemma span_all (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_lt l
