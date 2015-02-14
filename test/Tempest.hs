@@ -15,7 +15,6 @@
 
 module Tempest where
 
-import Debug.Trace
 import           Compiler.Hoopl as Hoopl hiding ((<*>))
 import           Control.Applicative
 import           Control.Exception
@@ -393,7 +392,7 @@ mkSaveOp r vid = do
 
 mkRestoreOp vid r = do
     stack <- get
-    let off = fromMaybe (-1) (M.lookup (trace ("lookup vid " ++ show vid) vid) (stackSlots stack))
+    let off = fromMaybe (-1) (M.lookup vid (stackSlots stack))
         rs  = Restore (Linearity False) off r
     return [NodeOO (Node rs (error "no restore meta"))]
 
