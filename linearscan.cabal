@@ -1,5 +1,5 @@
 name:          linearscan
-version:       0.3.0.0
+version:       0.3.0.1
 synopsis:      Linear scan register allocator, formally verified in Coq
 homepage:      http://github.com/jwiegley/linearscan
 license:       BSD3
@@ -95,6 +95,7 @@ test-suite test
   ghc-options:      -fno-warn-deprecated-flags
   hs-source-dirs:   test
   main-is:          Main.hs
+  other-modules:    Tempest
   build-depends: 
         base >=3
       , linearscan
