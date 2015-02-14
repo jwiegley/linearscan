@@ -258,6 +258,23 @@ sanityTests = do
             {- 43 -} add r20 r21 r18)
         return_
 
+  it "Inserts only necessary saves and restores" $ asmTest 4
+    (label "entry"
+        (do {-  3 -} add v0   v1  v2
+            {-  5 -} add v2   v1  v3
+            {-  7 -} add v3   v2  v4
+            {-  9 -} add v4   v1  v0)
+        return_) $
+
+    label "entry"
+        (do {-  3 -} add r1 r0 r2
+            {-  5 -} add r2 r0 r3
+                     save r0 0
+            {-  7 -} add r3 r2 r0
+                     restore 0 r2
+            {-  9 -} add r0 r2 r1)
+        return_
+
 blockTests :: SpecWith ()
 blockTests = do
   it "Allocates across blocks" $ asmTest 32
