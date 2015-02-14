@@ -22,21 +22,25 @@ Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
 Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
-  key in_from from to mappings vid :=
+  bid in_from from to mappings vid :=
 
   let mfrom_int := lookupInterval st vid (blockLastOpId from) in
-  if mfrom_int isn't Some from_interval then mappings else
-    (* jww (2015-01-28): Failing case should be provably impossible *)
-
-  let mto_int := lookupInterval st vid (blockFirstOpId to) in
-  if mto_int isn't Some to_interval then mappings else
-    (* jww (2015-01-28): Failing case should be provably impossible *)
+  let mto_int   := lookupInterval st vid (blockFirstOpId to) in
 
   (* If the interval match, no move resolution is necessary. *)
-  if from_interval == to_interval then mappings else
+  if mfrom_int == mto_int then mappings else
 
-  let msreg := lookupRegister st from_interval in
-  let mdreg := lookupRegister st to_interval in
+  let f mi :=
+      if mi is Some i
+      then if lookupRegister st i is Some r
+           then inl r
+           else inr vid
+      else inr vid in
+
+  let sreg := f mfrom_int in
+  let dreg := f mto_int in
+
+  if sreg == dreg then mappings else
 
   let addToGraphs e xs :=
       let: (gbeg, gend) := xs in
@@ -44,15 +48,16 @@ Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
       then (gbeg, addEdge e gend)
       else (addEdge e gbeg, gend) in
   let f mxs :=
-      let e := (msreg, mdreg) in
+      let e := (Some sreg, Some dreg) in
       @Some _ $ addToGraphs e
               $ if mxs is Some xs
                 then xs
                 else (emptyGraph, emptyGraph) in
-  IntMap_alter f key mappings.
+  IntMap_alter f bid mappings.
 
 Definition BlockMoves :=
-  (Graph (ordinal_eqType maxReg) * Graph (ordinal_eqType maxReg))%type.
+  (Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType) *
+   Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType))%type.
 
 Definition resolveDataFlow `(st : ScanState InUse sd)
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
@@ -84,20 +89,18 @@ Definition resolveDataFlow `(st : ScanState InUse sd)
      end for *)
   forFold emptyIntMap blocks $ fun mappings b =>
     let bid := blockId binfo b in
-    match IntMap_lookup bid liveSets with
-    | None => mappings          (* jww (2015-01-28): Should be impossible *)
-    | Some from =>
-      (fun successors =>
-        let in_from := size successors <= 1 in
-        forFold mappings successors $ fun ms s_bid =>
-          match IntMap_lookup s_bid liveSets with
-          | None => ms          (* jww (2015-01-28): Should be impossible *)
-          | Some to =>
-              let key := if in_from then bid else s_bid in
-              IntSet_forFold ms (blockLiveIn to) $
-                checkIntervalBoundary st key in_from from to
-          end)
-      (blockSuccessors binfo b)
-    end.
+    (* jww (2015-01-28): Failure here should be impossible *)
+    if IntMap_lookup bid liveSets isn't Some from then mappings else
+    (fun successors =>
+      (* If [in_from] is [true], resolving moves are inserted at the end of
+         the [from] block, rather than the beginning of the [to] block. *)
+      let in_from := size successors <= 1 in
+      forFold mappings successors $ fun ms s_bid =>
+        (* jww (2015-01-28): Failure here should be impossible *)
+        if IntMap_lookup s_bid liveSets isn't Some to then ms else
+        let key := if in_from then bid else s_bid in
+        IntSet_forFold ms (blockLiveIn to) $
+          checkIntervalBoundary st key in_from from to)
+    (blockSuccessors binfo b).
 
 End Resolve.

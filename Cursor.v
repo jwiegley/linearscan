@@ -44,7 +44,7 @@ Lemma curPosition_odd `(cur : ScanStateCursor sd) :
   odd (curPosition cur).
 Proof.
   rewrite /curPosition.
-  case: (curInterval cur) => [? ? ? r|? ? ? ? [? r] ?] /=;
+  case: (curInterval cur) => [? ? ? r|? ? ? ? ? [? r] ?] /=;
   exact: (Range_beg_odd r).
 Qed.
 

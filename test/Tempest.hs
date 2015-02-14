@@ -7,25 +7,31 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -Wall -Werror #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Tempest where
 
+import Debug.Trace
 import           Compiler.Hoopl as Hoopl hiding ((<*>))
 import           Control.Applicative
 import           Control.Exception
 import           Control.Lens
 import           Control.Monad.Free
+import           Control.Monad.State.Class
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.State
+import qualified Control.Monad.Trans.Free as TF
+import           Control.Monad.Trans.Free hiding (FreeF(..), Free)
+import           Control.Monad.Trans.State (StateT, evalStateT, evalState)
 import           Data.Foldable
-import           Data.IntMap
 import qualified Data.List
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid
+-- import           Debug.Trace
 import           LinearScan
 import           Test.Hspec
 
@@ -49,7 +55,17 @@ type Name = String
 newtype Linearity = Linearity { isLinear :: Bool }
   deriving (Eq, Show)
 
-data Test = Test deriving (Eq, Show)
+-- | Tests used for branching (correspond to branching instructions)
+data Test
+  -- | beq
+  = Zero
+  -- | bne
+  | NonZero
+  -- | bgt
+  | Positive
+  -- | blt
+  | Negative
+  deriving (Eq, Show)
 
 data CConv
   = CConvC {
@@ -178,8 +194,15 @@ data IRVar =
 instance Show IRVar where
     show (IRVar x _) = show x
 
-asmTest :: Program IRVar -> Program Reg -> Expectation
-asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
+type Engine m = (UniqueMonad m, MonadState Labels m)
+
+instance UniqueMonad (StateT Labels SimpleUniqueMonad) where
+    freshUnique = lift freshUnique
+
+asmTest :: (Engine m, m ~ StateT Labels SimpleUniqueMonad)
+        => Int -> Program IRVar m () -> Program Reg m ()
+        -> Expectation
+asmTest regs (compile -> (prog, entry)) (compile -> (result, _)) =
     go $ M.fromList $ zip (Prelude.map entryLabel blocks) [(1 :: Int)..]
   where
     GMany NothingO body NothingO = prog
@@ -187,7 +210,7 @@ asmTest (compile -> (prog, entry)) (compile -> (result, _)) =
 
     go blockIds =
         case evalState
-                 (allocate 32 (blockInfo getBlockId) opInfo blocks)
+                 (allocate regs (blockInfo getBlockId) opInfo blocks)
                  (newSpillStack 0) of
             Left e -> error $ "Allocation failed: " ++ e
             Right blks -> do
@@ -261,15 +284,13 @@ blockInfo getBlockId = BlockInfo
     , blockSuccessors = Prelude.map getBlockId . successors
 
     , blockOps = \(BlockCC a b z) ->
-        NodeCO a :
-        Prelude.map NodeOO (blockToList b) ++
-        [NodeOC z]
+        ([NodeCO a], Prelude.map NodeOO (blockToList b), [NodeOC z])
 
-    , setBlockOps = \_ ops ->
+    , setBlockOps = \_ [a] b [z] ->
         BlockCC
-            (getNodeCO (head ops))
-            (blockFromList (Prelude.map getNodeOO (init (tail ops))))
-            (getNodeOC (last ops))
+            (getNodeCO a)
+            (blockFromList (Prelude.map getNodeOO b))
+            (getNodeOC z)
     }
 
 data StackInfo = StackInfo
@@ -327,28 +348,30 @@ opInfo = OpInfo
     go Nop = mempty
     go (Add s1 s2 d1) =
         mkv Input s1 <> mkv Input s2 <> mkv Output d1
-      where
-        mkv :: VarKind -> IRVar -> [VarInfo]
-        mkv k (IRVar (PhysicalIV n) _)  = [vinfo k (Left n)]
-        mkv k (IRVar (VirtualIV n _) _) = [vinfo k (Right n)]
 
-        vinfo k en = VarInfo
-            { varId   = en
-            , varKind = k
-              -- If there are variables which can be used directly from
-              -- memory, then this can be False, which relaxes some
-              -- requirements.
-            , regRequired = True
-            }
+    mkv :: VarKind -> IRVar -> [VarInfo]
+    mkv k (IRVar (PhysicalIV n) _)  = [vinfo k (Left n)]
+    mkv k (IRVar (VirtualIV n _) _) = [vinfo k (Right n)]
+
+    vinfo k en = VarInfo
+        { varId   = en
+        , varKind = k
+          -- If there are variables which can be used directly from
+          -- memory, then this can be False, which relaxes some
+          -- requirements.
+        , regRequired = True
+        }
 
     getReferences :: Node a IRVar e x -> [VarInfo]
-    getReferences (Node (Label _) _) = mempty
-    getReferences (Node (Instr i) _) = go i
+    getReferences (Node (Label _) _)         = mempty
+    getReferences (Node (Instr i) _)         = go i
+    getReferences (Node (Jump _) _)          = mempty
+    getReferences (Node (Branch _ v _ _) _)  = mkv Input v
     getReferences (Node (ReturnInstr _ i) _) = go i
     getReferences n = error $ "getReferences: unhandled node: " ++ show n
 
     setRegister :: [(Int, PhysReg)] -> IRVar -> Reg
-    setRegister _ (IRVar (PhysicalIV r) _) = r
+    setRegister _ (IRVar (PhysicalIV r) _)  = r
     setRegister m (IRVar (VirtualIV n _) _) =
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
                   (Data.List.lookup n m)
@@ -370,36 +393,19 @@ mkSaveOp r vid = do
 
 mkRestoreOp vid r = do
     stack <- get
-    let off =
-            fromMaybe (error "Restore requested but not stack allocated")
-                      (M.lookup vid (stackSlots stack))
-        rs = Restore (Linearity False) off r
+    let off = fromMaybe (-1) (M.lookup (trace ("lookup vid " ++ show vid) vid) (stackSlots stack))
+        rs  = Restore (Linearity False) off r
     return [NodeOO (Node rs (error "no restore meta"))]
-
-assignVar :: IntMap PhysReg -> IRVar -> IRVar
-assignVar _ v@(IRVar (PhysicalIV _) _) = v
-assignVar m (IRVar (VirtualIV n _) x) = case Data.IntMap.lookup n m of
-    Just r -> IRVar (PhysicalIV r) x
-    a -> error $ "Unexpected allocation " ++ show a
-             ++ " for variable " ++ show n
-
-convertNode :: Show a => Node a IRVar O O -> ([(VarKind, IRVar)], [PhysReg])
-convertNode (Node (Instr i) _) = go i
-  where
-    go :: Instruction IRVar -> ([(VarKind, IRVar)], [PhysReg])
-    go (Add a b c) = mkv Input a <> mkv Input b <> mkv Output c
-    go x = error $ "convertNode.go: Unexpected " ++ show x
-
-    mkv :: VarKind -> IRVar -> ([(VarKind, IRVar)], [PhysReg])
-    mkv _ (IRVar (PhysicalIV r) _) = ([], [r])
-    mkv k v = ([(k, v)], [])
-
-convertNode x = error $ "convertNode: Unexpected" ++ show x
 
 var :: Int -> IRVar
 var i = IRVar { _ivVar = VirtualIV i Atom
               , _ivSrc = Nothing
               }
+
+fixed :: Int -> IRVar
+fixed i = IRVar { _ivVar = PhysicalIV i
+                , _ivSrc = Nothing
+                }
 
 reg :: PhysReg -> PhysReg
 reg r = r
@@ -478,52 +484,81 @@ r33 = reg 33
 r34 = reg 34
 r35 = reg 35
 
-nodesToList :: Free ((,) (Node () v O O)) () -> [Node () v O O]
+type BodyF v = Free ((,) (Node () v O O)) ()
+
+nodesToList :: BodyF v -> [Node () v O O]
 nodesToList (Pure ()) = []
 nodesToList (Free (Node n meta, xs)) = Node n meta : nodesToList xs
 
-data ProgramF v
+data ProgramF m v
     = FreeLabel
-      { labelString :: String
-      , labelBody   :: Free ((,) (Node () v O O)) ()
-      , labelClose  :: Node () v O C
+      { labelEntry :: Label
+      , labelBody  :: BodyF v
+      , labelClose :: m (Node () v O C)
       }
 
-type Program v = Free ((,) (ProgramF v)) ()
+type Program v m a = FreeT ((,) (ProgramF m v)) m a
 
-label :: String -> Free ((,) (Node () v O O)) () -> Node () v O C
-      -> Program v
-label str body close = Free (FreeLabel str body close, Pure ())
+type Labels = M.Map String Label
 
-compile :: NonLocal (Node () v)
-        => Program v -> (Graph (Node () v) C C, Hoopl.Label)
+getLabel :: Engine m => String -> m Label
+getLabel str = do
+    l <- use (at str)
+    case l of
+        Just lbl -> return lbl
+        Nothing -> do
+            lbl <- freshLabel
+            at str .= Just lbl
+            return lbl
+
+label :: Engine m => String -> BodyF v -> m (Node () v O C) -> Program v m ()
+label str body close = do
+    lbl <- lift $ getLabel str
+    liftF (FreeLabel lbl body close, ())
+
+compile :: (Engine m, m ~ StateT Labels SimpleUniqueMonad, NonLocal (Node () v))
+        => Program v m () -> (Graph (Node () v) C C, Hoopl.Label)
 compile prog = runSimpleUniqueMonad $
     flip evalStateT (mempty :: M.Map String Label) $ do
         body  <- go prog
-        entry <- firstLabel prog
-        return (bodyGraph body, entry)
+        entry <- use (at "entry")
+        case entry of
+            Nothing -> error "Missing 'entry' label"
+            Just lbl -> return (bodyGraph body, lbl)
   where
-    go (Pure ())        = return emptyBody
-    go (Free (blk, xs)) = addBlock <$> comp blk <*> go xs
+    go m = do
+        p <- runFreeT m
+        case p of
+            TF.Pure ()        -> return emptyBody
+            TF.Free (blk, xs) -> addBlock <$> comp blk <*> go xs
 
-    comp (FreeLabel str body close) = do
-        lbl <- lift freshLabel
-        at str .= Just lbl
+    comp (FreeLabel lbl body close) = do
+        close' <- close
         return $ BlockCC (Node (Label lbl) ())
-                         (blockFromList (nodesToList body)) close
+                         (blockFromList (nodesToList body)) close'
 
-    firstLabel (Pure ()) = error "body is empty!"
-    firstLabel (Free (FreeLabel str _ _, _)) =
-        fromMaybe (error "firstLabel failed") <$> use (at str)
-
-add :: v -> v -> v -> Free ((,) (Node () v O O)) ()
+add :: v -> v -> v -> BodyF v
 add x0 x1 x2 = Free (Node (Instr (Add x0 x1 x2)) (), Pure ())
 
-return_ :: Node () v O C
-return_ = Node (ReturnInstr [] Nop) ()
+move :: v -> v -> BodyF v
+move x0 x1 = Free (Node (Move x0 x1) (), Pure ())
 
-save :: PhysReg -> Dst Reg -> Free ((,) (Node () Reg O O)) ()
+return_ :: Monad m => m (Node () v O C)
+return_ = return $ Node (ReturnInstr [] Nop) ()
+
+branch :: Engine m => Test -> v -> String -> String -> m (Node () v O C)
+branch tst v good bad = do
+    lblg <- getLabel good
+    lblb <- getLabel bad
+    return $ Node (Branch tst v lblg lblb) ()
+
+jump :: Engine m => String -> m (Node () v O C)
+jump dest = do
+    lbl <- getLabel dest
+    return $ Node (Jump lbl) ()
+
+save :: PhysReg -> Dst Reg -> BodyF Reg
 save r dst = Free (Node (Save (Linearity False) r dst) (), Pure ())
 
-restore :: PhysReg -> Src Reg -> Free ((,) (Node () Reg O O)) ()
-restore r src = Free (Node (Restore (Linearity False) src r) (), Pure ())
+restore :: Src Reg -> PhysReg -> BodyF Reg
+restore src r = Free (Node (Restore (Linearity False) src r) (), Pure ())

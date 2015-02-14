@@ -87,13 +87,15 @@ fromOpInfo (OpInfo a b c d e f g) =
 data BlockInfo blk1 blk2 op1 op2 = BlockInfo
     { blockId         :: blk1 -> Int
     , blockSuccessors :: blk1 -> [Int]
-    , blockOps        :: blk1 -> [op1]
-    , setBlockOps     :: blk1 -> [op2] -> blk2
+    , blockOps        :: blk1 -> ([op1], [op1], [op1])
+    , setBlockOps     :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
     }
 
 fromBlockInfo :: BlockInfo blk1 blk2 op1 op2
               -> LS.BlockInfo blk1 blk2 op1 op2
-fromBlockInfo (BlockInfo a b c d) = LS.Build_BlockInfo a b c d
+fromBlockInfo (BlockInfo a b c d) =
+    LS.Build_BlockInfo a b
+        (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register

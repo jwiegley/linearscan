@@ -39,6 +39,26 @@ Definition splitKind (k : IntervalKind) : IntervalKind * IntervalKind :=
   | RightMost => (Middle, RightMost)
   end.
 
+Definition mergeKind (k1 k2 : IntervalKind) : IntervalKind :=
+  match k1, k2 with
+  | Whole,     Whole     => Whole
+  | Whole,     LeftMost  => LeftMost
+  | Whole,     Middle    => Middle
+  | Whole,     RightMost => RightMost
+  | LeftMost,  Whole     => LeftMost
+  | LeftMost,  LeftMost  => LeftMost
+  | LeftMost,  Middle    => LeftMost
+  | LeftMost,  RightMost => Whole
+  | Middle,    Whole     => Middle
+  | Middle,    LeftMost  => LeftMost
+  | Middle,    Middle    => Middle
+  | Middle,    RightMost => RightMost
+  | RightMost, Whole     => RightMost
+  | RightMost, LeftMost  => Whole
+  | RightMost, Middle    => RightMost
+  | RightMost, RightMost => RightMost
+  end.
+
 Record IntervalDesc : Set := {
     (* The [varId] is simply a number that refers to the variable for which
        this interval was created.  This number must be maintained by the
@@ -65,11 +85,11 @@ Inductive Interval : IntervalDesc -> Prop :=
                 ; rds  := NE_Sing (x; r)
                 |}
 
-  | I_Cons : forall i knd xs,
+  | I_Cons : forall i oknd knd xs,
       Interval {| ivar := i
                 ; ibeg := rbeg (NE_head xs).1
                 ; iend := rend (NE_last xs).1
-                ; iknd := knd
+                ; iknd := oknd
                 ; rds  := xs
                 |}
         -> forall r (H : rend r.1 < rbeg (NE_head xs).1),
@@ -115,7 +135,10 @@ Lemma intervalConnected
                   ; iknd := z
                   ; rds := NE_Cons r xs |}) :
   rend r.1 < rbeg (NE_head xs).1.
-Proof. move: i. invert => //. Qed.
+Proof.
+  move: i.
+  invert => //=.
+Qed.
 
 Lemma Interval_exact_beg `(i : Interval d) :
   ibeg d = rbeg (NE_head (rds d)).1.
@@ -124,6 +147,21 @@ Proof. move: i. invert => //. Qed.
 Lemma Interval_exact_end `(i : Interval d) :
   iend d = rend (NE_last (rds d)).1.
 Proof. move: i. invert => //. Qed.
+
+Definition intervalSetKind
+  `(i : Interval d) : forall k,
+  Interval {| ivar := ivar d
+            ; ibeg := ibeg d
+            ; iend := iend d
+            ; iknd := k
+            ; rds  := rds d |}.
+Proof.
+  inversion i.
+    by constructor.
+  move=> k.
+  subst.
+  exact: (@I_Cons _ oknd).
+Defined.
 
 Definition intervalUncons
   `(i : Interval {| ivar := iv
@@ -142,10 +180,12 @@ Definition intervalUncons
                  ; iknd := z
                  ; rds := xs |} ].
 Proof.
-  move: i. invert => //=.
-  split; auto. subst.
+  move: i.
+  invert => //=; subst.
+  split.
   case: r H6 => [rd r] *.
-  exact: (I_Sing iv z r).
+    exact: (I_Sing iv z r).
+  exact: (intervalSetKind H1).
 Defined.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
@@ -266,7 +306,7 @@ Proof.
   have Hlt': rend r'.1 < rbeg (NE_head rs').1.
     move/NE_Forall_head in H2.
     by rewrite /range_ltn in H2.
-  exact: (I_Cons (i:=vid) (knd:=Whole) i Hlt').
+  exact: (@I_Cons vid _ Whole _ i _ Hlt').
 Defined.
 
 (** Split the current interval before the position [before].  This must
@@ -293,8 +333,8 @@ Proof.
     move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
     move: (Interval_beg_of_rds i) (Interval_end_of_rds i).
     rewrite H2 H3 /= => *.
-    by exists (Some (exist _ _ (I_Sing iv lknd r0.2)),
-               Some (exist _ _ (I_Sing iv rknd r1.2))).
+    by exists (Some (packInterval (I_Sing iv lknd r0.2)),
+               Some (packInterval (I_Sing iv rknd r1.2))).
 
   (* All of the use positions occur before the split point.  However, it's
      possible that the range *ends* after the split point, meaning that there
@@ -305,7 +345,7 @@ Proof.
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
     move/andP=> [H1 /andP [/eqP H2 H3]].
-    exists (Some (exist _ _ (I_Sing iv knd r0.2)), None).
+    exists (Some (packInterval (I_Sing iv knd r0.2)), None).
     by rewrite /= {}H2 {}H3.
 
   (* Likewise, in this case all use positions occur after the split point, but
@@ -317,7 +357,7 @@ Proof.
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
     move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
-    exists (None, Some (exist _ _ (I_Sing iv knd r1.2))).
+    exists (None, Some (packInterval (I_Sing iv knd r1.2))).
     by rewrite /= {}H2 {}H3.
 
   (* If there are no use positions on either side of the split, it would
@@ -343,8 +383,8 @@ Proof.
       by rewrite -H3.
     rewrite H2 in Hb.
 
-    by exists (Some (exist _ _ (I_Sing iv lknd r0.2)),
-               Some (exist _ _ (I_Cons i1 Hi))).
+    by exists (Some (packInterval (I_Sing iv lknd r0.2)),
+               Some (packInterval (@I_Cons _ _ rknd _ i1 _ Hi))).
 
   (* In this branch, we know that all use positions in the first range occur
      before the split point, and so we must split in one of the ranges in
@@ -375,11 +415,12 @@ Proof.
       rewrite Hb He in i1_1i.
       rewrite Hb in H2.
       rewrite H2 in Hi0.
-      have i1_1i' := I_Cons i1_1i Hi0.
+      have i1_1i' := @I_Cons _ _ lknd _ i1_1i _ Hi0.
       rewrite H3.
       rewrite -He in i1_1i'.
 
-      by exists (Some (exist _ _ i1_1i'), Some i1_2).
+      by exists (Some (packInterval i1_1i'),
+                 Some (packInterval (intervalSetKind i1_2.2 rknd))).
 
     (* In this case, we need to cons the [r] from above with a new interval
        [i1_1], which can only differ by possibly being shorter than i1, in the
@@ -396,12 +437,12 @@ Proof.
       rewrite Hb He in i1_1i.
       have Hi: rend r.1 < rbeg (NE_head rds0).1
         by rewrite H0 Hb in Hi0.
-      have i1_1i' := I_Cons i1_1i Hi.
+      have i1_1i' := @I_Cons _ _ lknd _ i1_1i _ Hi.
       rewrite -He in i1_1i'.
       rewrite -H5 in H2.
       move/eqP in H4.
 
-      by exists (Some (exist _ _ i1_1i'), None).
+      by exists (Some (packInterval i1_1i'), None).
 
     (* In this case, we return [i0] as the left interval (which only
        references [r]), and [i1] as the right, since nothing has been
@@ -425,7 +466,8 @@ Proof.
       have: rend r0.1 <= before <= rbeg (NE_head rds0).1
         by apply/andP; split => //=.
 
-      by exists (Some (exist _ _ (I_Sing iv lknd r0.2)), Some (_; i1_2i)).
+      by exists (Some (packInterval (I_Sing iv lknd r0.2)),
+                 Some (packInterval (intervalSetKind i1_2i rknd))).
 
     + SCase "(None, None)".
       contradiction.
@@ -442,7 +484,7 @@ Proof.
     rewrite Heq2 in i1.
     move/eqP in Heq2.
 
-    exists (None, Some (exist _ _ (I_Cons i1 Hi0))).
+    exists (None, Some (packInterval (@I_Cons _ _ knd _ i1 _ Hi0))).
     by rewrite /= {}H2; firstorder.
 
   - Case "rs = R_Cons r rs; (o, o0) = (None, None)".

@@ -52,20 +52,21 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
   @snd _ _ $
   forFold (1, emptyIntMap) blocks $ fun acc b =>
     let: (idx, m) := acc in
+    let: (opsb, opsm, opse) := blockOps binfo b in
     let liveSet :=
         {| blockLiveGen   := emptyIntSet
          ; blockLiveKill  := emptyIntSet
          ; blockLiveIn    := emptyIntSet
          ; blockLiveOut   := emptyIntSet
-         ; blockFirstOpId := idx
+         ; blockFirstOpId := idx + (size opsb).*2
          ; blockLastOpId  := idx
          |} in
     let: (lastIdx', liveSet3) :=
-      forFold (idx, liveSet) (blockOps binfo b) $ fun acc o =>
+      forFold (idx, liveSet) (opsb ++ opsm ++ opse) $ fun acc o =>
         let: (lastIdx, liveSet1) := acc in
         (lastIdx.+2,
          forFold liveSet1 (opRefs oinfo o) $ fun liveSet2 v =>
-           let vid := varId v in
+           if @varId maxReg v isn't inr vid then liveSet2 else
            if varKind v is Input
            then
              if ~~ (IntSet_member vid (blockLiveKill liveSet2))
@@ -103,12 +104,12 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
   forFold liveSets (rev blocks) $ fun liveSets1 b =>
     let bid := blockId binfo b in
     match IntMap_lookup bid liveSets1 with
-    | None => liveSets1         (* should never happen *)
+    | None => liveSets1       (* jww (2015-02-14): should never happen *)
     | Some liveSet =>
       let liveSet2 :=
         forFold liveSet (blockSuccessors binfo b) $ fun liveSet1 s_bid =>
           match IntMap_lookup s_bid liveSets1 with
-          | None => liveSet1  (* should never happen *)
+          | None => liveSet1  (* jww (2015-02-14): should never happen *)
           | Some sux =>
             {| blockLiveGen   := blockLiveGen liveSet1
              ; blockLiveKill  := blockLiveKill liveSet1

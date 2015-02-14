@@ -127,7 +127,7 @@ Definition allocateBlockedReg {pre} :
             (* In calculating the highest use position of this register, if we
                know that it is being used at the current position, then it
                cannot be spilled there, and so we try to take it out of the
-               running by returning zero. *)
+               running by returning one. *)
             match findIntervalUsePos int atPos with
             | Some _ => Some odd1
             | None   => nextUseAfter int start

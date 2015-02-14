@@ -97,7 +97,7 @@ Definition emptyPendingRanges (b pos e : nat) (H : b < pos <= e)
   (liveOuts : IntSet) : PendingRanges b pos e.
 Proof.
   have empty  := emptyRangeCursor H.
-  have f xs vid := IntMap_insert vid empty xs.
+  have f xs vid := IntMap_insert (vid + maxReg) empty xs.
   exists (IntSet_foldl f emptyIntMap liveOuts).
   by undoubled.
 Defined.
@@ -301,12 +301,8 @@ Definition extractVarInfo (xs : seq (VarInfo maxReg)) : bool * seq VarKind :=
 
 Program Definition handleVars (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos)
   `(ranges : PendingRanges b pos.+1 e) : PendingRanges b pos e :=
-  let getVarId v := match varId v with
-    | inl n => nat_of_ord n
-    | inr v => v + maxReg
-    end in
   let vars := IntMap_map extractVarInfo $
-              IntMap_groupOn getVarId varRefs in
+              IntMap_groupOn (@nat_of_varId maxReg) varRefs in
   IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyRanges _)
                       (handleVars_onlyVars _) ranges.1 vars.
 Obligation 1. by undoubled. Qed.
@@ -349,7 +345,7 @@ Definition reduceBlock {pos} (block : blockType1) :
 Proof.
   move=> sz b e.
   rewrite /sz /blockSize.
-  set ops := blockOps binfo block.
+  set ops := allBlockOps binfo block.
   rewrite -size_rev.
   elim: (rev ops) => [|o os IHos] /=.
     by rewrite !addn0.

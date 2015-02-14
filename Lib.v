@@ -30,6 +30,12 @@ Notation "p .2" := (proj2_sig p)
   (at level 2, left associativity, format "p .2").
 Notation "( x ; y )" := (exist _ x y).
 
+Definition option_map `(f : a -> b) (x : option a) : option b :=
+  match x with
+  | None => None
+  | Some x => Some (f x)
+  end.
+
 Definition option_choose {a} (x y : option a) : option a :=
   match x with
   | None => y

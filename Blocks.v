@@ -49,6 +49,11 @@ Record VarInfo := {
   regRequired : bool
 }.
 
+Definition nat_of_varId v := match varId v with
+  | inl n => nat_of_ord n
+  | inr v => v + maxReg
+  end.
+
 Inductive OpKind : Set :=
   IsNormal | IsCall | IsBranch | IsLoopBegin | IsLoopEnd.
 
@@ -70,8 +75,9 @@ Definition BlockId := nat.
 Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
   blockId         : blockType1 -> BlockId;
   blockSuccessors : blockType1 -> seq BlockId;
-  blockOps        : blockType1 -> seq opType1;
-  setBlockOps     : blockType1 -> seq opType2 -> blockType2
+  blockOps        : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
+  setBlockOps     : blockType1 -> seq opType2 -> seq opType2 -> seq opType2
+                      -> blockType2
 }.
 
 Variables blockType1 blockType2 opType1 opType2 accType : Set.
@@ -79,7 +85,10 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo accType opType1 opType2.
 
-Definition blockSize (block : blockType1) := size (blockOps binfo block).
+Definition allBlockOps (block : blockType1) : seq opType1 :=
+  let: (a, b, c) := blockOps binfo block in a ++ b ++ c.
+
+Definition blockSize (block : blockType1) := size (allBlockOps block).
 
 (* jww (2015-01-12): Some of the things described by Wimmer in the section on
    dealing with computing of intervals have yet to be done:
@@ -91,7 +100,7 @@ Definition blockSize (block : blockType1) := size (blockOps binfo block).
 Definition OpId := nat.
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
-  foldl (fun bacc blk => foldl f bacc (blockOps binfo blk)) z.
+  foldl (fun bacc blk => foldl f bacc (allBlockOps blk)) z.
 
 Definition countOps : seq blockType1 -> nat :=
   foldOps (fun acc _ => acc.+1) 0.
