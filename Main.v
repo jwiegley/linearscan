@@ -30,7 +30,7 @@ Definition linearScan
 
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks' in
-  let liveSets' := computeGlobalLiveSets binfo blocks' liveSets in
+  let liveSets' := computeGlobalLiveSetsRecursively binfo blocks' liveSets in
 
   match buildIntervals binfo oinfo blocks liveSets'
   return SSError + (seq blockType2 * accType) with

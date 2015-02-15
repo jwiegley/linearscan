@@ -42,8 +42,31 @@ Definition IntMap_toList {a} (m : IntMap a) : seq (nat * a) :=
     | getIntMap xs => xs
   end.
 
+Section EqIntMap.
+
+Variable a : eqType.
+
+Definition eqIntMap (s1 s2 : IntMap a) :=
+  match s1, s2 with
+  | getIntMap xs, getIntMap ys => xs == ys
+  end.
+
+Lemma eqIntMapP : Equality.axiom eqIntMap.
+Proof.
+  move.
+  case=> [s1].
+  case=> [s2] /=.
+  case: (s1 =P s2) => [<-|neqx]; last by right; case.
+  by constructor.
+Qed.
+
+Canonical IntMap_eqMixin := EqMixin eqIntMapP.
+Canonical IntMap_eqType := Eval hnf in EqType (IntMap a) IntMap_eqMixin.
+
+End EqIntMap.
+
 Extract Inductive IntMap => "Data.IntMap.IntMap"
-  ["Data.IntMap.fromList"] "(\fS _ -> ())".
+  ["Data.IntMap.fromList"] "(\fS m -> fS m)".
 
 Extract Inlined Constant IntMap_lookup       => "Data.IntMap.lookup".
 Extract Inlined Constant IntMap_insert       => "Data.IntMap.insert".
@@ -53,13 +76,13 @@ Extract Inlined Constant IntMap_foldl        => "Data.IntMap.foldl".
 Extract Inlined Constant IntMap_foldlWithKey => "Data.IntMap.foldlWithKey".
 Extract Inlined Constant IntMap_mergeWithKey => "Data.IntMap.mergeWithKey".
 Extract Inlined Constant IntMap_toList       => "Data.IntMap.toList".
+Extract Inlined Constant eqIntMap            => "Prelude.const (Prelude.==)".
 
-Inductive IntSet :=
-  | emptyIntSet
-  | getIntSet of seq nat.
+Inductive IntSet := getIntSet of seq nat.
 
-Arguments emptyIntSet.
 Arguments getIntSet _.
+
+Definition emptyIntSet := getIntSet [::].
 
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
@@ -77,7 +100,30 @@ Definition IntSet_forFold {a} (z : a) (m : IntSet) (f: a -> nat -> a) : a :=
   IntSet_foldl f z m.
 
 Extract Inductive IntSet => "Data.IntSet.IntSet"
-  ["Data.IntSet.empty" "Data.IntSet.fromList"] "(\fO fS _ -> fO ())".
+  ["Data.IntSet.fromList"] "(\fS m -> fS m)".
+
+Section EqIntSet.
+
+Variable a : eqType.
+
+Definition eqIntSet (s1 s2 : IntSet) :=
+  match s1, s2 with
+  | getIntSet xs, getIntSet ys => xs == ys
+  end.
+
+Lemma eqIntSetP : Equality.axiom eqIntSet.
+Proof.
+  move.
+  case=> [s1].
+  case=> [s2] /=.
+  case: (s1 =P s2) => [<-|neqx]; last by right; case.
+  by constructor.
+Qed.
+
+Canonical IntSet_eqMixin := EqMixin eqIntSetP.
+Canonical IntSet_eqType := Eval hnf in EqType IntSet IntSet_eqMixin.
+
+End EqIntSet.
 
 Extract Inlined Constant IntSet_member     => "Data.IntSet.member".
 Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
@@ -85,6 +131,7 @@ Extract Inlined Constant IntSet_delete     => "Data.IntSet.delete".
 Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
 Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
 Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
+Extract Inlined Constant eqIntSet          => "(Prelude.==)".
 
 Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) : IntMap (seq a) :=
   forFold emptyIntMap l $ fun acc x =>

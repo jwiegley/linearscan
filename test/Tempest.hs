@@ -365,6 +365,8 @@ opInfo = OpInfo
     getReferences (Node (Label _) _)         = mempty
     getReferences (Node (Instr i) _)         = go i
     getReferences (Node (Jump _) _)          = mempty
+    getReferences (Node (Move src dst) _)    = mkv Input src <> mkv Output dst
+    getReferences (Node (LoadConst _ v) _)   = mkv Output v
     getReferences (Node (Branch _ v _ _) _)  = mkv Input v
     getReferences (Node (ReturnInstr _ i) _) = go i
     getReferences n = error $ "getReferences: unhandled node: " ++ show n
@@ -515,6 +517,11 @@ label str body close = do
     lbl <- lift $ getLabel str
     liftF (FreeLabel lbl body close, ())
 
+label_ :: Engine m => String -> m (Node () v O C) -> Program v m ()
+label_ str close = do
+    lbl <- lift $ getLabel str
+    liftF (FreeLabel lbl (Pure ()) close, ())
+
 compile :: (Engine m, m ~ StateT Labels SimpleUniqueMonad, NonLocal (Node () v))
         => Program v m () -> (Graph (Node () v) C C, Hoopl.Label)
 compile prog = runSimpleUniqueMonad $
@@ -541,6 +548,9 @@ add x0 x1 x2 = Free (Node (Instr (Add x0 x1 x2)) (), Pure ())
 
 move :: v -> v -> BodyF v
 move x0 x1 = Free (Node (Move x0 x1) (), Pure ())
+
+lc :: v -> BodyF v
+lc x0 = Free (Node (LoadConst Constant x0) (), Pure ())
 
 return_ :: Monad m => m (Node () v O C)
 return_ = return $ Node (ReturnInstr [] Nop) ()

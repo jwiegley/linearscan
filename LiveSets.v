@@ -16,6 +16,54 @@ Record BlockLiveSets := {
   blockLastOpId  : OpId
 }.
 
+Section EqBlockLiveSets.
+
+Variable a : eqType.
+
+Definition eqBlockLiveSets (s1 s2 : BlockLiveSets) :=
+  match s1, s2 with
+  | {| blockLiveGen   := lg1
+     ; blockLiveKill  := lk1
+     ; blockLiveIn    := li1
+     ; blockLiveOut   := lo1
+     ; blockFirstOpId := fi1
+     ; blockLastOpId  := la1
+     |},
+    {| blockLiveGen   := lg2
+     ; blockLiveKill  := lk2
+     ; blockLiveIn    := li2
+     ; blockLiveOut   := lo2
+     ; blockFirstOpId := fi2
+     ; blockLastOpId  := la2
+     |} =>
+    [&& lg1 == lg2
+    ,   lk1 == lk2
+    ,   li1 == li2
+    ,   lo1 == lo2
+    ,   fi1 == fi2
+    &   la1 == la2 ]
+  end.
+
+Lemma eqBlockLiveSetsP : Equality.axiom eqBlockLiveSets.
+Proof.
+  move.
+  case=> [lg1 lk1 li1 lo1 fi1 la1].
+  case=> [lg2 lk2 li2 lo2 fi2 la2] /=.
+  case: (lg1 =P lg2) => [<-|neqx]; last by right; case.
+  case: (lk1 =P lk2) => [<-|neqx]; last by right; case.
+  case: (li1 =P li2) => [<-|neqx]; last by right; case.
+  case: (lo1 =P lo2) => [<-|neqx]; last by right; case.
+  case: (fi1 =P fi2) => [<-|neqx]; last by right; case.
+  case: (la1 =P la2) => [<-|neqx]; last by right; case.
+  by constructor.
+Qed.
+
+Canonical BlockLiveSets_eqMixin := EqMixin eqBlockLiveSetsP.
+Canonical BlockLiveSets_eqType :=
+  Eval hnf in EqType BlockLiveSets BlockLiveSets_eqMixin.
+
+End EqBlockLiveSets.
+
 Section LiveSets.
 
 Variable maxReg : nat.          (* max number of registers *)
@@ -65,10 +113,11 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
       forFold (idx, liveSet) (opsb ++ opsm ++ opse) $ fun acc o =>
         let: (lastIdx, liveSet1) := acc in
         (lastIdx.+2,
-         forFold liveSet1 (opRefs oinfo o) $ fun liveSet2 v =>
-           if @varId maxReg v isn't inr vid then liveSet2 else
-           if varKind v is Input
-           then
+         let: (inputs, others) :=
+            partition (fun v => varKind v == Input) (opRefs oinfo o) in
+         let liveSet2 :=
+           forFold liveSet1 inputs $ fun liveSet2 v =>
+             if @varId maxReg v isn't inr vid then liveSet2 else
              if ~~ (IntSet_member vid (blockLiveKill liveSet2))
              then {| blockLiveGen   := IntSet_insert vid (blockLiveGen liveSet2)
                    ; blockLiveKill  := blockLiveKill liveSet2
@@ -77,15 +126,24 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
                    ; blockFirstOpId := blockFirstOpId liveSet2
                    ; blockLastOpId  := lastIdx
                    |}
-             else liveSet2
-           else
-             {| blockLiveGen   := blockLiveGen liveSet2
-              ; blockLiveKill  := IntSet_insert vid (blockLiveKill liveSet2)
-              ; blockLiveIn    := blockLiveIn liveSet2
-              ; blockLiveOut   := blockLiveOut liveSet2
-              ; blockFirstOpId := blockFirstOpId liveSet2
+             else liveSet2 in
+         let liveSet3 :=
+           forFold liveSet2 others $ fun liveSet3 v =>
+             if @varId maxReg v isn't inr vid then liveSet3 else
+             {| blockLiveGen   := blockLiveGen liveSet3
+              ; blockLiveKill  := IntSet_insert vid (blockLiveKill liveSet3)
+              ; blockLiveIn    := blockLiveIn liveSet3
+              ; blockLiveOut   := blockLiveOut liveSet3
+              ; blockFirstOpId := blockFirstOpId liveSet3
               ; blockLastOpId  := lastIdx
-              |})
+              |} in
+         {| blockLiveGen   := blockLiveGen liveSet3
+          ; blockLiveKill  := blockLiveKill liveSet3
+          ; blockLiveIn    := blockLiveIn liveSet3
+          ; blockLiveOut   := blockLiveOut liveSet3
+          ; blockFirstOpId := blockFirstOpId liveSet3
+          ; blockLastOpId  := lastIdx
+          |})
       in
     (lastIdx', IntMap_insert (blockId binfo b) liveSet3 m).
 
@@ -133,5 +191,15 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
          ; blockLastOpId  := blockLastOpId liveSet2
          |} liveSets1
     end.
+
+Definition computeGlobalLiveSetsRecursively (blocks : seq blockType1)
+  (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
+  let fix go n previous :=
+    if n isn't S n then previous else
+    let computed := computeGlobalLiveSets blocks previous in
+    if previous == computed
+    then computed
+    else go n computed in
+  go (size blocks) liveSets.
 
 End LiveSets.

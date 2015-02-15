@@ -473,6 +473,12 @@ Example groupBy_ex1 :
     = [:: [:: 1]; [:: 3; 3]; [:: 4]; [:: 5; 5]; [:: 9]; [:: 6]; [:: 8]].
 Proof. reflexivity. Qed.
 
+Definition partition {a} (p : a -> bool) : seq a -> seq a * seq a :=
+  foldr (fun x acc =>
+           if p x
+           then (x :: fst acc, snd acc)
+           else (fst acc, x :: snd acc)) ([::], [::]).
+
 Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).
 Proof.

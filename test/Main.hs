@@ -378,3 +378,50 @@ blockTests = do
         label "B4"
             (add r1 r1 r0)
             return_)
+
+  it "Another resolution case" $ asmTest 4
+    (do label "entry"           -- 1
+            (do lc v3           -- 3
+                lc v4           -- 5
+                lc v15          -- 7
+                lc v20)         -- 9
+            (jump "L3")         -- 11
+        label "L3"              -- 13
+            (do move v3 v9      -- 15
+                move v9 v11     -- 16
+                move v11 v10    -- 17
+                move v10 v12    -- 19
+                move v12 v13    -- 21
+                lc v14          -- 23
+                move v15 v5)    -- 25
+            (jump "L6")         -- 27
+        label_ "L6"             -- 31
+	    (branch Zero v4 "L3" "L2") -- 33
+        label "L2"                     -- 35
+            (do lc v21                 -- 37
+                move v21 v18           -- 39
+                move v5 v4             -- 41
+                lc v19                 -- 43
+                move v20 v17)          -- 45
+            (jump "L6"))               -- 47
+
+    (do label "entry"
+            (lc r3)
+            (jump "L3")
+        label "L2"
+            (do lc r21
+                move r21 r18
+                lc r19
+                move r20 r17)
+            (jump "L6")
+        label "L3"
+            (do move r3 r9
+                move r9 r11
+                move r11 r10
+                move r10 r12
+                move r12 r13
+                lc r14
+                move r15 r5)
+            (jump "L6")
+        label_ "L6"
+	    (branch Zero r4 "L3" "L2"))
