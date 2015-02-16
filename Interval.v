@@ -344,7 +344,7 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (Some, None)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move/andP=> [H1 /andP [/eqP H2 H3]].
+    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
     exists (Some (packInterval (I_Sing iv knd r0.2)), None).
     by rewrite /= {}H2 {}H3.
 

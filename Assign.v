@@ -3,6 +3,7 @@ Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
 Require Import LinearScan.Interval.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.LiveSets.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.State.
@@ -64,7 +65,7 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
   y' <-- y ;;
   pure (x', y').
 
-Definition savesAndRestores (opid : OpId) v reg int :
+Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
   AssnState (seq opType2 * seq opType2) :=
   if @varId maxReg v isn't inr vid then pure ([::], [::]) else
 
@@ -78,24 +79,32 @@ Definition savesAndRestores (opid : OpId) v reg int :
   let atBoundary :=
       ((knd == Input)  && (assnBlockBeg assn == opid)) ||
       ((knd == Output) && (opid.+2 == assnBlockEnd assn)) in
-  if atBoundary then pure ([::], [::]) else
 
-  let isFirst := firstUsePos int == Some opid in
-  let isLast  := nextUseAfter int opid == None in
-  let save    := saveOpM reg (Some vid) in
-  let restore := restoreOpM (Some vid) reg in
+  let isFirst  := firstUsePos int == Some opid in
+  let isLast   := nextUseAfter int opid == None in
+  (* jww (2015-02-16): We would like that only Input variables which are in
+     the "live out" set, or that are going to be re-loaded in the current
+     block, get spilled to the stack.  At the moment we spill more often than
+     is strictly anecessary. *)
+  (* let save     := if IntSet_member vid outs *)
+  (*                 then saveOpM reg (Some vid) *)
+  (*                 else pure [::] in *)
+  let save     := saveOpM reg (Some vid) in
+  let msave    := if atBoundary then pure [::] else save in
+  let restore  := restoreOpM (Some vid) reg in
+  let mrestore := if atBoundary then pure [::] else restore in
   match knd, iknd int, isFirst, isLast with
     | Input,  LeftMost,  _,     true  => pairM (pure [::]) save
-    | Input,  Middle,    true,  true  => pairM restore save
-    | Input,  Middle,    true,  _     => pairM restore (pure [::])
+    | Input,  Middle,    true,  true  => pairM mrestore save
+    | Input,  Middle,    true,  _     => pairM mrestore (pure [::])
     | Input,  Middle,    _,     true  => pairM (pure [::]) save
-    | Input,  RightMost, true,  _     => pairM restore (pure [::])
-    | Output, LeftMost,  _,     true  => pairM (pure [::]) save
-    | Output, Middle,    _,     true  => pairM (pure [::]) save
+    | Input,  RightMost, true,  _     => pairM mrestore (pure [::])
+    | Output, LeftMost,  _,     true  => pairM (pure [::]) msave
+    | Output, Middle,    _,     true  => pairM (pure [::]) msave
     | _,      _,         _,     _     => pure ([::], [::])
     end.
 
-Definition collectAllocs opid ints acc v :=
+Definition collectAllocs opid outs ints acc v :=
   if @varId maxReg v isn't inr vid then pure acc else
   let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
   forFoldM acc v_ints $ fun acc' x =>
@@ -104,16 +113,17 @@ Definition collectAllocs opid ints acc v :=
                       seq opType2 * seq opType2) with
     | (int, reg) =>
       let: (allocs', restores', saves') := acc' in
-      res <-- savesAndRestores opid v reg int ;;
+      res <-- savesAndRestores opid v reg int outs ;;
       let: (rs, ss) := res in
       pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
     end.
 
-Definition doAllocations ints op : AssnState (seq opType2) :=
+Definition doAllocations ints outs op : AssnState (seq opType2) :=
   assn <-- get ;;
   let opid := assnOpId assn in
   let vars := opRefs oinfo op in
-  res <-- forFoldM ([::], [::], [::]) vars $ collectAllocs opid ints ;;
+  res <-- forFoldM ([::], [::], [::]) vars $
+            collectAllocs opid outs ints ;;
   let: (allocs, restores, saves) := res in
   let op' := applyAllocs oinfo op allocs in
   (* With lenses, this would just be: assnOpId += 2 *)
@@ -146,8 +156,7 @@ Definition generateMoves
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
 
-Definition resolveMappings bid opsm mappings :
-  AssnState (seq opType2) :=
+Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
   if IntMap_lookup bid mappings isn't Some graphs then pure opsm else
@@ -161,32 +170,39 @@ Definition resolveMappings bid opsm mappings :
   let opsm'' := opsm' ++ emoves in
   pure opsm''.
 
-Definition considerOps (f : opType1 -> AssnState (seq opType2)) mappings :=
+Definition considerOps (f : IntSet -> opType1 -> AssnState (seq opType2))
+  (liveSets : IntMap BlockLiveSets) mappings :=
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
+    let bid := blockId binfo blk in
+
+    let outs := if IntMap_lookup bid liveSets is Some ls
+                then blockLiveOut ls
+                else emptyIntSet in
+
     let: (opsb, opsm, opse) := ops in
     modify (fun assn =>
               {| assnOpId     := assnOpId assn
                ; assnBlockBeg := assnOpId assn + (size opsb).*2
                ; assnBlockEnd := assnOpId assn + (size opsb + size opsm).*2
                ; assnAcc      := assnAcc assn |}) ;;
-    opsb' <-- concatMapM f opsb ;;
-    opsm' <-- concatMapM f opsm ;;
-    opse' <-- concatMapM f opse ;;
+    opsb' <-- concatMapM (f outs) opsb ;;
+    opsm' <-- concatMapM (f outs) opsm ;;
+    opse' <-- concatMapM (f outs) opse ;;
     (* Insert resolving moves based on the mappings *)
-    let bid := blockId binfo blk in
     opsm'' <-- resolveMappings bid opsm' mappings ;;
     pure $ setBlockOps binfo blk opsb' opsm'' opse'.
 
 Definition assignRegNum `(st : ScanState InUse sd)
-  (mappings : IntMap (BlockMoves maxReg)) (blocks : seq blockType1)
-  (acc : accType) : seq blockType2 * accType :=
+  (liveSets : IntMap BlockLiveSets) (mappings : IntMap (BlockMoves maxReg))
+  (blocks : seq blockType1) (acc : accType) : seq blockType2 * accType :=
   let: (blocks', assn) :=
     considerOps
       (doAllocations
          [seq (getIntervalDesc (getInterval (fst x)), snd x)
          | x <- handled sd ++ active sd ++ inactive sd])
+      liveSets
       mappings
       blocks
       {| assnOpId     := 1

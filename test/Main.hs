@@ -330,12 +330,14 @@ blockTests = do
             (jump "B4")
         label "B3"
             (do add r1 r2 r3
-                save r3 0
+                save r3 16
+                save r2 8
+                save r1 0
                 add r0 r0 r1
                 add r0 r0 r2
                 add r0 r1 r3
                 add r0 r2 r3
-                restore 0 r3)
+                restore 16 r3)
             (jump "B4")
         label "B4"
             (add r3 r3 r0)
@@ -405,23 +407,39 @@ blockTests = do
                 move v20 v17)          -- 45
             (jump "L6"))               -- 47
 
-    (do label "entry"
-            (lc r3)
-            (jump "L3")
-        label "L2"
-            (do lc r21
-                move r21 r18
-                lc r19
-                move r20 r17)
-            (jump "L6")
-        label "L3"
-            (do move r3 r9
-                move r9 r11
-                move r11 r10
-                move r10 r12
-                move r12 r13
-                lc r14
-                move r15 r5)
-            (jump "L6")
-        label_ "L6"
-	    (branch Zero r4 "L3" "L2"))
+    (do label "entry"           -- 1
+            (do lc r0           -- 3
+                lc r1           -- 5
+                lc r2           -- 7
+                lc r3           -- 9
+                save r3 0)
+            (jump "L3")         -- 11
+        label "L3"              -- 13
+            (do restore 8 r0
+                move r0 r3      -- 15
+                save r0 8
+                move r3 r0      -- 17
+                move r0 r3      -- 19
+                move r3 r0      -- 21
+                move r0 r3      -- 23
+                lc r0           -- 25
+                save r0 16
+                move r2 r0
+                save r2 24)     -- 27
+            (jump "L6")         -- 29
+        label_ "L6"             -- 31
+	    (branch Zero r1 "L3" "L2") -- 33
+        label "L2"                     -- 35
+            (do lc r3                  -- 37
+                move r3 r2             -- 39
+                move r0 r1             -- 41
+                save r1 40
+                save r0 32
+                lc r3                  -- 43
+                restore 0 r1
+                move r1 r0
+                restore 40 r1
+                restore 32 r0
+                restore 24 r2
+                save r1 0)             -- 45
+            (jump "L6"))

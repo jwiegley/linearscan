@@ -27,12 +27,12 @@ Definition IntMap_alter : forall a,
                let: (a, b) := z in
                if a == k
                then if f (Some x) is Some x'
-                    then (k, x') :: acc
+                    then rcons acc (k, x')
                     else acc
                else z :: acc)
             [::] xs
     else if f None is Some x
-         then (k, x) :: xs
+         then rcons xs (k, x)
          else xs.
 
 Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
@@ -42,6 +42,7 @@ Definition IntMap_map {a b} (f : a -> b) (m : IntMap a) : IntMap b :=
   let: getIntMap xs := m in
   getIntMap (map (fun x => (fst x, f (snd x))) xs).
 
+(* The implementation of this function is in LinearScan.Utils.hs *)
 Definition IntMap_mergeWithKey' {a b c}
   (combine : nat -> a -> b -> option c)
   (only1 : seq (nat * a) -> seq (nat * c))

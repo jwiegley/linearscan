@@ -45,7 +45,7 @@ Definition linearScan
         let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
 
         (* replace virtual registers with physical registers *)
-        inr $ assignRegNum binfo oinfo ssig'.2 mappings blocks accum
+        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks accum
     end
   end.
 

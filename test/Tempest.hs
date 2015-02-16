@@ -377,9 +377,9 @@ opInfo = OpInfo
         fromMaybe (error $ "Allocation failed for variable " ++ show n)
                   (Data.List.lookup n m)
 
-mkSaveOp r vid = do
+getStackSlot vid = do
     stack <- get
-    off' <- case M.lookup vid (stackSlots stack) of
+    case M.lookup vid (stackSlots stack) of
         Just off -> return off
         Nothing -> do
             let off = stackPtr stack
@@ -389,13 +389,15 @@ mkSaveOp r vid = do
                      M.insert vid off (stackSlots stack)
                  }
             return off
-    let sv = Save (Linearity False) r off'
+
+mkSaveOp r vid = do
+    off <- getStackSlot vid
+    let sv = Save (Linearity False) r off
     return [NodeOO (Node sv (error "no save meta"))]
 
 mkRestoreOp vid r = do
-    stack <- get
-    let off = fromMaybe (-1) (M.lookup vid (stackSlots stack))
-        rs  = Restore (Linearity False) off r
+    off <- getStackSlot vid
+    let rs  = Restore (Linearity False) off r
     return [NodeOO (Node rs (error "no restore meta"))]
 
 var :: Int -> IRVar

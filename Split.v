@@ -64,12 +64,6 @@ Proof.
   - Case "(Some, Some)".
     move=> [/= H1 H2 /eqP H3].
 
-    case Hincr: (beg < ibeg id1); last first.
-      (* It is not allowable to inject new unhandled intervals for the current
-         position.
-         jww (2015-01-22): This should be provably impossible. *)
-      exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
-
     rewrite eq_sym in H2.
     move: Hset.
     move/(_ uid id0 i0).
@@ -80,6 +74,80 @@ Proof.
     set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
     simpl in set_int_desc.
     move=> st.
+
+    case Hincr: (beg < ibeg id1); last first.
+      (* Wimmer: "All active and inactive intervals for this register
+         intersecting with current are split before the start of current and
+         spilled to the stack.  These split children are not considered during
+         allocation any more because they do not have a register assigned.  If
+         they have a use positions requiring a register, however, they must be
+         reloaded again to a register later on.  Therefore, they are split a
+         second time before these use positions, and the second split children
+         are sorted into the unhandled list.  They get a register assigned
+         when the allocator advances to the start position of these
+         intervals." *)
+      case: (splitPosition i1 BeforeFirstUsePosReqReg)
+        => [[splitPos2 Hodd2] |]; last first.
+        apply: inr (Some (exist _ (packScanState st) _)).
+        apply Build_SSMorphLen.
+        apply Build_SSMorph => //=.
+        exact.
+
+      case Hmid': (ibeg id1 < splitPos2 < iend id1); last first.
+        exact: inl (ECannotSplitSingleton2 uid). (* ERROR *)
+      move/andP: Hmid' => [Hmid1' Hmid2'].
+
+      case: id1 => iv1 ib1 ie1 ? rds1 in i1 H1 H3 Hincr Hmid1' Hmid2' *.
+      case: (intervalSpan Hodd2 i1) => [[[[id1_0 i1_0] |] [[id1_1 i1_1] |]]].
+      - SCase "(Some, Some)".
+        move=> [/= H1_1 H2_1 /eqP H3_1].
+        have := ScanState_newUnhandled st i1_1.
+        rewrite /= => {st}.
+        set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
+        simpl in new_unhandled.
+        case Hincr2: (beg < ibeg id1_1); last first.
+          (* It is not allowable to inject new unhandled intervals for the
+             current position.
+             jww (2015-01-22): This should be provably impossible. *)
+          move=> _.
+          exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
+        move/(_ is_true_true).
+        move=> st.
+
+        apply: inr (Some (exist _ (packScanState st) _)).
+        apply Build_SSMorphLen.
+        apply Build_SSMorph => //=.
+        by rewrite insert_size.
+
+      - SCase "(Some, None)".
+        move=> [/= H2_1 H3_1 H4_1].
+        apply: inr (Some (exist _ (packScanState st) _)).
+        apply Build_SSMorphLen.
+        apply Build_SSMorph => //=.
+        exact.
+
+      - SCase "(None, Some)".
+        move=> [/= H2_1 H3_1 H4_1].
+        have := ScanState_newUnhandled st i1_1.
+        rewrite /= => {st}.
+        set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
+        simpl in new_unhandled.
+        case Hincr2: (beg < ibeg id1_1); last first.
+          (* It is not allowable to inject new unhandled intervals for the
+             current position.
+             jww (2015-01-22): This should be provably impossible. *)
+          move=> _.
+          exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
+        move/(_ is_true_true).
+        move=> st.
+
+        apply: inr (Some (exist _ (packScanState st) _)).
+        apply Build_SSMorphLen.
+        apply Build_SSMorph => //=.
+        by rewrite insert_size.
+
+      - SCase "(None, None)".
+        contradiction.
 
     have := ScanState_newUnhandled st i1.
     rewrite /= => {st}.

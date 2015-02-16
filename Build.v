@@ -362,9 +362,9 @@ Proof.
     exact: newBuildState.
 
   have bid  := blockId binfo b.
-  have outs := if IntMap_lookup bid liveSets isn't Some ls
-               then emptyIntSet
-               else blockLiveOut ls.
+  have outs := if IntMap_lookup bid liveSets is Some ls
+               then blockLiveOut ls
+               else emptyIntSet.
 
   pose sz := blockSize binfo b.
   case E: (0 < sz);
