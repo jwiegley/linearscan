@@ -16,31 +16,58 @@ Definition emptyIntMap {a} := @getIntMap a [::].
    [Data.IntMap]. *)
 Definition IntMap_lookup : forall a, nat -> IntMap a -> option a :=
   fun _ k m => let: getIntMap x := m in maybeLookup x k.
-Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
-  fun _ _ _ x => x.
+
 Definition IntMap_alter : forall a,
   (option a -> option a) -> nat -> IntMap a -> IntMap a :=
-  fun _ _ _ x => x.
+  fun _ f k m =>
+    let: getIntMap xs := m in @getIntMap _ $
+    if IntMap_lookup k m is Some x
+    then
+      foldr (fun z acc =>
+               let: (a, b) := z in
+               if a == k
+               then if f (Some x) is Some x'
+                    then (k, x') :: acc
+                    else acc
+               else z :: acc)
+            [::] xs
+    else if f None is Some x
+         then (k, x) :: xs
+         else xs.
+
+Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
+  fun _ k x m => IntMap_alter (fun _ => Some x) k m.
 
 Definition IntMap_map {a b} (f : a -> b) (m : IntMap a) : IntMap b :=
-  match m with
-  | getIntMap xs => getIntMap (map (fun x => (fst x, f (snd x))) xs)
-  end.
+  let: getIntMap xs := m in
+  getIntMap (map (fun x => (fst x, f (snd x))) xs).
+
+Definition IntMap_mergeWithKey' {a b c}
+  (combine : nat -> a -> b -> option c)
+  (only1 : seq (nat * a) -> seq (nat * c))
+  (only2 : seq (nat * b) -> seq (nat * c))
+  (m1 : seq (nat * a)) (m2 : seq (nat * b)) : seq (nat * c) := [::].
 
 Definition IntMap_mergeWithKey {a b c} (combine : nat -> a -> b -> option c)
   (only1 : IntMap a -> IntMap c) (only2 : IntMap b -> IntMap c)
-  (m1 : IntMap a) (m2 : IntMap b) : IntMap c := only1 m1.
+  (m1 : IntMap a) (m2 : IntMap b) : IntMap c :=
+  let: getIntMap xs1 := m1 in
+  let: getIntMap xs2 := m2 in
+  let only1' xs :=
+    let: getIntMap xs' := only1 (getIntMap xs) in xs' in
+  let only2' xs :=
+    let: getIntMap xs' := only2 (getIntMap xs) in xs' in
+  getIntMap (IntMap_mergeWithKey' combine only1' only2' xs1 xs2).
 
 Definition IntMap_foldl {a b} (f : a -> b -> a) (z : a) (m : IntMap b) : a :=
-  let: getIntMap xs := m in foldl f z [seq snd i | i <- xs].
+  let: getIntMap xs := m in foldl (fun acc x => f acc (snd x)) z xs.
 
 Definition IntMap_foldlWithKey
-  {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a := z.
+  {a b} (f : a -> nat -> b -> a) (z : a) (m : IntMap b) : a :=
+  let: getIntMap xs := m in foldl (fun acc x => f acc (fst x) (snd x)) z xs.
 
 Definition IntMap_toList {a} (m : IntMap a) : seq (nat * a) :=
-  match m with
-    | getIntMap xs => xs
-  end.
+  let: getIntMap xs := m in xs.
 
 Section EqIntMap.
 
@@ -65,18 +92,20 @@ Canonical IntMap_eqType := Eval hnf in EqType (IntMap a) IntMap_eqMixin.
 
 End EqIntMap.
 
-Extract Inductive IntMap => "Data.IntMap.IntMap"
-  ["Data.IntMap.fromList"] "(\fS m -> fS m)".
+(* Extract Inductive IntMap => "Data.IntMap.IntMap" *)
+(*   ["Data.IntMap.fromList"] "(\fS m -> fS m)". *)
 
-Extract Inlined Constant IntMap_lookup       => "Data.IntMap.lookup".
-Extract Inlined Constant IntMap_insert       => "Data.IntMap.insert".
-Extract Inlined Constant IntMap_alter        => "Data.IntMap.alter".
-Extract Inlined Constant IntMap_map          => "Data.IntMap.map".
-Extract Inlined Constant IntMap_foldl        => "Data.IntMap.foldl".
-Extract Inlined Constant IntMap_foldlWithKey => "Data.IntMap.foldlWithKey".
-Extract Inlined Constant IntMap_mergeWithKey => "Data.IntMap.mergeWithKey".
-Extract Inlined Constant IntMap_toList       => "Data.IntMap.toList".
-Extract Inlined Constant eqIntMap            => "Prelude.const (Prelude.==)".
+Extract Inlined Constant IntMap_mergeWithKey' =>
+  "LinearScan.Utils.intMap_mergeWithKey'".
+
+(* Extract Inlined Constant IntMap_lookup       => "Data.IntMap.lookup". *)
+(* Extract Inlined Constant IntMap_insert       => "Data.IntMap.insert". *)
+(* Extract Inlined Constant IntMap_alter        => "Data.IntMap.alter". *)
+(* Extract Inlined Constant IntMap_map          => "Data.IntMap.map". *)
+(* Extract Inlined Constant IntMap_foldl        => "Data.IntMap.foldl". *)
+(* Extract Inlined Constant IntMap_foldlWithKey => "Data.IntMap.foldlWithKey". *)
+(* Extract Inlined Constant IntMap_mergeWithKey => "Data.IntMap.mergeWithKey". *)
+(* Extract Inlined Constant IntMap_toList       => "Data.IntMap.toList". *)
 
 Inductive IntSet := getIntSet of seq nat.
 
@@ -87,20 +116,31 @@ Definition emptyIntSet := getIntSet [::].
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
    [Data.IntMap]. *)
-Definition IntSet_member     : nat -> IntSet -> bool      := fun _ _ => false.
-Definition IntSet_insert     : nat -> IntSet -> IntSet    := fun _ x => x.
-Definition IntSet_delete     : nat -> IntSet -> IntSet    := fun _ x => x.
-Definition IntSet_union      : IntSet -> IntSet -> IntSet := fun _ x => x.
-Definition IntSet_difference : IntSet -> IntSet -> IntSet := fun _ x => x.
+Definition IntSet_member : nat -> IntSet -> bool :=
+  fun k m => let: getIntSet xs := m in k \in xs.
+
+Definition IntSet_insert : nat -> IntSet -> IntSet := fun k m =>
+  let: getIntSet xs := m in
+  if k \in xs then m else getIntSet (k :: xs).
+
+Definition IntSet_delete : nat -> IntSet -> IntSet := fun k m =>
+  let: getIntSet xs := m in getIntSet (rem k xs).
+
+Definition IntSet_union : IntSet -> IntSet -> IntSet := fun m1 m2 =>
+  let: getIntSet xs1 := m1 in
+  let: getIntSet xs2 := m2 in
+  getIntSet (undup (xs1 ++ xs2)).
+
+Definition IntSet_difference : IntSet -> IntSet -> IntSet := fun m1 m2 =>
+  let: getIntSet xs1 := m1 in
+  let: getIntSet xs2 := m2 in
+  getIntSet (filter (fun k => k \notin xs2) xs1).
 
 Definition IntSet_foldl : forall a, (a -> nat -> a) -> a -> IntSet -> a :=
-  fun _ _ z _ => z.
+  fun _ f z m => let: getIntSet xs := m in foldl f z xs.
 
 Definition IntSet_forFold {a} (z : a) (m : IntSet) (f: a -> nat -> a) : a :=
   IntSet_foldl f z m.
-
-Extract Inductive IntSet => "Data.IntSet.IntSet"
-  ["Data.IntSet.fromList"] "(\fS m -> fS m)".
 
 Section EqIntSet.
 
@@ -125,13 +165,15 @@ Canonical IntSet_eqType := Eval hnf in EqType IntSet IntSet_eqMixin.
 
 End EqIntSet.
 
-Extract Inlined Constant IntSet_member     => "Data.IntSet.member".
-Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert".
-Extract Inlined Constant IntSet_delete     => "Data.IntSet.delete".
-Extract Inlined Constant IntSet_union      => "Data.IntSet.union".
-Extract Inlined Constant IntSet_difference => "Data.IntSet.difference".
-Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'".
-Extract Inlined Constant eqIntSet          => "(Prelude.==)".
+(* Extract Inductive IntSet => "Data.IntSet.IntSet" *)
+(*   ["Data.IntSet.fromList"] "(\fS m -> fS m)". *)
+
+(* Extract Inlined Constant IntSet_member     => "Data.IntSet.member". *)
+(* Extract Inlined Constant IntSet_insert     => "Data.IntSet.insert". *)
+(* Extract Inlined Constant IntSet_delete     => "Data.IntSet.delete". *)
+(* Extract Inlined Constant IntSet_union      => "Data.IntSet.union". *)
+(* Extract Inlined Constant IntSet_difference => "Data.IntSet.difference". *)
+(* Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'". *)
 
 Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) : IntMap (seq a) :=
   forFold emptyIntMap l $ fun acc x =>

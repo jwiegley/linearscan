@@ -1,10 +1,11 @@
 module LinearScan.Utils where
 
 import Data.Char
-import Data.List
+import Data.List as L
+import Data.IntMap as M
 import Debug.Trace
 
-trace = Debug.Trace.trace . map chr
+trace = Debug.Trace.trace . L.map chr
 
 boundedTransport' pos n _top_assumption_ = _top_assumption_
 
@@ -12,9 +13,9 @@ snoc _ xs x = xs ++ [x]
 
 set_nth _ xs n x = take n xs ++ x : drop (n+1) xs
 
-vmap _ = Data.List.map
+vmap _ = L.map
 
-vfoldl' _ = Data.List.foldl'
+vfoldl' _ = L.foldl'
 
 vfoldl'_with_index _ f = go 0
   where
@@ -34,3 +35,15 @@ list_rect z f _ = go z
 uncons :: [a] -> Maybe (a, [a])
 uncons [] = Nothing
 uncons (x:xs) = Just (x, xs)
+
+intMap_mergeWithKey'
+    :: (Int -> a -> b -> Maybe c)
+    -> ([(Int, a)] -> [(Int, c)])
+    -> ([(Int, b)] -> [(Int, c)])
+    -> ([(Int, a)]) -> ([(Int, b)])
+    -> [(Int, c)]
+intMap_mergeWithKey' combine only1 only2 m1 m2 =
+    M.toList $ M.mergeWithKey combine
+        (M.fromList . only1 . M.toList)
+        (M.fromList . only2 . M.toList)
+        (M.fromList m1) (M.fromList m2)

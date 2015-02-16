@@ -159,23 +159,23 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
          b.live_in = (b.live_out – b.live_kill) ∪ b.live_gen
        end for
      while change occurred in any live set *)
-  forFold liveSets (rev blocks) $ fun liveSets1 b =>
+  forFoldr liveSets blocks $ fun b liveSets1 =>
     let bid := blockId binfo b in
     match IntMap_lookup bid liveSets1 with
     | None => liveSets1       (* jww (2015-02-14): should never happen *)
     | Some liveSet =>
       let liveSet2 :=
-        forFold liveSet (blockSuccessors binfo b) $ fun liveSet1 s_bid =>
+        forFold liveSet (blockSuccessors binfo b) $ fun liveSet2 s_bid =>
           match IntMap_lookup s_bid liveSets1 with
-          | None => liveSet1  (* jww (2015-02-14): should never happen *)
+          | None => liveSet2  (* jww (2015-02-14): should never happen *)
           | Some sux =>
-            {| blockLiveGen   := blockLiveGen liveSet1
-             ; blockLiveKill  := blockLiveKill liveSet1
-             ; blockLiveIn    := blockLiveIn liveSet1
-             ; blockLiveOut   := IntSet_union (blockLiveOut liveSet1)
+            {| blockLiveGen   := blockLiveGen liveSet2
+             ; blockLiveKill  := blockLiveKill liveSet2
+             ; blockLiveIn    := blockLiveIn liveSet2
+             ; blockLiveOut   := IntSet_union (blockLiveOut liveSet2)
                                               (blockLiveIn sux)
-             ; blockFirstOpId := blockFirstOpId liveSet1
-             ; blockLastOpId  := blockLastOpId liveSet1
+             ; blockFirstOpId := blockFirstOpId liveSet2
+             ; blockLastOpId  := blockLastOpId liveSet2
              |}
           end
         in

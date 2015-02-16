@@ -388,13 +388,13 @@ blockTests = do
             (jump "L3")         -- 11
         label "L3"              -- 13
             (do move v3 v9      -- 15
-                move v9 v11     -- 16
-                move v11 v10    -- 17
-                move v10 v12    -- 19
-                move v12 v13    -- 21
-                lc v14          -- 23
-                move v15 v5)    -- 25
-            (jump "L6")         -- 27
+                move v9 v11     -- 17
+                move v11 v10    -- 19
+                move v10 v12    -- 21
+                move v12 v13    -- 23
+                lc v14          -- 25
+                move v15 v5)    -- 27
+            (jump "L6")         -- 29
         label_ "L6"             -- 31
 	    (branch Zero v4 "L3" "L2") -- 33
         label "L2"                     -- 35

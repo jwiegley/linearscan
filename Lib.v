@@ -362,6 +362,9 @@ Qed.
 Definition forFold {A B : Type} (b : B) (v : seq A) (f : B -> A -> B) : B :=
   foldl f b v.
 
+Definition forFoldr {A B : Type} (b : B) (v : seq A) (f : A -> B -> B) : B :=
+  foldr f b v.
+
 Definition foldl_with_index
   {A B : Type} (f : nat -> B -> A -> B) (b : B) (v : seq A) : B :=
   let fix go n xs z :=
