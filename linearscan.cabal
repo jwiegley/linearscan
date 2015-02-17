@@ -88,24 +88,3 @@ library
   build-depends:    base >=4.7 && <4.8
                   , containers
                   , transformers
-
-test-suite test
-  default-language: Haskell2010
-  type:             exitcode-stdio-1.0
-  ghc-options:      -Wall -Werror -fno-warn-deprecated-flags
-  hs-source-dirs:   test
-  main-is:          Main.hs
-  other-modules:    AsmTest
-                    Hoopl
-                    Assembly
-                    DSL
-  build-depends: 
-        base >=3
-      , linearscan
-      , hspec              >= 1.4.4
-      , hspec-expectations >= 0.3
-      , containers         >= 0.5.5
-      , transformers       >= 0.3.0.0
-      , hoopl              >= 3.10.0.1
-      , lens-family-core
-      , free
