@@ -29,7 +29,7 @@ asmTest regs (compile "entry" -> (prog, entry))
         getBlockId lbl = fromMaybe (error "The impossible happened")
                                    (M.lookup lbl blockIds)
 
-    go blockIds = case evalState (alloc blockIds) (newSpillStack 0) of
+    go blockIds = case evalState (alloc blockIds) (newSpillStack 0 8) of
         Left err -> error $ "Allocation failed: " ++ err
         Right blks -> do
             let graph' = newGraph blks

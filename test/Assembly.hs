@@ -12,11 +12,9 @@ module Assembly where
 
 import           Compiler.Hoopl as Hoopl hiding ((<*>))
 import           Control.Applicative
-import           Control.Monad.Trans.State
 import           Data.Foldable
 import           Data.Traversable
 import qualified Data.List
-import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Lens.Family hiding (Constant)
@@ -140,39 +138,13 @@ branch tst v good bad =
 return_ :: EndNode (Node v)
 return_ = endNode $ return $ ReturnInstr [] Nop
 
-data StackInfo = StackInfo
-    { stackPtr   :: Int
-    , stackSlots :: M.Map (Maybe Int) Int
-    }
-    deriving (Eq, Show)
-
-newSpillStack :: Int -> StackInfo
-newSpillStack offset = StackInfo
-    { stackPtr   = offset
-    , stackSlots = mempty
-    }
-
-getStackSlot :: Maybe VarId -> State StackInfo Int
-getStackSlot vid = do
-    stack <- get
-    case M.lookup vid (stackSlots stack) of
-        Just off -> return off
-        Nothing -> do
-            let off = stackPtr stack
-            put StackInfo
-                 { stackPtr   = off + 8
-                 , stackSlots =
-                     M.insert vid off (stackSlots stack)
-                 }
-            return off
-
 data IRVar = PhysicalIV PhysReg | VirtualIV Int deriving Eq
 
 instance Show IRVar where
     show (PhysicalIV r) = "r" ++ show r
     show (VirtualIV n)  = "v" ++ show n
 
-instance NodeAlloc StackInfo (Node IRVar) (Node PhysReg) where
+instance NodeAlloc SpillStack (Node IRVar) (Node PhysReg) where
     isCall (Call {}) = True
     isCall _ = False
 

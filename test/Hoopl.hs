@@ -7,10 +7,12 @@
 
 module Hoopl where
 
-import Compiler.Hoopl as Hoopl hiding ((<*>))
-import Control.Applicative
-import Control.Monad.Trans.State (State)
-import LinearScan
+import           Compiler.Hoopl as Hoopl hiding ((<*>))
+import           Control.Applicative
+import           Control.Monad.Trans.State (State, get, put)
+import qualified Data.Map as M
+import           Data.Monoid
+import           LinearScan
 
 class HooplNode n1
       => NodeAlloc s n1 n2 | n1 -> n2, n2 -> n1, n1 -> s, n2 -> s where
@@ -71,3 +73,31 @@ opInfo = OpInfo
            NodeOO n -> [NodeOO (setRegisters m n)]
            NodeOC n -> [NodeOC (setRegisters m n)]
     }
+
+data SpillStack = SpillStack
+    { stackPtr      :: Int
+    , stackSlotSize :: Int
+    , stackSlots    :: M.Map (Maybe Int) Int
+    }
+    deriving (Eq, Show)
+
+newSpillStack :: Int -> Int -> SpillStack
+newSpillStack offset slotSize = SpillStack
+    { stackPtr      = offset
+    , stackSlotSize = slotSize
+    , stackSlots    = mempty
+    }
+
+getStackSlot :: Maybe VarId -> State SpillStack Int
+getStackSlot vid = do
+    stack <- get
+    case M.lookup vid (stackSlots stack) of
+        Just off -> return off
+        Nothing -> do
+            let off = stackPtr stack
+            put stack
+                 { stackPtr   = off + stackSlotSize stack
+                 , stackSlots =
+                     M.insert vid off (stackSlots stack)
+                 }
+            return off
