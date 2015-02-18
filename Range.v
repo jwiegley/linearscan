@@ -412,8 +412,8 @@ Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
   option oddnum :=
   if rangesIntersect xr yr
   then Some (if rbeg x < rbeg y
-             then exist _ (rbeg x) (Range_beg_odd xr)
-             else exist _ (rbeg y) (Range_beg_odd yr))
+             then exist _ (rbeg y) (Range_beg_odd yr)
+             else exist _ (rbeg x) (Range_beg_odd xr))
   else None.
 
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :

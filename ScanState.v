@@ -138,8 +138,8 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
     (if b is Pending
      then (* While a [ScanState] is [Pending], unhandled intervals may be
              added at any position.  Once it is finalized and [InUse],
-             unhandled intervals (arising from splits) may only be added after
-             the current position. *)
+             unhandled intervals (arising from splits) may only be added
+             after the current position. *)
           True
      else if unhandled sd is (_, u) :: _
           then u < ibeg d

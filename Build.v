@@ -387,8 +387,10 @@ Definition compileIntervals `(bs : BuildState pos) :
 Proof.
   apply: IntMap_foldlWithKey _ (vconst None, emptyIntMap) bs.
   move=> [regs vars] vid rs.
-  case E: rs.1 => [|? ?]; first by exact: (regs, vars).
+  case E: rs.1 => [|? ?];
+    first by exact: (regs, vars).
   case V: (vid < maxReg).
+    simpl in E.
     move: (Interval_fromRanges vid E) => /= i.
     exact: (vreplace regs (Ordinal V) (Some (packInterval i)), vars).
   have vid' := vid - maxReg.

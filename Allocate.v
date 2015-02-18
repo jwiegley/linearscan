@@ -52,22 +52,29 @@ Definition tryAllocateFreeReg {pre} :
     (option (SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) PhysReg)) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let current := curInterval cur in
+    let pos := curPosition cur in
 
     (* set freeUntilPos of all physical registers to maxInt
        for each interval it in active do
          freeUntilPos[it.reg] = 0
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
-    let go f v p := let: (i, r) := p in
-                    updateRegisterPos v r (f i) in
+    let go f v p := let: (i, r) := p in updateRegisterPos v r (f i) in
     let freeUntilPos' := foldl (go (fun _ => Some odd1)) (vconst None)
                                (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
-    let freeUntilPos :=
+    let freeUntilPos'' :=
         foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
            freeUntilPos' intersectingIntervals in
+    let freeUntilPos :=
+        vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
+          if mint is Some int
+          then updateRegisterPos acc reg
+                 (intervalIntersectionPoint int.2 current)
+          else acc)
+          freeUntilPos'' (fixedIntervals sd) in
 
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
@@ -93,7 +100,7 @@ Definition tryAllocateFreeReg {pre} :
                // register available for the first part of the interval
                current.reg = reg
                split current before freeUntilPos[reg] *)
-          if n.1 == 1
+          if (n.1 <= pos)
           then None
           else @Some _ $
             if intervalEnd current < n.1
@@ -120,23 +127,31 @@ Definition allocateBlockedReg {pre} :
          nextUsePos[it.reg] = next use of it after start of current
        for each interval it in inactive intersecting with current do
          nextUsePos[it.reg] = next use of it after start of current *)
-    let go v p := let: (i, r) := p in
-        let int := getInterval i in
+    let go {n : nat} (v : Vec (option oddnum) n) (p : IntervalSig * 'I_n) :=
+        let: (int, r) := p in
         let atPos u := pos == uloc u in
         let pos' :=
             (* In calculating the highest use position of this register, if we
                know that it is being used at the current position, then it
                cannot be spilled there, and so we try to take it out of the
                running by returning one. *)
-            match findIntervalUsePos int atPos with
+            match findIntervalUsePos int.1 atPos with
             | Some _ => Some odd1
-            | None   => nextUseAfter int start
+            | None   => nextUseAfter int.1 start
             end in
         updateRegisterPos v r pos' in
-    let nextUsePos' := foldl go (vconst None) (active sd) in
-    let intersectingIntervals :=
-        filter (fun x => intervalsIntersect current (getInterval (fst x)))
-               (inactive sd) in
+    let resolve xs := [seq (packInterval (getInterval (fst i)), snd i)
+                      | i <- xs] in
+    let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
+    let intersectingIntervals : seq (IntervalSig * PhysReg) :=
+        filter (fun x => intervalsIntersect current (fst x).2)
+               (resolve (inactive sd)) ++
+        vfoldl_with_index (fun reg acc mint =>
+          if mint is Some int
+          then if intervalsIntersect current int.2
+               then (int, reg) :: acc
+               else acc
+          else acc) [::] (fixedIntervals sd) in
     let nextUsePos := foldl go nextUsePos' intersectingIntervals in
 
     (* reg = register with highest nextUsePos *)
@@ -145,7 +160,11 @@ Definition allocateBlockedReg {pre} :
 
     if (match mres with
         | None   => false
-        | Some n => n.1 < start
+        | Some n =>
+            n.1 < if lookupUsePos current (fun u => pos <= uloc u)
+                    is Some nextUse
+                  then nextUse.1
+                  else intervalEnd current
         end)
     then
       (* if first usage of current is after nextUsePos[reg] then
@@ -154,7 +173,9 @@ Definition allocateBlockedReg {pre} :
            assign spill slot to current
            split current before its first use position that requires a
              register *)
-      splitCurrentInterval BeforeFirstUsePosReqReg ;;;
+      (if splitPosition current BeforeFirstUsePosReqReg is Some p
+       then splitCurrentInterval (BeforePos p)
+       else return_ tt) ;;;
 
       (* This scenario can only occur if the beginning of the current interval
          (the current position) is less than its first use position.  Thus,

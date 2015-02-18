@@ -22,6 +22,7 @@ Inductive SSError : Set :=
   | ECannotSplitSingleton5 : nat -> SSError
   | ECannotSplitSingleton6 : nat -> SSError
   | ECannotSplitSingleton7 : nat -> SSError
+  | ECannotSplitSingleton8 : nat -> SSError
   | ENoIntervalsToSplit
   | ERegisterAlreadyAssigned : nat -> SSError
   | ERegisterAssignmentsOverlap : nat -> SSError

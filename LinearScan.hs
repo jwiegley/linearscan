@@ -133,6 +133,8 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
                 "Current interval is a singleton (err#6) (" ++ show n ++ ")"
             LS.ECannotSplitSingleton7 n ->
                 "Current interval is a singleton (err#7) (" ++ show n ++ ")"
+            LS.ECannotSplitSingleton8 n ->
+                "Current interval is a singleton (err#8) (" ++ show n ++ ")"
             LS.ENoIntervalsToSplit ->
                 "There are no intervals to split"
             LS.ERegisterAlreadyAssigned n ->

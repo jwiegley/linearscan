@@ -60,18 +60,17 @@ Definition mergeKind (k1 k2 : IntervalKind) : IntervalKind :=
   end.
 
 Record IntervalDesc : Set := {
-    (* The [varId] is simply a number that refers to the variable for which
-       this interval was created.  This number must be maintained by the
-       caller, and has no meaning at this point in the code.  Note that
-       multiple intervals can all relate to the same [varId]. *)
-    ivar : nat;
-    ibeg : nat;
-    iend : nat;
-    (* [ispl] is true if this interval is the left half of a split block,
-       where isplit was [false] for that block; otherwise, isplit is
-       inherited. *)
-    iknd : IntervalKind;
-    rds  : NonEmpty RangeSig
+  (* The [varId] is simply a number that refers to the variable for which this
+     interval was created.  This number must be maintained by the caller, and
+     has no meaning at this point in the code.  Note that multiple intervals
+     can all relate to the same [varId]. *)
+  ivar : nat;
+  ibeg : nat;
+  iend : nat;
+  (* [ispl] is true if this interval is the left half of a split block, where
+     isplit was [false] for that block; otherwise, isplit is inherited. *)
+  iknd : IntervalKind;
+  rds  : NonEmpty RangeSig
 }.
 
 (** * Interval *)
@@ -195,18 +194,14 @@ Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
 
 Definition intervalIntersectionPoint `(Interval i) `(Interval j) :
   option oddnum :=
-  NE_foldl
-    (fun acc rd =>
-       match acc with
-       | Some x => Some x
-       | None =>
-         NE_foldl
-           (fun acc' rd' =>
-              match acc' with
-              | Some x => Some x
-              | None => rangeIntersectionPoint rd.2 rd'.2
-              end) None (rds j)
-       end) None (rds i).
+  NE_foldl (fun mx rd =>
+    option_choose mx
+      (NE_foldl
+         (fun mx' rd' =>
+            option_choose mx
+              (rangeIntersectionPoint rd.2 rd'.2))
+         None (rds j)))
+    None (rds i).
 
 Definition searchInRange (r : RangeSig) (f : UsePos -> bool) :
   option { r' : RangeSig & { u : UsePos | u \in ups r'.1 } }.
@@ -293,8 +288,8 @@ Definition Interval_fromRanges (vid : nat)
             ; iknd := Whole
             ; rds  := rs' |}.
 Proof.
-  case: sr => /=.
-  move=> x Hsort Hlt r rs Heqe; subst.
+  case: sr => /= [x Hsort Hlt].
+  move=> r rs Heqe; subst.
   set ups0 := NE_from_list _ _.
   have: NE_StronglySorted range_ltn ups0
     by exact: NE_StronglySorted_from_list.

@@ -30,26 +30,28 @@ Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
     (* This should be the same thing as splitting at the current position. *)
   end.
 
+Definition splitPosWithin `(i : Interval d) (pos : SplitPosition) :=
+  match pos with
+  | BeforePos (exist x _) => ibeg d < x < iend d
+  | BeforeFirstUsePosReqReg => true
+  | EndOfLifetimeHole => true
+  end.
+
 Definition splitInterval `(st : ScanState InUse sd)
-  `(uid : IntervalId sd) (pos : SplitPosition) (forCurrent : bool) :
+  `(Hunh : unhandled sd = (u, beg) :: us) (pos : SplitPosition)
+  (uid : IntervalId sd) (forCurrent : bool) :
   SSError + option { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
-  case: sd => /= ? ints ? unh ? ? ? in st uid *.
+  case: sd => /= ? ints ? unh ? ? ? in st u us Hunh uid *.
   set int := vnth ints uid.
 
-  (* Splitting is not possible if we have nothing to process.
-     jww (2015-01-22): This should be provably unreachable code. *)
-  case: unh => [|[u beg] us] in st uid int *.
-    exact: inl (ECannotSplitSingleton1 uid). (* ERROR *)
-
   case: (splitPosition int.2 pos) => [[splitPos Hodd] |]; last first.
-    exact: inr None.            (* could not split, but benign *)
+    exact: inr None.            (* could not split, but maybe benign *)
 
   (* Ensure that the [splitPos] falls within the interval, otherwise our
-     action can have no effect.
-     jww (2015-01-22): This should be provably impossible. *)
-  case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
-    exact: inl (ECannotSplitSingleton2 uid). (* ERROR *)
+     action can have no effect. *)
+  case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
+    exact: inl (ECannotSplitSingleton1 uid). (* ERROR *)
   move/andP: Hmid => [Hmid1 Hmid2].
 
   have Hset := ScanState_setInterval st.
@@ -111,7 +113,8 @@ Proof.
              jww (2015-01-22): This should be provably impossible. *)
           move=> _.
           exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
-        move/(_ is_true_true).
+        rewrite Hunh.
+        move/(_ Hincr2).
         move=> st.
 
         apply: inr (Some (exist _ (packScanState st) _)).
@@ -137,8 +140,9 @@ Proof.
              current position.
              jww (2015-01-22): This should be provably impossible. *)
           move=> _.
-          exact: inl (ECannotSplitSingleton3 uid). (* ERROR *)
-        move/(_ is_true_true).
+          exact: inl (ECannotSplitSingleton4 uid). (* ERROR *)
+        rewrite Hunh.
+        move/(_ Hincr2).
         move=> st.
 
         apply: inr (Some (exist _ (packScanState st) _)).
@@ -153,6 +157,7 @@ Proof.
     rewrite /= => {st}.
     set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
     simpl in new_unhandled.
+    rewrite Hunh.
     move/(_ Hincr).
     move=> st.
 
@@ -168,7 +173,7 @@ Proof.
 
     (* jww (2015-01-22): This should be provably impossible. *)
     case: forCurrent.
-      exact: inl (ECannotSplitSingleton4 uid). (* ERROR *)
+      exact: inl (ECannotSplitSingleton5 uid). (* ERROR *)
 
     rewrite eq_sym in H2.
     move: Hset.
@@ -196,12 +201,13 @@ Proof.
       (* It is not allowable to inject new unhandled intervals for the current
          position.
          jww (2015-01-22): This should be provably impossible. *)
-      exact: inl (ECannotSplitSingleton5 uid). (* ERROR *)
+      exact: inl (ECannotSplitSingleton6 uid). (* ERROR *)
 
     have := ScanState_newUnhandled st i1.
     rewrite /= => {st}.
     set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
     simpl in new_unhandled.
+    rewrite Hunh.
     move/(_ Hincr).
     move=> st.
 
@@ -222,17 +228,16 @@ Proof.
   move=> ssi.
   case: ssi => desc.
   case=> H. case: H => /=; case.
-  case: desc => /= ? intervals0 ? unhandled0 ? ? ?.
-
-  case E: unhandled0 => //= [[uid beg] us].
-  set desc := Build_ScanStateDesc _ _ _ _ _ _; simpl in desc.
-  move=> next_interval_increases0 unhandled_nonempty0 first_nonempty0.
-
-  move/splitInterval/(_ uid pos true).
+  case Hunh: (unhandled desc) => //= [[uid beg] us].
+  move=> H1 H2 H3.
+  move/splitInterval/(_ uid beg us Hunh pos uid true).
+  case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
   case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton6 uid). (* ERROR *)
+  - exact: inl (ECannotSplitSingleton7 uid). (* ERROR *)
   - apply: (inr (tt, _)).
     apply: (Build_SSInfo _ st).
+    rewrite Hunh /= in H.
+    specialize (H (ltn0Sn _)).
     apply Build_SSMorphHasLen;
     try apply Build_SSMorphHasLen;
     try apply Build_SSMorphLen;
@@ -240,8 +245,7 @@ Proof.
     try apply Build_SSMorph;
     rewrite ?insert_size ?size_map //;
     try move=> Hpre;
-    try exact: (leq_trans next_interval_increases0 _);
-    exact: H first_nonempty0.
+    exact: (leq_trans H1 _).
   - exact: inl err.
 Defined.
 
@@ -265,20 +269,17 @@ Proof.
     by exact: map_fst_filter_snd.
   move: intlist Hintlist intids Hin.
 
-  case: desc => /= ? intervals0 ? ? active0 inactive0 ?.
-  move=> intlist Hintlist intids Hin.
-
-  set desc := Build_ScanStateDesc _ _ _ _ _ _.
-  simpl in desc.
-  move=> next_interval_increases0 unhandled_nonempty0 first_nonempty0 st.
+  case Hunh: (unhandled desc) => //= [[uid beg] us].
+  case: desc => /= ? intervals0 ? ? active0 inactive0 ? in uid us Hunh *.
+  move=> intlist Hintlist intids Hin H1 H2 H3 st.
 
   elim Hintids: intids => /= [|aid aids IHaids] in Hin *.
     exact: inl ENoIntervalsToSplit. (* ERROR *)
 
   move: st.
-  move/splitInterval/(_ aid pos false).
+  move/splitInterval/(_ uid beg us Hunh pos aid false).
   case=> [err|[[[sd st] [[/= Hincr H]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton7 aid). (* ERROR *)
+  - exact: inl (ECannotSplitSingleton8 aid). (* ERROR *)
   - apply: (inr (tt, _)).
 
     (* When splitting an active interval, we must move the first half over to
@@ -295,6 +296,8 @@ Proof.
          simpl in act_to_inact;
          move=> st);
 
+    rewrite Hunh /= in H;
+    specialize (H (ltn0Sn _));
     apply: (Build_SSInfo _ st);
     apply Build_SSMorphHasLen;
     try apply Build_SSMorphHasLen;
@@ -302,8 +305,7 @@ Proof.
     try apply Build_SSMorph;
     rewrite ?insert_size ?size_map //;
     try move=> Hpre;
-    try exact: (leq_trans next_interval_increases0 _);
-    exact: (H first_nonempty0).
+    exact: (leq_trans H1 _).
   - exact: inl err.
 Defined.
 
