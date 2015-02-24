@@ -21,7 +21,7 @@ module LinearScan
     ) where
 
 import Control.Monad.Trans.State
--- import Debug.Trace
+import Debug.Trace
 import qualified LinearScan.Blocks as LS
 import qualified LinearScan.Main as LS
 import qualified LinearScan.Morph as LS
@@ -98,8 +98,7 @@ deriving instance Show OpKind
 
 fromOpInfo :: OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
 fromOpInfo (OpInfo a b c d e f g sh) =
-    LS.Build_OpInfo a
-        (map fromVarInfo . b)
+    LS.Build_OpInfo a (map fromVarInfo . b)
         ((runState .) . c)
         ((runState .) . d)
         ((runState .) . e)
@@ -130,11 +129,10 @@ showBlock1' getops bid pos liveIns liveOuts showops b =
 fromBlockInfo :: BlockInfo blk1 blk2 op1 op2
               -> LS.BlockInfo blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d) =
-    LS.Build_BlockInfo a b
-        (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
+    LS.Build_BlockInfo a b (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
         (showBlock1' (\blk -> case c blk of (x, y, z) -> x ++ y ++ z))
-        seq
-        -- Debug.Trace.trace
+        -- seq
+        Debug.Trace.trace
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register

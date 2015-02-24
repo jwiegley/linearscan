@@ -234,10 +234,20 @@ Definition nextUseAfter (d : IntervalDesc) (pos : nat) : option oddnum :=
   lookupUsePos d (fun u => pos < uloc u).
 Arguments nextUseAfter d pos /.
 
-Definition firstUsePos (d : IntervalDesc) : option nat :=
-  if ups (NE_head (rds d)).1 is u :: _
+Definition rangeFirstUsePos (rd : RangeDesc) : option nat :=
+  if ups rd is u :: _
   then Some (uloc u)
   else None.
+Arguments rangeFirstUsePos rd /.
+
+Definition firstUsePos (d : IntervalDesc) : option nat :=
+  let fix go xs :=
+      match xs with
+        | NE_Sing x => rangeFirstUsePos x.1
+        | NE_Cons x xs =>
+            option_choose (rangeFirstUsePos x.1) (go xs)
+      end in
+  go (rds d).
 Arguments firstUsePos d /.
 
 Definition firstUseReqReg (d : IntervalDesc) : option oddnum :=
@@ -290,10 +300,10 @@ Definition Interval_fromRanges (vid : nat)
 Proof.
   case: sr => /= [x Hsort Hlt].
   move=> r rs Heqe; subst.
-  set ups0 := NE_from_list _ _.
-  have: NE_StronglySorted range_ltn ups0
+  set rds0 := NE_from_list _ _.
+  have: NE_StronglySorted range_ltn rds0
     by exact: NE_StronglySorted_from_list.
-  elim: ups0 => //= [r'|r' rs' IHrs'].
+  elim: rds0 => //= [r'|r' rs' IHrs'].
     move: (I_Sing vid Whole r'.2).
     by destruct r'; destruct x.
   invert.

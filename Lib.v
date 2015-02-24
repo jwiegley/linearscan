@@ -77,6 +77,16 @@ Proof.
   case: xs => //= [|y ys] in H IHxs *.
 Qed.
 
+Lemma negneg : forall (a : eqType) (x y : a), ~~ (x != y) -> x = y.
+Proof.
+  move=> a x y H.
+  move/negbTE in H.
+  case E: (x == y).
+    by move/eqP in E.
+  move/eqP in E.
+  by move/eqP in H.
+Qed.
+
 Ltac move_to_top x :=
   match reverse goal with
   | H : _ |- _ => try move x after H
