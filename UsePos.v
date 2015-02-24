@@ -1,7 +1,5 @@
 Require Import LinearScan.Lib.
 
-Require Import Coq.Sorting.Sorted.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

@@ -21,6 +21,7 @@ module LinearScan
     ) where
 
 import Control.Monad.Trans.State
+-- import Debug.Trace
 import qualified LinearScan.Blocks as LS
 import qualified LinearScan.Main as LS
 import qualified LinearScan.Morph as LS
@@ -68,19 +69,41 @@ data OpInfo accType op1 op2 = OpInfo
     , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
     , restoreOp   :: Maybe Int -> PhysReg   -> State accType [op2]
     , applyAllocs :: op1 -> [(Int, PhysReg)] -> [op2]
+    , showOp1     :: op1 -> String
     }
+
+showOp1' :: (op1 -> String)
+         -> LS.OpId
+         -> [(Int, Either PhysReg LS.VarId)]
+         -> [(Int, Either PhysReg LS.VarId)]
+         -> op1
+         -> String
+showOp1' showop pos ins outs o =
+    let showerv (Left r)  = "r" ++ show r
+        showerv (Right v) = "v" ++ show v in
+    concatMap (\(i, erv) ->
+                "<Beg " ++ showerv erv ++
+                (if i == either id id erv
+                 then ""
+                 else "[" ++ show i ++ "]") ++ ">\n") ins ++
+    show pos ++ ": " ++ showop o ++ "\n" ++
+    concatMap (\(i, erv) ->
+                "<End " ++ showerv erv ++
+                (if i == either id id erv
+                 then ""
+                 else "[" ++ show i ++ "]") ++ ">\n") outs
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
 fromOpInfo :: OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
-fromOpInfo (OpInfo a b c d e f g) =
+fromOpInfo (OpInfo a b c d e f g sh) =
     LS.Build_OpInfo a
         (map fromVarInfo . b)
         ((runState .) . c)
         ((runState .) . d)
         ((runState .) . e)
-        ((runState .) . f) g
+        ((runState .) . f) g (showOp1' sh)
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -91,11 +114,27 @@ data BlockInfo blk1 blk2 op1 op2 = BlockInfo
     , setBlockOps     :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
     }
 
+showBlock1' :: (blk1 -> [op1])
+            -> LS.BlockId
+            -> LS.OpId
+            -> [Int]
+            -> [Int]
+            -> (LS.OpId -> [op1] -> String)
+            -> blk1
+            -> String
+showBlock1' getops bid pos liveIns liveOuts showops b =
+    "\nBlock " ++ show bid ++
+    " => IN:" ++ show liveIns ++ " OUT:" ++ show liveOuts ++ "\n" ++
+    showops pos (getops b)
+
 fromBlockInfo :: BlockInfo blk1 blk2 op1 op2
               -> LS.BlockInfo blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d) =
     LS.Build_BlockInfo a b
         (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
+        (showBlock1' (\blk -> case c blk of (x, y, z) -> x ++ y ++ z))
+        seq
+        -- Debug.Trace.trace
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register

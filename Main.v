@@ -15,7 +15,9 @@ Require Import LinearScan.LiveSets.
 Require Import LinearScan.Order.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
+Require Import LinearScan.Trace.
 Require Import LinearScan.Morph.
+Require Import String.
 
 Definition linearScan
   {blockType1 blockType2 opType1 opType2 accType : Set}
@@ -38,14 +40,16 @@ Definition linearScan
   | inr ssig =>
 
     (* allocate registers *)
-    match walkIntervals registers_exist ssig.2 (countOps binfo blocks).+1
+    let blocks' := traceBlocksHere binfo oinfo ssig.1 liveSets' blocks in
+    match walkIntervals registers_exist ssig.2 (countOps binfo blocks').+1
     return SSError + (seq blockType2 * accType) with
     | inl err => inl err
     | inr ssig' =>
-        let mappings := resolveDataFlow binfo ssig'.2 blocks liveSets' in
+        let blocks'' := traceBlocksHere binfo oinfo ssig'.1 liveSets' blocks' in
+        let mappings := resolveDataFlow binfo ssig'.2 blocks'' liveSets' in
 
         (* replace virtual registers with physical registers *)
-        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks accum
+        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks'' accum
     end
   end.
 
@@ -60,6 +64,8 @@ Set Extraction AccessOpaque.
     bounds. *)
 Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "(Prelude.succ)"]
   "(\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))".
+
+Extract Inductive String.string => "Prelude.String" ["[]" "(:)"].
 
 Extract Inductive comparison =>
   "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].

@@ -201,7 +201,7 @@ Definition assignRegNum `(st : ScanState InUse sd)
     considerOps
       (doAllocations
          [seq (getIntervalDesc (getInterval (fst x)), snd x)
-         | x <- handled sd ++ active sd ++ inactive sd])
+         | x <- allocations sd])
       liveSets
       mappings
       blocks

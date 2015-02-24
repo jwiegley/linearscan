@@ -19,13 +19,12 @@ Module UnhandledSorted.
 (* SSReflect doesn't provide a scheme for determining sortedness, so we
    confine the import of the Sorted library to this section. *)
 
-Require Import Coq.Lists.List.
-Require Import Coq.Sorting.Sorted.
-Require Import Ssreflect.seq.
+(* Require Import Coq.Lists.List. *)
+(* Require Import Ssreflect.seq. *)
 
 Lemma Forall_widen : forall n x (xs : list ('I_n * nat)),
-  Forall (lebf (@snd _ _) x) xs
-    -> Forall (lebf (@snd _ _) (widen_id (fst x), snd x))
+  List.Forall (lebf (@snd _ _) x) xs
+    -> List.Forall (lebf (@snd _ _) (widen_id (fst x), snd x))
                    [seq (widen_id (fst p), snd p) | p <- xs].
 Proof.
   move=> ? x xs.
@@ -45,8 +44,8 @@ Proof.
 Qed.
 
 Lemma Forall_insert_spec : forall a x (xs : seq (a * nat)) z,
-  Forall (lebf (@snd _ _) x) xs -> lebf (@snd _ _) x z
-    -> Forall (lebf (@snd _ _) x) (insert (lebf (@snd _ _)) z xs).
+  List.Forall (lebf (@snd _ _) x) xs -> lebf (@snd _ _) x z
+    -> List.Forall (lebf (@snd _ _) x) (insert (lebf (@snd _ _)) z xs).
 Proof.
   move=> a x.
   elim=> /= [|y ys IHys] z H Hlt.
@@ -77,7 +76,7 @@ Proof.
     unfold lebf in *.
     apply ltnW. rewrite ltnNge.
     apply/negP/eqP. by rewrite L.
-  apply Forall_impl with (P := (fun m : a * nat => lebf (@snd _ _) x m)).
+  apply List.Forall_impl with (P := (fun m : a * nat => lebf (@snd _ _) x m)).
     rewrite /lebf.
     move=> a0 Hlt.
     move: L => /negP.

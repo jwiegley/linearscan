@@ -1,4 +1,6 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.IntMap.
+Require Import String.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -57,6 +59,8 @@ Definition nat_of_varId v := match varId v with
 Inductive OpKind : Set :=
   IsNormal | IsCall | IsBranch | IsLoopBegin | IsLoopEnd.
 
+Definition OpId := nat.
+
 (* The [OpInfo] structure is a collection of functions that allow us to
    determine information about each operation coming from the caller's
    side. *)
@@ -67,7 +71,9 @@ Record OpInfo (accType opType1 opType2 : Set) := {
   swapOp      : PhysReg -> PhysReg -> accType -> seq opType2 * accType;
   saveOp      : PhysReg -> option VarId -> accType -> seq opType2 * accType;
   restoreOp   : option VarId -> PhysReg -> accType -> seq opType2 * accType;
-  applyAllocs : opType1 -> seq (VarId * PhysReg) -> seq opType2
+  applyAllocs : opType1 -> seq (VarId * PhysReg) -> seq opType2;
+  showOp1     : OpId -> seq (nat * (PhysReg + VarId))
+                     -> seq (nat * (PhysReg + VarId)) -> opType1 -> string
 }.
 
 Definition BlockId := nat.
@@ -77,8 +83,18 @@ Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
   blockSuccessors : blockType1 -> seq BlockId;
   blockOps        : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
   setBlockOps     : blockType1 -> seq opType2 -> seq opType2 -> seq opType2
-                      -> blockType2
+                      -> blockType2;
+  showBlock1      : BlockId
+                 -> OpId
+                 -> IntSet     (* liveIn *)
+                 -> IntSet     (* liveOut *)
+                 -> (OpId -> seq opType1 -> string)
+                 -> blockType1
+                 -> string;
+  traceBlocks     : string -> seq blockType1 -> seq blockType1
 }.
+
+Close Scope string_scope.
 
 Variables blockType1 blockType2 opType1 opType2 accType : Set.
 
@@ -96,8 +112,6 @@ Definition blockSize (block : blockType1) := size (allBlockOps block).
    - Loop handling (reordering blocks to optimize allocation)
    - Extending of ranges for input/output variables
 *)
-
-Definition OpId := nat.
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
   foldl (fun bacc blk => foldl f bacc (allBlockOps blk)) z.

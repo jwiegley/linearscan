@@ -82,8 +82,11 @@ Definition lookupInterval `(st : ScanState sd) (vid : nat) (opid : nat) :
       end in
   vfoldl_with_index f None (intervals sd).
 
+Definition allocations (sd : ScanStateDesc) :=
+  handled sd ++ active sd ++ inactive sd.
+
 Definition lookupRegister `(st : ScanState sd) intid : option PhysReg :=
-  forFold None (handled sd ++ active sd ++ inactive sd) $ fun acc x =>
+  forFold None (allocations sd) $ fun acc x =>
     let: (xid, reg) := x in
     match acc with
     | Some r => Some r

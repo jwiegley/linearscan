@@ -3,8 +3,9 @@ Require Export LinearScan.Ltac.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 
-Require Export Coq.Classes.RelationClasses.
 Require Export Coq.Program.Wf.
+Require Export Coq.Sorting.Sorted.
+Require Export Coq.Classes.RelationClasses.
 
 Generalizable All Variables.
 Set Implicit Arguments.
@@ -58,6 +59,23 @@ Proof. by []. Qed.
 
 Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
 Proof. by []. Qed.
+
+Lemma maybeLast_last : forall a (u : a) us,
+  maybeLast (u :: us) = last (Some u) [seq (Some i) | i <- us].
+Proof.
+  move=> a u.
+  elim=> //= [x xs IHxs].
+  case: xs => //= [|y ys] in IHxs *.
+Qed.
+
+Lemma maybeLast_spec : forall a (u : a) us, maybeLast (u :: us) = None -> False.
+Proof.
+  move=> a u.
+  elim=> //= [x xs IHxs] H.
+  rewrite maybeLast_last /= in H.
+  rewrite maybeLast_last in IHxs.
+  case: xs => //= [|y ys] in H IHxs *.
+Qed.
 
 Ltac move_to_top x :=
   match reverse goal with
@@ -156,8 +174,6 @@ Proof.
   split=> //.
   constructor=> //.
 Qed.
-
-Require Import Coq.Sorting.Sorted.
 
 Lemma StronglySorted_inv_app : forall a R (l1 l2 : seq a),
   StronglySorted R (l1 ++ l2)
@@ -438,10 +454,9 @@ Proof.
   elim: l => /= [|x xs IHxs] l1 l2 Heqe.
     by inv Heqe.
   case E: (p x); rewrite E in Heqe.
-    destruct (span p xs) eqn:S.
+    case S: (span p xs) => [l l0] in IHxs Heqe *.
     inv Heqe.
-    specialize (IHxs l l0).
-    by rewrite {}IHxs.
+    by rewrite (IHxs l l0).
   by inv Heqe.
 Qed.
 
@@ -481,6 +496,22 @@ Definition partition {a} (p : a -> bool) : seq a -> seq a * seq a :=
            if p x
            then (x :: fst acc, snd acc)
            else (fst acc, x :: snd acc)) ([::], [::]).
+
+Lemma partition_all {a} {p q : a -> bool} (xs : seq a) :
+  all p xs -> let: (ys, zs) := partition q xs in
+              all (fun x => p x && q x) ys &&
+              all (fun x => p x && ~~ q x) zs.
+Proof.
+  move=> H.
+  elim: xs => //= [x xs IHxs] in H *.
+  case: (partition q xs) => [ys zs] /= in IHxs *.
+  move/andP: H => [H1 H2].
+  specialize (IHxs H2).
+  case E: (q x) => /=.
+    by ordered.
+  move/negbT in E.
+  by ordered.
+Qed.
 
 Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq_predType T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).

@@ -60,9 +60,9 @@ Proof.
   rewrite /= in Hset.
 
   case: (intervalSpan Hodd i) => /= [[[[id0 i0] |] [[id1 i1] |]]].
-  (* The interval was split into two parts, each containing use positions.
-     The second part always goes back onto the unhandled list for processing
-     later. *)
+  (* The interval was split into two parts.  The second part goes back onto
+     the unhandled list for processing later if it contains use positions that
+     require a register. *)
   - Case "(Some, Some)".
     move=> [/= H1 H2 /eqP H3].
 
