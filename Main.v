@@ -27,29 +27,29 @@ Definition linearScan
   (blocks : seq blockType1) (accum : accType) :
   SSError + (seq blockType2 * accType) :=
   (* order blocks and operations (including loop detection) *)
-  let blocks' := computeBlockOrder blocks in
+  let blocks1 := computeBlockOrder blocks in
   (* numberOperations blocks' ;;; *)
 
   (* create intervals with live ranges *)
-  let liveSets  := computeLocalLiveSets binfo oinfo blocks' in
-  let liveSets' := computeGlobalLiveSetsRecursively binfo blocks' liveSets in
+  let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
+  let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
-  match buildIntervals binfo oinfo blocks liveSets'
+  match buildIntervals binfo oinfo blocks1 liveSets'
   return SSError + (seq blockType2 * accType) with
   | inl err => inl err
   | inr ssig =>
 
     (* allocate registers *)
-    let blocks' := traceBlocksHere binfo oinfo ssig.1 liveSets' blocks in
-    match walkIntervals registers_exist ssig.2 (countOps binfo blocks').+1
+    let blocks2 := traceBlocksHere binfo oinfo ssig.1 liveSets' blocks1 in
+    match walkIntervals registers_exist ssig.2 (countOps binfo blocks2).+1
     return SSError + (seq blockType2 * accType) with
     | inl err => inl err
     | inr ssig' =>
-        let blocks'' := traceBlocksHere binfo oinfo ssig'.1 liveSets' blocks' in
-        let mappings := resolveDataFlow binfo ssig'.2 blocks'' liveSets' in
+        let blocks3 := traceBlocksHere binfo oinfo ssig'.1 liveSets' blocks2 in
+        let mappings := resolveDataFlow binfo ssig'.2 blocks3 liveSets' in
 
         (* replace virtual registers with physical registers *)
-        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks'' accum
+        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks3 accum
     end
   end.
 

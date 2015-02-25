@@ -40,9 +40,9 @@ Arguments last_or_beg rd /.
 Record Range (rd : RangeDesc) : Prop := {
   Range_beg_bounded : if ups rd is u :: _
                       then rbeg rd <= u
-                      else rbeg rd < rend rd;
-  Range_end_bounded : last_or_beg rd < rend rd;
-  Range_sorted      : StronglySorted upos_lt (ups rd);
+                      else rbeg rd <= rend rd;
+  Range_end_bounded : last_or_beg rd <= rend rd;
+  Range_sorted      : StronglySorted upos_le (ups rd);
   Range_beg_odd     : odd (rbeg rd);
   Range_all_odd     : all (odd \o uloc) (ups rd)
 }.
@@ -60,7 +60,7 @@ Notation RangeSig := { rd : RangeDesc | Range rd }.
 Definition Range_shiftup `(r : Range rd) `(Hodd : odd b)
   `(H : if ups rd is u :: _
         then b <= u
-        else b < rend rd) : RangeSig.
+        else b <= rend rd) : RangeSig.
 Proof.
   exists {| rbeg := b
           ; rend := rend rd
@@ -74,7 +74,7 @@ Defined.
 Definition Range_shiftup_spec `(r : Range rd) `(Hodd : odd b)
   `(H : if ups rd is u :: _
         then b <= u
-        else b < rend rd) :
+        else b <= rend rd) :
   forall r1, r1 = Range_shiftup r Hodd H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
@@ -106,10 +106,12 @@ Proof.
   move: (Range_beg_odd r) => Hbegodd.
   move: (Range_all_odd r) => Hall.
   constructor=> //=.
-  - by case: (ups rd) => //= in H2 Hend Hsort *.
+  - case: (ups rd) => //= in H2 Hend Hsort *.
+    exact/ltnW.
   - constructor=> //.
     case: (ups rd) => //= [u us] in H2 Hsort *.
     constructor=> //.
+      exact/ltnW.
     inv Hsort.
     by match_all.
   - by apply/andP; split.
@@ -126,20 +128,20 @@ Definition emptyBoundedRange (b e : nat) (H : b < e) (Hodd : odd b) :
   BoundedRange b e.
 Proof.
   apply: exist _ (exist _ {| rbeg := b; rend := e; ups := [::] |} _) _.
-    constructor=> //=.
+    constructor=> //=; try exact/ltnW.
     by constructor.
   move=> /= r.
   by apply/andP; split.
 Defined.
 
-Lemma Range_bounded `(r : Range rd) : rbeg rd < rend rd.
+Lemma Range_bounded `(r : Range rd) : rbeg rd <= rend rd.
 Proof.
   case: rd => [rb re rus] in r *.
   case: rus => /= [|u us] in r *.
     by move: r => [/= *].
   move: r => [/= H1 H2 H3 H4].
   inv H3.
-  move: (Forall_last_ltn H2 H6).
+  move: (Forall_last_leq H2 H6).
   by ordered.
 Qed.
 
@@ -148,10 +150,10 @@ Definition Range_split
                ; rend := rend0
                ; ups  := l1 ++ l2 |}) :
   forall before, odd before
-    -> last_or rbeg0 l1 < before
+    -> last_or rbeg0 l1 <= before
     -> (if l2 is u :: _
         then before <= u
-        else before < rend0)
+        else before <= rend0)
     -> (Range {| rbeg := rbeg0
                ; rend := before
                ; ups  := l1 |} *
@@ -169,7 +171,7 @@ Proof.
   split.
     clear Hsortedr Hoddr Hend.
     elim: l1 {r} => /= [|x xs IHxs] in Hlt1 Hsortedl Hoddl Hbeg *.
-      by constructor.
+      constructor=> //=; try exact/ltnW.
     inversion Hsortedl; subst; inv Hoddl.
     constructor=> //=.
     apply/andP; split=> //.
@@ -186,16 +188,6 @@ Proof.
     move/Forall_all in H4.
     by rewrite /funcomp.
 Defined.
-
-Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
-Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
-
-Program Instance range_ltn_trans : Transitive range_ltn.
-Obligation 1.
-  rewrite /range_ltn /= in H H0 *.
-  move: (Range_bounded H2).
-  by ordered.
-Qed.
 
 Definition Range_cat `(r1 : Range rd1) `(r2 : Range rd2) :
   rend rd1 == rbeg rd2
@@ -240,6 +232,16 @@ Proof.
     rewrite all_cat.
     apply/andP; split=> //=.
 Defined.
+
+Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
+Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
+
+Program Instance range_ltn_trans : Transitive range_ltn.
+Obligation 1.
+  rewrite /range_ltn /= in H H0 *.
+  move: (Range_bounded H2).
+  by ordered.
+Qed.
 
 (* A [SortedRanges] is a list of non-contiguous, ordered ranges, for which we
    know that the parameter [bound] is less than or equal to the beginning of
@@ -452,10 +454,10 @@ Definition rangeSpan (before : nat) (Hodd : odd before) `(r : Range rd) :
 Proof.
   have Hsort := (Range_sorted r).
   destruct rd.
-  case E: (span (fun x => uloc x < before) ups0) => [l1 l2].
+  case E: (span (fun x => uloc x <= before) ups0) => [l1 l2].
   symmetry in E.
   move: (span_cat E) => -> in r *.
-  move/andP: (span_all Hsort E) => [H1 H2].
+  move/andP: (span_all_leq Hsort E) => [H1 H2].
   case Hb: (before <= rbeg0) => /=.
     exists (None, Some (packRange r)).
     by repeat (apply/andP; split=> //=).
@@ -464,11 +466,14 @@ Proof.
     by repeat (apply/andP; split=> //=).
   move/negbT in Hb; rewrite -ltnNge in Hb.
   move/negbT in He; rewrite -ltnNge in He.
-  have H3: last_or rbeg0 l1 < before by exact: all_last.
+  have H3: last_or rbeg0 l1 <= before.
+    apply: all_last_leq => //.
+    exact/ltnW.
   have H4: (if l2 is u :: _
             then before <= u
-            else before < rend0).
-    case: l2 => //= [y ys] in E r H2 *.
+            else before <= rend0).
+    case: l2 => //= [|y ys] in E r H2 *.
+      exact/ltnW.
     by move/andP: H2; ordered.
   move: (Range_split r Hodd H3 H4) => [r1 r2].
   exists (Some (packRange r1), Some (packRange r2)).

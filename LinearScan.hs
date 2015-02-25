@@ -132,7 +132,7 @@ fromBlockInfo (BlockInfo a b c d) =
     LS.Build_BlockInfo a b (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
         (showBlock1' (\blk -> case c blk of (x, y, z) -> x ++ y ++ z))
         -- seq
-        Debug.Trace.trace
+        (\x y -> Debug.Trace.trace ("====================\n" ++ x) y)
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register
@@ -156,8 +156,8 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     eres <- gets (LS.linearScan maxReg binfo oinfo blocks)
     case eres of
         Left x -> return $ Left $ case x of
-            LS.ECannotSplitSingleton1 n ->
-                "Current interval is a singleton (err#1) (" ++ show n ++ ")"
+            LS.ERegistersExhausted _ ->
+                "No registers available for allocation"
             LS.ECannotSplitSingleton2 n ->
                 "Current interval is a singleton (err#2) (" ++ show n ++ ")"
             LS.ECannotSplitSingleton3 n ->

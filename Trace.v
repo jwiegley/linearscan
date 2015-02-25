@@ -49,8 +49,8 @@ Definition showOps1 (sd : ScanStateDesc maxReg) (startPos : nat)
           then (nat_of_ord idx, inl vid) :: acc
           else acc in
         vfoldl_with_index k [::] (fixedIntervals sd)) refs in
-    let startingP vid i := (ivar i.1 == vid) && (ibeg i.1 == pos.*2.+1) in
-    let endingP vid i := (ivar i.1 == vid) && (iend i.1 == pos.*2.+1) in
+    let startingP vid i   := (ivar i.1 == vid) && (ibeg i.1 == pos.*2.+1) in
+    let endingP vid i     := (ivar i.1 == vid) && (iend i.1 == pos.*2.+1) in
     let checkReg p vid mi := if mi isn't Some i then false else p vid i in
     let startingAtPos := collectVarRefs startingP ++
                          collectRegRefs (checkReg startingP) in

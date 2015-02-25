@@ -15,7 +15,7 @@ Definition PhysReg : predArgType := 'I_maxReg.
 Open Scope nat_scope.
 
 Inductive SSError : Set :=
-  | ECannotSplitSingleton1 : nat -> SSError
+  | ERegistersExhausted : nat -> SSError
   | ECannotSplitSingleton2 : nat -> SSError
   | ECannotSplitSingleton3 : nat -> SSError
   | ECannotSplitSingleton4 : nat -> SSError

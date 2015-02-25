@@ -51,7 +51,7 @@ Proof.
   (* Ensure that the [splitPos] falls within the interval, otherwise our
      action can have no effect. *)
   case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
-    exact: inl (ECannotSplitSingleton1 uid). (* ERROR *)
+    exact: inl (ERegistersExhausted uid). (* ERROR *)
   move/andP: Hmid => [Hmid1 Hmid2].
 
   have Hset := ScanState_setInterval st.

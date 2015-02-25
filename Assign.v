@@ -106,7 +106,7 @@ Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
 
 Definition collectAllocs opid outs ints acc v :=
   if @varId maxReg v isn't inr vid then pure acc else
-  let v_ints := [seq x <- ints | isWithin (fst x) vid opid] in
+  let v_ints := [seq x <- ints | isWithin (fst x) vid (varKind v) opid] in
   forFoldM acc v_ints $ fun acc' x =>
     match x
     return AssnState (seq (VarId * PhysReg) *
@@ -133,7 +133,6 @@ Definition doAllocations ints outs op : AssnState (seq opType2) :=
              ; assnBlockEnd := assnBlockEnd assn'
              ; assnAcc      := assnAcc assn' |}) ;;
   pure $ restores ++ op' ++ saves.
-
 
 Definition generateMoves
   (moves : seq (option (PhysReg + nat) * option (PhysReg + nat))) :

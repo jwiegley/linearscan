@@ -169,13 +169,15 @@ Proof.
     by case: (ups br.1.1) => /= [|u us] in H2 *; undoubled.
 
   have Hupos: match ups br.1.1 with
-      | [::]   => upos < rend br.1.1
+      | [::]   => upos <= rend br.1.1
       | u :: _ => upos <= u
       end.
     by case: (ups br.1.1) => /= [|u us] in H2 E *; undoubled.
 
-  case K: ((Output \in kinds) && (Input \notin kinds)).
-  - (* If this is an output variable that is not also used as an input
+  case: [&& Output \in kinds
+        ,   Input \notin kinds
+        &   rbeg br.1.1 < upos].
+    (* If this is an output variable that is not also used as an input
        variable, then rather than creating a new range, we simply insert the
        use position into that range.  We also shift up the beginning of the
        range, since it may begin here.  By doing this iteratively for each
@@ -194,60 +196,57 @@ Proof.
     rewrite /= in H1 Hloc r2.
     apply: Some {| cursorMid     := mid
                  ; cursorPending := exist _ r2 _
-                 ; cursorRanges  := exist2 _ _ rs _ _
-                 |} => //=.
-    + by ordered.
-    + by undoubled.
-    + by undoubled.
+                 ; cursorRanges  := exist2 _ _ rs _ _ |} => //=.
+    - by ordered.
+    - by undoubled.
+    - by undoubled.
 
-  - (* Otherwise, we must create a new [BoundedRange], and merge the previous
-       one into the [SortedRanges]. *)
-    case Hloc: (rbeg br.1.1 <= upos).
-    + have U: rbeg br.1.1 <= upos < head_or_end br.1.1
-        by ordered.
-      pose r1 := Range_cons Hodd br.1.2 U.
-      apply: Some {| cursorMid     := mid
-                   ; cursorPending := exist _ r1 _
-                   ; cursorRanges  := srs
-                   |} => //=.
-      * by ordered.
-      * by undoubled.
-      * clear -br.
-        move: br => [? Hr].
-        exact: Hr.
+  (* Otherwise, we must create a new [BoundedRange], and merge the previous
+     one into the [SortedRanges]. *)
+  case Hloc: (rbeg br.1.1 <= upos).
+    have U: rbeg br.1.1 <= upos < head_or_end br.1.1 by ordered.
+    pose r1 := Range_cons Hodd br.1.2 U.
+    apply: Some {| cursorMid     := mid
+                 ; cursorPending := exist _ r1 _
+                 ; cursorRanges  := srs |} => //=.
+    - by ordered.
+    - by undoubled.
+    - clear -br.
+      move: br => [? Hr].
+      exact: Hr.
 
-    + pose r1 := newRange Hodd.
+  pose r1 := newRange Hodd.
 
-      move/negbT in Hloc.
-      rewrite -ltnNge /= in Hloc.
+  move/negbT in Hloc.
+  rewrite -ltnNge /= in Hloc.
 
-      have Hspan: b.*2.+1 <= (pos.+1).*2.+1 <= rbeg br.1.1.
-        apply/andP; split=> //.
-        rewrite doubleS.
-        simpl in E.
-        move: (Range_beg_odd br.1.2) => Hbegodd.
-        apply: ltn_odd => //.
-        by apply/andP; split.
+  have Hspan: b.*2.+1 <= (pos.+1).*2.+1 <= rbeg br.1.1.
+    apply/andP; split=> //.
+    rewrite doubleS.
+    simpl in E.
+    move: (Range_beg_odd br.1.2) => Hbegodd.
+    apply: ltn_odd => //.
+    by apply/andP; split.
 
-      apply: Some {| cursorMid     := pos.+1
-                   ; cursorPending := exist _ r1 _
-                   |} => //=.
-      * by ordered.
-      * by undoubled.
-      * by undoubled.
-      * exact: (prependRange srs Hspan).1.
-      * case: (prependRange srs Hspan) => [p /= spec].
-        have Hmid': (pos.+1).*2.+1 <= mid.*2.+1.
-          by undoubled.
-        move: br => [r Hlt] in H2 spec E Hupos Hloc Hspan *.
-        have H4: rend r.1 <= mid.*2.+1.
-          pose Hlt' := Hlt.
-          by ordered.
-        have Hleq := last_leq H3 H4.
-        rewrite spec /= in Hleq.
-        apply: (last_leq Hleq _).
-        move: (Range_bounded r.2).
-        by ordered.
+  apply: Some {| cursorMid     := pos.+1
+               ; cursorPending := exist _ r1 _ |} => //=.
+  - by ordered.
+  - by undoubled.
+  - by undoubled.
+  - exact: (prependRange srs Hspan).1.
+  - case: (prependRange srs Hspan) => [p /= spec].
+    have Hmid': (pos.+1).*2.+1 <= mid.*2.+1.
+      by undoubled.
+    move: br => [r Hlt] in H2 spec E Hupos Hloc Hspan *.
+    have H4: rend r.1 <= mid.*2.+1.
+      pose Hlt' := Hlt.
+      by ordered.
+    have Hleq := last_leq H3 H4.
+    rewrite spec /= in Hleq.
+    apply: (last_leq Hleq _).
+    move: (Range_bounded r.2).
+    simpl in *.
+    by ordered.
 Defined.
 
 Definition handleVars_onlyRanges {b pos e}
@@ -272,9 +271,11 @@ Proof.
                else pos.*2.+1
      ; rend := if Output \in kinds
                then e.*2.+1
-               else pos.*2.+2
-     ; ups  := [:: {| uloc   := pos.*2.+1
-                    ; regReq := req |} ]
+               else if Temp \in kinds
+                    then pos.*2.+2
+                    else pos.*2.+1
+     ; ups  := [:: {| uloc      := pos.*2.+1
+                    ; regReq    := req |} ]
      |}.
   apply: {| cursorMid     := e
           ; cursorPending := exist _ (exist _ rd _) _
@@ -282,13 +283,15 @@ Proof.
   try undoubled.
   - constructor=> /=.
     + by case: (Input \in kinds); undoubled.
-    + by case: (Output \in kinds); undoubled.
+    + by case: (Output \in kinds);
+         case: (Temp \in kinds); undoubled.
     + by constructor; constructor.
     + by case: (Input \in kinds); exact: odd_double_plus.
     + by rewrite odd_double.
   - move=> r.
     case: (Input \in kinds);
     case: (Output \in kinds);
+    case: (Temp \in kinds);
     by undoubled.
   - exists [::] => //.
     by constructor.
@@ -322,8 +325,8 @@ Qed.
 Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
   (ranges : PendingRanges b pos.+1 e) (Hlt : b <= pos) :
   PendingRanges b pos e :=
-  (* If the operation is a function call, assuming it makes use of every
-     register.
+  (* If the operation is a function call, force a flush of every register.
+
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
   let refs := opRefs oinfo op in

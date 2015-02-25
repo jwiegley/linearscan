@@ -68,20 +68,6 @@ Definition registerWithHighestPos :
          if n.1 < m.1 then (reg, Some m) else (r, Some n)
        end) (Ordinal registers_exist, Some odd1).
 
-Definition isWithin (int : IntervalDesc) (vid : nat) (opid : nat) : bool :=
-  (ivar int == vid) && (ibeg int <= opid < iend int).
-
-Definition lookupInterval `(st : ScanState sd) (vid : nat) (opid : nat) :
-  option (IntervalId sd) :=
-  let f idx acc int := match acc with
-      | Some x => Some x
-      | None =>
-        if isWithin int.1 vid opid
-        then Some idx
-        else None
-      end in
-  vfoldl_with_index f None (intervals sd).
-
 Definition allocations (sd : ScanStateDesc) :=
   handled sd ++ active sd ++ inactive sd.
 

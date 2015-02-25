@@ -13,8 +13,8 @@ Generalizable All Variables.
     use position. *)
 
 Record UsePos : Set := {
-    uloc   : nat;
-    regReq : bool
+    uloc      : nat;
+    regReq    : bool
 }.
 
 Coercion uloc : UsePos >-> nat.
@@ -27,11 +27,17 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
+Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
+Arguments upos_le x y /.
+
 Definition upos_ge (x y : UsePos) : bool := ~~ upos_lt x y.
 Arguments upos_ge x y /.
 
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
+
+Program Instance upos_le_trans : Transitive upos_le.
+Obligation 1. exact: (leq_trans H). Qed.
 
 Definition head_or x xs := head x [seq uloc u | u <- xs].
 Arguments head_or x xs /.
@@ -47,7 +53,8 @@ Implicit Type s : UsePos.
 Fixpoint equpos s1 s2 {struct s2} :=
   match s1, s2 with
   | {| uloc := u1; regReq := rr1 |},
-    {| uloc := u2; regReq := rr2 |} => (u1 == u2) && (rr1 == rr2)
+    {| uloc := u2; regReq := rr2 |} =>
+      [&& u1 == u2 & rr1 == rr2]
   end.
 
 Lemma equposP : Equality.axiom equpos.
@@ -78,10 +85,33 @@ Proof.
   exact: IHzs.
 Qed.
 
-Lemma all_last : forall x xs before,
+Lemma all_leq_ltn : forall x y xs,
+  all (fun u : UsePos => y <= u) xs -> x < y
+    -> all (fun u : UsePos => x <= u) xs.
+Proof.
+  move=> x y.
+  elim=> [|z zs IHzs] //=.
+  move/andP => [H1 H2] H3.
+  apply/andP; split.
+    by ordered.
+  exact: IHzs.
+Qed.
+
+Lemma all_last_ltn : forall x xs before,
   x < before
     -> all (fun y : UsePos => uloc y < before) xs
     -> last_or x xs < before.
+Proof.
+  move=> x xs before Hlt Hall.
+  elim: xs => //= [y ys IHys] in x Hlt Hall *.
+  move/andP: Hall => [H1 H2].
+  exact: IHys.
+Qed.
+
+Lemma all_last_leq : forall x xs before,
+  x <= before
+    -> all (fun y : UsePos => uloc y <= before) xs
+    -> last_or x xs <= before.
 Proof.
   move=> x xs before Hlt Hall.
   elim: xs => //= [y ys IHys] in x Hlt Hall *.
@@ -103,7 +133,7 @@ Proof.
   by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
 Qed.
 
-Lemma span_all (l : list UsePos) : forall (x : nat) l1 l2,
+Lemma span_all_ltn (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_lt l
     -> (l1, l2) = span (fun y => uloc y < x) l
     -> all (fun y => uloc y < x) l1 && all (fun y => x <= uloc y) l2.
@@ -126,6 +156,32 @@ Proof.
   apply/andP; split=> //.
   move/Forall_all in H2.
   exact: (all_ltn_leq H2).
+Qed.
+
+Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
+  StronglySorted upos_le l
+    -> (l1, l2) = span (fun y => uloc y <= x) l
+    -> all (fun y => uloc y <= x) l1 && all (fun y => x <= uloc y) l2.
+Proof.
+  move=> p l1 l2 Hsort Heqe.
+  elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
+    by inv Heqe.
+  case E: (x <= p) in Heqe *.
+    inv Hsort.
+    case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
+    move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
+    apply/andP; split.
+      inv Heqe.
+      by apply/andP; split.
+    by inv Heqe.
+  inv Hsort; inv Heqe.
+  clear IHxs H1.
+  move/negbT: E.
+  rewrite -ltnNge => Hle.
+  move/Forall_all in H2.
+  apply/andP; split=> //.
+    exact/ltnW.
+  exact: (all_leq_ltn H2).
 Qed.
 
 Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
@@ -154,4 +210,23 @@ Proof.
   move=> z y.
   elim=> //= [x xs IHxs].
   exact: leq_trans IHxs _.
+Qed.
+
+Lemma last_leq_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
+  last z xs < n -> y <= z -> last y xs < n.
+Proof.
+  move=> z y.
+  elim=> //= [x xs IHxs].
+  exact: leq_ltn_trans IHxs _.
+Qed.
+
+Lemma Forall_last_leq : forall (y : UsePos) (ys : seq UsePos) (n : nat),
+  last (uloc y) [seq uloc u | u <- ys] <= n
+    -> List.Forall (fun x : UsePos => y <= x) ys -> y <= n.
+Proof.
+  move=> y.
+  elim=> //= [z zs IHzs] n Hlast.
+  invert; subst.
+  apply: IHzs => //.
+  exact (last_leq Hlast H1).
 Qed.

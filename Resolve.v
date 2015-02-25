@@ -1,9 +1,10 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Allocate.
-Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.Interval.
+Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.
+Require Import LinearScan.Allocate.
 Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
@@ -21,11 +22,32 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
+Definition isWithin (int : IntervalDesc) (vid : nat) (knd : VarKind)
+  (opid : nat) : bool :=
+  [&& ivar int == vid
+  ,   ibeg int <= opid
+  &   if knd is Input
+      then opid <= iend int
+      else opid < iend int
+  ].
+
+Definition lookupInterval `(st : @ScanState maxReg InUse sd)
+  (vid : nat) (knd : VarKind) (opid : nat) :
+  option (IntervalId sd) :=
+  let f idx acc int := match acc with
+      | Some x => Some x
+      | None =>
+        if isWithin int.1 vid knd opid
+        then Some idx
+        else None
+      end in
+  vfoldl_with_index f None (intervals sd).
+
 Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
   bid in_from from to mappings vid :=
 
-  let mfrom_int := lookupInterval st vid (blockLastOpId from) in
-  let mto_int   := lookupInterval st vid (blockFirstOpId to) in
+  let mfrom_int := lookupInterval st vid Output (blockLastOpId from) in
+  let mto_int   := lookupInterval st vid Input (blockFirstOpId to) in
 
   (* If the interval match, no move resolution is necessary. *)
   if mfrom_int == mto_int then mappings else
