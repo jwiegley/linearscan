@@ -161,7 +161,8 @@ Proof.
   move: vars => [req kinds].
 
   set upos := {| uloc   := pos.*2.+1
-               ; regReq := req |}.
+               ; regReq := req
+               ; inputOnly := kinds == [:: Input] |}.
   have Hodd : odd upos by rewrite /= odd_double.
 
   have E: (upos < head_or_end br.1.1).
@@ -275,7 +276,8 @@ Proof.
                     then pos.*2.+2
                     else pos.*2.+1
      ; ups  := [:: {| uloc      := pos.*2.+1
-                    ; regReq    := req |} ]
+                    ; regReq    := req
+                    ; inputOnly := kinds == [:: Input] |} ]
      |}.
   apply: {| cursorMid     := e
           ; cursorPending := exist _ (exist _ rd _) _
@@ -332,10 +334,17 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
   let refs := opRefs oinfo op in
   let refs' :=
     if opKind oinfo op is IsCall
-    then [seq {| varId       := inl n
-               ; varKind     := Temp
-               ; regRequired := true
-               |} | n in ord_enum maxReg] ++ refs
+    then
+      (* Although every register should be dropped, some architectures
+         actually pass the address they wish to call to in a variable.  Since
+         this is only an input variable, it's OK to allocate it up to the
+         call, since we needn't assume it will contain a value after the
+         call.  jww (2015-02-18): This solution is WRONG. *)
+      drop (size refs)
+           [seq {| varId       := inl n
+                 ; varKind     := Temp
+                 ; regRequired := true
+                 |} | n in ord_enum maxReg] ++ refs
     else refs in
 
   handleVars refs' Hlt ranges.

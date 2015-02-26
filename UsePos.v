@@ -13,8 +13,9 @@ Generalizable All Variables.
     use position. *)
 
 Record UsePos : Set := {
-    uloc      : nat;
-    regReq    : bool
+  uloc      : nat;
+  regReq    : bool;
+  inputOnly : bool
 }.
 
 Coercion uloc : UsePos >-> nat.
@@ -52,18 +53,19 @@ Implicit Type s : UsePos.
 
 Fixpoint equpos s1 s2 {struct s2} :=
   match s1, s2 with
-  | {| uloc := u1; regReq := rr1 |},
-    {| uloc := u2; regReq := rr2 |} =>
-      [&& u1 == u2 & rr1 == rr2]
+  | {| uloc := u1; regReq := rr1; inputOnly := io1 |},
+    {| uloc := u2; regReq := rr2; inputOnly := io2 |} =>
+      [&& u1 == u2, rr1 == rr2 & io1 == io2]
   end.
 
 Lemma equposP : Equality.axiom equpos.
 Proof.
   move.
-  case=> [u1 rr1].
-  case=> [u2 rr2] /=.
+  case=> [u1 rr1 io1].
+  case=> [u2 rr2 io2] /=.
   case: (u1 =P u2) => [<-|neqx]; last by right; case.
   case: (rr1 =P rr2) => [<-|neqx]; last by right; case.
+  case: (io1 =P io2) => [<-|neqx]; last by right; case.
   by constructor.
 Qed.
 
