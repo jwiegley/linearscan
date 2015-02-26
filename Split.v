@@ -95,8 +95,8 @@ Proof.
         apply Build_SSMorph => //=.
         exact.
 
-      case Hmid': (ibeg id1 < splitPos2 < iend id1); last first.
-        exact: inl (ECannotSplitSingleton2 uid). (* ERROR *)
+      case Hmid': (ibeg id1 < splitPos2 <= iend id1); last first.
+        exact: inl (ECannotSplitSingleton2 uid i1 splitPos2). (* ERROR *)
       move/andP: Hmid' => [Hmid1' Hmid2'].
 
       case: id1 => iv1 ib1 ie1 ? rds1 in i1 H1 H3 Hincr Hmid1' Hmid2' *.

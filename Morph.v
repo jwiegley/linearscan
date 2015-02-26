@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.IState.
+Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 
 Set Implicit Arguments.
@@ -16,7 +17,7 @@ Open Scope nat_scope.
 
 Inductive SSError : Set :=
   | ERegistersExhausted : nat -> SSError
-  | ECannotSplitSingleton2 : nat -> SSError
+  | ECannotSplitSingleton2 : nat -> IntervalDesc -> nat -> SSError
   | ECannotSplitSingleton3 : nat -> SSError
   | ECannotSplitSingleton4 : nat -> SSError
   | ECannotSplitSingleton5 : nat -> SSError

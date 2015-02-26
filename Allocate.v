@@ -436,8 +436,8 @@ Require Import Coq.Program.Wf.
    [unhandled] list, and use those to determine register allocations.  The
    final result will be a [ScanState] whose [handled] list represents the
    final allocations for each interval. *)
-Fixpoint walkIntervals {sd : ScanStateDesc maxReg} (st : ScanState InUse sd)
-  (positions : nat) : SSError + ScanStateSig maxReg InUse :=
+Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
+  (SSError * ScanStateSig maxReg InUse) + ScanStateSig maxReg InUse :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
@@ -448,7 +448,7 @@ Fixpoint walkIntervals {sd : ScanStateDesc maxReg} (st : ScanState InUse sd)
     then
       (* trace "walkIntervals: count > 0" $ *)
       match handleInterval ss with
-      | inl err => inl err
+      | inl err => inl (err, packScanState (thisState ss))
       | inr (_, ss') =>
         (* A [ScanState InUse] may not insert new unhandled intervals at the
            same position as [curPos], and so even though [unhandled sd] may
@@ -460,7 +460,8 @@ Fixpoint walkIntervals {sd : ScanStateDesc maxReg} (st : ScanState InUse sd)
            evaluated. *)
         match strengthenHasLen (thisHolds ss') with
         | None => if cnt is S _
-                  then inl EUnexpectedNoMoreUnhandled
+                  then inl (EUnexpectedNoMoreUnhandled,
+                            packScanState (thisState ss'))
                   else inr ss'
         | Some holds' =>
             go cnt {| thisDesc  := thisDesc ss'
@@ -487,6 +488,6 @@ Fixpoint walkIntervals {sd : ScanStateDesc maxReg} (st : ScanState InUse sd)
     end
 
   else (* jww (2015-01-20): Should be provably impossible *)
-       inl EFuelExhausted.
+       inl (EFuelExhausted, packScanState st).
 
 End Allocate.

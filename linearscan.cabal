@@ -48,7 +48,6 @@ library
   exposed-modules:
     LinearScan
   other-modules:
-    LinearScan.Ascii
     LinearScan.Allocate
     LinearScan.Assign
     LinearScan.Blocks
@@ -81,8 +80,6 @@ library
     LinearScan.Ssrfun
     LinearScan.Ssrnat
     LinearScan.State
-    LinearScan.String0
-    LinearScan.Trace
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
@@ -91,3 +88,4 @@ library
   build-depends:    base >=4.7 && <4.8
                   , containers
                   , transformers
+                  , mtl

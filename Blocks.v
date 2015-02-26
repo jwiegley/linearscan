@@ -72,8 +72,7 @@ Record OpInfo (accType opType1 opType2 : Set) := {
   saveOp      : PhysReg -> option VarId -> accType -> seq opType2 * accType;
   restoreOp   : option VarId -> PhysReg -> accType -> seq opType2 * accType;
   applyAllocs : opType1 -> seq (VarId * PhysReg) -> seq opType2;
-  showOp1     : OpId -> seq (nat * (PhysReg + VarId))
-                     -> seq (nat * (PhysReg + VarId)) -> opType1 -> string
+  showOp      : opType1 -> string
 }.
 
 Definition BlockId := nat.
@@ -83,15 +82,7 @@ Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
   blockSuccessors : blockType1 -> seq BlockId;
   blockOps        : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
   setBlockOps     : blockType1 -> seq opType2 -> seq opType2 -> seq opType2
-                      -> blockType2;
-  showBlock1      : BlockId
-                 -> OpId
-                 -> IntSet     (* liveIn *)
-                 -> IntSet     (* liveOut *)
-                 -> (OpId -> seq opType1 -> string)
-                 -> blockType1
-                 -> string;
-  traceBlocks     : string -> seq blockType1 -> seq blockType1
+                      -> blockType2
 }.
 
 Close Scope string_scope.

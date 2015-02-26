@@ -22,6 +22,5 @@ Spec.v
 Split.v
 Ssr.v
 State.v
-Trace.v
 UsePos.v
 Vector.v

@@ -6,26 +6,42 @@
 
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
+Require Import LinearScan.Lib.
+Require Import LinearScan.IntMap.
 Require Import LinearScan.Allocate.
 Require Import LinearScan.Assign.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Build.
-Require Import LinearScan.Lib.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Order.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
-Require Import LinearScan.Trace.
 Require Import LinearScan.Morph.
 Require Import String.
+
+Inductive FinalStage :=
+  | BuildingIntervalsFailed
+  | AllocatingRegistersFailed.
+
+Record Details {blockType1 blockType2 opType1 opType2 accType : Set}
+  (maxReg : nat) := {
+  reason          : option (SSError * FinalStage);
+  liveSets        : IntMap BlockLiveSets;
+  inputBlocks     : seq blockType1;
+  allocatedBlocks : seq blockType2;
+  accumulator     : accType;
+  scanStatePre    : option (ScanStateDesc maxReg);
+  scanStatePost   : option (ScanStateDesc maxReg);
+  blockInfo       : BlockInfo blockType1 blockType2 opType1 opType2;
+  opInfo          : OpInfo maxReg accType opType1 opType2
+}.
 
 Definition linearScan
   {blockType1 blockType2 opType1 opType2 accType : Set}
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : OpInfo maxReg accType opType1 opType2)
-  (blocks : seq blockType1) (accum : accType) :
-  SSError + (seq blockType2 * accType) :=
+  (blocks : seq blockType1) (accum : accType) : Details maxReg :=
   (* order blocks and operations (including loop detection) *)
   let blocks1 := computeBlockOrder blocks in
   (* numberOperations blocks' ;;; *)
@@ -35,21 +51,29 @@ Definition linearScan
   let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
   match buildIntervals binfo oinfo blocks1 liveSets'
-  return SSError + (seq blockType2 * accType) with
-  | inl err => inl err
+  return @Details blockType1 blockType2 opType1 opType2 accType maxReg with
+  | inl err =>
+    Build_Details
+        _ _ _ _ _ maxReg (Some (err, BuildingIntervalsFailed))
+        liveSets' blocks1 [::] accum None None binfo oinfo
   | inr ssig =>
-
     (* allocate registers *)
-    let blocks2 := traceBlocksHere binfo oinfo ssig.1 liveSets' blocks1 in
-    match walkIntervals registers_exist ssig.2 (countOps binfo blocks2).+1
-    return SSError + (seq blockType2 * accType) with
-    | inl err => inl err
+    match walkIntervals registers_exist ssig.2 (countOps binfo blocks1).+1
+    return Details maxReg with
+    | inl (err, ssig') =>
+      Build_Details
+          _ _ _ _ _ maxReg (Some (err, AllocatingRegistersFailed))
+          liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1) binfo oinfo
     | inr ssig' =>
-        let blocks3 := traceBlocksHere binfo oinfo ssig'.1 liveSets' blocks2 in
-        let mappings := resolveDataFlow binfo ssig'.2 blocks3 liveSets' in
+        let mappings := resolveDataFlow binfo ssig'.2 blocks1 liveSets' in
 
         (* replace virtual registers with physical registers *)
-        inr $ assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks3 accum
+        let: (blocks2, accum') :=
+           assignRegNum binfo oinfo ssig'.2 liveSets' mappings blocks1 accum in
+        Build_Details
+            _ _ _ _ _ maxReg None
+            liveSets' blocks1 blocks2 accum' (Some ssig.1) (Some ssig'.1)
+            binfo oinfo
     end
   end.
 
