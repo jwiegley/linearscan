@@ -204,6 +204,15 @@ Fixpoint init {a : Type} (x : a) (l : seq a) :=
     | cons y ys => x :: init y ys
   end.
 
+Lemma Forall_head : forall A P (x : A) xs,
+  List.Forall P (x :: xs) -> P (head x xs).
+Proof.
+  move=> A P x.
+  elim=> /= [|y ys IHys] H.
+    by inv H.
+  by inv H; inv H3.
+Qed.
+
 Lemma Forall_append : forall A (P : A -> Prop) xs ys,
    List.Forall P xs /\ List.Forall P ys <-> List.Forall P (xs ++ ys).
 Proof.
@@ -447,23 +456,13 @@ Lemma foldl_cons : forall a (x : a) xs,
     = foldl (fun us : seq a => cons^~ us) [::] [:: x & xs].
 Proof. by move=> a x; elim. Qed.
 
-Definition foldl_cons_cons {a} (x : a) xs :
-  let f us : a -> seq a := cons ^~ us in
-  foldl f [:: x] xs = rcons (foldl f [::] xs) x.
-Proof.
-  move=> f.
-  elim: xs => //= [z zs IHzs].
-  rewrite foldl_cons.
-Admitted.
-
-Lemma foldl_cat_cons : forall a (xs ys : seq a),
-  foldl (fun us => cons^~ us) [::] xs ++ foldl (fun us => cons^~ us) [::] ys
-    = foldl (fun us => cons^~ us) [::] (xs ++ ys).
-Proof.
-  move=> a xs ys.
-  elim: xs => //= [x xs IHxs] in ys *.
-  rewrite foldl_cons.
-Admitted.
+(* Lemma foldl_cat_cons : forall a (xs ys : seq a), *)
+(*   foldl (fun us => cons^~ us) [::] xs ++ foldl (fun us => cons^~ us) [::] ys *)
+(*     = foldl (fun us => cons^~ us) [::] (xs ++ ys). *)
+(* Proof. *)
+(*   move=> a xs ys. *)
+(*   elim: xs => //= [x xs IHxs] in ys *. *)
+(*   rewrite foldl_cons. *)
 
 Definition foldr_with_index
   {A B : Type} (f : nat -> A -> B -> B) (b : B) (v : seq A) : B :=
@@ -518,7 +517,8 @@ Fixpoint span {a} (p : a -> bool) (l : list a) : (list a * list a) :=
   end.
 
 Lemma span_cat {a} (l : list a) : forall p l1 l2,
-  (l1, l2) = span p l -> l = l1 ++ l2.
+  (l1, l2) = span p l
+    -> l = l1 ++ l2 /\ all p l1 /\ (if l2 is x :: _ then ~~ (p x) else True).
 Proof.
   move=> p.
   elim: l => /= [|x xs IHxs] l1 l2 Heqe.
@@ -526,8 +526,14 @@ Proof.
   case E: (p x); rewrite E in Heqe.
     case S: (span p xs) => [l l0] in IHxs Heqe *.
     inv Heqe.
-    by rewrite (IHxs l l0).
-  by inv Heqe.
+    move: (IHxs l l0 (refl_equal _)) => [? [? ?]].
+    split; first by congr (_ :: _).
+    split=> //.
+    by apply/andP; split=> //.
+  inv Heqe.
+  split=> //.
+  split=> //.
+  by apply/negbT.
 Qed.
 
 Example span_ex1 :

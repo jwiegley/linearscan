@@ -110,7 +110,7 @@ Proof.
   - (* The combining function, when entries are present in both maps. *)
     move=> _ [mid Hmid H1 br /= H2 ps H3] rs.
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
-      move: (Range_beg_bounded br.1.2).
+      move: (Range_proper br.1.2).
       move: br => [r Hr] /= in H2 *.
       by case: (ups r.1); ordered.
     pose ps' := prependRange ps H0.
@@ -123,17 +123,22 @@ Proof.
       by ordered.
     have H5: b.*2.+1 <= rend r.1.
       have Hlt' := Hlt.
-      move: (Range_bounded r.2) => ?.
-      by ordered.
+      move: (Range_proper r.2) => Hrp.
+      rewrite /validRangeBounds in Hrp.
+      case: (ups r.1) => [|u us] /= in Hrp *.
+        by ordered.
+      by case: (inputOnly u) in Hrp *; ordered.
     have p := last_leq H3 H4.
+    rewrite -2!last_map -map_comp in spec.
     rewrite spec /= in p.
+    rewrite -2!last_map -map_comp in p.
     exact: (last_leq p H5).
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
     case=> [? _ /= ? br Hpos rs ?].
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
-      move: (Range_beg_bounded br.1.2).
+      move: (Range_proper br.1.2).
       move: br => [r ?] /= in Hpos *.
       by case: (ups r.1); ordered.
     exact: (prependRange rs H0).1.
@@ -169,11 +174,10 @@ Proof.
     rewrite /=.
     by case: (ups br.1.1) => /= [|u us] in H2 *; undoubled.
 
-  have Hupos: match ups br.1.1 with
-      | [::]   => upos <= rend br.1.1
-      | u :: _ => upos <= u
-      end.
-    by case: (ups br.1.1) => /= [|u us] in H2 E *; undoubled.
+  have Hupos: validRangeBounds upos (rend br.1.1) (ups br.1.1).
+    rewrite /head_or_end in E.
+    case: (ups br.1.1) => //= [u us] in H2 E *.
+    admit.
 
   case: [&& Output \in kinds
         ,   Input \notin kinds
@@ -186,13 +190,19 @@ Proof.
     move: br srs => [r Hr] [rs Hsort Hlt] /= in H2 H3 E Hupos *.
     pose r1 := Range_shiftup (b:=upos) r.2 Hodd Hupos.
 
-    have Hloc: rbeg r1.1 <= upos < head_or_end r1.1.
+    have Hloc: validRangeBounds (rbeg r1.1) (rend r1.1) (upos :: ups r1.1).
       have Hsh: r1 = Range_shiftup r.2 Hodd Hupos by [].
       rewrite /head_or_end /head_or.
       move: (Range_shiftup_spec Hsh) => [-> -> ->].
       clear Hsh r1.
-      by case: (ups r.2) => /= [|u us] in H3 H E *; undoubled.
-    pose r2 := Range_cons Hodd r1.2 Hloc.
+      case: (ups r.1) => /= [|u us] in H3 H E *.
+        admit.
+      admit.
+
+    have Hsorted: StronglySorted upos_le (upos :: ups r1.1).
+      admit.
+
+    pose r2 := Range_cons r1.2 Hloc Hsorted Hodd.
 
     rewrite /= in H1 Hloc r2.
     apply: Some {| cursorMid     := mid
@@ -205,8 +215,11 @@ Proof.
   (* Otherwise, we must create a new [BoundedRange], and merge the previous
      one into the [SortedRanges]. *)
   case Hloc: (rbeg br.1.1 <= upos).
-    have U: rbeg br.1.1 <= upos < head_or_end br.1.1 by ordered.
-    pose r1 := Range_cons Hodd br.1.2 U.
+    have U: validRangeBounds (rbeg br.1.1) (rend br.1.1) (upos :: ups br.1.1).
+      admit.
+    have S: StronglySorted (fun x y : UsePos => upos_le x y) (upos :: ups br.1.1).
+      admit.
+    pose r1 := Range_cons br.1.2 U S Hodd.
     apply: Some {| cursorMid     := mid
                  ; cursorPending := exist _ r1 _
                  ; cursorRanges  := srs |} => //=.
@@ -229,6 +242,8 @@ Proof.
     apply: ltn_odd => //.
     by apply/andP; split.
 
+  admit.
+(*
   apply: Some {| cursorMid     := pos.+1
                ; cursorPending := exist _ r1 _ |} => //=.
   - by ordered.
@@ -248,6 +263,7 @@ Proof.
     move: (Range_bounded r.2).
     simpl in *.
     by ordered.
+*)
 Defined.
 
 Definition handleVars_onlyRanges {b pos e}
@@ -283,13 +299,16 @@ Proof.
           ; cursorPending := exist _ (exist _ rd _) _
           |} => //=;
   try undoubled.
-  - constructor=> /=.
+  - admit.
+(*
+    constructor=> /=.
     + by case: (Input \in kinds); undoubled.
     + by case: (Output \in kinds);
          case: (Temp \in kinds); undoubled.
     + by constructor; constructor.
     + by case: (Input \in kinds); exact: odd_double_plus.
     + by rewrite odd_double.
+*)
   - move=> r.
     case: (Input \in kinds);
     case: (Output \in kinds);

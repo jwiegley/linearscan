@@ -54,16 +54,23 @@ Proof.
     exact: inl (ERegistersExhausted uid). (* ERROR *)
   move/andP: Hmid => [Hmid1 Hmid2].
 
+  (* jww (2015-02-28): If the split position would be at the very end, it
+     means spill the whole interval. *)
+
   have Hset := ScanState_setInterval st.
   case Hint: int => [d i] in Hmid1 Hmid2 *.
   case: d => iv ib ie ? rds in i Hint Hmid1 Hmid2 *.
   rewrite /= in Hset.
 
-  case: (intervalSpan Hodd i) => /= [[[[id0 i0] |] [[id1 i1] |]]].
+  have Hmid: (ibeg int.2 < splitPos < iend int.2) by admit.
+
+  case: (intervalSpan Hodd Hmid) => [[[i0|] [i1|]] H] //.
   (* The interval was split into two parts.  The second part goes back onto
      the unhandled list for processing later if it contains use positions that
      require a register. *)
   - Case "(Some, Some)".
+    admit.
+(*
     move=> [/= H1 H2 /eqP H3].
 
     rewrite eq_sym in H2.
@@ -218,6 +225,7 @@ Proof.
 
   - Case "(None, None)".
     contradiction.
+*)
 Defined.
 
 (** If [pos] is [None], it means "split before first use pos requiring a

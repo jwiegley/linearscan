@@ -52,6 +52,43 @@ Fixpoint NE_last {a} (ne : NonEmpty a) : a :=
     | NE_Cons x xs => NE_last xs
   end.
 
+Fixpoint NE_belast a (ne : NonEmpty a) : seq a :=
+  match ne with
+    | NE_Sing x => [::]
+    | NE_Cons x xs => x :: NE_belast xs
+  end.
+
+Fixpoint NE_rcons {a} (ne : NonEmpty a) z :=
+  match ne with
+    | NE_Sing x => NE_Cons x (NE_Sing z)
+    | NE_Cons x xs => NE_Cons x (NE_rcons xs z)
+  end.
+
+CoInductive NE_last_spec {a} : NonEmpty a -> Type :=
+  | NE_LastSing x     : NE_last_spec [::: x]
+  | NE_LastRcons s x  : NE_last_spec (NE_rcons s x).
+
+Lemma NE_lastI a (x : a) s :
+  NE_Cons x s = NE_rcons (NE_from_list x (NE_belast s)) (NE_last s).
+Proof.
+  elim: s => //= [y ys IHys] in x *.
+  by rewrite IHys.
+Qed.
+
+Lemma NE_lastP a s : @NE_last_spec a s.
+Proof. case: s => [|x s]; [left | rewrite NE_lastI; right]. Qed.
+
+Lemma NE_Cons_spec a (x : a) xs : NE_Cons x xs = NE_from_list x (NE_to_list xs).
+Proof.
+  by elim: xs => //= [y ys IHys] in x *; congr (NE_Cons _ _).
+Qed.
+
+Lemma NE_head_from_list a (x : a) xs : NE_head (NE_from_list x xs) = head x (x :: xs).
+Proof. by elim E: xs => // [*] in x *. Qed.
+
+Lemma NE_last_from_list a (x : a) xs : NE_last (NE_from_list x xs) = last x xs.
+Proof. by elim: xs => //= [*] in x *. Qed.
+
 Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
   match ne with
     | NE_Sing x => NE_Sing (f x)
@@ -87,6 +124,25 @@ Proof. induction xs; auto. Qed.
 Lemma NE_last_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_last (NE_append xs ys) = NE_last ys.
 Proof. induction xs; auto. Qed.
+
+Definition NE_last_ind P a :
+  (forall (x : a), P a [::: x])
+    -> (forall s x, P a s -> P a (NE_rcons s x))
+    -> forall s, P a s.
+Proof.
+  move=> Hsing Hlast s.
+  elim: s => [x|x s2 IHs2].
+    exact: Hsing.
+  replace (NE_Cons x s2) with (NE_append [::: x] s2); last by [].
+  set s := [::: x].
+  elim: s2 => [x2|x2 s3 IHs3] in IHs2 *.
+    replace (NE_append s [::: x2])
+      with (NE_rcons s x2); last by [].
+    exact: (Hlast s x2 (Hsing _)).
+  replace (NE_append s (NE_Cons x2 s3))
+    with (NE_append (NE_rcons [::: x] x2) s3); last by [].
+  admit.
+Qed.
 
 Section Sorted.
 

@@ -61,6 +61,15 @@ Definition useWithinRange (b e : nat) (u : UsePos) :=
   ~~ upos_within_bound b u && upos_within_bound e u.
 Arguments useWithinRange b e u /.
 
+(* A position is within a range if splitting at that point would divide it
+   into two ranges. *)
+Definition pos_within_range (pos : nat) (rd : RangeDesc) :=
+  if olast (ups rd) is Some u
+  then if inputOnly u
+       then rbeg rd < pos <= rend rd
+       else rbeg rd <= pos < rend rd
+  else rbeg rd < pos < rend rd.
+
 (* When [uses] is not [nil], then either [b < e] or [b <= e], depending on the
    use positions that occur within the range.  For example, an empty range is
    only possible if [b == e] and the only use positions occur at [b] and they
@@ -444,17 +453,21 @@ Definition endsWithInputOnly `(r : Range rd) : bool :=
    information about how these (possibly) two sub-ranges are related.  If only
    one range results, it must be identical to the original range. *)
 
+Record SplitRange (rd r1 r2 : RangeDesc) (before : nat) : Prop := {
+  _ : rend r1 = before;
+  _ : before  = rbeg r2;
+  _ : rbeg rd = rbeg r1;
+  _ : rend rd = rend r2;
+  _ : ups rd  = ups r1 ++ ups r2
+}.
+
 Definition SubRangesOf (before : nat) (Hodd : odd before) `(r : Range rd) :=
   { p : option RangeSig * option RangeSig
   | match p with
-    | (Some r0, Some r1) => [&& rend r0.1 == before
-                            ,   before == rbeg r1.1
-                            ,   rbeg rd == rbeg r0.1
-                            ,   rend rd == rend r1.1
-                            &   ups rd  == ups r0.1 ++ ups r1.1]
-    | (Some r0, None)    => (rend r0.1 <= before) && (rd == r0.1)
-    | (None, Some r1)    => (before <= rbeg r1.1) && (rd == r1.1)
-    | (None, None)       => false
+    | (Some r1, Some r2) => SplitRange rd r1.1 r2.1 before
+    | (Some r1, None)    => (rend r1.1 <= before) /\ ((rd; r) = r1)
+    | (None, Some r2)    => (before <= rbeg r2.1) /\ ((rd; r) = r2)
+    | (None, None)       => False
     end }.
 
 Definition rangeSpan (before : nat) (Hodd : odd before) `(r : Range rd) :
@@ -465,7 +478,7 @@ Proof.
 
   case E: (span (upos_within_bound before) ups0) => [l1 l2].
   symmetry in E.
-  move: (span_cat E) => Hspan.
+  move: (span_cat E) => [Hspan _].
   move/andP: (span_all_leq Hsort E) => [H1 H2].
   rewrite Hspan in r Hsort * => {Hspan E}.
   move/StronglySorted_inv_app: Hsort => [Hsort1 Hsort2].
@@ -499,8 +512,7 @@ Proof.
     by apply/andP; split=> //; ordered.
 
   move: (Range_split r Hodd Hr1 Hr2) => [r1 r2].
-  exists (Some (packRange r1), Some (packRange r2)).
-  by repeat (apply/andP; split=> //=).
+  by exists (Some (packRange r1), Some (packRange r2)).
 Defined.
 
 (** ** BoundedRange *)
