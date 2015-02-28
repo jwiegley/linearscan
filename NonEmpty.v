@@ -60,6 +60,7 @@ Fixpoint NE_map {a b : Type} (f : a -> b) (ne : NonEmpty a) : NonEmpty b :=
 
 Definition NE_foldl {a b : Type} (f : a -> b -> a) (z : a)
   (ne : NonEmpty b) : a := foldl f z ne.
+Arguments NE_foldl {a b} f z ne /.
 
 Fixpoint NE_mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
   (s : A) (v : NonEmpty X) : A * NonEmpty Y :=

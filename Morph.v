@@ -187,6 +187,25 @@ Proof.
   rewrite E /=. by [].
 Defined.
 
+Definition moveUnhandledToHandled {pre} : SState pre SSMorphHasLen SSMorph unit.
+Proof.
+  intros.
+  intro X.
+  destruct X.
+  destruct thisDesc0.
+  destruct thisHolds0.
+  destruct haslen_is_SSMorphLen0.
+  destruct len_is_SSMorph0.
+  destruct unhandled; first by [].
+  destruct p.
+  apply inr.
+  split. apply tt.
+  pose (ScanState_moveUnhandledToHandled thisState0).
+  eapply {| thisState := s |}.
+  Grab Existential Variables.
+  apply Build_SSMorph; intuition.
+Defined.
+
 Definition moveUnhandledToActive {pre} (reg : PhysReg) :
   SState pre SSMorphHasLen SSMorph unit.
 Proof.

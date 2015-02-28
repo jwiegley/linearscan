@@ -212,6 +212,11 @@ Proof.
   by exists r.
 Defined.
 
+Definition allUsePos (d : IntervalDesc) : seq UsePos :=
+  let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in
+  NE_foldl f [::] (rds d).
+Arguments allUsePos d /.
+
 Definition findIntervalUsePos (d : IntervalDesc) (f : UsePos -> bool) :
   option { r' : RangeSig & { u : UsePos | u \in ups r'.1 } } :=
   let fix go rs := match rs with
@@ -264,32 +269,7 @@ Proof. by elim: i => * //=. Qed.
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
-Record DividedInterval `(i : Interval d) (before : nat)
-  `(i1 : Interval d1) `(i2 : Interval d2) : Prop := {
-  _ : iend i1 <= before <= ibeg i2;
-  _ : ibeg i == ibeg i1;
-  _ : iend i == iend i2
-}.
-
-(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
-    point, the result type must be able to relate the sublists to the original
-    list. *)
-Definition SubIntervalsOf (before : nat) `(i : Interval d)
-  (p : option IntervalSig * option IntervalSig) :=
-  let f u := u < before in
-  match p with
-  | (Some i1, Some i2) => DividedInterval i before i1.2 i2.2
-  | (Some i1, None)    => [/\ ibeg d == ibeg i1.1
-                          ,   iend i1.1 <= iend d
-                          &   iend i1.1 <= before ]
-  | (None, Some i2)    => [/\ iend d == iend i2.1
-                          ,   ibeg d <= ibeg i2.1
-                          &   before <= ibeg i2.1]
-  | (None, None)       => False
-  end.
-
-Definition Interval_fromRanges (vid : nat)
-  `(sr : SortedRanges b) :
+Definition Interval_fromRanges (vid : nat) `(sr : SortedRanges b) :
   forall r rs, sr.1 = r :: rs ->
   let rs' := NE_from_list r rs in
   Interval {| ivar := vid
@@ -314,6 +294,30 @@ Proof.
   exact: (@I_Cons vid _ Whole _ i _ Hlt').
 Defined.
 
+(** When splitting a [NonEmpty UsePos] list into two sublists at a specific
+    point, the result type must be able to relate the sublists to the original
+    list. *)
+Definition SubIntervalsOf (before : nat) `(i : Interval d) :=
+  { p : option IntervalSig * option IntervalSig
+  | let f u := u < before in
+    match p with
+    | (Some i1, Some i2) => [&& iend i1.1 == before
+                            ,   before == ibeg i2.1
+                            ,   ibeg i == ibeg i1.1
+                            ,   iend i == iend i2.1
+                            &   allUsePos i ==
+                                  allUsePos i1.1 ++ allUsePos i2.1 ]
+    | (Some i1, None)    => [&& ibeg d == ibeg i1.1
+                            ,   iend i1.1 == iend d
+                            ,   iend i1.1 <= before
+                            &   allUsePos i == allUsePos i1.1 ]
+    | (None, Some i2)    => [&& ibeg d == ibeg i2.1
+                            ,   iend d == iend i2.1
+                            ,   before <= ibeg i2.1
+                            &   allUsePos i == allUsePos i2.1 ]
+    | (None, None)       => false
+    end }.
+
 (** Split the current interval before the position [before].  This must
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
@@ -325,7 +329,7 @@ Fixpoint intervalSpan {rs : NonEmpty RangeSig}
                   ; iend := ie
                   ; iknd := knd
                   ; rds  := rs |}) {struct rs} :
-  { p : option IntervalSig * option IntervalSig | SubIntervalsOf before i p }.
+  SubIntervalsOf before i.
 Proof.
   case: (splitKind knd) => [lknd rknd].
   destruct rs as [r|r rs];
@@ -335,11 +339,14 @@ Proof.
      that range, meaning that there are use positions both before and after.
      Therefore, we need to create two new intervals out of these parts. *)
   - Case "rs = R_Sing r; (r0, r1) = (Some, Some)".
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    move/andP=> [/eqP ? /andP
+                  [/eqP H2 /andP [/eqP H3 /andP [/eqP H4 /eqP H5]]]].
     move: (Interval_beg_of_rds i) (Interval_end_of_rds i).
-    rewrite H2 H3 /= => *.
-    by exists (Some (packInterval (I_Sing iv lknd r0.2)),
-               Some (packInterval (I_Sing iv rknd r1.2))).
+    rewrite H2 H3 /=.
+    exists (Some (packInterval (I_Sing iv lknd r0.2)),
+               Some (packInterval (I_Sing iv rknd r1.2))) => /=.
+    rewrite foldl_cat_cons -H5.
+    by ordered.
 
   (* All of the use positions occur before the split point.  However, it's
      possible that the range *ends* after the split point, meaning that there
@@ -349,9 +356,9 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (Some, None)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
-    exists (Some (packInterval (I_Sing iv knd r0.2)), None).
-    by rewrite /= {}H2 {}H3.
+    move/andP=> [? /andP [/eqP ? /andP [/eqP ? /eqP ?]]].
+    exists (Some (packInterval (I_Sing iv knd r0.2)), None) => /=.
+    admit.
 
   (* Likewise, in this case all use positions occur after the split point, but
      we may still be shortening the range if it began before the split point.
@@ -361,21 +368,20 @@ Proof.
   - Case "rs = R_Sing r; (o, o0) = (None, Some)".
     move: (Interval_exact_beg i) => /= <-.
     move: (Interval_end_of_rds i) => /= /eqP <-.
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
-    exists (None, Some (packInterval (I_Sing iv knd r1.2))).
-    by rewrite /= {}H2 {}H3.
+    move/andP=> [? /andP [/eqP ? /andP [/eqP ? /eqP ?]]].
+    exists (None, Some (packInterval (I_Sing iv knd r1.2))) => /=.
+    admit.
 
   (* If there are no use positions on either side of the split, it would
      indicate an empty range which is invalid. *)
-  - Case "rs = R_Sing r; (o, o0) = (None, None)".
-    contradiction.
+  - Case "rs = R_Sing r; (o, o0) = (None, None)". by [].
 
   (* We have a sequence of ranges, and the split occurs somewhere within the
      first range of that sequence.  This means basically that we are turning
      [(r :: rs)] into [[:: r0]] and [(r1 :: rs)], where [r0] and [r1] are
      the split parts of the first range. *)
   - Case "rs = R_Cons r rs; (o, o0) = (Some, Some)".
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    move/andP=> [/eqP H1 /andP [/eqP H2 /andP [/eqP H3 /andP [/eqP H4 H5]]]].
 
     move: (intervalUncons i) => [_ i1].
     move: (intervalConnected i) => ?.
@@ -384,19 +390,19 @@ Proof.
 
     move: (Interval_beg_of_rds i) (Interval_end_of_rds i) => /= Hb He.
 
-    have Hi: rend r1.1 < rbeg (NE_head rs).1
-      by rewrite -H3.
-    rewrite H2 in Hb.
+    have Hi: rend r1.1 < rbeg (NE_head rs).1 by rewrite -H4.
+    rewrite H3 in Hb.
 
-    by exists (Some (packInterval (I_Sing iv lknd r0.2)),
-               Some (packInterval (@I_Cons _ _ rknd _ i1 _ Hi))).
+    exists (Some (packInterval (I_Sing iv lknd r0.2)),
+            Some (packInterval (@I_Cons _ _ rknd _ i1 _ Hi))) => /=.
+    admit.
 
   (* In this branch, we know that all use positions in the first range occur
      before the split point, and so we must split in one of the ranges in
      [rs].  This means splitting on [rs], we which accomplish by calling this
      function recursively. *)
   - Case "rs = R_Cons r rs; (o, o0) = (Some, None)".
-    move/andP=> [H1 /andP [/eqP Hx /eqP Hy]].
+    move/andP=> [? /andP [/eqP Hx /eqP Hy]].
 
     move: (intervalUncons i) => [i0 i1].
     move: (intervalConnected i) => Hi0.
@@ -411,28 +417,29 @@ Proof.
     move: (intervalSpan rs before Hodd iv _ _ _ i1)
         => /= [] [[i1_1| ] [i1_2| ]].
     + SCase "(Some, Some)".
-      move=> [? /eqP H2 /eqP H3].
+      move=> [/andP [/eqP H1 /andP [/eqP H2 /andP [/eqP H3 /eqP H4]]]
+                    /eqP H5 /eqP H6].
       destruct i1_1 as [i1_1d i1_1i] eqn:Heqe.
       destruct i1_1d as [? ? ?].
       move: (Interval_beg_of_rds i1_1i)
             (Interval_end_of_rds i1_1i) => /eqP Hb /eqP He.
       simpl in *; clear Heqe.
       rewrite Hb He in i1_1i.
-      rewrite Hb in H2.
-      rewrite H2 in Hi0.
+      rewrite Hb in H3.
+      rewrite H3 in Hi0.
       have i1_1i' := @I_Cons _ _ lknd _ i1_1i _ Hi0.
-      rewrite H3.
       rewrite -He in i1_1i'.
 
-      by exists (Some (packInterval i1_1i'),
-                 Some (packInterval (intervalSetKind i1_2.2 rknd))).
+      exists (Some (packInterval i1_1i'),
+              Some (packInterval (intervalSetKind i1_2.2 rknd))).
+      admit.
 
     (* In this case, we need to cons the [r] from above with a new interval
        [i1_1], which can only differ by possibly being shorter than i1, in the
        case that there was an extension at the end with no use positions in it
        (for example, to cover the range of a loop). *)
     + SCase "(Some, None)".
-      move=> [/eqP H0 /= H2 H3 /eqP H4 /eqP H5].
+      move=> [/andP [/eqP H1 /andP [/eqP H2 /eqP H3]]] H4 H5.
 
       destruct i1_1 as [i1_1d i1_1i] eqn:Heqe.
       destruct i1_1d as [? ? ?].
@@ -441,19 +448,18 @@ Proof.
       simpl in *; clear Heqe.
       rewrite Hb He in i1_1i.
       have Hi: rend r.1 < rbeg (NE_head rds0).1
-        by rewrite H0 Hb in Hi0.
+        by admit. (* rewrite H0 Hb in Hi0. *)
       have i1_1i' := @I_Cons _ _ lknd _ i1_1i _ Hi.
       rewrite -He in i1_1i'.
-      rewrite -H5 in H2.
-      move/eqP in H4.
 
-      by exists (Some (packInterval i1_1i'), None).
+      exists (Some (packInterval i1_1i'), None).
+      admit.
 
     (* In this case, we return [i0] as the left interval (which only
        references [r]), and [i1] as the right, since nothing has been
        changed. *)
     + SCase "(None, Some)".
-      move=> [H0 /= H2 H3 /eqP H4 /eqP H5].
+      move=> [/andP [/eqP H1 /andP [/eqP H2 /eqP H3]]] H4 H5.
 
       destruct i1_2 as [i1_2d i1_2i] eqn:Heqe.
       destruct i1_2d as [? ? ?].
@@ -464,21 +470,21 @@ Proof.
       rewrite Hb in H2 H3.
       rewrite Hx in H4.
       move/eqP in H4.
-      rewrite He in H0.
-      rewrite -H5 in H0.
-      move/eqP in H5.
+      (* rewrite He in H0. *)
+      (* rewrite -H5 in H0. *)
+      (* move/eqP in H5. *)
 
-      have: rend r0.1 <= before <= rbeg (NE_head rds0).1
-        by apply/andP; split => //=.
+      (* have: rend r0.1 <= before <= rbeg (NE_head rds0).1 *)
+      (*   by apply/andP; split => //=. *)
 
-      by exists (Some (packInterval (I_Sing iv lknd r0.2)),
-                 Some (packInterval (intervalSetKind i1_2i rknd))).
+      exists (Some (packInterval (I_Sing iv lknd r0.2)),
+              Some (packInterval (intervalSetKind i1_2i rknd))).
+      admit.
 
-    + SCase "(None, None)".
-      contradiction.
+    + SCase "(None, None)". by [].
 
   - Case "rs = R_Cons r rs; (o, o0) = (None, Some)".
-    move/andP=> [H1 /andP [/eqP H2 /eqP H3]].
+    move/andP=> [H1 /andP [/eqP H2 /andP [/eqP H3 _]]].
 
     move: (intervalUncons i) => [_ i1].
     move: (intervalConnected i) => Hi0.
@@ -490,10 +496,10 @@ Proof.
     move/eqP in Heq2.
 
     exists (None, Some (packInterval (@I_Cons _ _ knd _ i1 _ Hi0))).
-    by rewrite /= {}H2; firstorder.
+    (* by rewrite /= {}H2; firstorder. *)
+    admit.
 
-  - Case "rs = R_Cons r rs; (o, o0) = (None, None)".
-    contradiction.
+  - Case "rs = R_Cons r rs; (o, o0) = (None, None)". by [].
 Defined.
 
 (** * Fixed Intervals *)

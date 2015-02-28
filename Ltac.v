@@ -49,9 +49,36 @@ Ltac breakup :=
     end;
   intuition.
 
+Lemma negneg : forall (a : eqType) (x y : a), ~~ (x != y) -> x = y.
+Proof.
+  move=> a x y H.
+  move/negbTE in H.
+  case E: (x == y).
+    by move/eqP in E.
+  move/eqP in E.
+  by move/eqP in H.
+Qed.
+
+Lemma negb_eq : forall (T : eqType) (a b : T), ~~ (a != b) = (a == b).
+Proof. by move=> T a b; case: (a == b). Qed.
+
 Ltac ordered := abstract (
   intuition;
   breakup;
+  repeat match goal with
+  | [ H: (_ <= _) = false |- _ ] => move/negbT in H
+  | [ H: (_ <  _) = false |- _ ] => move/negbT in H
+  end;
+  repeat match goal with
+  | [ H: is_true (~~ (?X <  ?Y)) |- _ ] => rewrite -leqNgt in H
+  | [ H: is_true (~~ (?X <= ?Y)) |- _ ] => rewrite -ltnNge in H
+  | [ H: is_true (~~ (?X == ?Y)) |- _ ] => idtac
+  | [ H: is_true (~~ (?X != ?Y)) |- _ ] => rewrite negb_eq in H
+  | [ |- is_true (~~ (?X <  ?Y)) ] => rewrite -leqNgt
+  | [ |- is_true (~~ (?X <= ?Y)) ] => rewrite -ltnNge
+  | [ |- is_true (~~ (?X == ?Y)) ] => idtac
+  | [ |- is_true (~~ (?X != ?Y)) ] => rewrite negb_eq
+  end;
   repeat match goal with
   | [ H: is_true (?X <  ?Y) |- _ ] => move/ltP in H
   | [ H: is_true (?X <= ?Y) |- _ ] => move/leP in H

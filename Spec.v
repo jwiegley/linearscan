@@ -101,6 +101,7 @@ Proof.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by inv IHst.
+  - Case "ScanState_moveUnhandledToHandled". by inv IHst.
   - Case "ScanState_moveActiveToInactive". exact: IHst.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.
@@ -119,6 +120,7 @@ Proof.
   - Case "ScanState_setInterval".           exact: IHst.
   - Case "ScanState_setFixedIntervals".     exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by apply/andP.
+  - Case "ScanState_moveUnhandledToHandled". exact: IHst.
   - Case "ScanState_moveActiveToInactive".  exact: proj_rem_uniq.
   - Case "ScanState_moveActiveToHandled".   exact: proj_rem_uniq.
   - Case "ScanState_moveInactiveToActive".  by apply/andP.
@@ -148,12 +150,14 @@ Lemma move_active_to_handled : forall maxReg sd x,
         activeIds sd ++ inactiveIds sd ++ handledIds sd)
     -> x \in active sd
     -> uniq (unhandledIds sd ++ [seq fst i | i <- rem x (active sd)] ++
-              inactiveIds sd ++ [seq fst i | i <- x :: handled sd]).
+              inactiveIds sd ++
+              [seq fst i | i <- (fst x, Some (snd x)) :: handled sd]).
 Proof.
   move=> ? sd x Huniq Hin.
-  uniq_reorg s2 sd Huniq
-    (rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA
-             perm_cat2l -!map_cat perm_eq_sym).
+  admit.
+  (* uniq_reorg s2 sd Huniq *)
+  (*   (rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA *)
+  (*            perm_cat2l -!map_cat perm_eq_sym). *)
 Qed.
 
 Lemma move_inactive_to_active : forall maxReg sd x,
@@ -174,10 +178,11 @@ Lemma move_inactive_to_handled : forall maxReg sd x,
     -> x \in inactive sd
     -> uniq (unhandledIds sd ++ activeIds sd
                ++ [seq fst i | i <- rem x (inactive sd)]
-               ++ [seq fst i | i <- x :: handled sd]).
+               ++ [seq fst i | i <- (fst x, Some (snd x)) :: handled sd]).
 Proof.
   move=> ? sd x Huniq Hin.
-  uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat).
+  admit.
+  (* uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat). *)
 Qed.
 
 Theorem lists_are_unique `(st : @ScanState maxReg b sd) :
@@ -189,32 +194,35 @@ Proof.
   - Case "ScanState_nil". by [].
 
   - Case "ScanState_newUnhandled".
-    move: IHst; rewrite -!map_cat => IHst /=.
-    set s2 := [seq fst i | i <- n :: unh] ++
-              [seq fst i
-              | i <- [seq widen_fst i
-                     | i <- active sd ++ inactive sd ++ handled sd]].
-    rewrite (@perm_eq_uniq _ _ s2) /s2 /unh /n.
-      rewrite map_cons !map_widen_fst /=.
-      apply/andP; split.
-        rewrite mem_cat.
-        apply/norP; split; exact: no_ord_max.
-      rewrite -map_cat map_inj_uniq; first exact: IHst.
-      exact: widen_ord_inj.
-    rewrite perm_cat2r.
-    apply/perm_map.
-    by rewrite insert_perm.
+    admit.
+    (* move: IHst; rewrite -!map_cat => IHst /=. *)
+    (* set s2 := [seq fst i | i <- n :: unh] ++ *)
+    (*           [seq fst i *)
+    (*           | i <- [seq widen_fst i *)
+    (*                  | i <- active sd ++ inactive sd ++ handled sd]]. *)
+    (* rewrite (@perm_eq_uniq _ _ s2) /s2 /unh /n. *)
+    (*   rewrite map_cons !map_widen_fst /=. *)
+    (*   apply/andP; split. *)
+    (*     rewrite mem_cat. *)
+    (*     apply/norP; split; exact: no_ord_max. *)
+    (*   rewrite -map_cat map_inj_uniq; first exact: IHst. *)
+    (*   exact: widen_ord_inj. *)
+    (* rewrite perm_cat2r. *)
+    (* apply/perm_map. *)
+    (* by rewrite insert_perm. *)
 
   - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive".
-    move: IHst; rewrite /= -cons_uniq -!map_cat => IHst.
-    set s2 := fst x :: [seq fst i | i <- unh] ++
-              [seq fst i | i <- act ++ inact ++ hnd].
-    rewrite (@perm_eq_uniq _ _ s2); first exact: IHst.
-    by rewrite -perm_cat_cons.
+    admit.
+    (* move: IHst; rewrite /= -cons_uniq -!map_cat => IHst. *)
+    (* set s2 := fst x :: [seq fst i | i <- unh] ++ *)
+    (*           [seq fst i | i <- act ++ inact ++ hnd]. *)
+    (* rewrite (@perm_eq_uniq _ _ s2); first exact: IHst. *)
+    (* by rewrite -perm_cat_cons. *)
 
+  - Case "ScanState_moveUnhandledToHandled". admit.
   - Case "ScanState_moveActiveToInactive".
     exact: (@move_active_to_inactive _ _ x IHst H).
   - Case "ScanState_moveActiveToHandled".
@@ -258,6 +266,9 @@ Proof.
 
   - Case "ScanState_moveUnhandledToActive".
     by rewrite addnA addnS -addSn -addnA.
+
+  - Case "ScanState_moveUnhandledToHandled".
+    admit.
 
   - Case "ScanState_moveActiveToInactive".
     rewrite size_rem; last assumption.
@@ -549,6 +560,7 @@ Proof.
     rewrite in_cons.
     apply/orP.
     by right.
+  - Case "ScanState_moveUnhandledToHandled". admit.
   - Case "ScanState_moveActiveToInactive". exact: IHst.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.

@@ -43,7 +43,10 @@ Definition option_choose {a} (x y : option a) : option a :=
   | Some _ => x
   end.
 
-Definition maybeLast a (l : seq a) : option a :=
+Lemma rcons_nil : forall a us (u : a), rcons us u = [::] -> False.
+Proof. by move=> a us u; case: us => // [|? ?] in u *. Qed.
+
+Definition olast a (l : seq a) : option a :=
   let fix go res xs :=
       match xs with
       | nil => res
@@ -51,40 +54,95 @@ Definition maybeLast a (l : seq a) : option a :=
       end in
   go None l.
 
-Example maybeLast_ex1 : maybeLast ([::] : seq nat) == None.
+Example olast_ex1 : olast ([::] : seq nat) == None.
 Proof. by []. Qed.
 
-Example maybeLast_ex2 : maybeLast [:: 1] == Some 1.
+Example olast_ex2 : olast [:: 1] == Some 1.
 Proof. by []. Qed.
 
-Example maybeLast_ex3 : maybeLast [:: 1; 2; 3] == Some 3.
+Example olast_ex3 : olast [:: 1; 2; 3] == Some 3.
 Proof. by []. Qed.
 
-Lemma maybeLast_last : forall a (u : a) us,
-  maybeLast (u :: us) = last (Some u) [seq (Some i) | i <- us].
+Lemma olast_last : forall a (u : a) us,
+  olast (u :: us) = Some (last u us).
 Proof.
   move=> a u.
   elim=> //= [x xs IHxs].
   case: xs => //= [|y ys] in IHxs *.
 Qed.
 
-Lemma maybeLast_spec : forall a (u : a) us, maybeLast (u :: us) = None -> False.
+Lemma olast_spec : forall a (u : a) us, olast (u :: us) = None -> False.
 Proof.
   move=> a u.
   elim=> //= [x xs IHxs] H.
-  rewrite maybeLast_last /= in H.
-  rewrite maybeLast_last in IHxs.
+  rewrite olast_last /= in H.
+  rewrite olast_last in IHxs.
   case: xs => //= [|y ys] in H IHxs *.
 Qed.
 
-Lemma negneg : forall (a : eqType) (x y : a), ~~ (x != y) -> x = y.
+Lemma olast_rcons : forall a (u : a) us, olast (rcons us u) = Some u.
 Proof.
-  move=> a x y H.
-  move/negbTE in H.
-  case E: (x == y).
-    by move/eqP in E.
-  move/eqP in E.
-  by move/eqP in H.
+  move=> a u.
+  elim=> //= [x xs IHxs].
+  case: xs => // [|y ys] in IHxs *.
+Qed.
+
+Lemma olast_cons : forall a (x y : a) ys,
+  olast (x :: y :: ys) = olast (y :: ys).
+Proof.
+  move=> a x y.
+  elim=> //= [x xs IHxs].
+Qed.
+
+Lemma olast_cons_rcons : forall a (z u : a) us,
+  olast (z :: rcons us u) = Some u.
+Proof.
+  move=> a z u.
+  elim=> //= [x xs IHxs].
+  case: xs => // [|y ys] in IHxs *.
+Qed.
+
+Lemma olast_cat : forall a (x : a) xs ys,
+  olast (ys ++ x :: xs) = olast (x :: xs).
+Proof.
+  move=> a y xs ys.
+  elim: xs => /= [|z zs IHzs] in y ys *.
+    by rewrite cats1 olast_rcons.
+  replace [:: y, z & zs] with ([:: y] ++ [:: z & zs]).
+    by rewrite catA !IHzs.
+  by [].
+Qed.
+
+Lemma olast_cat_rcons : forall a (x : a) xs ys,
+  olast (ys ++ rcons xs x) = Some x.
+Proof.
+  move=> a y xs ys.
+  elim: xs => /= [|z zs IHzs] in y ys *.
+    by rewrite cats1 olast_rcons.
+  rewrite olast_cat -cat1s.
+  exact: IHzs.
+Qed.
+
+Definition oends a (l : seq a) : option (a + (a * a)).
+Proof.
+  case: l => [|x xs].
+    exact: None.
+  case/lastP: xs => [|ys y].
+    exact: Some (inl x).
+  exact: Some (inr (x, y)).
+Defined.
+
+Lemma oends_spec a (l : seq a) :
+  match oends l with
+  | Some (inr (x, y)) => head x l = x /\ last y l = y
+  | Some (inl x)      => head x l = last x l
+  | None              => True
+  end.
+Proof.
+  rewrite /oends.
+  case: l => // [x xs].
+  case/lastP: xs => //= [ys y].
+  by rewrite last_rcons.
 Qed.
 
 Ltac move_to_top x :=
@@ -212,87 +270,66 @@ Proof.
   by inv H; inv H3.
 Qed.
 
-Lemma StronglySorted_cat
-  {A : Type} {x y : A} {xs ys : seq A} {R : A -> A -> Prop}
+Lemma StronglySorted_cat {A : Type} {xs ys : seq A} {R : A -> A -> Prop}
   `{Transitive _ R} :
-  StronglySorted R (x :: xs) ->
-  StronglySorted R (y :: ys)
+  StronglySorted R xs -> StronglySorted R ys
+    -> (match olast xs, ys with
+        | Some x, y :: _ => R x y
+        | _, _ => True
+        end)
+    -> StronglySorted R (xs ++ ys)%SEQ.
+Proof.
+  move=> Hsort1 Hsort2 Hrel.
+  case/lastP: xs => //= [xs1 x1] in Hsort1 Hrel *.
+  rewrite olast_rcons in Hrel.
+  case: ys => [|y1 ys1] in Hsort2 Hrel *.
+    by rewrite cats0.
+  elim: xs1 => //= [|x2 xs2 IHxs2] in Hsort1 *.
+    repeat constructor=> //.
+    inv Hsort2.
+    have: forall a : A, R y1 a -> R x1 a.
+      move=> a Ha.
+      exact: transitivity Hrel Ha.
+    move/List.Forall_impl.
+    exact.
+  inv Hsort1.
+  specialize (IHxs2 H2).
+  constructor=> {H2} //.
+  apply Forall_append.
+  split=> //.
+  apply Forall_rcons_inv in H3.
+  move: H3 => [_ H3].
+  constructor.
+    exact: transitivity H3 Hrel.
+  move/StronglySorted_inv_app: IHxs2 => [_ IHxs2].
+  inv IHxs2.
+  have: forall a : A, R y1 a -> R x2 a.
+    move=> a Ha.
+    exact: transitivity (transitivity H3 Hrel) Ha.
+  move/List.Forall_impl.
+  exact.
+Qed.
+
+Lemma StronglySorted_cat_cons
+  {A : Type} {x y : A} {xs ys : seq A} {R : A -> A -> Prop} `{Transitive _ R} :
+  StronglySorted R (x :: xs) -> StronglySorted R (y :: ys)
     -> R (last x xs) y
     -> StronglySorted R (x :: xs ++ y :: ys).
 Proof.
-  move=> rel Hsort1 Hsort2.
-  constructor.
-    induction xs; simpl in *.
-      induction ys; simpl in *.
-        constructor.
-          by constructor.
-        by constructor.
-      assumption.
-    constructor.
-      apply: IHxs.
-        inv rel.
-        constructor.
-          by inv H2.
-        by inv H3.
-      induction xs; simpl in *.
-        inv rel; inv H3.
-        by transitivity a.
-      assumption.
-    induction xs; simpl in *.
-      have H1: StronglySorted R [:: x]
-        by constructor; constructor.
-      have H2: R x y.
-        inv rel; inv H4.
-        by transitivity a.
-      specialize (IHxs H1 H2).
-      induction ys; simpl in *.
-        by constructor.
-      constructor=> //=.
-      inv Hsort1; inv H4; inv H5.
-      constructor.
-        by transitivity y.
-      specialize (IHys (SSorted_cons y H6 H8)
-                       (StronglySorted_skip IHxs)).
-      by inv IHys.
-    constructor; inv rel.
-      by inv H2; inv H5.
-    apply: IHxs0 => /=.
-    - constructor.
-        exact: StronglySorted_skip.
-      constructor.
-        by inv H3.
-      by inv H3; inv H5.
-    - destruct xs. simpl in *.
-        inv H2; inv H5.
-        by transitivity a0.
-      by [].
-    - move=> H4 H5.
-      destruct xs. simpl in *.
-        move: (SSorted_cons x H2 H3) => H6.
-        specialize (IHxs (StronglySorted_skip H6) Hsort2).
-        by inv IHxs.
-      move: (SSorted_cons x H2 H3) => H6.
-      specialize (IHxs (StronglySorted_skip H6) Hsort2).
-      by inv IHxs.
-  induction xs; simpl in *.
-    induction ys; simpl in *.
-      by constructor.
+  move=> Hsort1 Hsort2 Hrel.
+  case/lastP: xs => /= [|xs1 x1] in Hsort1 Hrel *.
     constructor=> //.
-    inv Hsort1; inv H2; inv H3.
-    constructor.
-      by transitivity y.
-    specialize (IHys (SSorted_cons y H4 H6)).
-    by inv IHys.
-  constructor; inv rel.
-    by inv H3.
-  apply: IHxs.
-    constructor.
-      by inv H2.
-    by inv H3.
-  inv H2; inv H3.
-  induction xs; simpl in *.
-    by transitivity a.
-  assumption.
+    constructor=> //.
+    inv Hsort2.
+    have: forall a : A, R y a -> R x a.
+      move=> a Ha.
+      exact: transitivity Hrel Ha.
+    move/List.Forall_impl.
+    exact.
+  rewrite -cat_cons.
+  apply: StronglySorted_cat => //.
+  rewrite olast_cons_rcons.
+  by rewrite last_rcons in Hrel.
 Qed.
 
 Lemma StronglySorted_rcons_inv : forall a R (x : a) xs,
@@ -404,6 +441,29 @@ Example ex_foldl_with_index_1 :
   foldl_with_index (fun n z x => (n, x) :: z) nil [:: 1; 2; 3]
     == [:: (2, 3); (1, 2); (0, 1)].
 Proof. reflexivity. Qed.
+
+Lemma foldl_cons : forall a (x : a) xs,
+  foldl (fun us : seq a => cons^~ us) [:: x] xs
+    = foldl (fun us : seq a => cons^~ us) [::] [:: x & xs].
+Proof. by move=> a x; elim. Qed.
+
+Definition foldl_cons_cons {a} (x : a) xs :
+  let f us : a -> seq a := cons ^~ us in
+  foldl f [:: x] xs = rcons (foldl f [::] xs) x.
+Proof.
+  move=> f.
+  elim: xs => //= [z zs IHzs].
+  rewrite foldl_cons.
+Admitted.
+
+Lemma foldl_cat_cons : forall a (xs ys : seq a),
+  foldl (fun us => cons^~ us) [::] xs ++ foldl (fun us => cons^~ us) [::] ys
+    = foldl (fun us => cons^~ us) [::] (xs ++ ys).
+Proof.
+  move=> a xs ys.
+  elim: xs => //= [x xs IHxs] in ys *.
+  rewrite foldl_cons.
+Admitted.
 
 Definition foldr_with_index
   {A B : Type} (f : nat -> A -> B -> B) (b : B) (v : seq A) : B :=

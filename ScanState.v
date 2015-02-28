@@ -32,7 +32,7 @@ Record ScanStateDesc : Type := {
     unhandled : list (IntervalId * nat);     (* starts after pos *)
     active    : list (IntervalId * PhysReg); (* ranges over pos *)
     inactive  : list (IntervalId * PhysReg); (* falls in lifetime hole *)
-    handled   : list (IntervalId * PhysReg); (* ends before pos *)
+    handled   : list (IntervalId * option PhysReg); (* ends before pos *)
 
     unhandledIds := [seq fst i | i <- unhandled];
     activeIds    := [seq fst i | i <- active];
@@ -69,7 +69,9 @@ Definition registerWithHighestPos :
        end) (Ordinal registers_exist, Some odd1).
 
 Definition allocations (sd : ScanStateDesc) :=
-  handled sd ++ active sd ++ inactive sd.
+  foldl (fun acc p => if snd p is Some r then (fst p, r) :: acc else acc)
+        [::] (handled sd)
+    ++ active sd ++ inactive sd.
 
 Definition lookupRegister `(st : ScanState sd) intid : option PhysReg :=
   forFold None (allocations sd) $ fun acc x =>
@@ -194,6 +196,27 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixints
        |}
 
+  | ScanState_moveUnhandledToHandled (* allocate a spill slot *)
+      ni unh act inact hnd ints fixints x :
+    ScanState InUse
+      {| nextInterval     := ni
+       ; unhandled        := x :: unh
+       ; active           := act
+       ; inactive         := inact
+       ; handled          := hnd
+       ; intervals        := ints
+       ; fixedIntervals   := fixints
+       |} ->
+    ScanState InUse
+      {| nextInterval     := ni
+       ; unhandled        := unh
+       ; active           := act
+       ; inactive         := inact
+       ; handled          := (fst x, None) :: hnd
+       ; intervals        := ints
+       ; fixedIntervals   := fixints
+       |}
+
   | ScanState_moveActiveToInactive sd :
     ScanState InUse sd -> forall x, x \in active sd ->
     ScanState InUse
@@ -213,7 +236,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; unhandled        := unhandled sd
        ; active           := rem x (active sd)
        ; inactive         := inactive sd
-       ; handled          := x :: handled sd
+       ; handled          := (fst x, Some (snd x)) :: handled sd
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
        |}
@@ -238,7 +261,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; unhandled        := unhandled sd
        ; active           := active sd
        ; inactive         := rem x (inactive sd)
-       ; handled          := x :: handled sd
+       ; handled          := (fst x, Some (snd x)) :: handled sd
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
        |}.
@@ -262,6 +285,7 @@ Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   | Case_aux c "ScanState_setInterval"
   | Case_aux c "ScanState_setFixedIntervals"
   | Case_aux c "ScanState_moveUnhandledToActive"
+  | Case_aux c "ScanState_moveUnhandledToHandled"
   | Case_aux c "ScanState_moveActiveToInactive"
   | Case_aux c "ScanState_moveActiveToHandled"
   | Case_aux c "ScanState_moveInactiveToActive"

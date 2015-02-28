@@ -28,17 +28,70 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
-Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
+Definition upos_le (x y : UsePos) : bool :=
+  if uloc x == uloc y
+  then inputOnly x
+  else uloc x < uloc y.
 Arguments upos_le x y /.
 
 Definition upos_ge (x y : UsePos) : bool := ~~ upos_lt x y.
 Arguments upos_ge x y /.
 
+(* A [UsePos] is within bound of a range position if, be it an input-only use
+   position, it fall on or before that position; or, be it not input-only, it
+   fall before it.  Examples:
+
+   Input-Only use positions:
+
+     1                     21
+     |                     | use at 21
+     +---------------------+
+
+     1                     21
+     |         use at 13   |
+     +---------+-----------+
+
+   Non Input-Only use positions (i.e., Temp and/or Output):
+
+     1                     21
+     |                     | use at 19
+     +-------------------+-+
+
+     1                     21
+     |         use at 13   |
+     +---------+-----------+
+
+  The reason for this distinction is that, when a range ends, whatever
+  variables it had live in registers at that time should still be in those
+  registers, so they are in a sense "still live" for the next instruction, if
+  they are only being used as inputs there.  Thus, we want the range to *not*
+  cover that position just for the sake of those input variables, so we can
+  use those same registers as outputs for another variable; but we also need
+  to know that if the range is spilled, those inputs are reloaded before that
+  instruction.  Hence this notion of a "use position not covered by a range",
+  if it be input-only and coincide with the end of the previous range. *)
+
+Definition upos_within_bound (before : nat) (u : UsePos) :=
+  if inputOnly u
+  then uloc u <= before
+  else uloc u < before.
+Arguments upos_within_bound before u /.
+
 Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
 Program Instance upos_le_trans : Transitive upos_le.
-Obligation 1. exact: (leq_trans H). Qed.
+Obligation 1.
+  case: (inputOnly x) in H *;
+  case: (inputOnly y) in H0 *;
+  case E1: (uloc x == uloc y) in H;
+  case E2: (uloc y == uloc z) in H0;
+  case E3: (uloc x == uloc z) in H H0 *;
+  move/eqP in E1; rewrite ?E1;
+  move/eqP in E2; rewrite ?E2;
+  move/eqP in E3; rewrite ?E3 //=;
+  by ordered.
+Qed.
 
 Definition head_or x xs := head x [seq uloc u | u <- xs].
 Arguments head_or x xs /.
@@ -47,9 +100,6 @@ Definition last_or x xs := last x [seq uloc u | u <- xs].
 Arguments last_or x xs /.
 
 Section EqUpos.
-
-Variables (T : eqType) (x0 : T).
-Implicit Type s : UsePos.
 
 Fixpoint equpos s1 s2 {struct s2} :=
   match s1, s2 with
@@ -73,6 +123,13 @@ Canonical upos_eqMixin := EqMixin equposP.
 Canonical upos_eqType := Eval hnf in EqType UsePos upos_eqMixin.
 
 End EqUpos.
+
+Lemma upos_eq : forall x y, x == y -> uloc x == uloc y.
+Proof.
+  move=> x y H.
+  move/eqP in H.
+  by rewrite H.
+Qed.
 
 Lemma all_ltn_leq : forall x y xs,
   all (fun u : UsePos => y < u) xs -> x <= y
@@ -135,55 +192,75 @@ Proof.
   by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
 Qed.
 
-Lemma span_all_ltn (l : list UsePos) : forall (x : nat) l1 l2,
-  StronglySorted upos_lt l
-    -> (l1, l2) = span (fun y => uloc y < x) l
-    -> all (fun y => uloc y < x) l1 && all (fun y => x <= uloc y) l2.
-Proof.
-  move=> p l1 l2 Hsort Heqe.
-  elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
-    by inv Heqe.
-  case E: (x < p) in Heqe *.
-    inv Hsort.
-    case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
-    move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
-    apply/andP; split.
-      inv Heqe.
-      by apply/andP; split.
-    by inv Heqe.
-  inv Hsort; inv Heqe.
-  clear IHxs H1.
-  move/negbT: E.
-  rewrite -leqNgt => Hle.
-  apply/andP; split=> //.
-  move/Forall_all in H2.
-  exact: (all_ltn_leq H2).
-Qed.
-
 Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_le l
-    -> (l1, l2) = span (fun y => uloc y <= x) l
-    -> all (fun y => uloc y <= x) l1 && all (fun y => x <= uloc y) l2.
+    -> (l1, l2) = span (upos_within_bound x) l
+    -> all (upos_within_bound x) l1 && all (negb \o upos_within_bound x) l2.
 Proof.
   move=> p l1 l2 Hsort Heqe.
   elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
     by inv Heqe.
-  case E: (x <= p) in Heqe *.
+  rewrite /upos_within_bound /= in IHxs Hsort Heqe *.
+  case E: (inputOnly x) in Heqe *.
+    case E1: (x <= p) in Heqe *.
+      inv Hsort.
+      case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
+      move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
+      apply/andP; split.
+        inv Heqe.
+        rewrite E.
+        by apply/andP; split.
+      by inv Heqe.
+    inv Hsort; inv Heqe.
+    move/Forall_all in H2.
+    clear IHxs H1.
+    rewrite E.
+    move/negbT in E1.
+    apply/andP; split=> //.
+    rewrite -ltnNge in E1.
+    apply/allP=> [x0 Hin].
+    move/allP: H2 => /(_ x0 Hin).
+    rewrite E /funcomp.
+    case: (inputOnly x0).
+      rewrite -ltnNge.
+      case E2: (uloc x == uloc x0).
+        by move/eqP: E2 => -> in E E1 *.
+      by ordered.
+    rewrite -leqNgt.
+    case E3: (uloc x == uloc x0).
+      move/eqP: E3 => -> in E E1 *.
+      move=> _.
+      exact/ltnW.
+    by ordered.
+  case E1: (x < p) in Heqe *.
     inv Hsort.
     case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
     move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
     apply/andP; split.
       inv Heqe.
+      rewrite E.
       by apply/andP; split.
     by inv Heqe.
-  inv Hsort; inv Heqe.
-  clear IHxs H1.
-  move/negbT: E.
-  rewrite -ltnNge => Hle.
+  inv Hsort.
   move/Forall_all in H2.
+  clear IHxs H1.
+  inv Heqe.
+  rewrite E.
+  move/negbT in E1.
   apply/andP; split=> //.
-    exact/ltnW.
-  exact: (all_leq_ltn H2).
+  rewrite -leqNgt in E1.
+  apply/allP=> [x0 Hin].
+  move/allP: H2 => /(_ x0 Hin).
+  rewrite /funcomp.
+  case: (inputOnly x0).
+    rewrite -ltnNge.
+    case E2: (uloc x == uloc x0).
+      by rewrite E.
+    by ordered.
+  rewrite -leqNgt.
+  case E2: (uloc x == uloc x0).
+    by rewrite E.
+  by ordered.
 Qed.
 
 Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
