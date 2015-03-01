@@ -28,10 +28,7 @@ End UsePosNotations.
 Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
 Arguments upos_lt x y /.
 
-Definition upos_le (x y : UsePos) : bool :=
-  if uloc x == uloc y
-  then inputOnly x
-  else uloc x < uloc y.
+Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
 Arguments upos_le x y /.
 
 Definition upos_ge (x y : UsePos) : bool := ~~ upos_lt x y.
@@ -194,73 +191,70 @@ Qed.
 
 Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_le l
-    -> (l1, l2) = span (upos_within_bound x) l
-    -> all (upos_within_bound x) l1 && all (negb \o upos_within_bound x) l2.
+    -> (l1, l2) = span (fun u => uloc u < x) l
+    -> all (fun u => uloc u < x) l1 && all (fun u => x <= uloc u) l2.
 Proof.
   move=> p l1 l2 Hsort Heqe.
   elim: l => /= [|x xs IHxs] in l1 l2 Hsort Heqe *.
     by inv Heqe.
-  rewrite /upos_within_bound /= in IHxs Hsort Heqe *.
-  case E: (inputOnly x) in Heqe *.
-    case E1: (x <= p) in Heqe *.
-      inv Hsort.
-      case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
-      move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
-      apply/andP; split.
-        inv Heqe.
-        rewrite E.
-        by apply/andP; split.
-      by inv Heqe.
-    inv Hsort; inv Heqe.
-    move/Forall_all in H2.
-    clear IHxs H1.
-    rewrite E.
-    move/negbT in E1.
-    apply/andP; split=> //.
-    rewrite -ltnNge in E1.
-    apply/allP=> [x0 Hin].
-    move/allP: H2 => /(_ x0 Hin).
-    rewrite E /funcomp.
-    case: (inputOnly x0).
-      rewrite -ltnNge.
-      case E2: (uloc x == uloc x0).
-        by move/eqP: E2 => -> in E E1 *.
-      by ordered.
-    rewrite -leqNgt.
-    case E3: (uloc x == uloc x0).
-      move/eqP: E3 => -> in E E1 *.
-      move=> _.
-      exact/ltnW.
-    by ordered.
+  rewrite /= in IHxs Hsort Heqe *.
+  (* case E: (inputOnly x) in Heqe *. *)
+  (*   case E1: (x <= p) in Heqe *. *)
+  (*     inv Hsort. *)
+  (*     case: (span _ xs) => [l1' l2'] in Heqe IHxs *. *)
+  (*     move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?]. *)
+  (*     apply/andP; split. *)
+  (*       inv Heqe. *)
+  (*       rewrite E. *)
+  (*       by apply/andP; split. *)
+  (*     by inv Heqe. *)
+  (*   inv Hsort; inv Heqe. *)
+  (*   move/Forall_all in H2. *)
+  (*   clear IHxs H1. *)
+  (*   rewrite E. *)
+  (*   move/negbT in E1. *)
+  (*   apply/andP; split=> //. *)
+  (*   rewrite -ltnNge in E1. *)
+  (*   apply/allP=> [x0 Hin]. *)
+  (*   move/allP: H2 => /(_ x0 Hin). *)
+  (*   rewrite E /funcomp. *)
+  (*   case: (inputOnly x0). *)
+  (*     rewrite -ltnNge. *)
+  (*     case E2: (uloc x == uloc x0). *)
+  (*       by move/eqP: E2 => -> in E E1 *. *)
+  (*     by ordered. *)
+  (*   rewrite -leqNgt. *)
+  (*   case E3: (uloc x == uloc x0). *)
+  (*     move/eqP: E3 => -> in E E1 *. *)
+  (*     move=> _. *)
+  (*     exact/ltnW. *)
+  (*   by ordered. *)
   case E1: (x < p) in Heqe *.
     inv Hsort.
     case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
     move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
     apply/andP; split.
       inv Heqe.
-      rewrite E.
       by apply/andP; split.
     by inv Heqe.
   inv Hsort.
   move/Forall_all in H2.
   clear IHxs H1.
   inv Heqe.
-  rewrite E.
-  move/negbT in E1.
+  move/negbT in E1; rewrite -leqNgt in E1.
   apply/andP; split=> //.
-  rewrite -leqNgt in E1.
   apply/allP=> [x0 Hin].
   move/allP: H2 => /(_ x0 Hin).
   rewrite /funcomp.
-  case: (inputOnly x0).
-    rewrite -ltnNge.
-    case E2: (uloc x == uloc x0).
-      by rewrite E.
-    by ordered.
-  rewrite -leqNgt.
-  case E2: (uloc x == uloc x0).
-    by rewrite E.
   by ordered.
+  (* case: (inputOnly x0). *)
+  (*   rewrite -ltnNge. *)
+  (*   case E2: (uloc x == uloc x0). *)
+  (*     by rewrite E. *)
+  (*   by ordered. *)
+  (* rewrite -leqNgt. *)
+  (* case E2: (uloc x == uloc x0). *)
+  (*   by rewrite E. *)
 Qed.
 
 Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),

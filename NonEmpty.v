@@ -40,6 +40,14 @@ Fixpoint NE_to_list {a} (ne : NonEmpty a) : list a :=
 
 Coercion NE_to_list : NonEmpty >-> list.
 
+Lemma NE_to_list_from_list {a} : forall (x : a) xs,
+  NE_to_list (NE_from_list x xs) = x :: xs.
+Proof.
+  move=> x xs.
+  elim: xs => //= [y ys IHys] in x *.
+  by rewrite IHys.
+Defined.
+
 Definition NE_head {a} (ne : NonEmpty a) : a :=
   match ne with
     | NE_Sing x => x
@@ -83,7 +91,19 @@ Proof.
   by elim: xs => //= [y ys IHys] in x *; congr (NE_Cons _ _).
 Qed.
 
-Lemma NE_head_from_list a (x : a) xs : NE_head (NE_from_list x xs) = head x (x :: xs).
+Lemma ne_list : forall a (x : a) xs ns,
+  NE_to_list ns = x :: xs -> ns = NE_from_list x xs.
+Proof.
+  move=> a x xs ns H.
+  replace ns with (NE_from_list x xs); last first.
+    case: ns => [r|r rs] in H *.
+      by inversion H.
+    by inversion H; rewrite NE_Cons_spec.
+  by [].
+Defined.
+
+Lemma NE_head_from_list a (x : a) xs :
+  NE_head (NE_from_list x xs) = head x (x :: xs).
 Proof. by elim E: xs => // [*] in x *. Qed.
 
 Lemma NE_last_from_list a (x : a) xs : NE_last (NE_from_list x xs) = last x xs.
@@ -125,6 +145,17 @@ Lemma NE_last_append_spec : forall {a} {xs ys : NonEmpty a},
   NE_last (NE_append xs ys) = NE_last ys.
 Proof. induction xs; auto. Qed.
 
+Lemma NE_append_from_list : forall {a} (x : a) xs y ys,
+  NE_from_list x (xs ++ y :: ys) =
+  NE_append (NE_from_list x xs) (NE_from_list y ys).
+Proof.
+  move=> a x xs y ys.
+  elim: xs => //= [z zs IHzs] in x y ys *.
+  f_equal.
+  exact: IHzs.
+Defined.
+
+(*
 Definition NE_last_ind P a :
   (forall (x : a), P a [::: x])
     -> (forall s x, P a s -> P a (NE_rcons s x))
@@ -141,8 +172,7 @@ Proof.
     exact: (Hlast s x2 (Hsing _)).
   replace (NE_append s (NE_Cons x2 s3))
     with (NE_append (NE_rcons [::: x] x2) s3); last by [].
-  admit.
-Qed.
+*)
 
 Section Sorted.
 

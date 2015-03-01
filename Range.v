@@ -58,17 +58,8 @@ Definition last_or_beg (rd : RangeDesc) := last_or (rbeg rd) (ups rd).
 Arguments last_or_beg rd /.
 
 Definition useWithinRange (b e : nat) (u : UsePos) :=
-  ~~ upos_within_bound b u && upos_within_bound e u.
+  (b <= u) && upos_within_bound e u.
 Arguments useWithinRange b e u /.
-
-(* A position is within a range if splitting at that point would divide it
-   into two ranges. *)
-Definition pos_within_range (pos : nat) (rd : RangeDesc) :=
-  if olast (ups rd) is Some u
-  then if inputOnly u
-       then rbeg rd < pos <= rend rd
-       else rbeg rd <= pos < rend rd
-  else rbeg rd < pos < rend rd.
 
 (* When [uses] is not [nil], then either [b < e] or [b <= e], depending on the
    use positions that occur within the range.  For example, an empty range is
@@ -77,7 +68,7 @@ Definition pos_within_range (pos : nat) (rd : RangeDesc) :=
 Definition validRangeBounds (b e : nat) (uses : seq UsePos) :=
   if uses isn't nil
   then all (useWithinRange b e) uses
-  else b < e.
+  else b <= e.
 Arguments validRangeBounds b e uses /.
 
 (** ** Range *)
@@ -108,29 +99,16 @@ Ltac reduce_last_use :=
     case: (olast X) => [?|] in H; rewrite ?all_rcons /= in H
   | [ |- context [olast ?X] ] =>
     case: (olast X) => [?|]; rewrite ?all_rcons /=
-  end;
-  repeat match goal with
-  | [ H : context [inputOnly ?U] |- _ ] =>
-    case: (inputOnly U) in H
-  | [ |- context [inputOnly ?U] ] =>
-    case: (inputOnly U)
+  | [ H : context [inputOnly ?U] |- _ ] => case: (inputOnly U) in H
+  | [ |- context [inputOnly ?U] ]       => case: (inputOnly U)
   end.
 
-Lemma Range_bounded `(r : Range rd) :
-  if olast (ups rd) is Some u
-  then if inputOnly u
-       then rbeg rd <= rend rd
-       else rbeg rd < rend rd
-  else rbeg rd < rend rd.
+Lemma Range_bounded `(r : Range rd) : rbeg rd <= rend rd.
 Proof.
   case: rd => [? ? rus] /= in r *.
   case: r => /= [Hproper _ _ _].
-  case/lastP: rus => //= [us u] in Hproper *.
-  rewrite olast_rcons.
-  case E: (rcons us u) => // in Hproper.
-    by apply rcons_nil in E.
-  move: E all_rcons Hproper => <- -> /andP [/= H _].
-  by case: (inputOnly u) in H *; ordered.
+  case: rus => //= [u us] in Hproper *.
+  by case: (inputOnly u) in Hproper *; ordered.
 Qed.
 
 Definition Range_shiftup `(r : Range rd) `(Hodd : odd b)
@@ -237,12 +215,12 @@ Proof.
   have Hb: rbeg rd1 <= rbeg rd2.
     move: (Range_bounded r1).
     move: (Range_bounded r2).
-    by abstract (reduce_last_use; ordered).
+    by reduce_last_use; ordered.
 
   have He: rend rd1 <= rend rd2.
     move: (Range_bounded r1).
     move: (Range_bounded r2).
-    by abstract (reduce_last_use; ordered).
+    by reduce_last_use; ordered.
 
   case: r1 => [/= Hr1a Hr1b Hr1c Hr1d].
   case: r2 => [/= Hr2a Hr2b Hr2c Hr2d].
@@ -461,58 +439,79 @@ Record SplitRange (rd r1 r2 : RangeDesc) (before : nat) : Prop := {
   _ : ups rd  = ups r1 ++ ups r2
 }.
 
-Definition SubRangesOf (before : nat) (Hodd : odd before) `(r : Range rd) :=
-  { p : option RangeSig * option RangeSig
-  | match p with
-    | (Some r1, Some r2) => SplitRange rd r1.1 r2.1 before
-    | (Some r1, None)    => (rend r1.1 <= before) /\ ((rd; r) = r1)
-    | (None, Some r2)    => (before <= rbeg r2.1) /\ ((rd; r) = r2)
-    | (None, None)       => False
-    end }.
+(* A position is within a range if splitting at that point would divide it
+   into two ranges.  Note that input variables are "zero-width", which allows
+   splitting at the end of a range, resulting in an empty range referencing
+   just those input variables, for the purposes of restoring it from the
+   stack. *)
+Definition splittable_range_pos (pos : nat) (rd : RangeDesc) :=
+  rbeg rd < pos <= rend rd.
+Arguments splittable_range_pos pos rd /.
 
-Definition rangeSpan (before : nat) (Hodd : odd before) `(r : Range rd) :
-  SubRangesOf Hodd r.
+(* Legal split positions:
+
+   Assume a Range from 1-11, with use positions at 1 (must *not* be
+   input-only), 5, 9 and 11 (must be input-only).  This is written:
+
+     1-11 [1 5 9 ->11]
+
+   - Cannot split at 1.
+   - Split at  3: 1-3  [1    ]  3-11 [5 9 ->11]
+   - Split at  5: 1-5  [1    ]  5-11 [5 9 ->11]
+   - Split at  7: 1-7  [1 5  ]  7-11 [  9 ->11]
+   - Split at  9: 1-9  [1 5  ]  9-11 [  9 ->11]
+   - Split at 11: 1-11 [1 5 9] 11-11 [    ->11]
+   - Cannot split at 13.
+
+   Note that is possible to produce a zero-width range by splitting at the end
+   when no input variable is there.  The algorithms above this can interpret
+   this as meaning that the range did not split at all. *)
+
+Definition SubRangesOf `(r : Range rd) (before : nat) :=
+  { p : RangeSig * RangeSig
+  | let: (r1, r2) := p in SplitRange rd r1.1 r2.1 before }.
+
+Definition rangeSpan `(r : Range rd) `(Hodd : odd before)
+  (Hwithin : splittable_range_pos before rd) : SubRangesOf r before.
 Proof.
   have Hsort := (Range_sorted r).
   destruct rd; simpl in *.
 
-  case E: (span (upos_within_bound before) ups0) => [l1 l2].
+  (* Anything which is [>= before] moves into the second range. *)
+  case E: (span (fun u => uloc u < before) ups0) => [l1 l2].
   symmetry in E.
   move: (span_cat E) => [Hspan _].
   move/andP: (span_all_leq Hsort E) => [H1 H2].
   rewrite Hspan in r Hsort * => {Hspan E}.
   move/StronglySorted_inv_app: Hsort => [Hsort1 Hsort2].
 
-  case Hb: (rend0 <= before).
-    exists (Some (packRange r), None) => /=.
-    by repeat (apply/andP; split=> //=).
-  move/negbT in Hb; rewrite -ltnNge in Hb.
-
-  case He: (before <= rbeg0).
-    exists (None, Some (packRange r)) => /=.
-    by repeat (apply/andP; split=> //=).
-  move/negbT in He; rewrite -ltnNge in He.
-
   move: (Range_proper r) => Hpr.
+  rewrite /= all_cat /useWithinRange !all_predI in Hpr.
 
   have Hr1: (validRangeBounds rbeg0 before l1).
-    rewrite /= /useWithinRange all_predI => {H2 Hsort1 Hsort2 Hb r}.
-    case: l1 => // [u1 us1] in H1 Hpr *.
-    apply/andP; split=> // {H1};
-    case/lastP: us1 => [|us1e u1e] /= in Hpr *;
-    rewrite ?all_cat /useWithinRange !all_predI in Hpr;
-    by ordered.
+    rewrite /= /useWithinRange all_predI => {H2 Hsort1 Hsort2 r}.
+    case: l1 => [|u1 us1] in H1 Hpr *.
+      by ordered.
+    case E: ((u1 :: us1) ++ l2) => [|? ?] in Hpr *.
+      by rewrite cat_cons in E.
+    apply/andP; split.
+      by ordered.
+    apply/allP=> [x Hin].
+    move/allP: H1 => /(_ x Hin).
+    rewrite /=.
+    reduce_last_use=> //.
+    exact/ltnW.
 
   have Hr2: (validRangeBounds before rend0 l2).
-    rewrite /= /useWithinRange all_predI => {H1 Hsort1 Hsort2 He r Hr1}.
-    case: l2 => // [u2 us2] in H2 Hpr *.
-    case: l1 => [|u1 us1] /= in Hpr *;
-    apply/andP; split=> // {H2};
-    rewrite /= ?all_cat /useWithinRange !all_predI /= in Hpr;
-    by apply/andP; split=> //; ordered.
+    rewrite /= /useWithinRange all_predI => {H1 Hsort1 Hsort2 r}.
+    case: l2 => [|u2 us2] in H2 Hpr *.
+      by ordered.
+    case E: (l1 ++ (u2 :: us2)) => [|? ?] in Hpr *.
+      by case: l1 => [|? ?] in E Hr1; discriminate.
+    by ordered.
 
   move: (Range_split r Hodd Hr1 Hr2) => [r1 r2].
-  by exists (Some (packRange r1), Some (packRange r2)).
+  by exists (packRange r1, packRange r2).
 Defined.
 
 (** ** BoundedRange *)
@@ -571,9 +570,8 @@ Proof.
   rewrite /range_ltn /= in H2 H3 *.
   case: xs => //= [y ys] in H2 H3 *.
   constructor; inv H3.
-    by abstract (reduce_last_use; ordered).
-  abstract (
-    move/Forall_all in H5; rewrite -all_map in H5;
-    apply/Forall_all; rewrite -all_map;
-    by reduce_last_use; match_all).
+    by reduce_last_use; ordered.
+  move/Forall_all in H5; rewrite -all_map in H5;
+  apply/Forall_all; rewrite -all_map;
+  by reduce_last_use; match_all.
 Defined.

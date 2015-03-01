@@ -16,6 +16,8 @@ Ltac breakup :=
   repeat match goal with
     | [ H: is_true (_ && _) |- _ ] => move/andP: H => [? ?]
     | [ |- is_true (_ && _) ] => apply/andP; split
+    | [ H: is_true (_ || _) |- _ ] => move/orP: H => [?|?]
+    | [ |- is_true (_ || _) ] => apply/orP; split
     | [ H: is_true (?X <  ?Y <  ?Z) |- _ ] => move/andP: H => [? ?]
     | [ H: is_true (?X <= ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]
     | [ H: is_true (?X <  ?Y <= ?Z) |- _ ] => move/andP: H => [? ?]
@@ -24,6 +26,14 @@ Ltac breakup :=
     | [ |- is_true (?X <= ?Y <= ?Z) ] => apply/andP; split
     | [ |- is_true (?X <  ?Y <= ?Z) ] => apply/andP; split
     | [ |- is_true (?X <= ?Y <  ?Z) ] => apply/andP; split
+    | [ H: is_true (~~ (?X <  ?Y <  ?Z)) |- _ ] => move/nandP in H
+    | [ H: is_true (~~ (?X <= ?Y <  ?Z)) |- _ ] => move/nandP in H
+    | [ H: is_true (~~ (?X <  ?Y <= ?Z)) |- _ ] => move/nandP in H
+    | [ H: is_true (~~ (?X <= ?Y <= ?Z)) |- _ ] => move/nandP in H
+    | [ |- is_true (~~ (?X <  ?Y <  ?Z)) ] => apply/nandP
+    | [ |- is_true (~~ (?X <= ?Y <  ?Z)) ] => apply/nandP
+    | [ |- is_true (~~ (?X <  ?Y <= ?Z)) ] => apply/nandP
+    | [ |- is_true (~~ (?X <= ?Y <= ?Z)) ] => apply/nandP
     end;
   repeat match goal with
     | [ H1: is_true (?X <  ?Y), H2: is_true (?Y <  ?Z) |- _ ] =>

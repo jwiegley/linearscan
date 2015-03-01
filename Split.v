@@ -37,7 +37,7 @@ Definition splitPosWithin `(i : Interval d) (pos : SplitPosition) :=
   | EndOfLifetimeHole => true
   end.
 
-Definition splitInterval `(st : ScanState InUse sd)
+Definition splitAtInterval `(st : ScanState InUse sd)
   `(Hunh : unhandled sd = (u, beg) :: us) (pos : SplitPosition)
   (uid : IntervalId sd) (forCurrent : bool) :
   SSError + option { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
@@ -62,14 +62,13 @@ Proof.
   case: d => iv ib ie ? rds in i Hint Hmid1 Hmid2 *.
   rewrite /= in Hset.
 
-  have Hmid: (ibeg int.2 < splitPos < iend int.2) by admit.
+  have Hmid: (ibeg int.2 < splitPos <= iend int.2) by admit.
 
-  case: (intervalSpan Hodd Hmid) => [[[i0|] [i1|]] H] //.
+  case: (splitInterval Hodd Hmid) => [[i0 i1] [H1 H2 H3]] //.
   (* The interval was split into two parts.  The second part goes back onto
      the unhandled list for processing later if it contains use positions that
      require a register. *)
-  - Case "(Some, Some)".
-    admit.
+  admit.
 (*
     move=> [/= H1 H2 /eqP H3].
 
@@ -238,7 +237,7 @@ Proof.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
   move=> H1 H2 H3.
-  move/splitInterval/(_ uid beg us Hunh pos uid true).
+  move/splitAtInterval/(_ uid beg us Hunh pos uid true).
   case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
   case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
   - exact: inl (ECannotSplitSingleton7 uid). (* ERROR *)
@@ -285,7 +284,7 @@ Proof.
     exact: inl ENoIntervalsToSplit. (* ERROR *)
 
   move: st.
-  move/splitInterval/(_ uid beg us Hunh pos aid false).
+  move/splitAtInterval/(_ uid beg us Hunh pos aid false).
   case=> [err|[[[sd st] [[/= Hincr H]]] |]]; last first.
   - exact: inl (ECannotSplitSingleton8 aid). (* ERROR *)
   - apply: (inr (tt, _)).
@@ -293,9 +292,9 @@ Proof.
     (* When splitting an active interval, we must move the first half over to
        the inactive list, since it no longer intersects with the current
        position.  This is only valid when [trueForActives] is [true], and only
-       if [splitInterval] does not modify the actives list.  It doesn't hurt
+       if [splitAtInterval] does not modify the actives list.  It doesn't hurt
        to always check whether it's a member, though we should prove that
-       [splitInterval] has the right behavior. *)
+       [splitAtInterval] has the right behavior. *)
     case E: ((widen_ord Hincr aid, reg) \in active sd) => //;
       first
         (have /= := ScanState_moveActiveToInactive st E;

@@ -297,6 +297,183 @@ Proof.
   exact: (@I_Cons vid _ Whole _ i _ Hlt').
 Defined.
 
+(* Divide the ranges of an [Interval] such that the first set are entirely
+   before the split position (and thus, the split could never occur there),
+   and the second set are either after the split position, or the split
+   position falls within the first of those ranges. *)
+Definition divideIntervalRanges `(i : Interval d) `(Hodd : odd before)
+  (Hwithin : ibeg d < before <= iend d) :
+  { p : SortedRanges (ibeg d) * SortedRanges (ibeg d)
+  | match p with
+    | (exist2 [::] _ _,
+       exist2 (r2 :: rs2) _ _) =>
+        [/\ splittable_range_pos before r2.1
+        &   rds d = NE_from_list r2 rs2 ]
+
+    | (exist2 (r1 :: rs1) _ _,
+       exist2 (r2 :: rs2) _ _) =>
+        [/\ rend (last r1 rs1).1 < rbeg r2.1
+        ,   rend (last r1 rs1).1 <= before <= rend r2.1
+        &   rds d = NE_append (NE_from_list r1 rs1) (NE_from_list r2 rs2) ]
+
+    | _ => False  (* no other splitting scenario is possible *)
+    end }.
+Proof.
+  case E: (span (fun rd => rend rd.1 < before) (rds d))
+    => [[|r1 rs1] [|r2 rs2]];
+
+  symmetry in E;
+  move/span_cat: E => [H1 [H2 H3]];
+  rewrite -?ltnNge in H3;
+  move: (Interval_sorted i) => Hsorted;
+  move: (Interval_exact_beg i) => Hbeg;
+  move: (Interval_exact_end i) => Hend;
+  rewrite ?cat0s ?cats0 in H1 Hsorted;
+  rewrite H1 in Hsorted;
+  try rewrite (ne_list H1) NE_head_from_list NE_last_from_list /= in Hbeg Hend;
+  rewrite Hbeg Hend in Hwithin.
+
+  - apply: exist _ (exist2 _ _ nil _ _, exist2 _ _ nil _ _) _ => //;
+    try constructor.
+    by case: (rds d) => // [?|? ?] in H1.
+
+  - apply: exist _ (exist2 _ _ nil _ _, exist2 _ _ (r2 :: rs2) _ _) _ => //;
+    try constructor;
+    try inv Hsorted.
+    + by rewrite Hbeg.
+    + by ordered.
+    + by rewrite (ne_list H1).
+
+  - apply: exist _ (exist2 _ _ (r1 :: rs1) _ _, exist2 _ _ nil _ _) _ => //;
+    try constructor;
+    try inv Hsorted.
+    + by ordered.
+    + clear -H2 Hwithin.
+      case/lastP: rs1 => [|rs1e r1e] /= in H2 Hwithin *;
+      rewrite ?last_rcons in Hwithin *;
+      rewrite ?all_rcons in H2 *;
+      by ordered.
+
+  - rewrite -/cat in Hend Hwithin.
+    pose Hsorted' := Hsorted.
+    apply StronglySorted_inv_app in Hsorted'.
+    move: Hsorted' => [Hsorted1 Hsorted2].
+    apply: exist _ (exist2 _ _ (r1 :: rs1) _ _,
+                    exist2 _ _ (r2 :: rs2) _ _) _ => //=.
+    + by ordered.
+    + apply StronglySorted_cons_cons in Hsorted.
+      rewrite /range_ltn in Hsorted.
+      rewrite Hbeg.
+      move: (Range_bounded r1.2).
+      by reduce_last_use; ordered.
+    + clear -H1 H2 H3 Hwithin Hsorted.
+      case/lastP: rs1 => [|rs r] /= in H1 H2 Hwithin Hsorted *;
+      rewrite ?last_rcons ?all_rcons in H1 H2 *;
+      split.
+      * by inv Hsorted; inv H5.
+      * by ordered.
+      * by rewrite (ne_list H1) NE_Cons_spec NE_to_list_from_list.
+      * inv Hsorted.
+        rewrite -cat1s -cat_rcons in H4.
+        apply StronglySorted_inv_app in H4; inv H4.
+        by apply StronglySorted_rcons_rcons_inv in H.
+      * by ordered.
+      * rewrite (ne_list H1).
+        exact: NE_append_from_list.
+Defined.
+
+(* Divide the ranges of an [Interval] into two sets.  Then, if a split is
+   needed in first range of the second set, split it two.  Return the two sets
+   of Ranges corresponding to the ranges of the two new Intervals after
+   splitting is done. *)
+Definition splitIntervalRanges `(i : Interval d) `(Hodd : odd before)
+  (Hwithin : ibeg d < before <= iend d) :
+  { p : SortedRanges (ibeg d) * SortedRanges before
+  | match p with
+    | (exist2 (r1 :: rs1) _ _,
+       exist2 (r2 :: rs2) _ _) =>
+        [/\ rend (last r1 rs1).1 <= before <= rbeg r2.1
+        ,   ibeg d = rbeg r1.1
+        &   iend d = rend (last r2 rs2).1 ]
+    | _ => False  (* no other splitting scenario is possible *)
+    end }.
+Proof.
+  move: (Interval_exact_beg i) => Hbeg.
+  move: (Interval_exact_end i) => Hend.
+  case: (divideIntervalRanges i Hodd Hwithin)
+    => [[[rs1 HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // H;
+    first by clear -H; case: rs1 => [|? ?] in H *.
+
+  (* If the split pos occurs within a lifetime hole, splitting the ranges
+     means just dividing them up, without any actual splitting necessary. *)
+  case E: (before <= rbeg r2.1).
+    apply: exist _ (exist2 _ _ rs1 _ _, exist2 _ _ (r2 :: rs2) _ _) _ => //.
+    case: rs1 => [|? ?] /= in H HSrs1 Hbrs1 *.
+      (* This branch is impossible. *)
+      move: H => [H1 H2].
+      move: (Interval_exact_beg i) (Interval_exact_end i) Hwithin.
+      rewrite {}H2 {H1} NE_head_from_list NE_last_from_list /=.
+      move=> -> -> /= /andP [H _].
+      by rewrite ltnNge E in H.
+    move: H Hbeg Hend => [? ? ->].
+    rewrite NE_head_append_spec NE_last_append_spec
+            NE_last_from_list NE_head_from_list.
+    move=> <- <-; split=> //.
+    by ordered.
+
+  (* Otherwise, it is somewhere in [r2] and we must split that [Range]. *)
+  have Hinr: splittable_range_pos before r2.1.
+    clear -H E;
+    move/negbT in E; rewrite -ltnNge in E.
+    case: rs1 => [|? ?] /= in H.
+      by move: H => [? ?].
+    move: H => [? ? ?].
+    by rewrite /=; ordered.
+
+  move: (@rangeSpan _ r2.2 _ Hodd Hinr) => [[r2a r2b] [H1 H2 H3 H4 H5]] //.
+  apply: exist _ (exist2 _ _ (rcons rs1 r2a) _ _,
+                  exist2 _ _ (r2b :: rs2) _ _) _ => //=.
+  - clear Hbrs1.
+    case/lastP: rs1 => [|rs r] /= in HSrs1 H *.
+      by constructor; constructor.
+    apply: StronglySorted_rcons_rcons => //.
+    case R: (rcons rs r) => [|y ys] in H.
+      by apply rcons_nil in R.
+    have Hlast: last y ys = last r (rcons rs r) by rewrite R.
+    rewrite Hlast last_rcons -H1 in H.
+    rewrite /range_ltn.
+    move/negbT in E; rewrite -ltnNge in E.
+    rewrite H3 in E.
+    move: H => [? ?].
+    by ordered.
+  - rewrite /= {HSrs1} in Hbrs2.
+    case: rs1 => [|x xs] /= in Hbrs1 H *;
+    by rewrite -?H3; ordered.
+  - constructor; inv HSrs2 => //.
+    have: forall a : RangeSig, range_ltn r2 a -> range_ltn r2b a.
+      move=> a.
+      rewrite /range_ltn.
+      by ordered.
+    move/List.Forall_impl.
+    by exact.
+  - by ordered.
+  - clear -H H1 H3 H4 Hbeg Hend.
+    case: rs1 => [|r1b rs1b] /= in H *.
+      move: H Hbeg Hend => [? ->].
+      rewrite NE_last_from_list NE_head_from_list H3 /=.
+      move=> <- -> _ H5 _ H6; split=> //.
+        by ordered.
+      case/lastP: rs2 => //= [? ?].
+      by rewrite !last_rcons.
+    move: H Hbeg Hend => [? ? ->].
+    rewrite NE_head_append_spec NE_last_append_spec
+            NE_last_from_list NE_head_from_list /=.
+    move=> <- -> _ H5 _ H6; split=> //.
+      by rewrite last_rcons; ordered.
+    case/lastP: rs2 => //= [? ?].
+    by rewrite !last_rcons.
+Defined.
+
 (** When splitting a [NonEmpty UsePos] list into two sublists at a specific
     point, the result type must be able to relate the sublists to the original
     list. *)
@@ -308,347 +485,30 @@ Record SplitInterval (i i1 i2 : IntervalDesc) (before : nat) : Prop := {
   _ : iend i = iend i2
 }.
 
-Definition SubIntervalsOf (before : nat) `(i : Interval d) :=
-  { p : option IntervalSig * option IntervalSig
-  | match p with
-    | (Some i1, Some i2) => SplitInterval d i1.1 i2.1 before
-    | _ => False
-    end }.
-
-Definition divideIntervalRanges `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg d < before < iend d) :
-  { p : seq RangeSig * seq RangeSig
-  | match p with
-    | ([::], r2 :: rs2)      => pos_within_range before r2.1
-    | (r1 :: rs1, r2 :: rs2) => rend (last r1 rs1).1 <= before < rend r2.1
-    | _                      => False
-    end }.
-Proof.
-  case E: (span (fun rd => rend rd.1 <= before) (rds d))
-    => [[|r1 rs1] [|r2 rs2]];
-  symmetry in E;
-  move/span_cat: E => [H1 [H2 H3]];
-  rewrite -?ltnNge in H3.
-  - exists (nil, nil).
-    by case: (rds d) => // [?|? ?] in H1.
-
-  - exists (nil, r2 :: rs2).
-    rewrite cat0s in H1.
-    rewrite /pos_within_range.
-    move: (Interval_exact_beg i).
-    move: (Interval_exact_end i).
-    replace (rds d) with (NE_from_list r2 rs2); last first.
-      case: (rds d) => [r|r rs] in H1 *.
-        by inv H1.
-      inv H1.
-      by rewrite NE_Cons_spec.
-    case: (olast (ups r2.1)) => [u|];
-    try case: (inputOnly u);
-    rewrite NE_head_from_list;
-    move=> _ /= <-;
-    by ordered.
-
-  - exists (r1 :: rs1, nil).
-    rewrite cats0 in H1.
-    move: (Interval_exact_end i).
-    replace (rds d) with (NE_from_list r1 rs1); last first.
-      case: (rds d) => [r|r rs] in H1 *.
-        by inv H1.
-      inv H1.
-      by rewrite NE_Cons_spec.
-    case/lastP: rs1 => [|rs1e r1e] /= in H2 H1 *.
-      move=> H.
-      rewrite H in Hwithin.
-      by ordered.
-    rewrite NE_last_from_list last_rcons.
-    rewrite all_rcons /= in H2.
-    move=> H.
-    rewrite H in Hwithin.
-    by ordered.
-
-  - exists (r1 :: rs1, r2 :: rs2).
-    case/lastP: rs1 => [|rs r] /= in H1 H2 *.
-      by ordered.
-    rewrite last_rcons.
-    rewrite all_rcons in H2.
-    by ordered.
-Defined.
+Definition SubIntervalsOf `(i : Interval d) (before : nat) :=
+  { p : IntervalSig * IntervalSig
+  | let: (i1, i2) := p in SplitInterval d i1.1 i2.1 before }.
 
 (** Split the current interval before the position [before].  This must
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Definition intervalSpan `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg i < before < iend i) : SubIntervalsOf before i.
+Definition splitInterval `(i : Interval d) `(Hodd : odd before)
+  (Hwithin : ibeg i < before <= iend i) : SubIntervalsOf i before.
 Proof.
-  case: (divideIntervalRanges i Hodd Hwithin) => [[[|r1 rs1] [|r2 rs2]] H] //;
-  case: (splitKind (iknd i)) => [lknd rknd];
-  case: (@rangeSpan before Hodd _ r2.2) => [[[r2a| ] [r2b| ]]] //.
-  - (* | first range | ...
-       |---^---------|
-       |   \-- split | *)
-    admit.
-  - (* Split is at the end of r2, impossible. *)
-    admit.
-  - (* Split is somewhere before r2, with no r1, impossible. *)
-    admit.
-  - (* | first range |  lifetime hole?  | later range | ...
-       |-------------|                  |---^---------|
-       |             |                  |   \-- split | *)
-    admit.
-  - (* Split is at the end of r2, impossible. *)
-    admit.
-  - (* | first range |  lifetime hole   | later range | ...
-       |-------------|     ^            |-------------|
-       |             |     \-- split    |             | *)
-    admit.
-    (* have id1 := {| ivar := ivar i *)
-    (*              ; ibeg := ibeg i *)
-    (*              ; iend := before *)
-    (*              ; iknd := lknd *)
-    (*              ; rds  := NE_from_list r1 rs1 *)
-    (*              |} in *)
-    (* have id2 := {| ivar := ivar i *)
-    (*              ; ibeg := rbeg r2 *)
-    (*              ; iend := rend (last r2 rs2).1 *)
-    (*              ; iknd := rknd *)
-    (*              ; rds  := NE_from_list r2 rs2 *)
-    (*              |} in *)
-    (* exist _ (Some (exist Interval id1 _), *)
-    (*          Some (exist Interval id2 _)) _ *)
+  case: (splitKind (iknd i)) => [lknd rknd].
+  case: (splitIntervalRanges i Hodd Hwithin)
+    => [[[[|r1 rs1] HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // [? ? ?].
+  have i1 :=
+    @Interval_fromRanges (ivar i) _ (exist2 _ _ (r1 :: rs1) HSrs1 Hbrs1)
+                         r1 rs1 refl_equal.
+  have i2 :=
+    @Interval_fromRanges (ivar i) _ (exist2 _ _ (r2 :: rs2) HSrs2 Hbrs2)
+                         r2 rs2 refl_equal.
+  apply: exist _ (packInterval (intervalSetKind i1 lknd),
+                  packInterval (intervalSetKind i2 rknd)) _.
+  by constructor; rewrite /= ?NE_last_from_list ?NE_head_from_list.
 Defined.
-
-(*
-Obligation 1.
-  move: Interval_fromRanges.
-
-Obligation 1.                   (* prove we cannot divide into empty ranges *)
-  case: (rds d) => [r|r rs] /= in Heq_anonymous *;
-  case: (rend r.1 <= before) in Heq_anonymous *;
-  try discriminate.
-  case: (span _ rs) => [? ?] in Heq_anonymous;
-  discriminate.
-Qed.
-Obligation 2.                   (* prove that before is beyond the end *)
-  clear H.
-  split=> //.
-  move/span_cat: Heq_anonymous => [H1 [H2 _]].
-  rewrite cats0 in H1.
-  rewrite -{}H1 in H2.
-  move: (Interval_exact_end i) => ->.
-  elim: (rds d) => /= [r|r rs IHrs] in H2 *;
-  by ordered.
-Qed.
-Obligation 3.
-  clear H H0.
-  split=> //.
-  move/span_cat: Heq_anonymous => [H1 [_ H3]].
-  rewrite cat0s in H1.
-  rewrite -{}H1 in H3.
-  move: (Interval_exact_beg i) => ->.
-  case: (rds d) => [[rd [Hrp _ _ _]]|[rd [Hrp _ _ _]] rs] /= in H3 *;
-  rewrite /= /useWithinRange all_predI in Hrp;
-  rewrite -ltnNge in H3.
-    admit.
-  admit.
-  (* case: (ups rd) => [|u us] in Hrp. *)
-Qed.
-Obligation 4.
-  move: Interval_fromRanges.
-  admit.
-Defined.
-Obligation 5.
-  admit.
-Defined.
-Obligation 6.
-  move/span_cat: Heq_anonymous => [H1 [H2 H3]].
-  constructor=> //=.
-  - case/lastP: rs1 => [|rs r] /= in H1 H2 *.
-      rewrite -ltnNge /= in H3.
-      admit.
-    rewrite last_rcons.
-    admit.
-  - admit.
-  - admit.
-Qed.
-Obligation 7.
-  split=> //.
-Qed.
-*)
-
-(*
-(** Split the current interval before the position [before].  This must
-    succeed, which means there must be use positions within the interval prior
-    to [before].  If [before] is [None], splitting is done before the first
-    use position that does not require a register. *)
-Fixpoint intervalSpan {rs : NonEmpty RangeSig}
-  (before : nat) (Hodd : odd before)
-  `(i : Interval {| ivar := iv
-                  ; ibeg := ib
-                  ; iend := ie
-                  ; iknd := knd
-                  ; rds  := rs |}) {struct rs} :
-  SubIntervalsOf before i.
-Proof.
-  case: (splitKind knd) => [lknd rknd].
-  destruct rs as [r|r rs];
-  case: (@rangeSpan before Hodd _ r.2) => [[[r0| ] [r1| ]]].
-
-  (* We have a single range, and the splitting point occur somewhere within
-     that range.  Therefore, we need to create two new intervals out of these
-     parts. *)
-  - Case "rs = R_Sing r; (r0, r1) = (Some, Some)".
-    move=> [H1 H2 H3 H4 H5].
-    move: {+}H2 (Interval_exact_beg i) => -> /=.
-    move: {+}H3 (Interval_exact_end i) => -> /=.
-    rewrite H2 in H1.
-    rewrite H4.
-    exists (Some (packInterval (I_Sing iv lknd r0.2)),
-            Some (packInterval (I_Sing iv rknd r1.2))).
-    by constructor=> //=; ordered.
-
-  (* If the split position is at or after the end of the range... *)
-  - Case "rs = R_Sing r; (o, o0) = (Some, None)".
-    move=> [H1 H2].
-    case: r0 => [rd0 r0] in H1 H2; inversion H2 as [H0].
-    move: {+}H0 (Interval_exact_beg i) => -> /=.
-    move: {+}H0 (Interval_exact_end i) => -> /=.
-    exists (Some (packInterval (I_Sing iv knd r.2)), None).
-    constructor=> //=; f_equal;
-      try by rewrite H0.
-    by destruct r.
-
-  (* If the split position is at or before the beginning of the range... *)
-  - Case "rs = R_Sing r; (o, o0) = (None, Some)".
-    move=> [H1 H2].
-    case: r1 => [rd1 r1] in H1 H2; inversion H2 as [H0].
-    move: {+}H0 (Interval_exact_beg i) => -> /=.
-    move: {+}H0 (Interval_exact_end i) => -> /=.
-    exists (None, Some (packInterval (I_Sing iv knd r.2))).
-    constructor=> //=; f_equal;
-      try by rewrite H0.
-    by destruct r.
-
-  (* An empty range with no use positions?  Impossible. *)
-  - Case "rs = R_Sing r; (o, o0) = (None, None)". by [].
-
-  (* We have a sequence of ranges, and the split occurs somewhere within the
-     first range of that sequence.  This means basically that we are turning
-     [(r :: rs)] into [[:: r0]] and [(r1 :: rs)], where [r0] and [r1] are
-     the split parts of the first range. *)
-  - Case "rs = R_Cons r rs; (o, o0) = (Some, Some)".
-    move=> [H1 H2 H3 H4 H5].
-
-    move: (intervalUncons i) => [_ i1].
-    move: (intervalConnected i) => ?.
-    move: (Interval_exact_end i) => /= Heq.
-    rewrite {}Heq in i1.
-
-    move: (Interval_exact_beg i) => /= Hb.
-    move: (Interval_exact_end i) => /= He.
-
-    have Hi: rend r1.1 < rbeg (NE_head rs).1 by rewrite -H4.
-    rewrite H3 in Hb.
-
-    exists (Some (packInterval (I_Sing iv lknd r0.2)),
-            Some (packInterval (@I_Cons _ _ rknd _ i1 _ Hi))).
-    by constructor=> //=; ordered.
-
-  (* In this branch, we are splitting beyond the end of the first range.  This
-     means splitting on [rs], we which accomplish by calling this function
-     recursively. *)
-  - Case "rs = R_Cons r rs; (o, o0) = (Some, None)".
-    move=> [Hx Hy].
-
-    move: (intervalUncons i) => [i0 i1].
-    move: (intervalConnected i) => Hi0.
-    move: (Interval_exact_end i) => /= Heq.
-    rewrite {}Heq in i1.
-
-    move: (Interval_exact_beg i) => /=.
-    move: (Interval_exact_end i) => /=.
-
-    (* After splitting [i1], the result we finally return will effectively be
-      (i0 :: i1_1, i1_2).  This means cons'ing [r] from above with [i1_1] to
-      form the first interval, and returning [i1_2] as the second interval. *)
-    move: (intervalSpan rs before Hodd iv
-             (rbeg (NE_head rs).1) (rend (NE_last rs).1) knd i1)
-        => /= [] [[i1_1| ] [i1_2| ]].
-    + SCase "(Some, Some)".
-      move=> [H1 /= H2 H3] H4 H5.
-      destruct i1_1 as [i1_1d i1_1i] eqn:Heqe.
-      destruct i1_1d as [? ? ?].
-      move: (Interval_exact_beg i1_1i) => Hb.
-      move: (Interval_exact_end i1_1i) => He.
-      simpl in *; clear Heqe.
-      rewrite Hb He in i1_1i.
-      rewrite Hb in H2.
-      rewrite H2 in Hi0.
-      rewrite H3 in H4.
-      have i1_1i' := @I_Cons _ _ lknd _ i1_1i _ Hi0.
-      rewrite -He in i1_1i'.
-
-      by exists (Some (packInterval i1_1i'),
-                 Some (packInterval (intervalSetKind i1_2.2 rknd))).
-
-    (* In this case, we need to cons the [r] from above with a new interval
-       [i1_1], which can only differ by possibly being shorter than i1, in the
-       case that there was an extension at the end with no use positions in it
-       (for example, to cover the range of a loop). *)
-    + SCase "(Some, None)".
-      move=> [H1 H2] H3 H4.
-
-      destruct i1_1 as [i1_1d i1_1i] eqn:Heqe.
-      destruct i1_1d as [? ? ?].
-      move: (Interval_exact_beg i1_1i) => Hb.
-      move: (Interval_exact_end i1_1i) => He.
-      simpl in *; clear Heqe.
-      rewrite Hb He in i1_1i.
-      have Hi: rend r.1 < rbeg (NE_head rds0).1
-        by inv H2; ordered.
-      have i1_1i' := @I_Cons _ _ knd _ i1_1i _ Hi.
-      rewrite -He in i1_1i'.
-
-      exists (Some (packInterval i1_1i'), None).
-      by constructor=> //=; inv H2.
-
-    (* In this case, we return [i0] as the left interval (which only
-       references [r]), and [i1] as the right, since nothing has been
-       changed. *)
-    + SCase "(None, Some)".
-      move=> [H1 H2] H3 H4.
-
-      destruct i1_2 as [i1_2d i1_2i] eqn:Heqe.
-      destruct i1_2d as [? ? ?].
-      move: (Interval_exact_beg i1_2i) => Hb.
-      move: (Interval_exact_end i1_2i) => He.
-      simpl in *; clear Heqe.
-      rewrite Hb He in i1_2i.
-      rewrite Hb in H2 H3.
-
-      exists (Some (packInterval (I_Sing iv lknd r0.2)),
-              Some (packInterval (intervalSetKind i1_2i rknd))).
-      by constructor=> //=; inv H2; ordered.
-
-    + SCase "(None, None)". by [].
-
-  - Case "rs = R_Cons r rs; (o, o0) = (None, Some)".
-    move=> [H1 H2].
-    case: r1 => [rd1 r1] in H1 H2; inversion H2 as [H0].
-
-    move: (intervalUncons i) => [_ i1].
-    move: (intervalConnected i) => Hi0.
-    move: (Interval_exact_beg i) => /= Heq1.
-    rewrite H0 in Heq1.
-    move: (Interval_exact_end i) => /= Heq2.
-    rewrite Heq2 in i1.
-
-    exists (None, Some (packInterval (@I_Cons _ _ knd _ i1 _ Hi0))).
-    by constructor=> //=; inv H2.
-
-  - Case "rs = R_Cons r rs; (o, o0) = (None, None)". by [].
-Defined.
-*)
 
 (** * Fixed Intervals *)
 

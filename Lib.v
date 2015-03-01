@@ -341,6 +341,23 @@ Proof.
   by rewrite last_rcons in Hrel.
 Qed.
 
+Lemma StronglySorted_cons_cons : forall a (R : a -> a -> Prop) x xs y ys,
+  StronglySorted R (x :: xs ++ y :: ys) -> R x y.
+Proof.
+  move=> a R x xs y ys H.
+  elim: xs => [|z zs IHzs] /= in x y ys H *.
+    by inv H; inv H3.
+  apply: (IHzs x y ys).
+  inv H.
+  have H4 := H2.
+  rewrite -cat_cons in H4.
+  apply StronglySorted_inv_app in H4.
+  inv H4.
+  inv H2.
+  constructor=> //.
+  by inv H3.
+Qed.
+
 Lemma StronglySorted_rcons_inv : forall a R (x : a) xs,
   StronglySorted R (rcons xs x) -> StronglySorted R xs.
 Proof.
@@ -352,6 +369,38 @@ Proof.
   constructor=> //.
   apply Forall_rcons_inv in H2.
   by inversion H2.
+Qed.
+
+Lemma Forall_rcons_rcons : forall a R `{Transitive _ R} (x : a) y z xs,
+  List.Forall (R z) (rcons xs x) -> R x y
+    -> List.Forall (R z) (rcons (rcons xs x) y).
+Proof.
+  move=> a R H x y z.
+  elim=> [|w ws IHws] /=.
+    constructor.
+      by inv H0.
+    constructor.
+      inv H0.
+      exact: transitivity H4 H1.
+    by constructor.
+  constructor.
+    by inv H0.
+  apply: IHws => //.
+  by inv H0.
+Qed.
+
+Lemma StronglySorted_rcons_rcons : forall a R `{Transitive _ R} (x : a) y xs,
+  StronglySorted R (rcons xs x) -> R x y
+    -> StronglySorted R (rcons (rcons xs x) y).
+Proof.
+  move=> a R H x y.
+  elim=> [|z zs IHzs] /=.
+    by repeat constructor.
+  constructor.
+    inv H0.
+   exact: (IHzs H4).
+ inv H0.
+ exact: Forall_rcons_rcons.
 Qed.
 
 Lemma StronglySorted_rcons_rcons_inv : forall a R (x y : a) xs,

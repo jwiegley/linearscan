@@ -176,9 +176,10 @@ End EqIntSet.
 (* Extract Inlined Constant IntSet_difference => "Data.IntSet.difference". *)
 (* Extract Inlined Constant IntSet_foldl      => "Data.IntSet.foldl'". *)
 
-Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) : IntMap (seq a) :=
+Definition IntMap_groupOn {a} (p : a -> nat) (l : seq a) :
+  IntMap (NonEmpty a) :=
   forFold emptyIntMap l $ fun acc x =>
     let n := p x in
     IntMap_alter (fun mxs => if mxs is Some xs
-                             then Some (x :: xs)
-                             else Some [:: x]) n acc.
+                             then Some (NE_Cons x xs)
+                             else Some [::: x]) n acc.
