@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.UsePos.
 Require Import String.
 
 Set Implicit Arguments.
@@ -11,35 +12,6 @@ Section Blocks.
 
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
-
-Inductive VarKind : Set := Input | Temp | Output.
-
-Section EqVarKind.
-
-Implicit Type s : VarKind.
-
-Fixpoint eqVarKind s1 s2 {struct s2} :=
-  match s1, s2 with
-  | Input, Input   => true
-  | Temp, Temp     => true
-  | Output, Output => true
-  | _, _           => false
-  end.
-
-Lemma eqVarKindP : Equality.axiom eqVarKind.
-Proof.
-  move.
-  move=> b1 b2 /=.
-  case: b1; case: b2=> /=;
-  constructor=> //=;
-  by case.
-Qed.
-
-Canonical VarKind_eqMixin := EqMixin eqVarKindP.
-Canonical VarKind_eqType :=
-  Eval hnf in EqType VarKind VarKind_eqMixin.
-
-End EqVarKind.
 
 Definition VarId := nat.
 

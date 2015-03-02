@@ -5,6 +5,43 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
+Inductive VarKind : Set := Input | Temp | Output.
+
+Section EqVarKind.
+
+Implicit Type s : VarKind.
+
+Fixpoint eqVarKind s1 s2 {struct s2} :=
+  match s1, s2 with
+  | Input, Input   => true
+  | Temp, Temp     => true
+  | Output, Output => true
+  | _, _           => false
+  end.
+
+Lemma eqVarKindP : Equality.axiom eqVarKind.
+Proof.
+  move.
+  move=> b1 b2 /=.
+  case: b1; case: b2=> /=;
+  constructor=> //=;
+  by case.
+Qed.
+
+Canonical VarKind_eqMixin := EqMixin eqVarKindP.
+Canonical VarKind_eqType :=
+  Eval hnf in EqType VarKind VarKind_eqMixin.
+
+End EqVarKind.
+
+Lemma at_least_one_var (kinds : seq VarKind) (Hkinds : 0 < size kinds) :
+  (Input \notin kinds) && (Output \notin kinds) && (Temp \notin kinds) -> False.
+Proof.
+  elim: kinds => // [k ks IHks] in Hkinds *.
+  move/andP=> [/andP [H1 H2] H3].
+  case: k => // in Hkinds H1 H2 H3 *.
+Qed.
+
 (** ** UsePos *)
 
 (** A "use position", or [UsePos], identifies an exact point in the
@@ -13,9 +50,9 @@ Generalizable All Variables.
     use position. *)
 
 Record UsePos : Set := {
-  uloc      : nat;
-  regReq    : bool;
-  inputOnly : bool
+  uloc   : nat;
+  regReq : bool;
+  uvar   : VarKind
 }.
 
 Coercion uloc : UsePos >-> nat.
@@ -69,7 +106,7 @@ Arguments upos_ge x y /.
   if it be input-only and coincide with the end of the previous range. *)
 
 Definition upos_within_bound (before : nat) (u : UsePos) :=
-  if inputOnly u
+  if uvar u is Input
   then uloc u <= before
   else uloc u < before.
 Arguments upos_within_bound before u /.
@@ -78,17 +115,7 @@ Program Instance upos_lt_trans : Transitive upos_lt.
 Obligation 1. exact: (ltn_trans H). Qed.
 
 Program Instance upos_le_trans : Transitive upos_le.
-Obligation 1.
-  case: (inputOnly x) in H *;
-  case: (inputOnly y) in H0 *;
-  case E1: (uloc x == uloc y) in H;
-  case E2: (uloc y == uloc z) in H0;
-  case E3: (uloc x == uloc z) in H H0 *;
-  move/eqP in E1; rewrite ?E1;
-  move/eqP in E2; rewrite ?E2;
-  move/eqP in E3; rewrite ?E3 //=;
-  by ordered.
-Qed.
+Obligation 1. by ordered. Qed.
 
 Definition head_or x xs := head x [seq uloc u | u <- xs].
 Arguments head_or x xs /.
@@ -100,8 +127,8 @@ Section EqUpos.
 
 Fixpoint equpos s1 s2 {struct s2} :=
   match s1, s2 with
-  | {| uloc := u1; regReq := rr1; inputOnly := io1 |},
-    {| uloc := u2; regReq := rr2; inputOnly := io2 |} =>
+  | {| uloc := u1; regReq := rr1; uvar := io1 |},
+    {| uloc := u2; regReq := rr2; uvar := io2 |} =>
       [&& u1 == u2, rr1 == rr2 & io1 == io2]
   end.
 

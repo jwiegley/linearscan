@@ -389,6 +389,17 @@ Proof.
   by inv H0.
 Qed.
 
+Lemma Forall_ordered : forall a (R : a -> a -> Prop) `{Transitive _ R} x y xs,
+  R x y -> List.Forall (R y) xs -> List.Forall (R x) xs.
+Proof.
+  move=> a R H x y xs H1 H2.
+  have: forall a, R y a -> R x a.
+    move=> z H3.
+    exact: transitivity H1 H3.
+  move/List.Forall_impl.
+  exact.
+Qed.
+
 Lemma StronglySorted_rcons_rcons : forall a R `{Transitive _ R} (x : a) y xs,
   StronglySorted R (rcons xs x) -> R x y
     -> StronglySorted R (rcons (rcons xs x) y).

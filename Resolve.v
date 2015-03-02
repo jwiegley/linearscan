@@ -1,6 +1,7 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Graph.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.

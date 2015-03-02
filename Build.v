@@ -8,8 +8,6 @@ Require Import LinearScan.LiveSets.
 Require Import LinearScan.Morph.
 Require Import LinearScan.ScanState.
 
-Require Import Coq.Sorting.Sorted.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -67,54 +65,76 @@ Record RangeCursor b pos e := {
     last cursorMid.*2.+1 [seq rend i.1 | i <- cursorRanges.1] <= e.*2.+1
 }.
 
-Definition emptyRangeCursor (b pos e : nat) (H : b < pos <= e) :
-  RangeCursor b pos e.
+Definition emptyRangeCursor (b e : nat) (H : b < e) : RangeCursor b e e.
 Proof.
-  have Hsz : b.*2.+1 < pos.*2.+1 by undoubled.
-  apply: {| cursorMid := pos |} => //=.
-  - exact: (emptyBoundedRange Hsz (odd_double_plus _)).
+  have Hsz : b.*2.+1 < e.*2.+1 by undoubled.
+  apply: {| cursorMid := e |} => //=.
+  - exact: emptyBoundedRange Hsz (odd_double_plus _).
   - by ordered.
   - exact: emptySortedRanges.
   - by undoubled.
 Defined.
 
-Definition transportRangeCursor {b prev base e}
-  (Hlt : b.*2.+1 <= base.*2.+1 <= prev.*2.+1)
-  (c : RangeCursor b prev e) : RangeCursor b base e.
+Definition transportRangeCursor {b prev base e} (Hlt : b <= base <= prev)
+  (cursor : RangeCursor b prev e) :
+  { cursor' : RangeCursor b base e
+  | [/\ ups  (cursorPending cursor).1.1 = ups  (cursorPending cursor').1.1
+    &   rend (cursorPending cursor).1.1 = rend (cursorPending cursor').1.1 ] }.
 Proof.
-  move: c => [mid br /= Hpos ranges Hend].
-  apply: {| cursorMid := mid |} => //=;
-  by case: (ups br.1.1) => [|u us] /= in Hpos *; ordered.
+  move: cursor => [mid br /= Hpos ranges Hend].
+  apply: exist _ {| cursorMid := mid |} _ => //=;
+  case: (ups br.1.1) => [|u us] /= in Hpos *;
+  move/andP: Hlt => [H1 H2];
+  rewrite -leq_double in H1;
+  rewrite -leq_double in H2;
+  by ordered.
 Defined.
 
-Definition PendingRanges b pos e :=
-  { _ : IntMap (RangeCursor b pos e) | b.*2.+1 <= pos.*2.+1 <= e.*2.+1 }.
+Definition shiftRangeCursor {b pos e} (H : b <= pos)
+  (cursor : RangeCursor b pos e) :
+  { cursor' : RangeCursor b pos e
+  | [/\ ups  (cursorPending cursor).1.1 = ups  (cursorPending cursor').1.1
+    &   rend (cursorPending cursor).1.1 = rend (cursorPending cursor').1.1 ] }.
+Proof.
+  case E: (rbeg (cursorPending cursor).1.1 <= pos.*2.+1).
+    by exists cursor.
+  case: cursor => [mid [r Hr] Hpos ranges Hend] /= in E *.
+  move/negbT in E; rewrite -ltnNge /= in E.
+  have Hodd : odd pos.*2.+1 by exact: odd_double_plus.
+  pose r1 := Range_shift_down r.2 Hodd E.
+  rewrite /head_or_end /head_or /= in Hpos.
+  apply: exist _ {| cursorMid     := mid
+                  ; cursorPending := exist _ r1 _
+                  ; cursorRanges  := ranges |} _ => //=.
+  - by undoubled.
+Defined.
 
-Definition emptyPendingRanges (b pos e : nat) (H : b < pos <= e)
-  (liveOuts : IntSet) : PendingRanges b pos e.
+Definition PendingRanges b pos e := IntMap (RangeCursor b pos e).
+
+Definition emptyPendingRanges (b e : nat) (H : b < e) (liveOuts : IntSet) :
+  PendingRanges b e e.
 Proof.
   have empty  := emptyRangeCursor H.
   have f xs vid := IntMap_insert (vid + maxReg) empty xs.
-  exists (IntSet_foldl f emptyIntMap liveOuts).
-  by undoubled.
+  exact: (IntSet_foldl f emptyIntMap liveOuts).
 Defined.
 
 Definition mergeIntoSortedRanges `(H : b <= pos)
   (pmap : PendingRanges b b pos) (rmap : IntMap (SortedRanges pos.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
 Proof.
-  apply: (IntMap_mergeWithKey _ _ _ pmap.1 rmap).
+  apply: (IntMap_mergeWithKey _ _ _ pmap rmap).
   - (* The combining function, when entries are present in both maps. *)
-    move=> _ [mid br /= Hpos ranges Hend] sr.
+    move=> _ [mid br /= _ ranges Hend] sr.
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
       move: (Range_proper br.1.2).
-      move: br => [r Hr] /= in Hpos *.
+      move: br => [r Hr] /=.
       by case: (ups r.1); ordered.
     pose ps' := prependRange ranges H0.
     move: ps' => [ps' spec].
     clear H0.
     apply: (Some (@SortedRanges_cat _ ps' _ sr _)) => /=.
-    move: br => [r Hlt] in Hpos ps' spec *.
+    move: br => [r Hlt] in ps' spec *.
     have H4: rend r.1 <= mid.*2.+1.
       have Hlt' := Hlt.
       by ordered.
@@ -124,7 +144,7 @@ Proof.
       rewrite /validRangeBounds in Hrp.
       case: (ups r.1) => [|u us] /= in Hrp *.
         by ordered.
-      by case: (inputOnly u) in Hrp *; ordered.
+      by case: (uvar u) in Hrp *; ordered.
     have p := last_leq Hend H4.
     rewrite -2!last_map -map_comp in spec.
     rewrite spec /= in p.
@@ -133,10 +153,10 @@ Proof.
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-    case=> [mid br /= Hpos ranges Hend].
+    case=> [mid br /= _ ranges Hend].
     have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
       move: (Range_proper br.1.2).
-      move: br => [r ?] /= in Hpos *.
+      move: br => [r ?] /=.
       by case: (ups r.1); ordered.
     exact: (prependRange ranges H0).1.
 
@@ -155,229 +175,383 @@ Definition varKindLtn (x y : VarKind) : bool :=
   | _, _         => true
   end.
 
-Definition handleVars_combine {b pos e} (H : b <= pos) (vid : nat)
-  (range : RangeCursor b pos.+1 e)
-  (vars : bool * { ks : seq VarKind | size ks > 0}) :
-  option (RangeCursor b pos e).
+Definition upos_before_rend `(r : Range rd) (upos : UsePos) :=
+  if ups rd is u :: _
+  then if (uvar upos != Input) && (uloc u == rend rd)
+       then upos <  u
+       else upos <= u
+  else if uvar upos is Input
+       then upos <= rend rd
+       else upos <  rend rd.
+Arguments upos_before_rend [rd] r upos /.
+
+Lemma validUsePosition `(r : Range rd) (upos : UsePos)
+  (Hbeg : rbeg rd <= upos) (Hend : upos_before_rend r upos) :
+  [/\ validRangeBounds (rbeg rd) (rend rd) (upos :: ups rd)
+  &   StronglySorted upos_le (upos :: ups rd)].
 Proof.
-  move: range => [mid br /= Hpos ranges Hend].
-  move: vars => [req [kinds Hkinds]].
-
-  set upos := {| uloc      := pos.*2.+1
-               ; regReq    := req
-               ; inputOnly := [&& Input  \in kinds
-                              ,   Output \notin kinds
-                              &   Temp   \notin kinds] |}.
-  have Hodd : odd upos by rewrite /= odd_double.
-
-  have E: (upos < head_or_end br.1.1).
-    rewrite /=.
-    by case: (ups br.1.1) => /= [|u us] in Hpos *; undoubled.
-
-  have Hupos: validRangeBounds upos (rend br.1.1) (ups br.1.1).
-    move: (Range_proper br.1.2) => Hproper.
-    move: (Range_sorted br.1.2) => Hsorted.
-    rewrite /head_or_end in E.
-    rewrite /= in Hproper *.
-    case: (ups br.1.1) => [|u us] //= in Hpos E Hproper Hsorted *.
-      by ordered.
-    move/andP: Hproper => [/andP [H1 H2] H3].
-    inv Hsorted.
-    apply/andP; split=> //.
-      apply/andP; split=> //.
-      exact/ltnW.
-    elim: us => [|u' us' IHus'] /= in H3 H5 H6 *.
-      by ordered.
-    move/andP: H3 => [/andP [? ?] ?].
-    apply/andP; split=> //.
-      apply/andP; split=> //.
-      inv H6.
-      by ordered.
-    apply: IHus' => //.
-      by inv H5.
-    by inv H6.
-
-  case K: [&& Output \in kinds
-          ,   Input \notin kinds
-          &   rbeg br.1.1 < upos].
-    (* If this is an output variable that is not also used as an input
-       variable, then rather than creating a new range, we simply insert the
-       use position into that range.  We also shift up the beginning of the
-       range, since it may begin here.  By doing this iteratively for each
-       variable, we determine when the range truly starts. *)
-    move: br ranges => [r Hr] [rs Hsort Hlt] /= in Hend Hpos Hupos E K *.
-    pose r1 := Range_shiftup (b:=upos) r.2 Hodd Hupos.
-
-    have Hloc: validRangeBounds (rbeg r1.1) (rend r1.1) (upos :: ups r1.1).
-      move/andP: K => [K1 /andP [K2 _]].
-      move/negbTE in K2.
-      rewrite /= {}K1 {}K2 {r1}.
-      case: (ups r.1) => /= [|u us] in Hpos Hupos H E *;
-      case: (Temp \in kinds) => //=;
-      try case: (inputOnly u) in Hupos *;
-      by ordered.
-
-    have Hsorted: StronglySorted upos_le (upos :: ups r1.1).
-      move: (Range_sorted r1.2).
-      constructor=> //.
-      admit.
-    pose r2 := Range_cons r1.2 Hloc Hsorted Hodd.
-
-    rewrite /= in Hpos Hloc r2.
-    apply: Some {| cursorMid     := mid
-                 ; cursorPending := exist _ r2 _
-                 ; cursorRanges  := exist2 _ _ rs _ _ |} => //=.
-    - by undoubled.
-    - by ordered.
-
-  (* Otherwise, we must create a new [BoundedRange], and merge the previous
-     one into the [SortedRanges]. *)
-  case Hloc: (rbeg br.1.1 <= upos).
-    have U: validRangeBounds (rbeg br.1.1) (rend br.1.1) (upos :: ups br.1.1).
-      admit.
-    have S: StronglySorted (fun x y : UsePos => upos_le x y) (upos :: ups br.1.1).
-      admit.
-    pose r1 := Range_cons br.1.2 U S Hodd.
-    apply: Some {| cursorMid     := mid
-                 ; cursorPending := exist _ r1 _
-                 ; cursorRanges  := ranges |} => //=.
-    - clear -br.
-      move: br => [? Hr].
-      exact: Hr.
-    - admit.
-
-  pose r1 := newRange Hodd.
-
-  move/negbT in Hloc.
-  rewrite -ltnNge /= in Hloc.
-
-  (* have Hspan: b.*2.+1 <= (pos.+1).*2.+1 <= rbeg br.1.1. *)
-  (*   apply/andP; split=> //. *)
-  (*   rewrite doubleS. *)
-  (*   simpl in E. *)
-  (*   move: (Range_beg_odd br.1.2) => Hbegodd. *)
-  (*   rewrite doubleS in Hpos. *)
-  (*   by ordered. *)
-
-  admit.
-(*
-  apply (Some {| cursorMid     := pos.+1
-               ; cursorPending := exist _ r1 _ |}) => //=.
-  - by ordered.
-  - by undoubled.
-  - by undoubled.
-  - exact: (prependRange srs Hspan).1.
-  - case: (prependRange srs Hspan) => [p /= spec].
-    have Hmid': (pos.+1).*2.+1 <= mid.*2.+1.
-      by undoubled.
-    move: br => [r Hlt] in H2 spec E Hupos Hloc Hspan *.
-    have H4: rend r.1 <= mid.*2.+1.
-      pose Hlt' := Hlt.
-      by ordered.
-    have Hleq := last_leq H3 H4.
-    rewrite spec /= in Hleq.
-    apply: (last_leq Hleq _).
-    move: (Range_bounded r.2).
-    simpl in *.
+  rewrite /= in Hend.
+  split.
+    move: (Range_proper r).
+    case: (ups rd) => [|u us] /= in Hend *;
+    case: (uvar upos) => // in Hend *;
+    try case: (uvar u) => //= in Hend *;
+    try case E: (uloc u == rend rd) => // in Hend *;
+    try move/andP => [/andP [? H] ?];
+    try move/(leq_eqF E) in H;
     by ordered.
-*)
+  move: (Range_sorted r) => Hsorted.
+  constructor=> // {Hbeg}.
+  case: (ups rd) => /= [|u us] in Hend Hsorted *.
+    by constructor.
+  case: (uvar upos) => // in Hend *;
+  try case: (uvar u) => //= in Hend *;
+  constructor=> //;
+  inv Hsorted;
+  case: (uloc u == rend rd) => // in Hend;
+  try exact/ltnW;
+  try exact: Forall_ordered;
+  move/ltnW in Hend;
+  exact: Forall_ordered.
 Defined.
 
-Definition handleVars_onlyRanges {b pos e}
-  (Hlt : b.*2.+1 <= pos.*2.+1 <= (pos.+1).*2.+1) :
-  IntMap (RangeCursor b pos.+1 e) -> IntMap (RangeCursor b pos e).
+Definition BoundedCursor b pos e :=
+  { c : RangeCursor b pos e
+  | pos.*2.+1 < rend (cursorPending c).1.2
+  & pos.*2.+1 <= head_or_end (cursorPending c).1.2 }.
+
+Definition insertIntoRange {b pos e}
+  (upos : UsePos) (Hodd : odd upos) (cursor : BoundedCursor b pos e)
+  (Hbeg : rbeg (cursorPending cursor.1).1.1 <= upos)
+  (Heqe : uloc upos == pos.*2.+1) : BoundedCursor b pos e.
 Proof.
-  apply: IntMap_map _.
-  exact: (transportRangeCursor Hlt).
+  case: cursor => [[mid [r Hr] Hpos ranges Hend] /= H1 H2] in Hbeg *.
+  have Hupos: upos_before_rend r.2 upos.
+    rewrite /= in Hpos *.
+    case: (ups r.1) => [|u us] /= in Hpos *;
+    case: (uvar upos) => //=;
+    try case E: (uloc u == rend r.1) => //=;
+    try move/eqP in E; rewrite ?E;
+    by ordered.
+  move: (validUsePosition Hbeg Hupos) => [Hloc Hsorted].
+  pose r' := Range_cons r.2 Hloc Hsorted Hodd.
+  apply: exist2 _ _ _ _ _.
+  - apply: {| cursorMid     := mid
+            ; cursorPending := exist _ r' _
+            ; cursorRanges  := ranges |} => //=.
+    clear -Heqe Hr Hloc.
+    rewrite /= in Hloc.
+    by ordered.
+  - by [].
+  - rewrite /=.
+    by move/eqP in Heqe; rewrite Heqe.
 Defined.
 
-Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) :
-  IntMap (bool * { ks : seq VarKind | size ks > 0})
-    -> IntMap (RangeCursor b pos e).
+Definition makeNewRange {b pos e} (H : b <= pos < e)
+  (upos : UsePos) (Hodd : odd upos) (Heqe : uloc upos == pos.*2.+1) :
+  match uvar upos with
+  | Input  => BoundedRange b.*2.+1   pos.*2.+1
+  | Temp   => BoundedRange pos.*2.+1 pos.*2.+2
+  | Output => BoundedRange pos.*2.+1 e.*2.+1
+  end.
 Proof.
-  apply: IntMap_map _.
-  move=> [req [kinds Hkinds]].
-
   (* If the variable is only [Input], assume it starts from the beginning; and
      if [Output], that it persists until the end.  Only [Temp] variables are
      handled using a single-instruction range. *)
   pose rd :=
-    {| rbeg := if Input \in kinds
+    {| rbeg := if uvar upos is Input
                then b.*2.+1
                else pos.*2.+1
-     ; rend := if Output \in kinds
-               then e.*2.+1
-               else if Temp \in kinds
-                    then pos.*2.+2
-                    else pos.*2.+1
-     ; ups  := [:: {| uloc      := pos.*2.+1
-                    ; regReq    := req
-                    ; inputOnly := [&& Input  \in kinds
-                                   ,   Output \notin kinds
-                                   &   Temp   \notin kinds] |} ]
-     |}.
-  apply: {| cursorMid     := e
-          ; cursorPending := exist _ (exist _ rd _) _
-          |} => //=.
-  - constructor=> /=.
-    + clear rd req.
-      case: (Input \in kinds);
-      case: (Output \in kinds);
-      case: (Temp \in kinds);
-      try undoubled.
-      admit.
+     ; rend := match uvar upos with
+               | Input  => pos.*2.+1
+               | Temp   => pos.*2.+2
+               | Output => e.*2.+1
+               end
+     ; ups  := [:: upos ] |}.
+
+  case V: (uvar upos) in rd *;
+  apply: exist _ _ _.
+
+  - apply: exist _ _ _.
+    exact: rd.
+    constructor=> /=.
+    + move/eqP in Heqe.
+      rewrite Heqe.
+      case: (uvar upos) in V *;
+      by undoubled.
     + by constructor; constructor.
-    + by case: (Input \in kinds); exact: odd_double_plus.
-    + by rewrite odd_double.
-  - move=> r.
-    case: (Input \in kinds);
-    case: (Output \in kinds);
-    case: (Temp \in kinds);
+    + by case: (uvar upos); exact: odd_double_plus.
+    + by apply/andP; split.
+
+    rewrite /=.
+    case: (uvar upos).
+    + case U: (pos.*2.+1 == pos.*2.+2).
+        move/eqP in U.
+        by ordered.
+      by undoubled.
+    + by undoubled.
+    + by undoubled.
+
+  - apply: exist _ _ _.
+    exact: rd.
+    constructor=> /=.
+    + move/eqP in Heqe.
+      rewrite Heqe.
+      case: (uvar upos) in V *;
+      by undoubled.
+    + by constructor; constructor.
+    + by case: (uvar upos); exact: odd_double_plus.
+    + by apply/andP; split.
+
+    rewrite /=.
+    case: (uvar upos).
+    + case U: (pos.*2.+1 == pos.*2.+2).
+        move/eqP in U.
+        by ordered.
+      by undoubled.
+    + by undoubled.
+    + by undoubled.
+
+  - apply: exist _ _ _.
+    exact: rd.
+    constructor=> /=.
+    + move/eqP in Heqe.
+      rewrite Heqe.
+      case: (uvar upos) in V *;
+      by undoubled.
+    + by constructor; constructor.
+    + by case: (uvar upos); exact: odd_double_plus.
+    + by apply/andP; split.
+
+    rewrite /=.
+    case: (uvar upos).
+    + case U: (pos.*2.+1 == pos.*2.+2).
+        move/eqP in U.
+        by ordered.
+      by undoubled.
+    + by undoubled.
+    + by undoubled.
+
+  (* rewrite /=. *)
+  (* move/eqP in Heqe; rewrite {}Heqe. *)
+  (* case: (uvar upos). *)
+  (* - by case U: (pos.*2.+1 == pos.*2.+2) => //=. *)
+  (* - case U: (pos.*2.+1 == pos.*2.+2) => //=. *)
+  (*   move/eqP in U. *)
+  (*   by ordered. *)
+  (* - rewrite /=. *)
+  (*   case U: (pos.*2.+1 == e.*2.+1) => //. *)
+  (*   move/eqP in U. *)
+  (*   move/andP: H => [_ H]. *)
+  (*   rewrite -ltn_double in H. *)
+  (*   move/ltn_addn1 in H. *)
+  (*   by ordered. *)
+Defined.
+
+Definition insertOrAddRange {b pos e} (Hlt : b <= pos < e)
+  (upos : UsePos) (Hodd : odd upos) (Heqe : uloc upos == pos.*2.+1)
+  (cursor : option (BoundedCursor b pos e)) :
+  option (BoundedCursor b pos e).
+Proof.
+  apply: Some _.
+
+  case: cursor => [c|]; last first.
+    (* There was no prior cursor, so start by creating a new range to contain
+       the use position. *)
+    have r := makeNewRange Hlt Hodd Heqe.
+    case: (uvar upos) in r.
+
+    apply: exist2 _ _ _ _ _.
+    - apply: {| cursorMid     := pos
+              ; cursorPending := r
+              ; cursorRanges  := exist2 _ _ [::] _ _
+              |} => //=.
+      + clear -Hlt Heqe.
+        destruct r.
+        admit.
+      + by constructor.
+      + by undoubled.
+    - rewrite /=.
+      case: (uvar upos).
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+
+  (* If the (possibly shifted) range begins at or before [upos], add the use
+     position to it. *)
+  case E: (rbeg (cursorPending c.1).1.1 <= upos).
+    (* Verify that the use position occurs before the end of the current pending
+       range. *)
+    exact: (insertIntoRange Hodd E Heqe).
+
+  move: c => [[mid br Hpos ranges Hend] Hupos ?] in E *.
+
+  (* Otherwise, create a new range to contain the use position. *)
+  have H3 : b <= pos < pos.+1 by ordered.
+  pose r3 := makeNewRange H3 Hodd Heqe.
+
+  have Hspan: b.*2.+1 <= (pos.+1).*2.+1 <= rbeg br.1.1.
+    clear r3.
+    rewrite doubleS.
+    rewrite /= {Hupos} in E.
+    move/eqP in Heqe.
+    rewrite -Heqe.
+    apply/andP; split.
+      admit.
+    move: (Range_beg_odd br.1.2) => Hbegodd.
+    clear -E Heqe Hodd Hbegodd.
+    move/negbT in E; rewrite -ltnNge /= in E.
+    apply: ltn_odd => //.
+    by apply/andP; split.
+  clear E.
+
+  admit.
+(*
+  apply: {| cursorMid     := pos.+1
+          ; cursorPending := r3.1
+          ; cursorRanges  := (prependRange ranges Hspan).1
+         |} => //=.
+  - clear -Hlt Heqe.
+    move/eqP: Heqe => ->.
     by undoubled.
-  - move=> r _.
-    case: (Input \in kinds);
-    case: (Output \in kinds);
-    case: (Temp \in kinds);
-    by undoubled.
-  - exists [::] => //.
-    by constructor.
-  - by undoubled.
+  - case: (prependRange ranges Hspan) => [p /= spec].
+    move: br => [r Hr] /= in Hspan spec Hpos Hupos *.
+    have H4: rend r.1 <= mid.*2.+1.
+      pose Hlt' := Hlt.
+      by ordered.
+    have Hleq := last_leq Hend H4.
+    rewrite -2!last_map -map_comp in spec.
+    rewrite spec /= in Hleq.
+    rewrite -2!last_map -map_comp in Hleq.
+    apply: (last_leq Hleq _).
+    move: (Range_bounded r.2).
+    simpl in *.
+    by ordered.
+
+  rewrite /= {r3}.
+  move/eqP in Heqe; rewrite {}Heqe.
+  case: (uvar upos) => //=.
+  - case U: (pos.*2.+1 == pos.*2.+2) => //=.
+    move/eqP in U.
+    by ordered.
+  - rewrite /=.
+    case U: (pos.*2.+1 == (pos.+1).*2.+1) => //.
+    move/eqP in U.
+    rewrite doubleS in U.
+    by ordered.
+*)
+Defined.
+
+Definition handleOutputVar {b pos e} (H : b <= pos < e)
+  (cursor : option (RangeCursor b pos e)) (var : VarInfo maxReg) :
+  option (RangeCursor b pos e).
+Proof.
+  case E: (varKind var != Input); last exact: cursor.
+
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := regRequired var
+               ; uvar   := varKind var |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+
+  have H1 : b <= pos by ordered.
+  have c1 := if varKind var is Output
+             then option_map (fun c => (shiftRangeCursor H1 c).1) cursor
+             else cursor.
+
+  admit.
+  (* exact (option_map sval (insertOrAddRange H Hodd _ undefined)). *)
+Defined.
+
+Definition handleInputVar {b pos e} (H : b <= pos < e)
+  (cursor : option (RangeCursor b pos e)) (var : VarInfo maxReg) :
+  option (RangeCursor b pos e).
+Proof.
+  case E: (varKind var == Input); last exact: cursor.
+
+  set upos := {| uloc   := pos.*2.+1
+               ; regReq := regRequired var
+               ; uvar   := varKind var |}.
+  have Hodd : odd upos by rewrite /= odd_double.
+
+  have c1 := cursor.
+
+  have Hupos :
+    if c1 is Some c
+    then (if uvar upos is Input
+          then leq
+          else ltn) upos (head_or_end (cursorPending c).1.1)
+    else true.
+    rewrite [uvar _]/=.
+    case: c1 => // [c].
+    case V: (varKind var).
+    - move: (cursorHpos c).
+      by move/andP=> [_ H1].
+    - by rewrite V in E.
+    - by rewrite V in E.
+
+  admit.
+  (* exact: (insertOrAddRange H Hodd _ Hupos). *)
+Defined.
+
+Definition handleVars_combine {b pos e} (H : b <= pos < e) (vid : nat)
+  (vars : seq (VarInfo maxReg))
+  (c0 : RangeCursor b pos.+1 e) : option (RangeCursor b pos e).
+Proof.
+  have H1 : b <= pos <= pos.+1 by ordered.
+  have c1 := Some (transportRangeCursor H1 c0).1.
+  have c2 := foldl (handleOutputVar H) c1 [seq k <- vars | varKind k != Input].
+  have c3 := foldl (handleInputVar H)  c2 [seq k <- vars | varKind k == Input].
+  exact: c3.
+Defined.
+
+(* If there is no variable reference at this position, do nothing. *)
+Definition handleVars_onlyRanges {b pos e} (H : b <= pos < e) :
+  IntMap (RangeCursor b pos.+1 e) -> IntMap (RangeCursor b pos e).
+Proof.
+  have H1 : b <= pos <= pos.+1 by ordered.
+  exact (IntMap_map (fun c => (transportRangeCursor H1 c).1)).
+Defined.
+
+(* If a variable referenced for which no reservation was made (for example, an
+   input variable that is not used as an output later in the block), we simply
+   add it.
+
+   jww (2015-03-01): Note that it should be provably impossible for an output
+   variable to be seen here for the first time, unless it is not a member of
+   the live out set. *)
+Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) (vid : nat) :
+  IntMap (seq (VarInfo maxReg)) -> IntMap (RangeCursor b pos e).
+Proof.
+  apply: IntMap_foldl _ emptyIntMap => m vars.
+  have c2 :=
+    foldl (handleOutputVar H) None [seq k <- vars | varKind k != Input].
+  have c3 := foldl (handleInputVar H)  c2 [seq k <- vars | varKind k == Input].
+  case: c3 => [c3|].
+    exact: IntMap_insert vid c3 m.
+  exact: m.
 Defined.
 
 Definition extractVarInfo (xs : NonEmpty (VarInfo maxReg)) :
-  bool * { ks : seq VarKind | size ks > 0 }.
+  seq (VarInfo maxReg).
 Proof.
-  split.
-    exact: (find (@regRequired maxReg) xs != size xs).
-  move/(NE_map (@varKind maxReg)) in xs.
   case: xs => [x|x xs].
-    by exists [:: x].
-  exists (sortBy varKindLtn (x :: xs)).
-  by rewrite /= insert_size.
+    exact: [:: x].
+  exact: (x :: xs).
 Defined.
 
-Program Definition handleVars (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos)
+Program Definition handleVars
+  (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos < e)
   `(ranges : PendingRanges b pos.+1 e) : PendingRanges b pos e :=
   let vars := IntMap_map extractVarInfo $
               IntMap_groupOn (@nat_of_varId maxReg) varRefs in
-  IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyRanges _)
-                      (handleVars_onlyVars _) ranges.1 vars.
-Obligation 1. by undoubled. Qed.
-Obligation 2.
-  case: ranges => [ranges H0].
-  move/andP: H0 => [H1 H2].
-  apply/andP; split=> //.
-  move/ltnW: H2.
-  by rewrite doubleS ltnS ltn_double.
-Qed.
-Obligation 3.
-  case: ranges => [ranges H0].
-  move/andP: H0 => [H1 H2].
-  by undoubled.
-Qed.
+  IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyVars Hlt _)
+                      (handleVars_onlyRanges Hlt) vars ranges.
 
 Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
-  (ranges : PendingRanges b pos.+1 e) (Hlt : b <= pos) :
+  (ranges : PendingRanges b pos.+1 e) (Hlt : b <= pos < e) :
   PendingRanges b pos e :=
   (* If the operation is a function call, force a flush of every register.
 
@@ -410,12 +584,33 @@ Proof.
   move=> sz b e.
   rewrite /sz /blockSize.
   set ops := allBlockOps binfo block.
-  rewrite -size_rev.
-  elim: (rev ops) => [|o os IHos] /=.
-    by rewrite !addn0.
-  rewrite !addnS.
+
+  have H : 0 < size ops -> b < pos + (size ops) <= e.
+    rewrite /b /e /sz /blockSize.
+    replace (allBlockOps binfo block) with ops; last by [].
+    move=> ?.
+    apply/andP; split=> //.
+    exact: ltn_plus.
+  elim/last_ind E: ops => [|os o IHos] /= in H *.
+    by rewrite addn0.
   move=> ranges.
-  move: (reduceOp block o ranges (leq_plus _ _)).
+
+  have H1 : b <= pos + (size os) < e.
+    rewrite size_rcons in H.
+    have: 0 < (size os).+1 by [].
+    move/H=> /andP [H2 H3].
+    apply/andP; split.
+      exact: leq_plus.
+    by rewrite addnS in H3.
+  rewrite size_rcons addnS in ranges.
+  move: (reduceOp block o ranges H1).
+
+  have: 0 < size os -> b < pos + size os <= e.
+    move=> ?.
+    apply/andP; split.
+      exact: ltn_plus.
+    move/andP: H1 => [_ ?].
+    exact/ltnW.
   exact: IHos.
 Defined.
 
@@ -436,12 +631,10 @@ Proof.
 
   (* For every variable in the live out set, create an empty range covering
      the entire span. *)
-  pose endpos := pos + sz.
-  have Hsz  : pos < endpos by exact: ltn_plus.
-  have Hsze : pos < endpos <= endpos by ordered.
+  have Hsz : pos < pos + sz by exact: ltn_plus.
 
-  have pending := reduceBlock (emptyPendingRanges Hsze outs).
-  exact: mergeIntoSortedRanges (ltnW Hsz) pending (IHbs endpos).
+  have pending := reduceBlock (emptyPendingRanges Hsz outs).
+  exact: mergeIntoSortedRanges (ltnW Hsz) pending (IHbs (pos + sz)).
 Defined.
 
 Definition compileIntervals `(bs : BuildState pos) :
@@ -464,7 +657,7 @@ Defined.
 
 Definition buildIntervals (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : SSError + ScanStateSig maxReg InUse :=
-  let handleVar (ss  : ScanStateSig maxReg Pending) i :=
+  let add_unhandled_interval (ss  : ScanStateSig maxReg Pending) i :=
         packScanState (ScanState_newUnhandled ss.2 i.2 I) in
   let s0 := ScanState_nil maxReg in
   if blocks isn't b :: bs
@@ -474,7 +667,7 @@ Definition buildIntervals (blocks : seq blockType1)
        let: (regs, vars) := compileIntervals bs in
        let s1 := ScanState_setFixedIntervals s0 regs in
        let s2 := packScanState s1 in
-       let s3 := IntMap_foldl handleVar s2 vars in
+       let s3 := IntMap_foldl add_unhandled_interval s2 vars in
        let s4 := ScanState_finalize s3.2 in
        inr $ packScanState s4)
     (reduceBlocks (b :: bs) liveSets).

@@ -99,8 +99,8 @@ Ltac reduce_last_use :=
     case: (olast X) => [?|] in H; rewrite ?all_rcons /= in H
   | [ |- context [olast ?X] ] =>
     case: (olast X) => [?|]; rewrite ?all_rcons /=
-  | [ H : context [inputOnly ?U] |- _ ] => case: (inputOnly U) in H
-  | [ |- context [inputOnly ?U] ]       => case: (inputOnly U)
+  | [ H : context [uvar ?U] |- _ ] => case: (uvar U) in H
+  | [ |- context [uvar ?U] ]       => case: (uvar U)
   end.
 
 Lemma Range_bounded `(r : Range rd) : rbeg rd <= rend rd.
@@ -108,35 +108,57 @@ Proof.
   case: rd => [? ? rus] /= in r *.
   case: r => /= [Hproper _ _ _].
   case: rus => //= [u us] in Hproper *.
-  by case: (inputOnly u) in Hproper *; ordered.
+  by reduce_last_use; ordered.
 Qed.
 
-Definition Range_shiftup `(r : Range rd) `(Hodd : odd b)
-  `(H : validRangeBounds b (rend rd) (ups rd)) : RangeSig.
+Lemma Range_ends_after_use `(r : Range rd) : forall n,
+  n <= head_or_end rd -> n <= rend rd.
+Proof.
+  rewrite /head_or_end /head_or.
+  move: (Range_proper r) => /=.
+  rewrite /useWithinRange /=.
+  case: (ups rd) => //= [u us].
+  by reduce_last_use; ordered.
+Qed.
+
+Definition Range_shift_down `(r : Range rd) `(Hodd : odd b) (H : b < rbeg rd) :
+  RangeSig.
 Proof.
   exists {| rbeg := b
           ; rend := rend rd
           ; ups  := ups rd |}.
-  by case: r => [*]; constructor.
+  move: r => [Hproper Hsorted _ Hallodd].
+  constructor=> //=.
+  elim: (ups rd) => [|u us IHus] in Hproper Hsorted Hallodd *.
+    rewrite /= in Hproper *.
+    by ordered.
+  rewrite /= in IHus Hproper *.
+  case: us => [|x xs] /= in IHus Hproper Hsorted Hallodd *.
+    by case E: (uvar u) in Hproper *; ordered.
+  case: (uvar u) => /= in Hproper *;
+  apply/andP; split;
+  inv Hsorted;
+  try apply: IHus;
+  by ordered.
 Defined.
 
-Definition Range_shiftup_spec `(r : Range rd) `(Hodd : odd b)
-  `(H : validRangeBounds b (rend rd) (ups rd)) :
-  forall r1, r1 = Range_shiftup r Hodd H
+Definition Range_shift_down_spec `(r : Range rd) `(Hodd : odd b)
+  (H : b < rbeg rd) :
+  forall r1, r1 = Range_shift_down r Hodd H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
        &   ups  r1.1 = ups r ].
 Proof. by move=> r1; invert. Qed.
 
 Definition newRange (upos : UsePos) (Hodd : odd upos)
-  (Hinput : ~~ inputOnly upos) : RangeSig.
+  (Hinput : uvar upos != Input) : RangeSig.
 Proof.
   exists {| rbeg := uloc upos
           ; rend := (uloc upos).+1
           ; ups  := [:: upos] |}.
   move/negbTE in Hinput.
   constructor=> //=.
-  - by rewrite Hinput; ordered.
+  - by case (uvar upos); ordered.
   - by constructor; constructor.
   - by apply/andP; split.
 Defined.
@@ -185,7 +207,7 @@ Proof.
   move/andP=> [/andP [H1 H2] ?].
   apply/andP; split; last exact: IHxs.
   apply/andP; split;
-  case: (inputOnly x) => {IHxs} in H1 H2 *;
+  case: (uvar x) => {IHxs} in H1 H2 *;
   by ordered.
 Qed.
 
@@ -235,8 +257,8 @@ Proof.
     rewrite olast_last;
     case: (ups rd2) => // [u2 us2] /= in Hr2a *.
     case/lastP: us1 => /= [|us1e u1e] in Hr1a *.
-      case: (inputOnly u1) in Hr1a *;
-      case: (inputOnly u2) in Hr2a;
+      case: (uvar u1) in Hr1a *;
+      case: (uvar u2) in Hr2a;
       rewrite -Heqe in Hr2a;
       case E: (uloc u1 == uloc u2) => //;
       try move/negbT in E;
@@ -248,9 +270,9 @@ Proof.
     move/andP: Hr1aC => [/= /andP [Hr1aC Hr1aD] Hr1aE].
     move/andP: Hr2a => [/= /andP [Hr2aA Hr2aB] Hr2aC].
     abstract (
-      case: (inputOnly u1) in Hr1aA Hr1aB *;
-      case: (inputOnly u1e) in Hr1aC Hr1aD *;
-      case: (inputOnly u2) in Hr2aA Hr2aB;
+      case: (uvar u1) in Hr1aA Hr1aB *;
+      case: (uvar u1e) in Hr1aC Hr1aD *;
+      case: (uvar u2) in Hr2aA Hr2aB;
       rewrite -Heqe in Hr2aA Hr2aB;
       case E: (uloc u1e == uloc u2) => //;
       try move/negbT in E;
@@ -278,7 +300,7 @@ Obligation 1.
   rewrite /range_ltn /= in H H0 *.
   move: (Range_bounded H2).
   case: (olast (ups y)) => [u|];
-  first case: (inputOnly u);
+  first case: (uvar u);
   by ordered.
 Qed.
 
@@ -424,7 +446,7 @@ Defined.
 
 Definition endsWithInputOnly `(r : Range rd) : bool :=
   if olast (ups rd) is Some u
-  then (uloc u == rend rd) && inputOnly u
+  then (uloc u == rend rd) && (uvar u == Input)
   else false.
 
 (* When a [Range] is split into two ranges, we preserve a great deal of

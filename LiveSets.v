@@ -1,6 +1,7 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Blocks.
 Require Import LinearScan.IntMap.
+Require Import LinearScan.UsePos.
+Require Import LinearScan.Blocks.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
