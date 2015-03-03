@@ -292,8 +292,39 @@ Proof.
       by rewrite -E (allWithinRange_cat Hr1a Hr2a).
 Defined.
 
-Definition range_ltn (x y : RangeSig) : Prop := rend x.1 < rbeg y.1.
-Definition range_leq (x y : RangeSig) : Prop := rend x.1 <= rbeg y.1.
+Definition Range_merge `(r1 : Range rd1) `(r2 : Range rd2) :
+  rbeg rd2 <= rend rd1
+  -> Range {| rbeg := minn (rbeg r1) (rbeg r2)
+            ; rend := maxn (rend r1) (rend r2)
+            ; ups  := sortBy upos_le (ups r1 ++ ups r2) |}.
+Proof.
+  move=> /eqP Heqe.
+  (* constructor=> //=; *)
+  (* clear -Hp1 Hs1 Hodd1 Hp2 Hs2 Hodd2 E Hminmax; *)
+  (* rewrite /range_ltn /= in E; *)
+  (* case: (ups rd1) => [|u1 us1] //= in Hp1 Hs1 Hodd1 *; *)
+  (* case: (ups rd2) => [|u2 us2] //= in Hp2 Hs2 Hodd2 *. *)
+  (* - case: (insert upos_le u2 (sortBy upos_le us2)) => //= [x xs]. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+  (* - admit. *)
+
+  constructor=> //=.
+  admit.
+  admit.
+  admit.
+  admit.
+Defined.
+
+Definition range_ltn (x y : RangeSig) : bool := rend x.1 < rbeg y.1.
+Definition range_leq (x y : RangeSig) : bool := rend x.1 <= rbeg y.1.
 
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.

@@ -469,6 +469,9 @@ Proof.
   by rewrite odd_double.
 Qed.
 
+Lemma isP : forall x : bool, x = true -> x.
+Proof. by []. Qed.
+
 Lemma ltn_odd n m : odd n && odd m -> n < m -> n.+1 < m.
 Proof.
   move/andP=> [nodd modd] Hlt.
@@ -714,7 +717,7 @@ Qed.
 Lemma has_size : forall (a : eqType) x (xs : seq a), x \in xs -> 0 < size xs.
 Proof. move=> a x; elim=> //. Qed.
 
-Fixpoint insert {a} (P : rel a) (z : a) (l : list a) : list a :=
+Fixpoint insert {a} (P : a -> a -> bool) (z : a) (l : list a) : list a :=
   if l is x :: xs
   then if P x z
        then x :: insert P z xs
@@ -736,6 +739,54 @@ Example sortBy_ex2 :
   sortBy gtn [:: 1; 3; 5; 7; 9; 2; 4; 6; 8] = [:: 9; 8; 7; 6; 5; 4; 3; 2; 1].
 Proof. reflexivity. Qed.
 
+Lemma Forall_insert : forall a (R : a -> a -> bool) `{Transitive _ R} x xs y,
+  R x y -> List.Forall (R x) xs -> List.Forall (R x) (insert R y xs).
+Proof.
+  move=> a R H x xs y H1 H2.
+  elim: xs => [|z zs IHzs] /= in H1 H2 *.
+    rewrite /insert.
+    by constructor.
+  rewrite /insert /= -/insert.
+  case E: (R z y).
+    constructor.
+      by inv H2.
+    apply: IHzs => //.
+    by inv H2.
+  constructor=> //.
+Qed.
+
+Lemma StronglySorted_insert :
+  forall a (R : a -> a -> bool) `{Transitive _ R} x xs,
+  StronglySorted R xs -> (forall y, ~~ R y x -> R x y)
+    -> StronglySorted R (insert R x xs).
+Proof.
+  move=> a R H x xs H1 H2.
+  elim=> [|y ys IHys] /= in H1 *.
+    rewrite /insert.
+    by constructor; constructor.
+  rewrite /insert /= -/insert.
+  case E: (R y x).
+    constructor=> //.
+    exact: Forall_insert.
+  constructor.
+    constructor=> //.
+    constructor.
+    apply/H2.
+    by rewrite E.
+  move/negbT/H2 in E.
+  exact: (@Forall_ordered _ R H x y ys E H1).
+Qed.
+
+Lemma sortyBy_sorted : forall a (R : a -> a -> bool) `{Transitive _ R} xs,
+  (forall x y, ~~ R y x -> R x y) -> StronglySorted R (sortBy R xs).
+Proof.
+  move=> a R H xs H1.
+  elim: xs => [|x xs IHxs] /=.
+    by constructor.
+  apply: StronglySorted_insert => //.
+  exact: (H1 x).
+Qed.
+
 Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq_predType T),
   perm_eql (x :: y :: xs) (y :: x :: xs).
 Proof.
@@ -753,12 +804,14 @@ Proof.
   exact/perm_eqlP/IHys.
 Qed.
 
-Lemma insert_size : forall (a : eqType) P (x : a) xs,
+Lemma insert_size : forall a P (x : a) xs,
   size (insert P x xs) = (size xs).+1.
 Proof.
   move=> a P x xs.
-  rewrite (@perm_eq_size _ _ (x :: xs)) => //.
-  exact/perm_eqlP/insert_perm.
+  elim: xs => //= [y ys IHys].
+  rewrite /insert /= -/insert.
+  case: (P y x) => //=.
+  by rewrite IHys.
 Qed.
 
 Lemma proj_rem_uniq (a b : eqType) (f : a -> b) : forall x xs,
