@@ -777,7 +777,7 @@ Proof.
   exact: (@Forall_ordered _ R H x y ys E H1).
 Qed.
 
-Lemma sortyBy_sorted : forall a (R : a -> a -> bool) `{Transitive _ R} xs,
+Lemma sortBy_sorted : forall a (R : a -> a -> bool) `{Transitive _ R} xs,
   (forall x y, ~~ R y x -> R x y) -> StronglySorted R (sortBy R xs).
 Proof.
   move=> a R H xs H1.

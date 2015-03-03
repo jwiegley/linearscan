@@ -49,27 +49,69 @@ Proof.
   exact: (rend x <= rend y).
 Defined.
 
-Definition compilePendingRanges {b e}
+Program Instance BoundedRange_leq_trans {b e} :
+  Transitive (@BoundedRange_leq b e).
+Obligation 1.
+  rewrite /BoundedRange_leq /= in H H0 *.
+  destruct x; destruct y; destruct z.
+  destruct x; destruct x1; destruct i.
+  destruct x0; destruct i0.
+  case E1: (rend x == rend x0) in H H0 *;
+  case E2: (rend x0 == rend x1) in H H0 *;
+  case E3: (rend x1 == rend x) in H H0 *;
+  case E4: (rend x == rend x1) in H H0 *;
+  move/eqP in E1;
+  move/eqP in E2;
+  move/eqP in E3;
+  move/eqP in E4;
+  by ordered.
+Qed.
+
+Lemma BoundedRange_leq_antisym {b e} : forall x y,
+  ~~ (@BoundedRange_leq b e) y x -> (@BoundedRange_leq b e) x y.
+Proof.
+  move=> x y Hneg.
+  rewrite /BoundedRange_leq /= in Hneg *.
+  destruct x; destruct y.
+  destruct x; destruct x0.
+  case E1: (rend x == rend x0) in Hneg *;
+  case E2: (rend x0 == rend x) in Hneg *;
+  move/eqP in E1;
+  move/eqP in E2;
+  by ordered.
+Qed.
+
+Definition compilePendingRanges {b e} (Hlt : b <= e)
   (ranges : seq (BoundedRange b.*2.+1 e.*2.+1))
   (H : StronglySorted BoundedRange_leq ranges) :
-  { rs : seq (BoundedRange b.*2.+1 e.*2.+1)
-  | StronglySorted range_ltn [seq r.1 | r <- rs]
+  { rs : SortedRanges b.*2.+1
+  | last b.*2.+1 [seq rend r.1 | r <- rs.1] <= e.*2.+1
   & if ranges is _ :: _
-    then if rs is r' :: _
+    then if rs.1 is r' :: _
          then { H : 0 < size ranges
-              | rend (safe_hd ranges H).1.1 <= rend r'.1.1 }
+              | rend (safe_hd ranges H).1.1 <= rend r'.1 }
          else False
     else True}.
 Proof.
   elim: ranges => [|r1 rs IHrs] in H *.
+    apply: exist2 _ _ _ _ _.
     exists [::].
-      by constructor.
-    exact: I.
+    - by constructor.
+    - by [].
+    - by undoubled.
+    - exact: I.
 
   destruct rs as [|r2 rs2] eqn:R2.
-    exists [:: r1].
-      by constructor; constructor.
-    by exists (ltn0Sn _).
+    apply: exist2 _ _ _ _ _.
+    exists [:: r1.1].
+    - by constructor; constructor.
+    - clear -r1.
+      case: r1 => [H1 H2] /=.
+      by ordered.
+    - clear -r1.
+      case: r1 => [H1 H2] /=.
+      by ordered.
+    - by exists (ltn0Sn _).
 
   have Hconn : rend r1.1.1 <= rend r2.1.1.
     inv H; inv H2; inv H3.
@@ -82,59 +124,77 @@ Proof.
   apply StronglySorted_inv in H.
   move: H => [Hs Hf].
   specialize (IHrs Hs).
-  case: IHrs => [[|r2' rs2'] H2 H3] in Hs *;
+  case: IHrs => [[[|r2' rs2'] H2a H2b] /= H3 H4] in Hs *;
     first by [].
 
   (* Owing to the way the list is sorted, this is the only check we need for
      overlap and adjacency. *)
-  case E: (range_ltn r1.1 r2'.1).
+  case E: (range_ltn r1.1 r2').
     rewrite /=.
-    exists [:: r1, r2' & rs2'].
-    constructor.
-      exact: H2.
-    constructor.
-      exact: E.
-    inv H2.
-    exact/(Forall_ordered E).
-    by exists (ltn0Sn _).
+    apply: exist2 _ _ _ _ _.
+    exists [:: r1.1, r2' & rs2'].
+    - constructor.
+        exact: H2a.
+      constructor.
+        exact: E.
+      inv H2a.
+      exact/(Forall_ordered E).
+    - clear -r1.
+      case: r1 => [H1 H2] /=.
+      by ordered.
+    - by [].
+    - by exists (ltn0Sn _).
 
   move: r1 => [[rd1 r1] Hr1] /= in Hs Hf Hconn E *.
-  move: r2' => [[rd2' r2'] Hr2] /= in Hs Hf E R2 H2 H3 *.
+  move: r2' => [rd2' r2'] /= in Hs Hf E R2 H2a H2b H3 H4 *.
 
   (* Otherwise, if the ranges are directly adjacent, or overlap, coalesce them
      into a single range. *)
+  apply: exist2 _ _ _ _ _.
   apply: exist2 _ _ [:: _ & rs2'] _ _.
-  apply: exist _ _ _.
-  apply: packRange (Range_merge r1 r2' _).
+  apply: (packRange (Range_merge r1 r2' _)).
     rewrite /range_ltn /= in E.
     by move/negbT in E; rewrite -leqNgt in E.
-  rewrite /=.
-  clear -Hr1 Hr2.
-  rewrite leq_min.
-  rewrite geq_max.
-  by ordered.
 
   (* Prove that sorting over range_ltn has been established. *)
-  rewrite /range_ltn /= in H2 E *.
+  rewrite /range_ltn /= in E *.
   constructor.
-    by inv H2.
+    by inv H2a.
   induction rs2' as [|r3 rs3 IHrs3].
     by constructor.
   rewrite /=.
-  have Hmax: maxn (rend rd1) (rend rd2') < rbeg r3.1.1.
+  have Hmax: maxn (rend rd1) (rend rd2') < rbeg r3.1.
     inv Hf.
-    clear -Hs H2 H3 Hconn.
-    inv H2; inv H3; inv H1; inv H4.
+    clear -Hs H2a H4 Hconn.
+    inv H2a; inv H4; inv H1; inv H2.
     rewrite gtn_max.
+    rewrite /range_ltn /= in H3.
     by ordered.
   constructor=> //.
   apply IHrs3.
   constructor=> //.
-    by inv H2; inv H1.
-  by inv H2; inv H4.
+    by inv H2a; inv H1.
+  by inv H2a; inv H2.
+
+  rewrite /= in H3 *.
+  apply: (last_leq H3).
+  rewrite gtn_max in Hmax.
+  apply/ltnW.
+  move: (Range_bounded r3.2).
+  by ordered.
 
   (* Return a witness to an ordering property [rend rd1 <= maxn (rend rd1)
      (rend rd2')], which makes induction much easier. *)
+  rewrite /=.
+  rewrite leq_min.
+  by ordered.
+
+  rewrite /=.
+  apply: (last_leq H3).
+  rewrite geq_max.
+  inv H4.
+  by ordered.
+
   rewrite /=.
   exists (ltn0Sn _).
   rewrite leq_max.
@@ -147,46 +207,21 @@ Definition mergeIntoSortedRanges `(H : b <= e)
 Proof.
   apply: (IntMap_mergeWithKey _ _ _ pmap rmap).
   - (* The combining function, when entries are present in both maps. *)
-    move=> _ brs sr.
-
-(*
-    have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
-      move: (Range_proper br.1.2).
-      move: br => [r Hr] /=.
-      by case: (ups r.1); ordered.
-    pose ps' := prependRange ranges H0.
-    move: ps' => [ps' spec].
-    clear H0.
-    apply: (Some (@SortedRanges_cat _ ps' _ sr _)) => /=.
-    move: br => [r Hlt] in ps' spec *.
-    have H4: rend r.1 <= mid.*2.+1.
-      have Hlt' := Hlt.
-      by ordered.
-    have H5: b.*2.+1 <= rend r.1.
-      have Hlt' := Hlt.
-      move: (Range_proper r.2) => Hrp.
-      rewrite /validRangeBounds in Hrp.
-      case: (ups r.1) => [|u us] /= in Hrp *.
-        by ordered.
-      by case: (uvar u) in Hrp *; ordered.
-    have p := last_leq Hend H4.
-    rewrite -2!last_map -map_comp in spec.
-    rewrite spec /= in p.
-    rewrite -2!last_map -map_comp in p.
-    exact: (last_leq p H5).
-*)
-    admit.
+    move=> _ brs srs2.
+    pose sbrs := sortBy BoundedRange_leq brs.
+    pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
+    specialize (Hsort BoundedRange_leq_trans).
+    move: (compilePendingRanges Hsort) => [[srs1 ? ?] Hbound _].
+    exact: Some (SortedRanges_cat srs2 Hbound).
 
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
-(*
-    have H0: b.*2.+1 <= b.*2.+1 <= rbeg br.1.1.
-      move: (Range_proper br.1.2).
-      move: br => [r ?] /=.
-      by case: (ups r.1); ordered.
-    exact: (prependRange ranges H0).1.
-*)
-    admit.
+    move=> brs.
+    pose sbrs := sortBy BoundedRange_leq brs.
+    pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
+    specialize (Hsort BoundedRange_leq_trans).
+    move: (compilePendingRanges Hsort) => [srs1 _ _].
+    exact: srs1.
 
   - (* When no pmap entry is present. *)
     move=> sr.
