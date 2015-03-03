@@ -117,6 +117,9 @@ Obligation 1. exact: (ltn_trans H). Qed.
 Program Instance upos_le_trans : Transitive upos_le.
 Obligation 1. by ordered. Qed.
 
+Lemma upos_le_antisym : forall x y : UsePos, ~~ (y <= x) -> x <= y.
+Proof. by ordered. Qed.
+
 Definition head_or x xs := head x [seq uloc u | u <- xs].
 Arguments head_or x xs /.
 

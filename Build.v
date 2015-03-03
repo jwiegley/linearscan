@@ -152,9 +152,7 @@ Proof.
      into a single range. *)
   apply: exist2 _ _ _ _ _.
   apply: exist2 _ _ [:: _ & rs2'] _ _.
-  apply: (packRange (Range_merge r1 r2' _)).
-    rewrite /range_ltn /= in E.
-    by move/negbT in E; rewrite -leqNgt in E.
+  apply: (packRange (Range_merge r1 r2')).
 
   (* Prove that sorting over range_ltn has been established. *)
   rewrite /range_ltn /= in E *.
@@ -211,7 +209,7 @@ Proof.
     pose sbrs := sortBy BoundedRange_leq brs.
     pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
     specialize (Hsort BoundedRange_leq_trans).
-    move: (compilePendingRanges Hsort) => [[srs1 ? ?] Hbound _].
+    move: (compilePendingRanges H Hsort) => [[srs1 ? ?] Hbound _].
     exact: Some (SortedRanges_cat srs2 Hbound).
 
   - (* When no rmap entry are present. *)
@@ -220,7 +218,7 @@ Proof.
     pose sbrs := sortBy BoundedRange_leq brs.
     pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
     specialize (Hsort BoundedRange_leq_trans).
-    move: (compilePendingRanges Hsort) => [srs1 _ _].
+    move: (compilePendingRanges H Hsort) => [srs1 _ _].
     exact: srs1.
 
   - (* When no pmap entry is present. *)

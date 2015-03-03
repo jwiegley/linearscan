@@ -293,34 +293,192 @@ Proof.
 Defined.
 
 Definition Range_merge `(r1 : Range rd1) `(r2 : Range rd2) :
-  rbeg rd2 <= rend rd1
-  -> Range {| rbeg := minn (rbeg r1) (rbeg r2)
-            ; rend := maxn (rend r1) (rend r2)
-            ; ups  := sortBy upos_le (ups r1 ++ ups r2) |}.
+  Range {| rbeg := minn (rbeg r1) (rbeg r2)
+         ; rend := maxn (rend r1) (rend r2)
+         ; ups  := sortBy upos_le (ups r1 ++ ups r2) |}.
 Proof.
-  move=> /eqP Heqe.
-  (* constructor=> //=; *)
-  (* clear -Hp1 Hs1 Hodd1 Hp2 Hs2 Hodd2 E Hminmax; *)
-  (* rewrite /range_ltn /= in E; *)
-  (* case: (ups rd1) => [|u1 us1] //= in Hp1 Hs1 Hodd1 *; *)
-  (* case: (ups rd2) => [|u2 us2] //= in Hp2 Hs2 Hodd2 *. *)
-  (* - case: (insert upos_le u2 (sortBy upos_le us2)) => //= [x xs]. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-  (* - admit. *)
-
   constructor=> //=.
-  admit.
-  admit.
-  admit.
-  admit.
+  - move: r1 => [Hproper1 _ _ _].
+    move: r2 => [Hproper2 _ _ _].
+    rewrite /validRangeBounds in Hproper1 Hproper2.
+    rewrite -(@sortBy_all _ _ upos_le).
+    case: (ups rd1) => [|u1 us1] in Hproper1 *;
+    case: (ups rd2) => [|u2 us2] /= in Hproper2 *;
+    rewrite ?cat0s ?cats0 /=.
+    - rewrite leq_max !geq_min.
+      apply/orP; left.
+      by apply/orP; left.
+    - + case: (insert upos_le u2 (sortBy upos_le us2)) => [|? ?].
+          rewrite leq_max !geq_min.
+          apply/orP; left.
+          by apply/orP; left.
+        case: (uvar u2) in Hproper2 *.
+        rewrite leq_max !geq_min.
+        rewrite /useWithinRange /=.
+        elim: us2 => [|u2' us2' IHus2'] /= in Hproper2 *.
+          by ordered.
+        have H : (rbeg rd2 <= u2 <= rend rd2) &&
+                 all (useWithinRange (rbeg rd2) (rend rd2)) us2'
+          by ordered.
+        specialize (IHus2' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u2') in Hproper2 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us2 => [|u2' us2' IHus2'] /= in Hproper2 *.
+          rewrite leq_max !geq_min.
+          by ordered.
+        have H : (rbeg rd2 <= u2 < rend rd2) &&
+                 all (useWithinRange (rbeg rd2) (rend rd2)) us2'
+          by ordered.
+        specialize (IHus2' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u2') in Hproper2 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us2 => [|u2' us2' IHus2'] /= in Hproper2 *.
+          rewrite leq_max !geq_min.
+          by ordered.
+        have H : (rbeg rd2 <= u2 < rend rd2) &&
+                 all (useWithinRange (rbeg rd2) (rend rd2)) us2'
+          by ordered.
+        specialize (IHus2' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u2') in Hproper2 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+    - + case: (insert upos_le u1 (sortBy upos_le us1)) => [|? ?].
+          rewrite leq_max !geq_min.
+          apply/orP; right.
+          by apply/orP; right.
+        rewrite leq_max !geq_min.
+        rewrite /useWithinRange /= in Hproper1 *.
+        case: (uvar u1) in Hproper1 *.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          by ordered.
+        have H : (rbeg rd1 <= u1 <= rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          rewrite leq_max.
+          by ordered.
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          rewrite leq_max.
+          by ordered.
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+    - + case: (insert upos_le u1 _) => [|? ?].
+          rewrite leq_max !geq_min.
+          case: (uvar u2) in Hproper2;
+          apply/orP; right;
+          apply/orP; right;
+          by ordered.
+        rewrite leq_max !geq_min.
+        rewrite /useWithinRange /= in Hproper1 *.
+        case: (uvar u1) in Hproper1 *.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          (* case: (uvar u2) in Hproper2 *; *)
+          (* rewrite leq_max !geq_min. *)
+          (* apply/andP; split. *)
+          (*   by ordered. *)
+          admit.
+        have H : (rbeg rd1 <= u1 <= rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          admit.
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+      + rewrite /useWithinRange /=.
+        elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
+          admit.
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
+                 all (useWithinRange (rbeg rd1) (rend rd1)) us1'
+          by ordered.
+        specialize (IHus1' H).
+        apply/andP; split.
+          by ordered.
+        apply/andP; split.
+          case: (uvar u1') in Hproper1 *;
+          rewrite leq_max !geq_min;
+          by ordered.
+        by ordered.
+
+  - case: (ups rd1) => [|u1 us1];
+    case: (ups rd2) => [|u2 us2] /=;
+    rewrite ?cat0s ?cats0;
+    try constructor;
+    apply: StronglySorted_insert;
+    try apply: sortBy_sorted;
+    by ordered.
+
+  - move: (Range_beg_odd r1) => ?.
+    move: (Range_beg_odd r2) => ?.
+    by rewrite odd_minn.
+
+  - move: (Range_uses_odd r1).
+    move: (Range_uses_odd r2).
+    rewrite -(@sortBy_all _ _ upos_le) all_cat.
+    by ordered.
 Defined.
 
 Definition range_ltn (x y : RangeSig) : bool := rend x.1 < rbeg y.1.

@@ -479,6 +479,30 @@ Proof.
   exact/negPn.
 Qed.
 
+Lemma odd_negb_subn : forall x y, odd x -> odd y -> ~~ odd (x - y).
+Proof.
+  move=> x y Hx Hy.
+  (* elim: (x - y) => // [ IHx] in Hx *. *)
+  (* case: y => // [y] in Hy x Hx IHx *. *)
+  (* rewrite subnS subSn /=. *)
+  (* rewrite odd_sub. *)
+  (*   by rewrite negb_add Hx Hy. *)
+  admit.
+Qed.
+
+Lemma odd_minn : forall x y, odd x -> odd y -> odd (minn x y).
+Proof.
+  move=> x y Hx Hy.
+  case E: (x < y).
+    rewrite minnE odd_sub; last exact: leq_subr.
+    rewrite Hx addTb.
+    exact: odd_negb_subn.
+  rewrite minnE odd_sub; last exact: leq_subr.
+  rewrite Hx addTb odd_sub.
+    by rewrite Hx Hy.
+  by ordered.
+Qed.
+
 Definition distance (n m : nat) : nat := if n < m then m - n else n - m.
 
 Lemma ltn_plus : forall m n, 0 < n -> m < m + n.
@@ -785,6 +809,27 @@ Proof.
     by constructor.
   apply: StronglySorted_insert => //.
   exact: (H1 x).
+Qed.
+
+Lemma and_swap : forall x y z, [&& x, y & z] = [&& y, x & z].
+Proof. by case; case; case. Qed.
+
+Lemma insert_all : forall a (P : a -> bool) (R : a -> a -> bool) x xs,
+  all P (insert R x xs) = P x && all P xs.
+Proof.
+  move=> a P R x.
+  elim=> //= [u us IHus].
+  rewrite /insert /= -/insert.
+  case: (R u x) => //=.
+  by rewrite IHus and_swap.
+Qed.
+
+Lemma sortBy_all : forall a (P : a -> bool) (R : a -> a -> bool) xs,
+  all P xs = all P (sortBy R xs).
+Proof.
+  move=> a P R.
+  elim=> //= [u us IHus].
+  by rewrite IHus insert_all.
 Qed.
 
 Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq_predType T),
