@@ -18,13 +18,9 @@ Open Scope nat_scope.
 Inductive SSError : Set :=
   | ERegistersExhausted : nat -> SSError
   | ENoValidSplitPosition : nat -> SSError
-  | ECannotSplitSingleton2 : nat -> IntervalDesc -> nat -> SSError
+  | ECannotSplitSingleton1 : nat -> SSError
+  | ECannotSplitSingleton2 : nat -> SSError
   | ECannotSplitSingleton3 : nat -> SSError
-  | ECannotSplitSingleton4 : nat -> SSError
-  | ECannotSplitSingleton5 : nat -> SSError
-  | ECannotSplitSingleton6 : nat -> SSError
-  | ECannotSplitSingleton7 : nat -> SSError
-  | ECannotSplitSingleton8 : nat -> SSError
   | ENoIntervalsToSplit
   | ERegisterAlreadyAssigned : nat -> SSError
   | ERegisterAssignmentsOverlap : nat -> SSError

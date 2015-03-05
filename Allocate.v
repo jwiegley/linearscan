@@ -171,7 +171,7 @@ Definition allocateBlockedReg {pre} :
            assign spill slot to current
            split current before its first use position that requires a
              register *)
-      let p := splitPosition current BeforeFirstUsePosReqReg in
+      let p := firstUseReqRegOrEnd current in
       splitCurrentInterval (BeforePos p) ;;;
 
       (* // make sure that current does not intersect with

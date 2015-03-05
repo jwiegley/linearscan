@@ -332,21 +332,12 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
             "No registers available for allocation"
         LS.ENoValidSplitPosition _ ->
             "No valid split position could be found"
-        LS.ECannotSplitSingleton2 n int splitPos ->
-            "Current interval is a singleton (#2) @" ++ show splitPos
-                ++ " : " ++ showIntervalDesc n int
+        LS.ECannotSplitSingleton1 n ->
+            "Current interval is a singleton (err#1) (" ++ show n ++ ")"
+        LS.ECannotSplitSingleton2 n ->
+            "Current interval is a singleton (err#2) (" ++ show n ++ ")"
         LS.ECannotSplitSingleton3 n ->
             "Current interval is a singleton (err#3) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton4 n ->
-            "Current interval is a singleton (err#4) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton5 n ->
-            "Current interval is a singleton (err#5) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton6 n ->
-            "Current interval is a singleton (err#6) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton7 n ->
-            "Current interval is a singleton (err#7) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton8 n ->
-            "Current interval is a singleton (err#8) (" ++ show n ++ ")"
         LS.ENoIntervalsToSplit ->
             "There are no intervals to split"
         LS.ERegisterAlreadyAssigned n ->

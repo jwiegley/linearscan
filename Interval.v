@@ -302,6 +302,32 @@ Definition firstUseReqReg (d : IntervalDesc) : option oddnum :=
   lookupUsePos d regReq.
 Arguments firstUseReqReg d /.
 
+Lemma firstUseReqReg_spec (d : IntervalDesc) : forall pos,
+  Some pos = firstUseReqReg d -> ibeg d < pos.1 <= iend d.
+Proof.
+  move=> pos H.
+  case: d => [? ? ? ? ?] /= in pos H *.
+  admit.
+Qed.
+
+Program Definition firstUseReqRegOrEnd `(i : Interval d) : oddnum :=
+  if firstUseReqReg d is Some n
+  then n
+  else if odd (iend d)
+       then iend d
+       else (iend d).-1.
+Obligation 1.
+  case E: (odd (iend d)) => //.
+  move: (Interval_exact_beg i) => Hbeg.
+  move: (Interval_bounded i) => Hbound.
+  move: (Range_beg_odd (NE_head (rds d)).2) => Hodd.
+  rewrite -{}Hbeg in Hodd.
+  case: (iend d) => [|n] /= in E Hbound *.
+    move/odd_gt1 in Hodd.
+    by ordered.
+  by move/negbT/negbNE in E.
+Qed.
+
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
 Definition Interval_fromRanges (vid : nat) `(sr : SortedRanges b) :

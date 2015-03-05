@@ -98,6 +98,8 @@ Proof.
     exact/StronglySorted_insert_spec/StronglySorted_widen/IHst.
 
   - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled".
+    admit. (* jww (2015-03-05): show that widening does not affect sorting *)
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by inv IHst.
@@ -117,6 +119,7 @@ Proof.
   - Case "ScanState_nil".                   by [].
   - Case "ScanState_newUnhandled".          by rewrite -map_comp.
   - Case "ScanState_finalize".              exact: IHst.
+  - Case "ScanState_newHandled".            by rewrite -map_comp.
   - Case "ScanState_setInterval".           exact: IHst.
   - Case "ScanState_setFixedIntervals".     exact: IHst.
   - Case "ScanState_moveUnhandledToActive". by apply/andP.
@@ -212,6 +215,7 @@ Proof.
     (* by rewrite insert_perm. *)
 
   - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled". admit.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
   - Case "ScanState_moveUnhandledToActive".
@@ -261,6 +265,7 @@ Proof.
     by rewrite /unh insert_size !size_map addSn.
 
   - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled". by rewrite 3!addnS !size_map.
   - Case "ScanState_setInterval". exact: IHst.
   - Case "ScanState_setFixedIntervals". exact: IHst.
 
@@ -328,6 +333,7 @@ Qed.
 (*     - exact: IHst. *)
 (*     - exact: widen_fst_inj. *)
 (*     - exact: widen_fst_inj. *)
+(*   - Case "ScanState_newHandled". by []. *)
 (*   - Case "ScanState_setInterval". by []. *)
 (*   - Case "ScanState_setFixedIntervals". exact: IHst. *)
 (*   - Case "ScanState_moveUnhandledToActive". by []. *)
@@ -544,6 +550,12 @@ Proof.
     f_equal.
     exact: eq_irrelevance.
   - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled".
+    move/mapP: Hin => [[? ?] H Hin].
+    rewrite /widen_fst /= in Hin.
+    inversion Hin => /=.
+    rewrite ?vnth_vshiftin -H2 in H *.
+    exact: IHst.
   - Case "ScanState_setInterval".
     case E: (xid == uid).
       move/eqP in E.
