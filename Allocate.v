@@ -415,23 +415,29 @@ Definition handleInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) (option PhysReg) :=
   (* position = start position of current *)
   withCursor (maxReg:=maxReg) $ fun _ cur =>
+    let current  := curInterval cur in
     let position := curPosition cur in
-    (* // check for intervals in active that are handled or inactive *)
-    liftLen (fun sd => @checkActiveIntervals sd position) ;;;
-    (* // check for intervals in inactive that are handled or active *)
-    liftLen (fun sd => @checkInactiveIntervals sd position) ;;;
 
-    (* // find a register for current
-       tryAllocateFreeReg
-       if allocation failed then
-         allocateBlockedReg
-       if current has a register assigned then
-         add current to active (done by the helper functions) *)
-    mres <<- tryAllocateFreeReg ;;
-    match mres with
-    | Some x => imap (@Some _) x
-    | None   => allocateBlockedReg
-    end.
+    (* Remove any empty intervals from the unhandled list *)
+    if firstUsePos current is None
+    then @moveUnhandledToHandled maxReg pre ;;; return_ None
+    else
+      (* // check for intervals in active that are handled or inactive *)
+      liftLen (fun sd => @checkActiveIntervals sd position) ;;;
+      (* // check for intervals in inactive that are handled or active *)
+      liftLen (fun sd => @checkInactiveIntervals sd position) ;;;
+
+      (* // find a register for current
+         tryAllocateFreeReg
+         if allocation failed then
+           allocateBlockedReg
+         if current has a register assigned then
+           add current to active (done by the helper functions) *)
+      mres <<- tryAllocateFreeReg ;;
+      match mres with
+      | Some x => imap (@Some _) x
+      | None   => allocateBlockedReg
+      end.
 
 Require Import Coq.Program.Wf.
 (* Include Trace. *)
