@@ -22,6 +22,9 @@ module LinearScan
 
 import           Control.Monad.State
 import           Data.Functor.Identity
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as M
+import qualified Data.List as L
 import           Debug.Trace
 import qualified LinearScan.Blocks as LS
 import           LinearScan.Blocks as LS
@@ -80,18 +83,21 @@ data OpInfo accType op1 op2 = OpInfo
 
 showOp1' :: (op1 -> String)
          -> LS.OpId
-         -> [(Int, Either PhysReg LS.VarId)]
-         -> [(Int, Either PhysReg LS.VarId)]
+           -- Interval Id, it's identity, and possible assigned reg
+         -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
+         -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
          -> op1
          -> String
 showOp1' showop pos ins outs o =
     let showerv (Left r)  = "r" ++ show r
         showerv (Right v) = "v" ++ show v in
-    let marker label (i, erv) =
+    let render Nothing = ""
+        render (Just r) = "=r" ++ show r in
+    let marker label (i, erv, reg) =
             "<" ++ label ++ " " ++ showerv erv ++
             (if i == either id id erv
              then ""
-             else "[" ++ show i ++ "]") ++ ">\n" in
+             else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
     concatMap (marker "End") outs ++
     concatMap (marker "Beg") ins ++
     show pos ++ ": " ++ showop o ++ "\n"
@@ -134,6 +140,7 @@ data ScanStateDesc = ScanStateDesc
     , active         :: [(IntervalId, PhysReg)]
     , inactive       :: [(IntervalId, PhysReg)]
     , handled        :: [(IntervalId, Maybe PhysReg)]
+    , allocations    :: IntMap PhysReg
     }
 
 deriving instance Show LS.IntervalDesc
@@ -193,7 +200,12 @@ showUsePositions (u:us) = go u ++ " " ++ showUsePositions us
 
 toScanStateDesc :: LS.ScanStateDesc -> ScanStateDesc
 toScanStateDesc (LS.Build_ScanStateDesc a b c d e f g) =
-    ScanStateDesc a b c d e f g
+    let rs = L.foldl' (\m (k, mx) -> case mx of
+                            Nothing -> m
+                            Just r -> M.insert k r m)
+                 M.empty g in
+    let xs = L.foldl' (\m (k, r) -> M.insert k r m) rs (e ++ f) in
+    ScanStateDesc a b c d e f g xs
 
 tracer :: String -> a -> a
 tracer x = Debug.Trace.trace ("====================\n" ++ x)
@@ -216,17 +228,24 @@ showOps1 :: LinearScan.OpInfo accType op1 op2 -> ScanStateDesc -> Int -> [op1]
 showOps1 _ _ _ [] = ""
 showOps1 oinfo sd pos (o:os) =
     let here = pos*2+1 in
+    let allocs = allocations sd in
     let k idx (bacc, eacc) i =
+            let mreg = M.lookup idx allocs in
             (if LS.ibeg i == here
-             then (idx, Right (LS.ivar i)) : bacc
+             then (idx, Right (LS.ivar i), mreg) : bacc
              else bacc,
              if LS.iend i == here
-             then (idx, Right (LS.ivar i)) : eacc
+             then (idx, Right (LS.ivar i), mreg) : eacc
              else eacc) in
     let r _idx acc Nothing = acc
         r idx (bacc, eacc) (Just i) =
-            (if LS.ibeg i == here then (idx, Left idx) : bacc else bacc,
-             if LS.iend i == here then (idx, Left idx) : eacc else eacc) in
+            let mreg = M.lookup idx allocs in
+            (if LS.ibeg i == here
+             then (idx, Left idx, mreg) : bacc
+             else bacc,
+             if LS.iend i == here
+             then (idx, Left idx, mreg) : eacc
+             else eacc) in
     let (begs, ends) =
             LS.vfoldl'_with_index (0 :: Int) k ([], []) (intervals sd) in
     let (begs', ends') =

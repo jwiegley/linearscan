@@ -81,12 +81,19 @@ Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
       ((knd == Input)  && (assnBlockBeg assn == opid)) ||
       ((knd == Output) && (opid.+2 == assnBlockEnd assn)) in
 
+  (* jww (2015-03-05): This cannot be done here.  Instead of checking for
+     saveAndRestores while scanning the variable references of an operation,
+     we need to check the list of intervals at each operation to see whether
+     any are beginning or ending there. *)
   let isFirst  := firstUsePos int == Some opid in
   let isLast   := nextUseAfter int opid == None in
+  (* let isFirst  := ibeg int == opid in *)
+  (* let isLast   := iend int == opid in *)
+
   (* jww (2015-02-16): We would like that only Input variables which are in
      the "live out" set, or that are going to be re-loaded in the current
      block, get spilled to the stack.  At the moment we spill more often than
-     is strictly anecessary. *)
+     is strictly necessary. *)
   (* let save     := if IntSet_member vid outs *)
   (*                 then saveOpM reg (Some vid) *)
   (*                 else pure [::] in *)

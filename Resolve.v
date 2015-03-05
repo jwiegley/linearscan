@@ -50,7 +50,7 @@ Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
   let mfrom_int := lookupInterval st vid Output (blockLastOpId from) in
   let mto_int   := lookupInterval st vid Input (blockFirstOpId to) in
 
-  (* If the interval match, no move resolution is necessary. *)
+  (* If the intervals match, no move resolution is necessary. *)
   if mfrom_int == mto_int then mappings else
 
   let f mi :=
@@ -68,8 +68,8 @@ Definition checkIntervalBoundary `(st : @ScanState maxReg InUse sd)
   let addToGraphs e xs :=
       let: (gbeg, gend) := xs in
       if in_from
-      then (gbeg, addEdge e gend)
-      else (addEdge e gbeg, gend) in
+      then (addEdge e gbeg, gend)
+      else (gbeg, addEdge e gend) in
   let f mxs :=
       let e := (Some sreg, Some dreg) in
       @Some _ $ addToGraphs e
