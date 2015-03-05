@@ -83,8 +83,7 @@ Definition tryAllocateFreeReg {pre} :
         [unhandled] list to the [active] list in the current [ScanStateDesc],
         it also assigns a register to the newly active interval that can be
         accessed by calling [getAssignment]. *)
-    let success := moveUnhandledToActive reg ;;;
-                   return_ reg in
+    let success := moveUnhandledToActive reg ;;; return_ reg in
 
     return_ $
       match mres with
@@ -157,13 +156,6 @@ Definition allocateBlockedReg {pre} :
     (* mres = highest use position of the found register *)
     let (reg, mres) := registerWithHighestPos registers_exist nextUsePos in
 
-    (** [moveUnhandledToActive] not only moves an [IntervalId] from the
-        [unhandled] list to the [active] list in the current [ScanStateDesc],
-        it also assigns a register to the newly active interval that can be
-        accessed by calling [getAssignment]. *)
-    let success := moveUnhandledToActive reg ;;;
-                   return_ $ Some reg in
-
     if (match mres with
         | None   => false
         | Some n =>
@@ -182,26 +174,19 @@ Definition allocateBlockedReg {pre} :
       let p := splitPosition current BeforeFirstUsePosReqReg in
       splitCurrentInterval (BeforePos p) ;;;
 
-      (* This scenario can only occur if the beginning of the current interval
-         (the current position) is less than its first use position.  Thus,
-         when we split we are simply throwing away the first part of the
-         interval (with no use positions) up until [pos], and then keeping the
-         rest of the interval on the unhandled list so it can be processed
-         later. *)
-
       (* // make sure that current does not intersect with
          // the fixed interval for reg
          if current intersects with the fixed interval for reg then
            split current before this intersection *)
-      mloc <<- intersectsWithFixedInterval reg ;;
-      match mloc with
-      | Some n => splitCurrentInterval (BeforePos n)
-      | None   => return_ tt
-      end ;;;
+      (* mloc <<- intersectsWithFixedInterval reg ;; *)
+      (* match mloc with *)
+      (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
+      (* | None   => return_ tt *)
+      (* end ;;; *)
 
       (* The allocation failed, so we had to spill some part of the current
          interval instead. *)
-      @weakenHasLen_ maxReg _ ;;;
+      @moveUnhandledToHandled maxReg pre ;;;
       return_ None
     else
       (* // spill intervals that currently block reg
@@ -226,7 +211,9 @@ Definition allocateBlockedReg {pre} :
       | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
-      success.
+
+      moveUnhandledToActive reg ;;;
+      return_ $ Some reg.
 
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.

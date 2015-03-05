@@ -67,7 +67,7 @@ Proof.
 
   (* The interval was split into two parts.  The first part gets spilled by
      adding it to the handled list without a register assignment; the second
-     part goes back onto the unhandled list for processing later, unless it is
+     goes back onto the unhandled list for processing later, unless it is
      empty (i.e., ibeg i == iend i, *and* there are no use positions). *)
 
   (* Update the state with the new dimensions of the first interval. *)
@@ -86,7 +86,69 @@ Proof.
   move/eqP: (beginnings (maxReg:=maxReg) st Hin) => Heqe.
 
   (* The second interval goes back on the unhandled list, to be processed in a
-     later iteration.  Note that this does not change the head of the list. *)
+     later iteration.  Note: this cannot change the head of the unhandled
+     list. *)
+  have := ScanState_newUnhandled st i1.2.
+  rewrite U Hunh => /=.
+  have Hincr: (beg < ibeg i1.1).
+    clear -Hmid H1 H2 H3 x Hunh Heqe.
+    inversion Hunh.
+    rewrite -Heqe /= vnth_vreplace /=.
+    move/andP: Hmid => [? ?].
+    by ordered.
+  move/(_ Hincr).
+  rewrite /= => {st} st.
+
+  apply: inr (Some (packScanState st; _)).
+  apply Build_SSMorphLen.
+  apply Build_SSMorph => //=.
+  by rewrite insert_size.
+Defined.
+
+Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
+  (Hunh : size (unhandled sd) > 0) (uid : IntervalId sd)
+  (splitActive : bool) (pos : SplitPosition) :
+  SSError + option { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
+Proof.
+  case: sd => /= [? ints ? unh ? ? ?] in st uid Hunh *.
+  set int := vnth ints uid.
+
+  case: (splitPosition int.2 pos) => [splitPos Hodd].
+
+  (* Ensure that the [splitPos] falls within the interval, otherwise our
+     action can have no effect. *)
+  case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
+    exact: inl (ENoValidSplitPosition uid). (* ERROR *)
+
+  case Hint: int => [d i] in Hmid *.
+  case: d => [iv ib ie ? rds] /= in i Hint Hmid *.
+
+  case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
+
+  (* The interval was split into two parts.  The first part gets spilled by
+     adding it to the handled list without a register assignment; the second
+     goes back onto the unhandled list for processing later, unless it is
+     empty (i.e., ibeg i == iend i, *and* there are no use positions). *)
+
+  (* Update the state with the new dimensions of the first interval. *)
+  move: (ScanState_setInterval st) => /= /(_ uid i0.1 i0.2).
+  move: Hint; rewrite /int => ->.
+  move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+  rewrite /= => {st} st.
+
+(*
+  (* Establish that beg == ibeg i0.1. *)
+  clear int.
+  case U: unh => // [x xs] in uid st us Hunh *.
+  have Hin : (uid, beg) \in unh.
+    rewrite U Hunh.
+    exact: mem_head.
+  rewrite -U in st *.
+  move/eqP: (beginnings (maxReg:=maxReg) st Hin) => Heqe.
+
+  (* The second interval goes back on the unhandled list, to be processed in a
+     later iteration.  Note: this cannot change the head of the unhandled
+     list. *)
   have := ScanState_newUnhandled st i1.2.
   rewrite U Hunh => /=.
   have Hincr: (beg < ibeg i1.1).
@@ -99,7 +161,7 @@ Proof.
   rewrite /= => {st} st.
 
   (* The first interval goes onto the handled list, with no register assigned
-     to indicate the spill. *)
+     to indicate a spill. *)
   case E: (insert _ _ _) => [|y ys] in st *.
     clear -E.
     rewrite /insert /= -/insert in E.
@@ -117,6 +179,8 @@ Proof.
   move=> H5 H6.
   move/ltn_addn1 in H6.
   by move/H5 in H6.
+*)
+  admit.
 Defined.
 
 (*
@@ -165,8 +229,8 @@ Defined.
         by rewrite insert_size.
 *)
 
-(** If [pos] is [None], it means "split before first use pos requiring a
-    register". *)
+(** If [reg] is some value, it means we allocate the first part of the split
+   interval to that register; otherwise, we spill it. *)
 Definition splitCurrentInterval {pre} (pos : SplitPosition) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
