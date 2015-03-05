@@ -268,7 +268,7 @@ Proof.
     by rewrite addnA addnS -addSn -addnA.
 
   - Case "ScanState_moveUnhandledToHandled".
-    admit.
+    by rewrite 3!addnS -addSn.
 
   - Case "ScanState_moveActiveToInactive".
     rewrite size_rem; last assumption.
@@ -560,7 +560,11 @@ Proof.
     rewrite in_cons.
     apply/orP.
     by right.
-  - Case "ScanState_moveUnhandledToHandled". admit.
+  - Case "ScanState_moveUnhandledToHandled".
+    apply: IHst.
+    rewrite in_cons.
+    apply/orP.
+    by right.
   - Case "ScanState_moveActiveToInactive". exact: IHst.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.

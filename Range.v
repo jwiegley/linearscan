@@ -121,29 +121,31 @@ Proof.
   by reduce_last_use; ordered.
 Qed.
 
-Definition Range_shift_down `(r : Range rd) `(Hodd : odd b) (H : b < rbeg rd) :
-  RangeSig.
+Definition Range_shift_down `(r : Range rd) `(Hodd : odd b)
+  (H : b < head_or_end rd) : RangeSig.
 Proof.
   exists {| rbeg := b
           ; rend := rend rd
           ; ups  := ups rd |}.
   move: r => [Hproper Hsorted _ Hallodd].
   constructor=> //=.
-  elim: (ups rd) => [|u us IHus] in Hproper Hsorted Hallodd *.
-    rewrite /= in Hproper *.
-    by ordered.
-  rewrite /= in IHus Hproper *.
+  rewrite /head_or_end /head_or /= in H.
+  elim: (ups rd) => [|u us IHus] in Hproper Hsorted Hallodd H *.
+    rewrite /= in Hproper H *.
+    exact/ltnW.
+  rewrite /= in IHus Hproper H *.
   case: us => [|x xs] /= in IHus Hproper Hsorted Hallodd *.
     by case E: (uvar u) in Hproper *; ordered.
   case: (uvar u) => /= in Hproper *;
   apply/andP; split;
   inv Hsorted;
   try apply: IHus;
+  inv H3;
   by ordered.
 Defined.
 
 Definition Range_shift_down_spec `(r : Range rd) `(Hodd : odd b)
-  (H : b < rbeg rd) :
+  (H : b < head_or_end rd) :
   forall r1, r1 = Range_shift_down r Hodd H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
@@ -418,11 +420,44 @@ Proof.
         rewrite /useWithinRange /= in Hproper1 *.
         case: (uvar u1) in Hproper1 *.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
-          (* case: (uvar u2) in Hproper2 *; *)
-          (* rewrite leq_max !geq_min. *)
-          (* apply/andP; split. *)
-          (*   by ordered. *)
-          admit.
+          case: (uvar u2) in Hproper2 *;
+          rewrite leq_max !geq_min;
+          apply/andP; split;
+          apply/andP; split;
+          try by ordered.
+          move/andP: Hproper2 => [? H];
+          elim: us2 => //= [u2' us2' IHus2'] in H *;
+          move/andP: H => [/andP [? Hb] H];
+          specialize (IHus2' H);
+          apply/andP; split=> //;
+          apply/andP; split;
+          [ rewrite geq_min;
+            by apply/orP; right
+          | case: (uvar u2') in Hb *;
+            rewrite leq_max;
+            by apply/orP; right ].
+          move/andP: Hproper2 => [? H];
+          elim: us2 => //= [u2' us2' IHus2'] in H *;
+          move/andP: H => [/andP [? Hb] H];
+          specialize (IHus2' H);
+          apply/andP; split=> //;
+          apply/andP; split;
+          [ rewrite geq_min;
+            by apply/orP; right
+          | case: (uvar u2') in Hb *;
+            rewrite leq_max;
+            by apply/orP; right ].
+          move/andP: Hproper2 => [? H];
+          elim: us2 => //= [u2' us2' IHus2'] in H *;
+          move/andP: H => [/andP [? Hb] H];
+          specialize (IHus2' H);
+          apply/andP; split=> //;
+          apply/andP; split;
+          [ rewrite geq_min;
+            by apply/orP; right
+          | case: (uvar u2') in Hb *;
+            rewrite leq_max;
+            by apply/orP; right ].
         have H : (rbeg rd1 <= u1 <= rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
           by ordered.
@@ -436,7 +471,15 @@ Proof.
         by ordered.
       + rewrite /useWithinRange /=.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
-          admit.
+          move/andP: Hproper2 => [/andP [? Ha] H];
+          elim: us2 => /= [|u2' us2' IHus2'] in H *;
+          case: (uvar u2) in Ha *;
+          rewrite !leq_max !geq_min;
+          try ordered;
+          move/andP: H => [/andP [? Hb] H];
+          specialize (IHus2' H);
+          case: (uvar u2') in Hb *;
+          by ordered.
         have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
           by ordered.
@@ -450,7 +493,15 @@ Proof.
         by ordered.
       + rewrite /useWithinRange /=.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
-          admit.
+          move/andP: Hproper2 => [/andP [? Ha] H];
+          elim: us2 => /= [|u2' us2' IHus2'] in H *;
+          case: (uvar u2) in Ha *;
+          rewrite !leq_max !geq_min;
+          try ordered;
+          move/andP: H => [/andP [? Hb] H];
+          specialize (IHus2' H);
+          case: (uvar u2') in Hb *;
+          by ordered.
         have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
           by ordered.
@@ -611,8 +662,8 @@ Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
   option oddnum :=
   if rangesIntersect xr yr
   then Some (if rbeg x < rbeg y
-             then exist _ (rbeg y) (Range_beg_odd yr)
-             else exist _ (rbeg x) (Range_beg_odd xr))
+             then (rbeg y; Range_beg_odd yr)
+             else (rbeg x; Range_beg_odd xr))
   else None.
 
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
@@ -739,7 +790,7 @@ Arguments newBoundedRange [b e] r _ /.
 Definition emptyBoundedRange (b e : nat) (H : b < e) (Hodd : odd b) :
   BoundedRange b e.
 Proof.
-  apply: exist _ (exist _ {| rbeg := b; rend := e; ups := [::] |} _) _.
+  apply: (exist _ {| rbeg := b; rend := e; ups := [::] |} _; _).
     constructor=> //=; try exact/ltnW.
     by constructor.
   move=> /= r.
@@ -757,7 +808,7 @@ Proof.
   case: ranges => [rs Hsort Hbound].
   case: rp => [r /= Hlt] in H *.
   case: rs => [|x xs] in Hsort Hbound *.
-    apply: exist _ (exist2 _ _ [:: r] _ _) _ => //=.
+    apply: (exist2 _ _ [:: r] _ _; _) => //=.
     - by constructor; constructor.
     - by ordered.
   move: (Range_bounded r.2).
@@ -765,14 +816,14 @@ Proof.
   rewrite /= in Hbound.
   case Heqe: (rend r.1 == rbeg x.1); move=> ?.
     pose r' := packRange (Range_cat r.2 x.2 Heqe).
-    apply: exist _ (exist2 _ _ [:: r' & xs] _ _) _ => /=.
+    apply: (exist2 _ _ [:: r' & xs] _ _; _) => /=.
     - by constructor; inv Hsort.
     - by ordered.
     - inv Hsort; invert; subst.
       by case: xs => //= in H2 H3 H4 H5 *.
   move: (leq_trans Hlt2 Hbound) => Hleq.
   move/(leq_eqF Heqe) in Hleq.
-  apply: exist _ (exist2 _ _ [:: r, x & xs] _ _) _ => /=;
+  apply: (exist2 _ _ [:: r, x & xs] _ _; _) => /=;
     try by ordered.
   constructor=> //.
   constructor=> //.

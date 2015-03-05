@@ -37,11 +37,11 @@ Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
   match p with
   | None => v
   | Some x =>
-      vreplace v r (Some (match vnth v r with
-                    | Some n =>
-                        if n.1 < x.1 then n else x
-                    | None => x
-                    end))
+      vreplace v r
+        (Some (match vnth v r with
+               | Some n => if n.1 < x.1 then n else x
+               | None   => x
+               end))
   end.
 
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
@@ -52,7 +52,7 @@ Definition tryAllocateFreeReg {pre} :
     (option (SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) PhysReg)) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let current := curInterval cur in
-    let pos := curPosition cur in
+    let pos     := curPosition cur in
 
     (* set freeUntilPos of all physical registers to maxInt
        for each interval it in active do
@@ -60,56 +60,54 @@ Definition tryAllocateFreeReg {pre} :
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
     let go f v p := let: (i, r) := p in updateRegisterPos v r (f i) in
-    let freeUntilPos' := foldl (go (fun _ => Some odd1)) (vconst None)
-                               (active sd) in
+    let freeUntilPos' :=
+        foldl (go (fun _ => Some odd1)) (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
     let freeUntilPos'' :=
         foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
-           freeUntilPos' intersectingIntervals in
+          freeUntilPos' intersectingIntervals in
     let freeUntilPos :=
         vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
           if mint is Some int
           then updateRegisterPos acc reg
                  (intervalIntersectionPoint int.2 current)
-          else acc)
-          freeUntilPos'' (fixedIntervals sd) in
+          else acc) freeUntilPos'' (fixedIntervals sd) in
 
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
     let (reg, mres) := registerWithHighestPos registers_exist freeUntilPos in
 
     (** [moveUnhandledToActive] not only moves an [IntervalId] from the
-        [unhandled] list to the [active] list in the current [ScanStateDesc], it
-        also assignments a register to that newly active interval, which can be
+        [unhandled] list to the [active] list in the current [ScanStateDesc],
+        it also assigns a register to the newly active interval that can be
         accessed by calling [getAssignment]. *)
+    let success := moveUnhandledToActive reg ;;;
+                   return_ reg in
 
-    let success := moveUnhandledToActive reg ;;; return_ reg in
-    let maction :=
-        match mres with
-        | None => Some success
-        | Some n =>
-          (* if freeUntilPos[reg] = 0 then
-               // no register available without spilling
-               allocation failed
-             else if current ends before freeUntilPos[reg] then
-               // register available for the whole interval
-               current.reg = reg
-             else
-               // register available for the first part of the interval
-               current.reg = reg
-               split current before freeUntilPos[reg] *)
-          if (n.1 <= pos)
-          then None
-          else @Some _ $
-            if intervalEnd current < n.1
-            then success
-            else splitCurrentInterval (BeforePos n) ;;;
-                 moveUnhandledToActive reg ;;;
-                 return_ reg
-        end in
-    return_ maction.
+    return_ $
+      match mres with
+      | None => Some success
+      | Some n =>
+        (* if freeUntilPos[reg] = 0 then
+             // no register available without spilling
+             allocation failed
+           else if current ends before freeUntilPos[reg] then
+             // register available for the whole interval
+             current.reg = reg
+           else
+             // register available for the first part of the interval
+             current.reg = reg
+             split current before freeUntilPos[reg] *)
+        if n.1 <= pos
+        then None
+        else @Some _ $
+          if intervalEnd current < n.1
+          then success
+          else splitCurrentInterval (BeforePos n) ;;;
+               success
+      end.
 
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
@@ -140,6 +138,7 @@ Definition allocateBlockedReg {pre} :
             | None   => nextUseAfter int.1 start
             end in
         updateRegisterPos v r pos' in
+
     let resolve xs := [seq (packInterval (getInterval (fst i)), snd i)
                       | i <- xs] in
     let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
@@ -158,6 +157,13 @@ Definition allocateBlockedReg {pre} :
     (* mres = highest use position of the found register *)
     let (reg, mres) := registerWithHighestPos registers_exist nextUsePos in
 
+    (** [moveUnhandledToActive] not only moves an [IntervalId] from the
+        [unhandled] list to the [active] list in the current [ScanStateDesc],
+        it also assigns a register to the newly active interval that can be
+        accessed by calling [getAssignment]. *)
+    let success := moveUnhandledToActive reg ;;;
+                   return_ $ Some reg in
+
     if (match mres with
         | None   => false
         | Some n =>
@@ -173,9 +179,8 @@ Definition allocateBlockedReg {pre} :
            assign spill slot to current
            split current before its first use position that requires a
              register *)
-      (if splitPosition current BeforeFirstUsePosReqReg is Some p
-       then splitCurrentInterval (BeforePos p)
-       else return_ tt) ;;;
+      let p := splitPosition current BeforeFirstUsePosReqReg in
+      splitCurrentInterval (BeforePos p) ;;;
 
       (* This scenario can only occur if the beginning of the current interval
          (the current position) is less than its first use position.  Thus,
@@ -193,6 +198,9 @@ Definition allocateBlockedReg {pre} :
       | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
+
+      (* The allocation failed, so we had to spill some part of the current
+         interval instead. *)
       @weakenHasLen_ maxReg _ ;;;
       return_ None
     else
@@ -200,8 +208,9 @@ Definition allocateBlockedReg {pre} :
          current.reg = reg
          split active interval for reg at position
          split any inactive interval for reg at the end of its lifetime hole *)
-      splitAnyInactiveIntervalForReg reg ;;;
-      splitActiveIntervalForReg reg (exist _ pos posOdd) ;;;
+      let oddpos := (pos; posOdd) in
+      splitAnyInactiveIntervalForReg reg oddpos ;;;
+      splitActiveIntervalForReg reg oddpos ;;;
 
       (* The remaining part of these active and inactive intervals go back
          onto the unhandled list; the former part goes onto the inact list. *)
@@ -210,29 +219,25 @@ Definition allocateBlockedReg {pre} :
          // the fixed interval for reg
          if current intersects with the fixed interval for reg then
            split current before this intersection *)
+      (* jww (2015-01-30): What if the fixed interval begins at the current
+         position? *)
       mloc <<- intersectsWithFixedInterval reg ;;
-      match mloc
-      with
+      match mloc with
       | Some n => splitCurrentInterval (BeforePos n)
       | None   => return_ tt
       end ;;;
-      (* jww (2015-01-30): What if the fixed interval begins at the current
-         position? *)
-      moveUnhandledToActive reg ;;;
-      return_ (Some reg).
+      success.
 
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
 Proof.
-  case. case=> Hdec ? (* ? *).
+  case. case=> ? ?.
   exact: (widen_ord _).
 Defined.
 
 Definition mt_fst b b' (sslen : SSMorphLen b b')
   (x : IntervalId b * PhysReg) :=
-  match x with
-  | (xid, reg) => (morphlen_transport sslen xid, reg)
-  end.
+  let: (xid, reg) := x in (morphlen_transport sslen xid, reg).
 
 Notation int_reg sd := (@IntervalId maxReg sd * PhysReg)%type.
 Definition int_reg_seq sd := seq (int_reg sd).
@@ -264,8 +269,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
                    else exist2 _ _ z st (newSSMorphLen z) in
     match ss with
     | exist2 sd' st' sslen' =>
-        exist2 _ _ (exist _ sd' sslen')
-               (conj st' (transitivity sslen sslen')) _
+        exist2 _ _ (sd'; sslen') (conj st' (transitivity sslen sslen')) _
     end in
   go (getInterval (fst x)).
 Obligation 2.
@@ -276,7 +280,7 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ (* _ _ *)].
+    case=> [? _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
@@ -286,14 +290,14 @@ Obligation 2.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [Hinc _ (* _ _ *)].
+    case=> [? _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ (* _ _ *)].
+  case=> [? _].
   rewrite map_widen_ord_refl.
   exact: subseq_impl_cons.
 Qed.
@@ -328,13 +332,13 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   | true  =>
       match moveInactiveToActive st Hin _ with
       | exist2 sd' st' sslen' =>
-          inr (exist2 _ _ sd' st' (exist _ sslen' _))
+          inr (exist2 _ _ sd' st' (sslen'; _))
       end
   | false => inl (ERegisterAssignmentsOverlap (snd x : PhysReg))
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [Hinc _ (* _ _ *)].
+  case: sslen'; case=> [? _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -360,7 +364,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
           (sslen' : SSMorphLen z sd')
           (Hsub'  : subseq [seq mt_fst sslen' i | i <- xs]
                            (inactive sd')) :=
-        inr (exist2 _ _ (exist _ sd' sslen')
+        inr (exist2 _ _ (sd'; sslen')
                     (conj st' (transitivity sslen sslen')) Hsub') in
     if intervalEnd i < pos
     then match moveInactiveToHandled st Hin with
@@ -378,7 +382,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
 Obligation 2.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [Hinc _ (* _ _ *)].
+  case=> [? _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -476,7 +480,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
     (* trace "walkIntervals: destructing list" $ *)
     match List.destruct_list (unhandled sd) with
     | inright _ => inr (packScanState st)
-    | inleft (existT (_, pos) (exist _ H)) =>
+    | inleft (existT (_, pos) (_; H)) =>
         (* trace "walkIntervals: found item" $ *)
         match go (count (fun x => snd x == pos) (unhandled sd))
                  {| thisDesc  := sd
@@ -487,7 +491,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
         end
     end
 
-  else (* jww (2015-01-20): Should be provably impossible *)
-       inl (EFuelExhausted, packScanState st).
+  (* jww (2015-01-20): Should be provably impossible *)
+  else inl (EFuelExhausted, packScanState st).
 
 End Allocate.

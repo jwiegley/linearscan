@@ -1,6 +1,8 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
+Require Import LinearScan.Spec.
 Require Import LinearScan.Morph.
 
 Set Implicit Arguments.
@@ -16,73 +18,108 @@ Definition PhysReg : predArgType := 'I_maxReg.
 Inductive SplitPosition :=
   | BeforePos of oddnum
   | BeforeFirstUsePosReqReg
-  | EndOfLifetimeHole.
+  | EndOfLifetimeHole of oddnum.
 
 (* Given an interval, determine its optimal split position.  If no split
    position can be found, it means the interval may be safely spilled, and all
    further variable references should be accessed directly from memory. *)
 Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
-  option oddnum :=
+  oddnum :=
   match pos with
-  | BeforePos x             => Some x
-  | BeforeFirstUsePosReqReg => firstUseReqReg i
-  | EndOfLifetimeHole       => None (* jww (2015-01-22): NYI *)
-    (* This should be the same thing as splitting at the current position. *)
+  | BeforePos n             => n
+  | BeforeFirstUsePosReqReg => if firstUseReqReg i is Some n
+                               then n
+                               else if odd (iend i)
+                                    then iend i
+                                    else (iend i).-1
+  | EndOfLifetimeHole n     => afterLifetimeHole i n
   end.
+Obligation 1.
+  case E: (odd (iend d)) => //.
+  move: (Interval_exact_beg i) => Hbeg.
+  move: (Interval_bounded i) => Hbound.
+  move: (Range_beg_odd (NE_head (rds d)).2) => Hodd.
+  rewrite -{}Hbeg in Hodd.
+  case: (iend d) => [|n] /= in E Hbound *.
+    move/odd_gt1 in Hodd.
+    by ordered.
+  by move/negbT/negbNE in E.
+Qed.
 
-Definition splitPosWithin `(i : Interval d) (pos : SplitPosition) :=
-  match pos with
-  | BeforePos (exist x _) => ibeg d < x < iend d
-  | BeforeFirstUsePosReqReg => true
-  | EndOfLifetimeHole => true
-  end.
-
-Definition splitAtInterval `(st : ScanState InUse sd)
-  `(Hunh : unhandled sd = (u, beg) :: us) (pos : SplitPosition)
-  (uid : IntervalId sd) (forCurrent : bool) :
+Definition splitUnhandledInterval `(st : ScanState InUse sd)
+  `(Hunh : unhandled sd = (uid, beg) :: us) (pos : SplitPosition) :
   SSError + option { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
-  case: sd => /= ? ints ? unh ? ? ? in st u us Hunh uid *.
+  case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
 
-  case: (splitPosition int.2 pos) => [[splitPos Hodd] |]; last first.
-    exact: inr None.            (* could not split, but maybe benign *)
+  case: (splitPosition int.2 pos) => [splitPos Hodd].
 
   (* Ensure that the [splitPos] falls within the interval, otherwise our
      action can have no effect. *)
   case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
-    exact: inl (ERegistersExhausted uid). (* ERROR *)
-  move/andP: Hmid => [Hmid1 Hmid2].
+    exact: inl (ENoValidSplitPosition uid). (* ERROR *)
 
-  (* jww (2015-02-28): If the split position would be at the very end, it
-     means spill the whole interval. *)
+  case Hint: int => [d i] in Hmid *.
+  case: d => [iv ib ie ? rds] /= in i Hint Hmid *.
 
-  have Hset := ScanState_setInterval st.
-  case Hint: int => [d i] in Hmid1 Hmid2 *.
-  case: d => iv ib ie ? rds in i Hint Hmid1 Hmid2 *.
-  rewrite /= in Hset.
+  case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
 
-  have Hmid: (ibeg int.2 < splitPos <= iend int.2) by admit.
+  (* The interval was split into two parts.  The first part gets spilled by
+     adding it to the handled list without a register assignment; the second
+     part goes back onto the unhandled list for processing later, unless it is
+     empty (i.e., ibeg i == iend i, *and* there are no use positions). *)
 
-  case: (splitInterval Hodd Hmid) => [[i0 i1] [H1 H2 H3]] //.
-  (* The interval was split into two parts.  The second part goes back onto
-     the unhandled list for processing later if it contains use positions that
-     require a register. *)
-  admit.
+  (* Update the state with the new dimensions of the first interval. *)
+  move: (ScanState_setInterval st) => /= /(_ uid i0.1 i0.2).
+  move: Hint; rewrite /int => ->.
+  move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+  rewrite /= => {st} st.
+
+  (* Establish that beg == ibeg i0.1. *)
+  clear int.
+  case U: unh => // [x xs] in uid st us Hunh *.
+  have Hin : (uid, beg) \in unh.
+    rewrite U Hunh.
+    exact: mem_head.
+  rewrite -U in st *.
+  move/eqP: (beginnings (maxReg:=maxReg) st Hin) => Heqe.
+
+  (* The second interval goes back on the unhandled list, to be processed in a
+     later iteration.  Note that this does not change the head of the list. *)
+  have := ScanState_newUnhandled st i1.2.
+  rewrite U Hunh => /=.
+  have Hincr: (beg < ibeg i1.1).
+    clear -Hmid H1 H2 H3 x Hunh Heqe.
+    inversion Hunh.
+    rewrite -Heqe /= vnth_vreplace /=.
+    move/andP: Hmid => [? ?].
+    by ordered.
+  move/(_ Hincr).
+  rewrite /= => {st} st.
+
+  (* The first interval goes onto the handled list, with no register assigned
+     to indicate the spill. *)
+  case E: (insert _ _ _) => [|y ys] in st *.
+    clear -E.
+    rewrite /insert /= -/insert in E.
+    by case: (lebf _ _) in E; discriminate.
+  move: (ScanState_moveUnhandledToHandled st).
+  rewrite /= => {st} st.
+
+  apply: inr (Some (packScanState st; _)).
+  apply Build_SSMorphLen.
+  apply Build_SSMorph => //=.
+  rewrite /=.
+
+  have /=: (1 < (size ((uid, beg) :: us)).+1 -> 1 < size (y :: ys))
+    by rewrite -E insert_size.
+  move=> H5 H6.
+  move/ltn_addn1 in H6.
+  by move/H5 in H6.
+Defined.
+
 (*
-    move=> [/= H1 H2 /eqP H3].
-
-    rewrite eq_sym in H2.
-    move: Hset.
-    move/(_ uid id0 i0).
-    rewrite /int in Hint.
-    rewrite Hint.
-    move/(_ H2).
-    rewrite /= => {st}.
-    set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
-    simpl in set_int_desc.
-    move=> st.
-
     case Hincr: (beg < ibeg id1); last first.
       (* Wimmer: "All active and inactive intervals for this register
          intersecting with current are split before the start of current and
@@ -96,7 +133,7 @@ Proof.
          intervals." *)
       case: (splitPosition i1 BeforeFirstUsePosReqReg)
         => [[splitPos2 Hodd2] |]; last first.
-        apply: inr (Some (exist _ (packScanState st) _)).
+        apply: inr (Some (packScanState st; _)).
         apply Build_SSMorphLen.
         apply Build_SSMorph => //=.
         exact.
@@ -107,7 +144,6 @@ Proof.
 
       case: id1 => iv1 ib1 ie1 ? rds1 in i1 H1 H3 Hincr Hmid1' Hmid2' *.
       case: (intervalSpan Hodd2 i1) => [[[[id1_0 i1_0] |] [[id1_1 i1_1] |]]].
-      - SCase "(Some, Some)".
         move=> [/= H1_1 H2_1 /eqP H3_1].
         have := ScanState_newUnhandled st i1_1.
         rewrite /= => {st}.
@@ -123,109 +159,11 @@ Proof.
         move/(_ Hincr2).
         move=> st.
 
-        apply: inr (Some (exist _ (packScanState st) _)).
+        apply: inr (Some (packScanState st; _)).
         apply Build_SSMorphLen.
         apply Build_SSMorph => //=.
         by rewrite insert_size.
-
-      - SCase "(Some, None)".
-        move=> [/= H2_1 H3_1 H4_1].
-        apply: inr (Some (exist _ (packScanState st) _)).
-        apply Build_SSMorphLen.
-        apply Build_SSMorph => //=.
-        exact.
-
-      - SCase "(None, Some)".
-        move=> [/= H2_1 H3_1 H4_1].
-        have := ScanState_newUnhandled st i1_1.
-        rewrite /= => {st}.
-        set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
-        simpl in new_unhandled.
-        case Hincr2: (beg < ibeg id1_1); last first.
-          (* It is not allowable to inject new unhandled intervals for the
-             current position.
-             jww (2015-01-22): This should be provably impossible. *)
-          move=> _.
-          exact: inl (ECannotSplitSingleton4 uid). (* ERROR *)
-        rewrite Hunh.
-        move/(_ Hincr2).
-        move=> st.
-
-        apply: inr (Some (exist _ (packScanState st) _)).
-        apply Build_SSMorphLen.
-        apply Build_SSMorph => //=.
-        by rewrite insert_size.
-
-      - SCase "(None, None)".
-        contradiction.
-
-    have := ScanState_newUnhandled st i1.
-    rewrite /= => {st}.
-    set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
-    simpl in new_unhandled.
-    rewrite Hunh.
-    move/(_ Hincr).
-    move=> st.
-
-    apply: inr (Some (exist _ (packScanState st) _)).
-    apply Build_SSMorphLen.
-    apply Build_SSMorph => //=.
-    by rewrite insert_size.
-
-  (* This generally means the interval was shrunk, and should only happen when
-     we are splitting active or inactive intervals, not the current interval. *)
-  - Case "(Some, None)".
-    move=> [/= H2 H3 H4].
-
-    (* jww (2015-01-22): This should be provably impossible. *)
-    case: forCurrent.
-      exact: inl (ECannotSplitSingleton5 uid). (* ERROR *)
-
-    rewrite eq_sym in H2.
-    move: Hset.
-    move/(_ uid id0 i0).
-    rewrite /int in Hint.
-    rewrite Hint.
-    move/(_ H2).
-    rewrite /= => {st}.
-    set set_int_desc := Build_ScanStateDesc _ _ _ _ _ _.
-    simpl in set_int_desc.
-    move=> st.
-
-    apply: inr (Some (exist _ (packScanState st) _)).
-    apply Build_SSMorphLen.
-    apply Build_SSMorph => //=.
-    exact.
-
-  (* This means the interval was shrunk by moving its beginning position
-     forward.  This is acceptable for the current interval, since it makes
-     progress. *)
-  - Case "(None, Some)".
-    move=> [/= H2 H3 H4].
-
-    case Hincr: (beg < ibeg id1); last first.
-      (* It is not allowable to inject new unhandled intervals for the current
-         position.
-         jww (2015-01-22): This should be provably impossible. *)
-      exact: inl (ECannotSplitSingleton6 uid). (* ERROR *)
-
-    have := ScanState_newUnhandled st i1.
-    rewrite /= => {st}.
-    set new_unhandled := Build_ScanStateDesc _ _ _ _ _ _.
-    simpl in new_unhandled.
-    rewrite Hunh.
-    move/(_ Hincr).
-    move=> st.
-
-    apply: inr (Some (exist _ (packScanState st) _)).
-    apply Build_SSMorphLen.
-    apply Build_SSMorph => //=.
-    by rewrite insert_size.
-
-  - Case "(None, None)".
-    contradiction.
 *)
-Defined.
 
 (** If [pos] is [None], it means "split before first use pos requiring a
     register". *)
@@ -237,7 +175,7 @@ Proof.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
   move=> H1 H2 H3.
-  move/splitAtInterval/(_ uid beg us Hunh pos uid true).
+  move/splitUnhandledInterval/(_ uid beg us Hunh pos).
   case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
   case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
   - exact: inl (ECannotSplitSingleton7 uid). (* ERROR *)
@@ -283,7 +221,10 @@ Proof.
   elim Hintids: intids => /= [|aid aids IHaids] in Hin *.
     exact: inl ENoIntervalsToSplit. (* ERROR *)
 
-  move: st.
+  exact: inl ENoIntervalsToSplit. (* ERROR *)
+  (* move: st. *)
+  (* admit. *)
+(*
   move/splitAtInterval/(_ uid beg us Hunh pos aid false).
   case=> [err|[[[sd st] [[/= Hincr H]]] |]]; last first.
   - exact: inl (ECannotSplitSingleton8 aid). (* ERROR *)
@@ -314,17 +255,18 @@ Proof.
     try move=> Hpre;
     exact: (leq_trans H1 _).
   - exact: inl err.
+*)
 Defined.
 
 Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
   splitAssignedIntervalForReg reg (BeforePos pos) true.
 
-Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) :
+Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> ss.
-  have := splitAssignedIntervalForReg reg EndOfLifetimeHole false.
+  have := splitAssignedIntervalForReg reg (EndOfLifetimeHole pos) false.
   move=> /(_ pre ss).
   case=> [err|[_ ss']]; right; split; try constructor.
     exact: ss.

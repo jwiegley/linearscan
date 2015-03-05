@@ -9,14 +9,14 @@ module LinearScan
     ( -- * Main entry point
       allocate
       -- * Blocks
-    , BlockInfo(..)
+    , LinearScan.BlockInfo(..)
       -- * Operations
-    , OpInfo(..)
+    , LinearScan.OpInfo(..)
     , OpKind(..)
       -- * Variables
     , VarId
-    , VarInfo(..)
-    , VarKind(..)
+    , LinearScan.VarInfo(..)
+    , LS.VarKind(..)
     , PhysReg
     ) where
 
@@ -24,6 +24,7 @@ import           Control.Monad.State
 import           Data.Functor.Identity
 import           Debug.Trace
 import qualified LinearScan.Blocks as LS
+import           LinearScan.Blocks as LS
 import qualified LinearScan.IntMap as LS
 import qualified LinearScan.Interval as LS
 import qualified LinearScan.LiveSets as LS
@@ -34,13 +35,6 @@ import qualified LinearScan.ScanState as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
 
-import           LinearScan.Blocks
-    ( VarId
-    , VarKind(..)
-    , OpKind(..)
-    , PhysReg
-    )
-
 -- | Each variable has associated allocation details, and a flag to indicate
 --   whether it must be loaded into a register at its point of use.  Variables
 --   are also distinguished by their kind, which allows for restricting the
@@ -49,17 +43,17 @@ import           LinearScan.Blocks
 --   variables extends until their final use.
 data VarInfo = VarInfo
     { varId       :: Either PhysReg VarId
-    , varKind     :: VarKind
+    , varKind     :: LS.VarKind
     , regRequired :: Bool
     }
 
-deriving instance Eq VarKind
--- deriving instance Show VarKind
+deriving instance Eq LS.VarKind
+deriving instance Show LS.VarKind
 
-fromVarInfo :: VarInfo -> LS.VarInfo
+fromVarInfo :: LinearScan.VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 
-toVarInfo :: LS.VarInfo -> VarInfo
+toVarInfo :: LS.VarInfo -> LinearScan.VarInfo
 toVarInfo (LS.Build_VarInfo a b c) = VarInfo a b c
 
 -- | Every operation may reference multiple variables and/or specific physical
@@ -75,7 +69,7 @@ toVarInfo (LS.Build_VarInfo a b c) = VarInfo a b c
 --   loop bodies.
 data OpInfo accType op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
-    , opRefs      :: op1 -> [VarInfo]
+    , opRefs      :: op1 -> [LinearScan.VarInfo]
     , moveOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , swapOp      :: PhysReg   -> PhysReg   -> State accType [op2]
     , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
@@ -88,10 +82,9 @@ showOp1' :: (op1 -> String)
          -> LS.OpId
          -> [(Int, Either PhysReg LS.VarId)]
          -> [(Int, Either PhysReg LS.VarId)]
-         -> [(Int, Either PhysReg LS.VarId)]
          -> op1
          -> String
-showOp1' showop pos ins mids outs o =
+showOp1' showop pos ins outs o =
     let showerv (Left r)  = "r" ++ show r
         showerv (Right v) = "v" ++ show v in
     let marker label (i, erv) =
@@ -99,15 +92,14 @@ showOp1' showop pos ins mids outs o =
             (if i == either id id erv
              then ""
              else "[" ++ show i ++ "]") ++ ">\n" in
-    concatMap (marker "End") mids ++
+    concatMap (marker "End") outs ++
     concatMap (marker "Beg") ins ++
-    show pos ++ ": " ++ showop o ++ "\n" ++
-    concatMap (marker "End") outs
+    show pos ++ ": " ++ showop o ++ "\n"
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
+fromOpInfo :: LinearScan.OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
     LS.Build_OpInfo a (map fromVarInfo . b)
         ((runState .) . c)
@@ -115,7 +107,7 @@ fromOpInfo (OpInfo a b c d e f g h) =
         ((runState .) . e)
         ((runState .) . f) g h
 
-toOpInfo :: LS.OpInfo accType op1 op2 -> OpInfo accType op1 op2
+toOpInfo :: LS.OpInfo accType op1 op2 -> LinearScan.OpInfo accType op1 op2
 toOpInfo (LS.Build_OpInfo a b c d e f g h) =
     OpInfo a (map toVarInfo . b)
         ((StateT .) . fmap (fmap (fmap Identity)) c)
@@ -141,7 +133,7 @@ data ScanStateDesc = ScanStateDesc
     , unhandled      :: [(IntervalId, Int)]
     , active         :: [(IntervalId, PhysReg)]
     , inactive       :: [(IntervalId, PhysReg)]
-    , handled        :: [(IntervalId, PhysReg)]
+    , handled        :: [(IntervalId, Maybe PhysReg)]
     }
 
 deriving instance Show LS.IntervalDesc
@@ -194,10 +186,10 @@ showUsePositions :: [LS.UsePos] -> String
 showUsePositions [] = ""
 showUsePositions [u] = go u
   where
-    go (LS.Build_UsePos n req) = show n ++ (if req then "" else "?")
+    go (LS.Build_UsePos n req _v) = show n ++ (if req then "" else "?")
 showUsePositions (u:us) = go u ++ " " ++ showUsePositions us
   where
-    go (LS.Build_UsePos n req) = show n ++ (if req then "" else "?")
+    go (LS.Build_UsePos n req _v) = show n ++ (if req then "" else "?")
 
 toScanStateDesc :: LS.ScanStateDesc -> ScanStateDesc
 toScanStateDesc (LS.Build_ScanStateDesc a b c d e f g) =
@@ -219,50 +211,32 @@ showBlock1 getops bid pos liveIns liveOuts showops b =
     " => IN:" ++ show liveIns ++ " OUT:" ++ show liveOuts ++ "\n" ++
     showops pos (getops b)
 
-showOps1 :: OpInfo accType op1 op2 -> ScanStateDesc -> Int -> [op1] -> String
+showOps1 :: LinearScan.OpInfo accType op1 op2 -> ScanStateDesc -> Int -> [op1]
+         -> String
 showOps1 _ _ _ [] = ""
 showOps1 oinfo sd pos (o:os) =
-    let refs = opRefs oinfo o in
-    let handleInts ints p v vid f =
-            let k idx acc i =
-                    if p v vid i
-                    then (idx, f vid) : acc
-                    else acc in
-            LS.vfoldl'_with_index (0 :: Int) k [] ints in
-    let collectVarRefs p = flip concatMap refs $ \v ->
-          let evid = varId v in
-          case evid of
-              Left _ -> []
-              Right vid -> handleInts (intervals sd) p v vid Right in
-    let collectRegRefs p = flip concatMap refs $ \v ->
-          let evid = varId v in
-          case evid of
-              Right _ -> []
-              Left vid -> handleInts (fixedIntervals sd) p v vid Left in
-    let startingP _ vid i =
-            (LS.ivar i == vid) && (LS.ibeg i == pos*2+1) in
-    let endingBeforeP v vid i   =
-            (LS.ivar i == vid) &&
-            (varKind v == Input) &&
-            (LS.iend i == pos*2+1) in
-    let endingAfterP v vid i   =
-            (LS.ivar i == vid) &&
-            (varKind v /= Input) &&
-            (LS.iend i == pos*2+1) in
-    let checkReg _ _ _ Nothing = False
-        checkReg p v vid (Just i) = p v vid i in
-    let startingAtPos   = collectVarRefs startingP ++
-                          collectRegRefs (checkReg startingP) in
-    let endingBeforePos = collectVarRefs endingBeforeP ++
-                          collectRegRefs (checkReg endingBeforeP) in
-    let endingAtPos     = collectVarRefs endingAfterP ++
-                          collectRegRefs (checkReg endingAfterP) in
-    showOp1' (showOp1 oinfo) (pos*2+1)
-             startingAtPos endingBeforePos endingAtPos o
+    let here = pos*2+1 in
+    let k idx (bacc, eacc) i =
+            (if LS.ibeg i == here
+             then (idx, Right (LS.ivar i)) : bacc
+             else bacc,
+             if LS.iend i == here
+             then (idx, Right (LS.ivar i)) : eacc
+             else eacc) in
+    let r _idx acc Nothing = acc
+        r idx (bacc, eacc) (Just i) =
+            (if LS.ibeg i == here then (idx, Left idx) : bacc else bacc,
+             if LS.iend i == here then (idx, Left idx) : eacc else eacc) in
+    let (begs, ends) =
+            LS.vfoldl'_with_index (0 :: Int) k ([], []) (intervals sd) in
+    let (begs', ends') =
+            LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
+                                  (fixedIntervals sd) in
+    showOp1' (showOp1 oinfo) (pos*2+1) begs' ends' o
         ++ showOps1 oinfo sd (pos+1) os
 
-showBlocks1 :: BlockInfo blk1 blk2 op1 op2
-            -> OpInfo accType op1 op2
+showBlocks1 :: LinearScan.BlockInfo blk1 blk2 op1 op2
+            -> LinearScan.OpInfo accType op1 op2
             -> ScanStateDesc
             -> LS.IntMap LS.BlockLiveSets
             -> [blk1]
@@ -271,21 +245,23 @@ showBlocks1 binfo oinfo sd ls = go 0
   where
     go _ [] = ""
     go pos (b:bs) =
-        let bid = blockId binfo b in
+        let bid = LinearScan.blockId binfo b in
         let (liveIn, liveOut) =
                  case LS.coq_IntMap_lookup bid ls of
                      Nothing -> (LS.emptyIntSet, LS.emptyIntSet)
                      Just s  -> (LS.blockLiveIn s, LS.blockLiveOut s) in
-        let allBlockOps blk = let (x, y, z) = blockOps binfo blk in
-                              x ++ y ++ z in
-        showBlock1 allBlockOps bid pos liveIn liveOut (showOps1 oinfo sd) b
-            ++ go (pos + length (allBlockOps b)) bs
+        let allops blk = let (x, y, z) = LinearScan.blockOps binfo blk in
+                         x ++ y ++ z in
+        showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b
+            ++ go (pos + length (allops b)) bs
 
-fromBlockInfo :: BlockInfo blk1 blk2 op1 op2 -> LS.BlockInfo blk1 blk2 op1 op2
+fromBlockInfo :: LinearScan.BlockInfo blk1 blk2 op1 op2
+              -> LS.BlockInfo blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d) =
     LS.Build_BlockInfo a b (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
 
-toBlockInfo :: LS.BlockInfo blk1 blk2 op1 op2 -> BlockInfo blk1 blk2 op1 op2
+toBlockInfo :: LS.BlockInfo blk1 blk2 op1 op2
+            -> LinearScan.BlockInfo blk1 blk2 op1 op2
 toBlockInfo (LS.Build_BlockInfo a b c d) =
     BlockInfo a b (\blk -> let ((x, y), z) = c blk in (x, y, z)) d
 
@@ -297,8 +273,8 @@ data Details blk1 blk2 op1 op2 accType = Details
     , accumulator     :: accType
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
-    , blockInfo       :: BlockInfo blk1 blk2 op1 op2
-    , opInfo          :: OpInfo accType op1 op2
+    , blockInfo       :: LinearScan.BlockInfo blk1 blk2 op1 op2
+    , opInfo          :: LinearScan.OpInfo accType op1 op2
     }
 
 instance Show (Details blk1 blk2 op1 op2 accType) where
@@ -334,8 +310,8 @@ toDetails (LS.Build_Details a b c d e f g h i) =
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
 allocate :: Int                  -- ^ Maximum number of registers to use
-         -> BlockInfo blk1 blk2 op1 op2
-         -> OpInfo accType op1 op2
+         -> LinearScan.BlockInfo blk1 blk2 op1 op2
+         -> LinearScan.OpInfo accType op1 op2
          -> [blk1]
          -> State accType (Either String [blk2])
 allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
@@ -354,6 +330,8 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     reasonToStr r = case r of
         LS.ERegistersExhausted _ ->
             "No registers available for allocation"
+        LS.ENoValidSplitPosition _ ->
+            "No valid split position could be found"
         LS.ECannotSplitSingleton2 n int splitPos ->
             "Current interval is a singleton (#2) @" ++ show splitPos
                 ++ " : " ++ showIntervalDesc n int

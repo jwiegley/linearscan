@@ -180,7 +180,8 @@ Proof.
   exact: (intervalSetKind H1).
 Defined.
 
-Lemma Interval_sorted `(i : Interval d) : StronglySorted range_ltn (rds d).
+Lemma Interval_NE_sorted `(i : Interval d) :
+  NE_StronglySorted range_ltn (rds d).
 Proof.
   induction i; simpl in *.
     by constructor; constructor.
@@ -193,9 +194,27 @@ Proof.
     move: (Range_bounded a.2) => Hbound.
     case: xs => [x|x xs] /= in i0 H H2 H3 *;
     inv H3;
-    rewrite /range_ltn in H4;
+    [ rewrite /range_ltn in H1
+    | rewrite /range_ltn in H4 ];
     by reduce_last_use; ordered.
   - by inv IHi.
+Qed.
+
+Lemma Interval_sorted `(i : Interval d) : StronglySorted range_ltn (rds d).
+Proof. by move/NE_StronglySorted_to_list: (Interval_NE_sorted i). Qed.
+
+Lemma Interval_bounded `(i : Interval d) : ibeg d <= iend d.
+Proof.
+  move: (Interval_NE_sorted i).
+  inv i.
+    move=> _.
+    exact: (Range_bounded r).
+  invert.
+  move: (Range_bounded r.2) => Hbound.
+  move: (Range_bounded (NE_last xs).2) => Hbound2.
+  move/NE_Forall_last in H4.
+  rewrite /range_ltn in H4.
+  by ordered.
 Qed.
 
 Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
@@ -266,6 +285,19 @@ Definition firstUsePos (d : IntervalDesc) : option nat :=
   go (rds d).
 Arguments firstUsePos d /.
 
+Definition afterLifetimeHole (d : IntervalDesc) (pos : oddnum) : oddnum :=
+  let f x k :=
+      if rbeg x.1 > pos.1
+      then (rbeg x.1; Range_beg_odd x.2)
+      else k in
+  let fix go xs :=
+      match xs with
+        | NE_Sing x    => f x pos
+        | NE_Cons x xs => f x (go xs)
+      end in
+  go (rds d).
+Arguments afterLifetimeHole d pos /.
+
 Definition firstUseReqReg (d : IntervalDesc) : option oddnum :=
   lookupUsePos d regReq.
 Arguments firstUseReqReg d /.
@@ -333,18 +365,18 @@ Proof.
   try rewrite (ne_list H1) NE_head_from_list NE_last_from_list /= in Hbeg Hend;
   rewrite Hbeg Hend in Hwithin.
 
-  - apply: exist _ (exist2 _ _ nil _ _, exist2 _ _ nil _ _) _ => //;
+  - apply: ((exist2 _ _ nil _ _, exist2 _ _ nil _ _); _) => //;
     try constructor.
     by case: (rds d) => // [?|? ?] in H1.
 
-  - apply: exist _ (exist2 _ _ nil _ _, exist2 _ _ (r2 :: rs2) _ _) _ => //;
+  - apply: ((exist2 _ _ nil _ _, exist2 _ _ (r2 :: rs2) _ _); _) => //;
     try constructor;
     try inv Hsorted.
     + by rewrite Hbeg.
     + by ordered.
     + by rewrite (ne_list H1).
 
-  - apply: exist _ (exist2 _ _ (r1 :: rs1) _ _, exist2 _ _ nil _ _) _ => //;
+  - apply: ((exist2 _ _ (r1 :: rs1) _ _, exist2 _ _ nil _ _); _) => //;
     try constructor;
     try inv Hsorted.
     + by ordered.
@@ -358,8 +390,8 @@ Proof.
     pose Hsorted' := Hsorted.
     apply StronglySorted_inv_app in Hsorted'.
     move: Hsorted' => [Hsorted1 Hsorted2].
-    apply: exist _ (exist2 _ _ (r1 :: rs1) _ _,
-                    exist2 _ _ (r2 :: rs2) _ _) _ => //=.
+    apply: ((exist2 _ _ (r1 :: rs1) _ _,
+             exist2 _ _ (r2 :: rs2) _ _); _) => //=.
     + by ordered.
     + apply StronglySorted_cons_cons in Hsorted.
       rewrite /range_ltn in Hsorted.
@@ -407,7 +439,7 @@ Proof.
   (* If the split pos occurs within a lifetime hole, splitting the ranges
      means just dividing them up, without any actual splitting necessary. *)
   case E: (before <= rbeg r2.1).
-    apply: exist _ (exist2 _ _ rs1 _ _, exist2 _ _ (r2 :: rs2) _ _) _ => //.
+    apply: ((exist2 _ _ rs1 _ _, exist2 _ _ (r2 :: rs2) _ _); _) => //.
     case: rs1 => [|? ?] /= in H HSrs1 Hbrs1 *.
       (* This branch is impossible. *)
       move: H => [H1 H2].
@@ -431,8 +463,8 @@ Proof.
     by rewrite /=; ordered.
 
   move: (@rangeSpan _ r2.2 _ Hodd Hinr) => [[r2a r2b] [H1 H2 H3 H4 H5]] //.
-  apply: exist _ (exist2 _ _ (rcons rs1 r2a) _ _,
-                  exist2 _ _ (r2b :: rs2) _ _) _ => //=.
+  apply: ((exist2 _ _ (rcons rs1 r2a) _ _,
+           exist2 _ _ (r2b :: rs2) _ _); _) => //=.
   - clear Hbrs1.
     case/lastP: rs1 => [|rs r] /= in HSrs1 H *.
       by constructor; constructor.
@@ -485,7 +517,7 @@ Record SplitInterval (i i1 i2 : IntervalDesc) (before : nat) : Prop := {
   _ : iend i = iend i2
 }.
 
-Definition SubIntervalsOf `(i : Interval d) (before : nat) :=
+Definition SubIntervalsOf (d : IntervalDesc) (before : nat) :=
   { p : IntervalSig * IntervalSig
   | let: (i1, i2) := p in SplitInterval d i1.1 i2.1 before }.
 
@@ -494,7 +526,7 @@ Definition SubIntervalsOf `(i : Interval d) (before : nat) :=
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
 Definition splitInterval `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg i < before <= iend i) : SubIntervalsOf i before.
+  (Hwithin : ibeg d < before <= iend d) : SubIntervalsOf d before.
 Proof.
   case: (splitKind (iknd i)) => [lknd rknd].
   case: (splitIntervalRanges i Hodd Hwithin)
@@ -505,8 +537,8 @@ Proof.
   have i2 :=
     @Interval_fromRanges (ivar i) _ (exist2 _ _ (r2 :: rs2) HSrs2 Hbrs2)
                          r2 rs2 refl_equal.
-  apply: exist _ (packInterval (intervalSetKind i1 lknd),
-                  packInterval (intervalSetKind i2 rknd)) _.
+  apply: ((packInterval (intervalSetKind i1 lknd),
+           packInterval (intervalSetKind i2 rknd)); _).
   by constructor; rewrite /= ?NE_last_from_list ?NE_head_from_list.
 Defined.
 

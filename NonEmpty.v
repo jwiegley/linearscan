@@ -1,5 +1,8 @@
 Require Import LinearScan.Ssr.
 
+Require Import Coq.Sorting.Sorted.
+Require Export Coq.Classes.RelationClasses.
+
 Generalizable All Variables.
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -194,6 +197,14 @@ Lemma NE_Forall_head : forall P (xs : NonEmpty A),
   NE_Forall P xs -> P (NE_head xs).
 Proof. induction xs; intros; inversion H0; assumption. Qed.
 
+Lemma NE_Forall_last : forall P (xs : NonEmpty A),
+  NE_Forall P xs -> P (NE_last xs).
+Proof.
+  intros. induction xs; simpl in *.
+    inversion H0. assumption.
+  apply IHxs. inversion H0. assumption.
+Qed.
+
 Section Membership.
 
 Fixpoint NE_member (z : A) (ne : NonEmpty A) : Prop :=
@@ -220,6 +231,35 @@ Inductive NE_StronglySorted : NonEmpty A -> Prop :=
   | NE_SSorted_sing a   : NE_StronglySorted (NE_Sing a)
   | NE_SSorted_cons a l : NE_StronglySorted l -> NE_Forall (R a) l
                             -> NE_StronglySorted (NE_Cons a l).
+
+Lemma NE_StronglySorted_to_list : forall xs,
+  NE_StronglySorted xs -> StronglySorted R (NE_to_list xs).
+Proof.
+  elim=> [x|x xs IHxs] /=.
+    by constructor; constructor.
+  move=> Hsort.
+  constructor.
+    apply: IHxs.
+    by inversion Hsort.
+  case: xs => [y|y ys] in IHxs Hsort *.
+    constructor.
+      inversion Hsort; subst.
+      by inversion H3.
+    by constructor.
+  constructor.
+    inversion Hsort; subst.
+    by inversion H3.
+  inversion Hsort; subst.
+  specialize (IHxs H2).
+  inversion IHxs.
+  rewrite -/NE_to_list.
+  inversion H3; subst.
+  have: forall a, R y a -> R x a.
+    move=> a Ha.
+    exact: transitivity H8 Ha.
+  move/List.Forall_impl.
+  exact.
+Qed.
 
 End Sorted.
 

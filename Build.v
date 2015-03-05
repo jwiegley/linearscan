@@ -285,8 +285,8 @@ Proof.
                end
      ; ups  := [:: upos ] |}.
 
-  apply: exist _ _ _.
-  apply: exist _ _ _.
+  apply: (_; _).
+  apply: (_; _).
    exact: rd.
    constructor=> /=.
    + move/eqP in Heqe; rewrite {}Heqe.
@@ -336,7 +336,7 @@ Proof.
   have res : { r1 : RangeSig | (b.*2.+1 <= rbeg r1.1 <= upos) &&
                                (rend r1.1 <= e.*2.+1) }.
     move: (NE_head range) => [r /andP [Hbeg Hend]].
-    case E: (upos < rbeg r.1).
+    case E: (upos < head_or_end r.1).
       pose r1 := Range_shift_down r.2 Hodd E.
       have Hr1: r1 = Range_shift_down r.2 Hodd E by [].
       exists r1.
@@ -345,7 +345,8 @@ Proof.
       by undoubled.
     move/negbT in E; rewrite -ltnNge /= in E.
     exists r.
-    by ordered.
+    move: (Range_proper r.2) => /=.
+    by case: (ups r.1) => [|? ?] /= in E *; ordered.
   move: res => [r1 /andP [/andP [? Hbeg2] ?]].
 
   (* Check whether our use position actually fits within the end of the
@@ -400,13 +401,13 @@ Proof. exact. Defined.
    jww (2015-03-01): Note that it should be provably impossible for an output
    variable to be seen here for the first time, unless it is not a member of
    the live out set. *)
-Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) (vid : nat) :
+Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) :
   IntMap (seq (VarInfo maxReg)) -> IntMap (PendingRanges b e).
 Proof.
-  apply: IntMap_foldl _ emptyIntMap => m vars.
+  apply: IntMap_foldlWithKey _ emptyIntMap => m vid vars.
   have c2 :=
     foldl (handleOutputVar H) None [seq k <- vars | varKind k == Output].
-  have c3 := foldl (handleVar H) c2 [seq k <- vars | varKind k == Input].
+  have c3 := foldl (handleVar H) c2 [seq k <- vars | varKind k != Output].
   case: c3 => [c3|]; last first.
     exact: m.
   exact: IntMap_insert vid c3 m.
@@ -420,12 +421,12 @@ Proof.
   exact: (x :: xs).
 Defined.
 
-Program Definition handleVars
+Definition handleVars
   (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos < e)
   `(ranges : IntMap (PendingRanges b e)) : IntMap (PendingRanges b e) :=
   let vars := IntMap_map extractVarInfo $
               IntMap_groupOn (@nat_of_varId maxReg) varRefs in
-  IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyVars Hlt _)
+  IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyVars Hlt)
                       (handleVars_onlyRanges Hlt) vars ranges.
 
 Definition reduceOp {b pos e} (block : blockType1) (op : opType1)

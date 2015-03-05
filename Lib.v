@@ -193,7 +193,7 @@ Definition list_membership {a : eqType} (l : seq a) :
       match l with
       | nil => nil
       | cons x xs =>
-          exist _ x (mem_head _ xs) :: map exist_in_cons (go xs)
+          (x; mem_head _ xs) :: map exist_in_cons (go xs)
       end in
   go l.
 
@@ -462,6 +462,9 @@ Definition oddnum := { n : nat | odd n }.
 
 Program Definition odd1 := exist odd 1 _.
 
+Lemma odd_gt1 : forall n, odd n -> n >= 1.
+Proof. by elim. Qed.
+
 Lemma odd_double_plus (n : nat) : odd n.*2.+1.
 Proof.
   elim: n => [|n IHn] //=.
@@ -479,28 +482,11 @@ Proof.
   exact/negPn.
 Qed.
 
-Lemma odd_negb_subn : forall x y, odd x -> odd y -> ~~ odd (x - y).
-Proof.
-  move=> x y Hx Hy.
-  (* elim: (x - y) => // [ IHx] in Hx *. *)
-  (* case: y => // [y] in Hy x Hx IHx *. *)
-  (* rewrite subnS subSn /=. *)
-  (* rewrite odd_sub. *)
-  (*   by rewrite negb_add Hx Hy. *)
-  admit.
-Qed.
-
 Lemma odd_minn : forall x y, odd x -> odd y -> odd (minn x y).
 Proof.
   move=> x y Hx Hy.
-  case E: (x < y).
-    rewrite minnE odd_sub; last exact: leq_subr.
-    rewrite Hx addTb.
-    exact: odd_negb_subn.
-  rewrite minnE odd_sub; last exact: leq_subr.
-  rewrite Hx addTb odd_sub.
-    by rewrite Hx Hy.
-  by ordered.
+  rewrite /minn.
+  by case: (x < y).
 Qed.
 
 Definition distance (n m : nat) : nat := if n < m then m - n else n - m.
