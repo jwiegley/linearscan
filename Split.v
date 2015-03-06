@@ -162,7 +162,7 @@ Proof.
   (* Is there a use position requiring a register in the second interval?  If
      yes, then split it again; otherwise, spill it. *)
 
-  case F: (firstUseReqReg i1.1) => [[splitPos2 Hodd2] |]; last first.
+  case: (firstUseReqReg i1.2) => [[[splitPos2 Hodd2] /= Hmid2] |]; last first.
     rewrite Hunh in st.
     move: (ScanState_newHandled st i1.2) => /=.
     rewrite /= => {st} st.
@@ -170,6 +170,32 @@ Proof.
     apply Build_SSMorphHasLen => //.
     apply Build_SSMorphLen => //.
     by apply Build_SSMorph => //=.
+
+  case E: (ibeg i1.1 == splitPos2).
+    (* The second interval goes back on the unhandled list, to be processed in a
+       later iteration.  Note: this cannot change the head of the unhandled
+       list. *)
+    have := ScanState_newUnhandled st i1.2.
+    rewrite Hunh => /=.
+    case Hincr: (ibeg i1.1 <= beg).
+      move=> *.
+      exact: inl (ENoValidSplitPosition xid). (* ERROR *)
+    move/negbT in Hincr; rewrite -ltnNge in Hincr.
+    move/(_ Hincr).
+    rewrite /= => {st} st.
+
+    apply: inr (Some (packScanState st; _)).
+    apply Build_SSMorphHasLen.
+      apply Build_SSMorphLen.
+        apply Build_SSMorph.
+        by ordered.
+      by rewrite /= insert_size /=.
+    by rewrite /= insert_size /=.
+
+  have Hmid3 : ibeg i1.1 < splitPos2 <= iend i1.1.
+    move/andP: Hmid2 => [Hmid2 ?].
+    move/(leq_eqF E) in Hmid2.
+    by ordered.
 
   (* Wimmer: "All active and inactive intervals for this register intersecting
      with current are split before the start of current and spilled to the
@@ -180,9 +206,7 @@ Proof.
      use positions, and the second split children are sorted into the
      unhandled list.  They get a register assigned when the allocator advances
      to the start position of these intervals." *)
-  symmetry in F.
-  move: (firstUseReqReg_spec F) => Hmid2.
-  case: (splitInterval i1.2 Hodd2 Hmid2)
+  case: (splitInterval i1.2 Hodd2 Hmid3)
     => [[i1_0 i1_1] [/= H1_1 H2_1 H3_1]] //.
 
   (* The second interval goes back on the unhandled list, to be processed in a
@@ -191,7 +215,7 @@ Proof.
   have := ScanState_newUnhandled st i1_1.2.
   rewrite Hunh => /=.
   have Hincr: (beg < ibeg i1_1.1).
-    clear -Hmid Hmid2 H1 H2 H3 H1_1 H2_1 H3_1 Hunh Hbeg.
+    clear -Hmid Hmid2 Hmid3 H1 H2 H3 H1_1 H2_1 H3_1 Hunh Hbeg.
     move: (Interval_bounded i1_0.2) => ?.
     rewrite H2_1 in Hmid2.
     rewrite /= in Hbeg.

@@ -119,9 +119,33 @@ Definition intervalEnd   `(Interval i) : nat := iend i.
 Arguments intervalStart [i] _ /.
 Arguments intervalEnd [i] _ /.
 
-(* jww (2015-02-28): This may need revisiting. *)
-Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
+Definition isWithin (int : IntervalDesc) (vid : nat) (knd : VarKind)
+  (opid : nat) : bool :=
+  [&& ivar int == vid
+  ,   ibeg int <= opid
+  &   if knd is Input
+      then opid <= iend int
+      else opid < iend int
+  ].
+
+Definition posWithinInterval `(i : Interval d) (pos : nat) : bool :=
   intervalStart i <= pos < intervalEnd i.
+Arguments posWithinInterval [d] i pos /.
+
+Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
+  let within r :=
+      (* If the [Range] has input variables at its end, then the end position
+         is considered covered by the range, since a split there will result
+         in the need to save and restore those inputs. *)
+      if [seq u <- ups r.1
+         | (uloc u == rend r.1) && (uvar u == Input)] isn't nil
+      then rbeg r.1 < pos <= rend r.1
+      else rbeg r.1 < pos <  rend r.1 in
+  let fix go rs := match rs with
+      | NE_Sing r     => within r
+      | NE_Cons r rs' => within r || go rs'
+      end in
+  go (rds d).
 Arguments intervalCoversPos [d] i pos /.
 
 (* This lemma proves that if an [Interval] is formed from the list of ranges,
@@ -234,12 +258,11 @@ Definition intervalIntersectionPoint `(Interval i) `(Interval j) :
     None (rds i).
 
 Definition searchInRange (r : RangeSig) (f : UsePos -> bool) :
-  option { r' : RangeSig & { u : UsePos | u \in ups r'.1 } }.
+  option { u : UsePos | u \in ups r.1 }.
 Proof.
   case: (findRangeUsePos r.2 f) => [x|];
     last exact: None.
-  apply: Some _.
-  by exists r.
+  exact: Some _.
 Defined.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
@@ -247,27 +270,67 @@ Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   NE_foldl f [::] (rds d).
 Arguments allUsePos d /.
 
-Definition findIntervalUsePos (d : IntervalDesc) (f : UsePos -> bool) :
-  option { r' : RangeSig & { u : UsePos | u \in ups r'.1 } } :=
-  let fix go rs := match rs with
-      | NE_Sing r     => searchInRange r f
-      | NE_Cons r rs' => option_choose (searchInRange r f) (go rs')
-      end in
-  go (rds d).
+Definition findIntervalUsePos `(i : Interval d) (f : UsePos -> bool) :
+  option { r' : RangeSig & { u : UsePos | u \in ups r'.1
+                                        & ibeg d <= u <= iend d } }.
+Proof.
+  move: (Interval_exact_beg i).
+  move: (Interval_exact_end i) => /=.
+  destruct d.
+  elim: rds0 => [r|r rs IHrs] /= i H1 H2 in i *.
+    move: (searchInRange r f) => [[u Hin]|]; last first.
+      exact: None.
+    apply: Some _.
+    exists r.
+    exists u.
+      assumption.
+    move: (Range_proper r.2) => Hproper.
+    rewrite /validRangeBounds -H1 -H2 in Hproper.
+    elim: (ups r.1) => //= [x xs IHxs] in Hin Hproper *.
+    case: (uvar x) in Hproper;
+    case E: (uloc u == uloc x);
+    first
+      [ move/eqP in E; rewrite E;
+        by ordered
+      | rewrite in_cons in Hin;
+        move/orP: Hin => [Hin|Hin];
+        [ move/eqP in Hin;
+          destruct u; destruct x; simpl in *;
+          inversion Hin;
+          by rewrite H0 eq_refl in E
+        | apply: (IHxs Hin);
+          case: xs => [|? ?] in IHxs Hin Hproper *;
+          by ordered ] ].
+  move: (searchInRange r f) => [[u Hin]|]; last first.
+    apply: IHrs => //=.
+      move/intervalUncons: i => [? i].
+      admit.
+    admit.
+  clear IHrs.
+  apply: Some _.
+  exists r.
+  exists u.
+    assumption.
+  admit.
+Defined.
 
-Definition lookupUsePos (d : IntervalDesc) (f : UsePos -> bool) : option oddnum.
-  case: (findIntervalUsePos d f) => [[r [u Hin]]|];
+Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
+  option { u : oddnum | ibeg d <= u.1 <= iend d }.
+  case: (findIntervalUsePos i f) => [[r [u Hin]]|];
     last exact: None.
   move: (Range_uses_odd r.2).
-  move/allP => /(_ u Hin) /= Hodd.
+  move/allP => /(_ u Hin) /= Hodd H.
   apply: Some _.
-  by exists u.
+  exists (uloc u; Hodd).
+  exact: H.
 Defined.
-Arguments lookupUsePos d f /.
+Arguments lookupUsePos [d] i f /.
 
-Definition nextUseAfter (d : IntervalDesc) (pos : nat) : option oddnum :=
-  lookupUsePos d (fun u => pos < uloc u).
-Arguments nextUseAfter d pos /.
+Definition nextUseAfter `(i : Interval d) (pos : nat) : option oddnum :=
+  if lookupUsePos i (fun u => pos < uloc u) is Some (n; _)
+  then Some n
+  else None.
+Arguments nextUseAfter [d] i pos /.
 
 Definition rangeFirstUsePos (rd : RangeDesc) : option nat :=
   if ups rd is u :: _
@@ -298,20 +361,12 @@ Definition afterLifetimeHole (d : IntervalDesc) (pos : oddnum) : oddnum :=
   go (rds d).
 Arguments afterLifetimeHole d pos /.
 
-Definition firstUseReqReg (d : IntervalDesc) : option oddnum :=
-  lookupUsePos d regReq.
-Arguments firstUseReqReg d /.
-
-Lemma firstUseReqReg_spec (d : IntervalDesc) : forall pos,
-  Some pos = firstUseReqReg d -> ibeg d < pos.1 <= iend d.
-Proof.
-  move=> pos H.
-  case: d => [? ? ? ? ?] /= in pos H *.
-  admit.
-Qed.
+Definition firstUseReqReg `(i : Interval d) :
+  option { u : oddnum | ibeg d <= u.1 <= iend d } := lookupUsePos i regReq.
+Arguments firstUseReqReg [d] i /.
 
 Program Definition firstUseReqRegOrEnd `(i : Interval d) : oddnum :=
-  if firstUseReqReg d is Some n
+  if firstUseReqReg i is Some n
   then n
   else if odd (iend d)
        then iend d
@@ -554,7 +609,23 @@ Definition SubIntervalsOf (d : IntervalDesc) (before : nat) :=
 Definition splitInterval `(i : Interval d) `(Hodd : odd before)
   (Hwithin : ibeg d < before <= iend d) : SubIntervalsOf d before.
 Proof.
-  case: (splitKind (iknd i)) => [lknd rknd].
+  (* If before falls within a lifetime hole for the interval, then splitting
+     at that position results in two intervals that are not connected by any
+     need ato save and restore variables. *)
+  case: (if intervalCoversPos i before
+         then splitKind (iknd i)
+         else (match iknd i with
+               | Whole     => Whole
+               | LeftMost  => Whole
+               | Middle    => RightMost
+               | RightMost => RightMost
+               end,
+               match iknd i with
+               | Whole     => Whole
+               | LeftMost  => LeftMost
+               | Middle    => LeftMost
+               | RightMost => Whole
+               end)) => [lknd rknd].
   case: (splitIntervalRanges i Hodd Hwithin)
     => [[[[|r1 rs1] HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // [? ? ?].
   have i1 :=

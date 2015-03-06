@@ -529,14 +529,6 @@ Lemma foldl_cons : forall a (x : a) xs,
     = foldl (fun us : seq a => cons^~ us) [::] [:: x & xs].
 Proof. by move=> a x; elim. Qed.
 
-(* Lemma foldl_cat_cons : forall a (xs ys : seq a), *)
-(*   foldl (fun us => cons^~ us) [::] xs ++ foldl (fun us => cons^~ us) [::] ys *)
-(*     = foldl (fun us => cons^~ us) [::] (xs ++ ys). *)
-(* Proof. *)
-(*   move=> a xs ys. *)
-(*   elim: xs => //= [x xs IHxs] in ys *. *)
-(*   rewrite foldl_cons. *)
-
 Definition foldr_with_index
   {A B : Type} (f : nat -> A -> B -> B) (b : B) (v : seq A) : B :=
   let fix go n xs z :=
@@ -564,6 +556,16 @@ Fixpoint mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
 Example ex_mapAccumL_1 :
   mapAccumL (fun n x => (n.+1, x.+2)) 0 [:: 1; 2; 3] == (3, [:: 3; 4; 5]).
 Proof. reflexivity. Qed.
+
+Definition getBy {a} (p : a -> bool) (xs : seq a) : option a :=
+  forFold None xs $ fun acc x =>
+    match acc with
+    | Some y => Some y
+    | None =>
+      if p x
+      then Some x
+      else None
+    end.
 
 Definition sumlist : seq nat -> nat := foldl addn 0.
 

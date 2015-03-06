@@ -7,6 +7,7 @@ Require Import LinearScan.IntMap.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
+Require Import LinearScan.Allocate.
 Require Import LinearScan.State.
 
 Set Implicit Arguments.
@@ -66,6 +67,7 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
   y' <-- y ;;
   pure (x', y').
 
+(*
 Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
   AssnState (seq opType2 * seq opType2) :=
   if @varId maxReg v isn't inr vid then pure ([::], [::]) else
@@ -111,36 +113,14 @@ Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
     | Output, Middle,    _,     true  => pairM (pure [::]) msave
     | _,      _,         _,     _     => pure ([::], [::])
     end.
+*)
 
-Definition collectAllocs opid outs ints acc v :=
-  if @varId maxReg v isn't inr vid then pure acc else
-  let v_ints := [seq x <- ints | isWithin (fst x) vid (varKind v) opid] in
-  forFoldM acc v_ints $ fun acc' x =>
-    match x
-    return AssnState (seq (VarId * PhysReg) *
-                      seq opType2 * seq opType2) with
-    | (int, reg) =>
-      let: (allocs', restores', saves') := acc' in
-      res <-- savesAndRestores opid v reg int outs ;;
-      let: (rs, ss) := res in
-      pure ((vid, reg) :: allocs', rs ++ restores', ss ++ saves')
-    end.
-
-Definition doAllocations ints outs op : AssnState (seq opType2) :=
-  assn <-- get ;;
-  let opid := assnOpId assn in
-  let vars := opRefs oinfo op in
-  res <-- forFoldM ([::], [::], [::]) vars $
-            collectAllocs opid outs ints ;;
-  let: (allocs, restores, saves) := res in
-  let op' := applyAllocs oinfo op allocs in
-  (* With lenses, this would just be: assnOpId += 2 *)
-  modify (fun assn' =>
-            {| assnOpId     := opid.+2
-             ; assnBlockBeg := assnBlockBeg assn'
-             ; assnBlockEnd := assnBlockEnd assn'
-             ; assnAcc      := assnAcc assn' |}) ;;
-  pure $ restores ++ op' ++ saves.
+Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
+  seq (VarId * PhysReg) :=
+  if @varId maxReg v isn't inr vid then [::] else
+  if lookupInterval vid (varKind v) opid allocs is Some alloc
+  then [:: (vid, intReg alloc)]
+  else [::].
 
 Definition generateMoves
   (moves : seq (option (PhysReg + nat) * option (PhysReg + nat))) :
@@ -163,6 +143,34 @@ Definition generateMoves
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
 
+Definition doAllocations (allocs : seq (Allocation maxReg)) op :
+  AssnState (seq opType2) :=
+  assn <-- get ;;
+  let opid := assnOpId assn in
+  let vars := opRefs oinfo op in
+  let hereAllocs := concat $ map (varAllocs opid allocs) vars in
+  let transitions :=
+      foldl (fun acc v =>
+        if @varId maxReg v isn't inr vid
+        then acc
+        else if checkIntervalBoundary allocs opid opid.+2 vid true
+               is Some trans
+             then (varKind v, trans) :: acc
+             else acc) [::] vars in
+  let generator k :=
+      generateMoves [seq (Some (fst (snd x)), Some (snd (snd x)))
+                    | x <- transitions & fst x == k] in
+  inputs  <-- generator Input ;;
+  outputs <-- generator Output ;;
+  let op' := applyAllocs oinfo op hereAllocs in
+  (* With lenses, this would just be: assnOpId += 2 *)
+  modify (fun assn' =>
+            {| assnOpId     := opid.+2
+             ; assnBlockBeg := assnBlockBeg assn'
+             ; assnBlockEnd := assnBlockEnd assn'
+             ; assnAcc      := assnAcc assn' |}) ;;
+  pure $ inputs ++ op' ++ outputs.
+
 Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
@@ -177,7 +185,7 @@ Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   let opsm'' := opsm' ++ emoves in
   pure opsm''.
 
-Definition considerOps (f : IntSet -> opType1 -> AssnState (seq opType2))
+Definition considerOps (f : opType1 -> AssnState (seq opType2))
   (liveSets : IntMap BlockLiveSets) mappings :=
   mapM $ fun blk =>
     (* First apply all allocations *)
@@ -194,21 +202,19 @@ Definition considerOps (f : IntSet -> opType1 -> AssnState (seq opType2))
                ; assnBlockBeg := assnOpId assn + (size opsb).*2
                ; assnBlockEnd := assnOpId assn + (size opsb + size opsm).*2
                ; assnAcc      := assnAcc assn |}) ;;
-    opsb' <-- concatMapM (f outs) opsb ;;
-    opsm' <-- concatMapM (f outs) opsm ;;
-    opse' <-- concatMapM (f outs) opse ;;
+    opsb' <-- concatMapM f opsb ;;
+    opsm' <-- concatMapM f opsm ;;
+    opse' <-- concatMapM f opse ;;
     (* Insert resolving moves based on the mappings *)
     opsm'' <-- resolveMappings bid opsm' mappings ;;
     pure $ setBlockOps binfo blk opsb' opsm'' opse'.
 
-Definition assignRegNum `(st : ScanState InUse sd)
+Definition assignRegNum (allocs : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets) (mappings : IntMap (BlockMoves maxReg))
   (blocks : seq blockType1) (acc : accType) : seq blockType2 * accType :=
   let: (blocks', assn) :=
     considerOps
-      (doAllocations
-         [seq (getIntervalDesc (getInterval (fst x)), snd x)
-         | x <- allocations sd])
+      (doAllocations allocs)
       liveSets
       mappings
       blocks

@@ -132,9 +132,9 @@ Definition allocateBlockedReg {pre} :
                know that it is being used at the current position, then it
                cannot be spilled there, and so we try to take it out of the
                running by returning one. *)
-            match findIntervalUsePos int.1 atPos with
+            match findIntervalUsePos int.2 atPos with
             | Some _ => Some odd1
-            | None   => nextUseAfter int.1 start
+            | None   => nextUseAfter int.2 start
             end in
         updateRegisterPos v r pos' in
 
@@ -160,7 +160,7 @@ Definition allocateBlockedReg {pre} :
         | None   => false
         | Some n =>
             n.1 < if lookupUsePos current (fun u => pos <= uloc u)
-                    is Some nextUse
+                    is Some (nextUse; _)
                   then nextUse.1
                   else intervalEnd current
         end)
@@ -251,7 +251,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
     let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let ss := if intervalEnd i < pos
               then moveActiveToHandled st Hin
-              else if ~~ intervalCoversPos i pos
+              else if ~~ posWithinInterval i pos
                    then moveActiveToInactive st Hin
                    else exist2 _ _ z st (newSSMorphLen z) in
     match ss with
@@ -358,7 +358,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
          | exist2 sd' st' sslen' =>
              f sd' st' sslen' _
          end
-    else if intervalCoversPos i pos
+    else if posWithinInterval i pos
          then match moveInactiveToActive' st Hsub Hin with
               | inl err => inl err
               | inr (exist2 sd' st' (exist sslen' Hsub')) =>
@@ -486,5 +486,20 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
 
   (* jww (2015-01-20): Should be provably impossible *)
   else inl (EFuelExhausted, packScanState st).
+
+Record Allocation := {
+  intId  : nat;
+  intVal : IntervalDesc;
+  intReg : PhysReg
+}.
+
+Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
+  [seq {| intId  := nat_of_ord (fst x)
+        ; intVal := getIntervalDesc (getInterval (fst x))
+        ; intReg := snd x |} | x <- allocations sd].
+
+Definition lookupInterval (vid : nat) (knd : VarKind) (opid : nat) :
+  seq Allocation -> option Allocation :=
+  getBy (fun alloc => isWithin (intVal alloc) vid knd opid).
 
 End Allocate.
