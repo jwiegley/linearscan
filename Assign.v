@@ -71,7 +71,9 @@ Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
   seq (VarId * PhysReg) :=
   if @varId maxReg v isn't inr vid then [::] else
   if lookupInterval vid (varKind v) opid allocs is Some alloc
-  then [:: (vid, intReg alloc)]
+  then if intReg alloc is Some reg
+       then [:: (vid, reg)]
+       else [::]
   else [::].
 
 Definition generateMoves
@@ -99,51 +101,67 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   AssnState (seq opType2) :=
   assn <-- get ;;
   let opid := assnOpId assn in
-  let vars := opRefs oinfo op in
-  let hereAllocs := concat $ map (varAllocs opid allocs) vars in
+
+  let findIntervals b p f :=
+      if b then [::] else
+      [seq (let vid := ivar (intVal j) in f vid j)
+      | j <- [seq i <- allocs
+             | p i & if intReg i is Some _ then true else false ]] in
+
   (* Find all intervals for which this is the final operation, then pair them
      intervals beginning at the next operation for the same variable.  This is
      only done if we are not at the beginning or end of a block. *)
-  let atBoundary :=
-      (opid <= assnBlockBeg assn) || (assnBlockEnd assn <= opid) in
   let endingTransitions :=
-      if atBoundary then [::] else
-      [seq (let vid := ivar (intVal j) in
-            let mto_int :=
-                getBy (fun x => (ibeg (intVal x) == opid) &&
-                                (ivar (intVal x) == vid)) allocs in
-            checkIntervalBoundary (Some j) mto_int vid true)
-      | j <- [seq i <- allocs | iend (intVal i) == opid]] in
+      findIntervals (opid <= assnBlockBeg assn)
+        (fun i => iend (intVal i) == opid)
+        (fun vid j =>
+           if getBy (fun x => (ibeg (intVal x) == opid) &&
+                              (ivar (intVal x) == vid)) allocs
+             is Some to_int
+           then checkIntervalBoundary j to_int vid true
+           else None) in
   let edgeTransitions :=
-      if atBoundary then [::] else
-      [seq (Some (inr (ivar (intVal j)), inl (intReg j)))
-      | j <- [seq i <- allocs | (ibeg (intVal i) == opid) &&
-                                (iend (intVal i) == opid)]] in
+      findIntervals (opid <= assnBlockBeg assn)
+        (fun i => (ibeg (intVal i) == opid) &&
+                  (iend (intVal i) == opid))
+        (fun vid j =>
+           (Some (inr vid,
+            if intReg j is Some reg
+            then inl reg
+            else inr vid))) in
   let startingTransitions :=
-      if atBoundary then [::] else
-      [seq (let vid := ivar (intVal j) in
-            let mfrom_int :=
-                getBy (fun x => (iend (intVal x) == opid) &&
-                                (ivar (intVal x) == vid)) allocs in
-            checkIntervalBoundary mfrom_int (Some j) vid true)
-      | j <- [seq i <- allocs | ibeg (intVal i) == opid]] in
+      findIntervals (assnBlockEnd assn <= opid)
+        (fun i => ibeg (intVal i) == opid)
+        (fun vid j =>
+           if getBy (fun x => (iend (intVal x) == opid) &&
+                               (ivar (intVal x) == vid)) allocs
+             is Some from_int
+           then checkIntervalBoundary from_int j vid true
+           else None) in
+
   let generator k :=
       forFoldrM [::] k $ fun mx acc =>
         if mx is Some x
         then moves <-- generateMoves [:: (Some (fst x), Some (snd x))] ;;
              pure $ moves ++ acc
         else pure acc in
+
   closing <-- generator endingTransitions ;;
   edges   <-- generator edgeTransitions ;;
   opening <-- generator startingTransitions ;;
+
+  let vars := opRefs oinfo op in
+  let hereAllocs := concat $ map (varAllocs opid allocs) vars in
   let op' := applyAllocs oinfo op hereAllocs in
+
   (* With lenses, this would just be: assnOpId += 2 *)
   modify (fun assn' =>
             {| assnOpId     := opid.+2
              ; assnBlockBeg := assnBlockBeg assn'
              ; assnBlockEnd := assnBlockEnd assn'
              ; assnAcc      := assnAcc assn' |}) ;;
-  pure $ closing ++ edges ++ op' ++ opening.
+
+  pure $ closing ++ edges ++ opening ++ op'.
 
 Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the

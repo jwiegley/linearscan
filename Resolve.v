@@ -22,29 +22,23 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
-Definition checkIntervalBoundary
-  (mfrom_int mto_int : option (Allocation maxReg)) (vid : nat)
-  (checkIntervalKinds : bool) :
+Definition checkIntervalBoundary (from_int to_int : Allocation maxReg)
+  (vid : nat) (checkIntervalKinds : bool) :
   option (sum_eqType (ordinal_eqType maxReg) nat_eqType *
           sum_eqType (ordinal_eqType maxReg) nat_eqType) :=
   (* If the intervals match, no move resolution is necessary. *)
-  if option_map (@intId maxReg) mfrom_int ==
-     option_map (@intId maxReg) mto_int then None else
+  if intId from_int == intId to_int then None else
 
   let f mr := if mr is Some r then inl r else inr vid in
-  let sreg := f (option_map (@intReg maxReg) mfrom_int) in
-  let dreg := f (option_map (@intReg maxReg) mto_int) in
+  let sreg := f (intReg from_int) in
+  let dreg := f (intReg to_int) in
   if sreg == dreg
   then None
   else
     if checkIntervalKinds
     then
-      let fromk := if mfrom_int is Some i
-                   then iknd (intVal i)
-                   else Middle in
-      let tok   := if mto_int is Some i
-                   then iknd (intVal i)
-                   else Middle in
+      let fromk := iknd (intVal from_int) in
+      let tok   := iknd (intVal to_int) in
       if match fromk, tok with
          | LeftMost, RightMost => true
          | LeftMost, Middle    => true
@@ -59,22 +53,25 @@ Definition checkIntervalBoundary
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to mappings vid :=
   let mfrom_int := lookupInterval vid Output (blockLastOpId from) allocs in
-  let mto_int   := lookupInterval vid Input (blockFirstOpId to) allocs in
-  if checkIntervalBoundary mfrom_int mto_int vid false
-    isn't Some (sreg, dreg)
+  let mto_int   := lookupInterval vid Output (blockFirstOpId to) allocs in
+  if (mfrom_int, mto_int) isn't (Some from_int, Some to_int)
   then mappings
   else
-    let addToGraphs e xs :=
-        let: (gbeg, gend) := xs in
-        if in_from
-        then (gbeg, addEdge e gend)
-        else (addEdge e gbeg, gend) in
-    let f mxs :=
-        addToGraphs (Some sreg, Some dreg) $
-          if mxs is Some xs
-          then xs
-          else (emptyGraph, emptyGraph) in
-    IntMap_alter (@Some _ \o f) bid mappings.
+    if checkIntervalBoundary from_int to_int vid false
+      isn't Some (sreg, dreg)
+    then mappings
+    else
+      let addToGraphs e xs :=
+          let: (gbeg, gend) := xs in
+          if in_from
+          then (gbeg, addEdge e gend)
+          else (addEdge e gbeg, gend) in
+      let f mxs :=
+          addToGraphs (Some sreg, Some dreg) $
+            if mxs is Some xs
+            then xs
+            else (emptyGraph, emptyGraph) in
+      IntMap_alter (@Some _ \o f) bid mappings.
 
 Definition BlockMoves :=
   (Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType) *

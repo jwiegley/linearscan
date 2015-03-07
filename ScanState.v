@@ -68,21 +68,6 @@ Definition registerWithHighestPos :
          if n.1 < m.1 then (reg, Some m) else (r, Some n)
        end) (Ordinal registers_exist, Some odd1).
 
-Definition allocations (sd : ScanStateDesc) :=
-  foldl (fun acc p => if snd p is Some r then (fst p, r) :: acc else acc)
-        [::] (handled sd).
-
-Definition lookupRegister `(st : ScanState sd) intid : option PhysReg :=
-  forFold None (allocations sd) $ fun acc x =>
-    let: (xid, reg) := x in
-    match acc with
-    | Some r => Some r
-    | None =>
-      if xid == intid
-      then Some reg
-      else None
-    end.
-
 (** ** ScanState *)
 
 (** The [ScanState] inductive data type describes the allowable state
