@@ -114,6 +114,11 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
                                 (ivar (intVal x) == vid)) allocs in
             checkIntervalBoundary (Some j) mto_int vid true)
       | j <- [seq i <- allocs | iend (intVal i) == opid]] in
+  let edgeTransitions :=
+      if atBoundary then [::] else
+      [seq (Some (inr (ivar (intVal j)), inl (intReg j)))
+      | j <- [seq i <- allocs | (ibeg (intVal i) == opid) &&
+                                (iend (intVal i) == opid)]] in
   let startingTransitions :=
       if atBoundary then [::] else
       [seq (let vid := ivar (intVal j) in
@@ -129,6 +134,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
              pure $ moves ++ acc
         else pure acc in
   closing <-- generator endingTransitions ;;
+  edges   <-- generator edgeTransitions ;;
   opening <-- generator startingTransitions ;;
   let op' := applyAllocs oinfo op hereAllocs in
   (* With lenses, this would just be: assnOpId += 2 *)
@@ -137,7 +143,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
              ; assnBlockBeg := assnBlockBeg assn'
              ; assnBlockEnd := assnBlockEnd assn'
              ; assnAcc      := assnAcc assn' |}) ;;
-  pure $ closing ++ op' ++ opening.
+  pure $ closing ++ edges ++ op' ++ opening.
 
 Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
