@@ -34,6 +34,15 @@ Record AssnStateInfo := {
 
 Definition AssnState := State AssnStateInfo.
 
+Definition swapOpM sreg dreg : AssnState (seq opType2) :=
+  assn <-- get ;;
+  let: (mop, acc') := swapOp oinfo sreg dreg (assnAcc assn) in
+  put {| assnOpId     := assnOpId assn
+       ; assnBlockBeg := assnBlockBeg assn
+       ; assnBlockEnd := assnBlockEnd assn
+       ; assnAcc      := acc' |} ;;
+  pure mop.
+
 Definition moveOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- get ;;
   let: (mop, acc') := moveOp oinfo sreg dreg (assnAcc assn) in
@@ -70,89 +79,40 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
 Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
   seq (VarId * PhysReg) :=
   if @varId maxReg v isn't inr vid then [::] else
-  if lookupInterval vid (varKind v) opid allocs is Some alloc
-  then if intReg alloc is Some reg
-       then [:: (vid, reg)]
-       else [::]
-  else [::].
+  map (fun x => (vid, x)) $ catMaybes
+    [seq intReg i | i <- allocs
+    & let int := intVal i in
+      [&& ivar int == vid
+      ,   ibeg int <= opid
+      &   if varKind v is Input
+          then opid <= iend int
+          else opid <  iend int]].
 
-Definition generateMoves
-  (moves : seq (option (PhysReg + nat) * option (PhysReg + nat))) :
+Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   AssnState (seq opType2) :=
   forFoldrM [::] moves $ fun mv acc =>
     mops <-- match mv with
-      | (Some (inl sreg), Some (inl dreg)) =>
-          fmap (@Some _) $ moveOpM sreg dreg
-      | (Some (inl sreg), Some (inr vid)) =>
-          fmap (@Some _) $ saveOpM sreg (Some vid)
-      | (Some (inl sreg), None) => fmap (@Some _) $ saveOpM sreg None
-      | (Some (inr vid), Some (inl dreg)) =>
-          fmap (@Some _) $ restoreOpM (Some vid) dreg
-      | (None, Some (inl dreg)) => fmap (@Some _) $ restoreOpM None dreg
-        (* jww (2015-02-14): There are possibilities, like Some (inr sv), Some
-           (inr dv), which should be provably impossible, since no resolving
-           move for the same variable would ever both to copy from and to the
-           same stack location. *)
-      | (_, _) => pure None
+      | Swap    sreg dreg => fmap (@Some _) $ swapOpM sreg dreg
+      | Move    sreg dreg => fmap (@Some _) $ moveOpM sreg dreg
+      | Spill   sreg vid  => fmap (@Some _) $ saveOpM sreg (Some vid)
+      | Restore vid  dreg => fmap (@Some _) $ restoreOpM (Some vid) dreg
+      | Nop => pure None
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
 
 Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   AssnState (seq opType2) :=
   assn <-- get ;;
-  let opid := assnOpId assn in
+  let opid  := assnOpId assn in
+  let vars  := opRefs oinfo op in
+  let regs  := concat $ map (varAllocs opid allocs) vars in
+  let ops   := applyAllocs oinfo op regs in
 
-  let findIntervals b p f :=
-      if b then [::] else
-      [seq (let vid := ivar (intVal j) in f vid j)
-      | j <- [seq i <- allocs
-             | p i & if intReg i is Some _ then true else false ]] in
-
-  (* Find all intervals for which this is the final operation, then pair them
-     intervals beginning at the next operation for the same variable.  This is
-     only done if we are not at the beginning or end of a block. *)
-  let endingTransitions :=
-      findIntervals (opid <= assnBlockBeg assn)
-        (fun i => iend (intVal i) == opid)
-        (fun vid j =>
-           if getBy (fun x => (ibeg (intVal x) == opid) &&
-                              (ivar (intVal x) == vid)) allocs
-             is Some to_int
-           then checkIntervalBoundary j to_int vid true
-           else None) in
-  let edgeTransitions :=
-      findIntervals (opid <= assnBlockBeg assn)
-        (fun i => (ibeg (intVal i) == opid) &&
-                  (iend (intVal i) == opid))
-        (fun vid j =>
-           (Some (inr vid,
-            if intReg j is Some reg
-            then inl reg
-            else inr vid))) in
-  let startingTransitions :=
-      findIntervals (assnBlockEnd assn <= opid)
-        (fun i => ibeg (intVal i) == opid)
-        (fun vid j =>
-           if getBy (fun x => (iend (intVal x) == opid) &&
-                               (ivar (intVal x) == vid)) allocs
-             is Some from_int
-           then checkIntervalBoundary from_int j vid true
-           else None) in
-
-  let generator k :=
-      forFoldrM [::] k $ fun mx acc =>
-        if mx is Some x
-        then moves <-- generateMoves [:: (Some (fst x), Some (snd x))] ;;
-             pure $ moves ++ acc
-        else pure acc in
-
-  closing <-- generator endingTransitions ;;
-  edges   <-- generator edgeTransitions ;;
-  opening <-- generator startingTransitions ;;
-
-  let vars := opRefs oinfo op in
-  let hereAllocs := concat $ map (varAllocs opid allocs) vars in
-  let op' := applyAllocs oinfo op hereAllocs in
+  transitions <--
+    (if assnBlockBeg assn < opid < assnBlockEnd assn
+     then generateMoves
+            (determineMoves (resolvingMoves allocs opid opid.+2 false))
+     else pure [::]) ;;
 
   (* With lenses, this would just be: assnOpId += 2 *)
   modify (fun assn' =>
@@ -161,7 +121,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
              ; assnBlockEnd := assnBlockEnd assn'
              ; assnAcc      := assnAcc assn' |}) ;;
 
-  pure $ closing ++ edges ++ opening ++ op'.
+  pure $ ops ++ transitions.
 
 Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
@@ -170,10 +130,10 @@ Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
 
   let: (gbeg, gend) := graphs in
 
-  bmoves <-- generateMoves (topsort gbeg) ;;
+  bmoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gbeg)) ;;
   let opsm' := bmoves ++ opsm in
 
-  emoves <-- generateMoves (topsort gend) ;;
+  emoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gend)) ;;
   let opsm'' := opsm' ++ emoves in
   pure opsm''.
 

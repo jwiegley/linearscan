@@ -31,8 +31,6 @@ import qualified LinearScan.Utils
     s/_Blocks__//g; s/Blocks__//g;
     s/_MLS__MS__//g; s/MLS__MS__//g;
 
-    s/\| Spill/| Spill deriving (Prelude.Show, Prelude.Eq)/;
-
     s/morphlen_transport maxReg b b' =/morphlen_transport maxReg b b' = GHC.Base.id/;
 
     s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;

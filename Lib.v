@@ -31,6 +31,8 @@ Notation "p .2" := (proj2_sig p)
   (at level 2, left associativity, format "p .2").
 Notation "( x ; y )" := (exist _ x y).
 
+Definition isJust {a} (x : option a) := if x is Some _ then true else false.
+
 Definition option_map `(f : a -> b) (x : option a) : option b :=
   match x with
   | None => None
@@ -554,6 +556,12 @@ Example ex_foldr_with_index_1 :
   foldr_with_index (fun n x z => (n, x) :: z) nil [:: 1; 2; 3]
     == [:: (0, 1); (1, 2); (2, 3)].
 Proof. reflexivity. Qed.
+
+Definition catMaybes {a} (l : seq (option a)) : seq a :=
+  forFoldr [::] l $ fun mx rest =>
+    if mx is Some x
+    then x :: rest
+    else rest.
 
 Fixpoint mapAccumL {A X Y : Type} (f : A -> X -> (A * Y))
   (s : A) (v : seq X) : A * seq Y :=

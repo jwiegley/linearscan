@@ -3,6 +3,7 @@ Require Import LinearScan.Graph.
 Require Import LinearScan.IntMap.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
+Require Import LinearScan.ScanState.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Allocate.
@@ -22,62 +23,137 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
-Definition checkIntervalBoundary (from_int to_int : Allocation maxReg)
-  (vid : nat) (checkIntervalKinds : bool) :
-  option (sum_eqType (ordinal_eqType maxReg) nat_eqType *
-          sum_eqType (ordinal_eqType maxReg) nat_eqType) :=
-  (* If the intervals match, no move resolution is necessary. *)
-  if intId from_int == intId to_int then None else
+Record Allocation := {
+  intId  : nat;
+  intVal : IntervalDesc;
+  intReg : option PhysReg
+}.
 
-  let f mr := if mr is Some r then inl r else inr vid in
-  let sreg := f (intReg from_int) in
-  let dreg := f (intReg to_int) in
-  if sreg == dreg
-  then None
-  else
-    if checkIntervalKinds
-    then
-      let fromk := iknd (intVal from_int) in
-      let tok   := iknd (intVal to_int) in
-      if match fromk, tok with
-         | LeftMost, RightMost => true
-         | LeftMost, Middle    => true
-         | Middle,   Middle    => true
-         | Middle,   RightMost => true
-         | _,        _         => false
-         end
-      then Some (sreg, dreg)
-      else None
-    else Some (sreg, dreg).
+Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
+  [seq {| intId  := nat_of_ord (fst x)
+        ; intVal := getIntervalDesc (getInterval (fst x))
+        ; intReg := snd x |} | x <- handled sd].
 
-Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
-  bid in_from from to mappings vid :=
-  let mfrom_int := lookupInterval vid Output (blockLastOpId from) allocs in
-  let mto_int   := lookupInterval vid Output (blockFirstOpId to) allocs in
-  if (mfrom_int, mto_int) isn't (Some from_int, Some to_int)
-  then mappings
-  else
-    if checkIntervalBoundary from_int to_int vid false
-      isn't Some (sreg, dreg)
-    then mappings
-    else
-      let addToGraphs e xs :=
-          let: (gbeg, gend) := xs in
-          if in_from
-          then (gbeg, addEdge e gend)
-          else (addEdge e gbeg, gend) in
-      let f mxs :=
-          addToGraphs (Some sreg, Some dreg) $
-            if mxs is Some xs
-            then xs
-            else (emptyGraph, emptyGraph) in
-      IntMap_alter (@Some _ \o f) bid mappings.
+Definition RawResolvingMove := (option PhysReg * option PhysReg)%type.
+
+Inductive ResolvingMove :=
+  | Move of PhysReg & PhysReg
+  | Swap of PhysReg & PhysReg
+  | Spill of PhysReg & VarId
+  | Restore of VarId & PhysReg
+  | Nop.
+
+Definition determineMove vid (x : RawResolvingMove) : ResolvingMove :=
+  match x with
+  | (Some x, Some y) => Move x y
+  | (Some x, None)   => Spill x vid
+  | (None,   Some y) => Restore vid y
+  | (None,   None)   => Nop
+  end.
+
+Definition prepareForGraph vid (x : RawResolvingMove) :
+  option (sum_eqType (ordinal_eqType maxReg) nat_eqType) *
+  option (sum_eqType (ordinal_eqType maxReg) nat_eqType) :=
+  match x with
+  | (Some x, Some y) => (Some (inl x), Some (inl y))
+  | (Some x, None)   => (Some (inl x), Some (inr vid))
+  | (None,   Some y) => (Some (inr vid), Some (inl y))
+  | (None,   None)   => (Some (inr vid), Some (inr vid))
+  end.
+
+Definition moveFromGraph
+  (mv : option (sum_eqType (ordinal_eqType maxReg) nat_eqType) *
+        option (sum_eqType (ordinal_eqType maxReg) nat_eqType)) :
+  ResolvingMove :=
+  match mv with
+  | (Some (inl x), Some (inl y)) => Move x y
+  | (Some (inl x), Some (inr y)) => Spill x y
+  | (Some (inr x), Some (inl y)) => Restore x y
+  | _ => Nop
+  end.
+
+Definition determineMoves (moves : IntMap RawResolvingMove) :
+  seq ResolvingMove :=
+  let graph := forFold emptyGraph (IntMap_toList moves) $ fun g mv =>
+                 addEdge (prepareForGraph (fst mv) (snd mv)) g in
+  map moveFromGraph (topsort graph).
+
+(* Assuming a transition [from] one point in the procedure [to] another --
+   where these two positions may be contiguous, or connected via a branch --
+   determining the set of resolving moves necessary to maintain a consist view
+   of the registers and stack between the two positions.
+
+   For example, if at [from] variable v3 is in register 3, and at [to] it is
+   in register 2, this would generate a resolving move from 3 -> 2.  Moves
+   will always be one of four types:
+
+    - A move from one register to another
+    - A move from the stack to a register
+    - A move from a register to the stack
+    - A swap between two registers *)
+Definition resolvingMoves (allocs : seq Allocation) (from to : nat)
+  (checkIntervalKinds : bool) :
+  IntMap RawResolvingMove :=
+
+  (* First determine all of the variables which are live at [from] *at the end
+     of that instruction*, either in registers or on the stack.  Then gather
+     the variables live at [to] *at the beginning of that instruction*. *)
+  let liveAtFrom :=
+      IntMap_fromList [seq (ivar (intVal i), i) | i <- allocs
+                      & ibeg (intVal i) <= from < iend (intVal i)] in
+  let liveAtTo :=
+      IntMap_fromList [seq (ivar (intVal i), i) | i <- allocs
+                      & ibeg (intVal i) <= to <= iend (intVal i)] in
+
+    (* if checkIntervalKinds *)
+    (* then *)
+    (*   let fromk := iknd (intVal from_int) in *)
+    (*   let tok   := iknd (intVal to_int) in *)
+    (*   if match fromk, tok with *)
+    (*      | LeftMost, RightMost => true *)
+    (*      | LeftMost, Middle    => true *)
+    (*      | Middle,   Middle    => true *)
+    (*      | Middle,   RightMost => true *)
+    (*      | _,        _         => false *)
+    (*      end *)
+    (*   then Some (sreg, dreg) *)
+    (*   else None *)
+
+  IntMap_mergeWithKey
+    (fun vid x y =>
+       if intReg x == intReg y
+       then None
+       else Some (intReg x, intReg y))
+    (fun _ => emptyIntMap)
+    (fun _ => emptyIntMap)
+    liveAtFrom liveAtTo.
+
+Definition checkBlockBoundary (allocs : seq Allocation)
+  bid in_from from to liveIn mappings :=
+  let select acc vid x := if IntSet_member vid liveIn
+                          then (vid, x) :: acc
+                          else acc in
+  let moves := IntMap_foldlWithKey select [::] $
+               resolvingMoves allocs (blockLastOpId from)
+                                     (blockFirstOpId to) false in
+  forFold mappings moves $ fun ms mv =>
+    let addToGraphs e xs :=
+        let: (gbeg, gend) := xs in
+        if in_from
+        then (gbeg, addEdge e gend)
+        else (addEdge e gbeg, gend) in
+    let f mxs :=
+        addToGraphs (prepareForGraph (fst mv) (snd mv)) $
+          if mxs is Some xs
+          then xs
+          else (emptyGraph, emptyGraph) in
+    IntMap_alter (@Some _ \o f) bid ms.
 
 Definition BlockMoves :=
   (Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType) *
    Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType))%type.
 
-Definition resolveDataFlow (allocs : seq (Allocation maxReg))
+Definition resolveDataFlow (allocs : seq Allocation)
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
   IntMap BlockMoves :=
   (* for each block from in blocks do
@@ -117,8 +193,7 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
         (* jww (2015-01-28): Failure here should be impossible *)
         if IntMap_lookup s_bid liveSets isn't Some to then ms else
         let key := if in_from then bid else s_bid in
-        IntSet_forFold ms (blockLiveIn to) $
-          checkBlockBoundary allocs key in_from from to)
+        checkBlockBoundary allocs key in_from from to (blockLiveIn to) ms)
     (blockSuccessors binfo b).
 
 End Resolve.

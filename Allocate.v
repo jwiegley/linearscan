@@ -498,19 +498,4 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
   (* jww (2015-01-20): Should be provably impossible *)
   else inl (EFuelExhausted, packScanState st).
 
-Record Allocation := {
-  intId  : nat;
-  intVal : IntervalDesc;
-  intReg : option PhysReg
-}.
-
-Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
-  [seq {| intId  := nat_of_ord (fst x)
-        ; intVal := getIntervalDesc (getInterval (fst x))
-        ; intReg := snd x |} | x <- handled sd].
-
-Definition lookupInterval (vid : nat) (knd : VarKind) (opid : nat) :
-  seq Allocation -> option Allocation :=
-  getBy (fun alloc => isWithin (intVal alloc) vid knd opid).
-
 End Allocate.

@@ -39,26 +39,6 @@ Definition splitKind (k : IntervalKind) : IntervalKind * IntervalKind :=
   | RightMost => (Middle, RightMost)
   end.
 
-Definition mergeKind (k1 k2 : IntervalKind) : IntervalKind :=
-  match k1, k2 with
-  | Whole,     Whole     => Whole
-  | Whole,     LeftMost  => LeftMost
-  | Whole,     Middle    => Middle
-  | Whole,     RightMost => RightMost
-  | LeftMost,  Whole     => LeftMost
-  | LeftMost,  LeftMost  => LeftMost
-  | LeftMost,  Middle    => LeftMost
-  | LeftMost,  RightMost => Whole
-  | Middle,    Whole     => Middle
-  | Middle,    LeftMost  => LeftMost
-  | Middle,    Middle    => Middle
-  | Middle,    RightMost => RightMost
-  | RightMost, Whole     => RightMost
-  | RightMost, LeftMost  => Whole
-  | RightMost, Middle    => RightMost
-  | RightMost, RightMost => RightMost
-  end.
-
 Record IntervalDesc : Set := {
   (* The [varId] is simply a number that refers to the variable for which this
      interval was created.  This number must be maintained by the caller, and

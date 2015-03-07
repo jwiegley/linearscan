@@ -11,6 +11,8 @@ Arguments getIntMap [a] _.
 
 Definition emptyIntMap {a} := @getIntMap a [::].
 
+Definition IntMap_fromList := getIntMap.
+
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
    [Data.IntMap]. *)
@@ -41,6 +43,12 @@ Definition IntMap_insert : forall a, nat -> a -> IntMap a -> IntMap a :=
 Definition IntMap_map {a b} (f : a -> b) (m : IntMap a) : IntMap b :=
   let: getIntMap xs := m in
   getIntMap (map (fun x => (fst x, f (snd x))) xs).
+
+Definition IntMap_mapWithKey {a b} (f : nat -> a -> b) (m : IntMap a) :
+  IntMap b :=
+  let: getIntMap xs := m in
+  let f k x rest := (fst x, f k (snd x)) :: rest in
+  getIntMap (foldr_with_index f [::] xs).
 
 (* The implementation of this function is in LinearScan.Utils.hs *)
 Definition IntMap_mergeWithKey' {a b c}
