@@ -352,7 +352,7 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
         LS.ERegistersExhausted _ ->
             "No registers available for allocation"
         LS.ENoValidSplitPosition _ ->
-            "No valid split position could be found"
+            "No split position could be found"
         LS.ECannotSplitSingleton1 n ->
             "Current interval is a singleton (err#1) (" ++ show n ++ ")"
         LS.ECannotSplitSingleton2 n ->

@@ -213,6 +213,31 @@ Proof.
   by inv H; inv H3.
 Qed.
 
+Lemma Forall_rcons_inv : forall a P (x : a) xs,
+  List.Forall P (rcons xs x) -> List.Forall P xs /\ P x.
+Proof.
+  move=> a P x.
+  elim=> [|y ys IHys] /=.
+    by invert.
+  invert.
+  specialize (IHys H2).
+  inversion IHys.
+  split=> //.
+  constructor=> //.
+Qed.
+
+Lemma Forall_last : forall A P (x : A) xs,
+  List.Forall P (x :: xs) -> P (last x xs).
+Proof.
+  move=> A P x.
+  elim/last_ind=> /= [|ys y IHys] H.
+    by inv H.
+  inv H.
+  rewrite last_rcons.
+  apply Forall_rcons_inv in H3.
+  by inv H3.
+Qed.
+
 Lemma Forall_append : forall A (P : A -> Prop) xs ys,
    List.Forall P xs /\ List.Forall P ys <-> List.Forall P (xs ++ ys).
 Proof.
@@ -237,19 +262,6 @@ Proof.
     by move/IHxs: H3 => [? ?].
   inversion H; subst.
   by move/IHxs: H3 => [? ?].
-Qed.
-
-Lemma Forall_rcons_inv : forall a P (x : a) xs,
-  List.Forall P (rcons xs x) -> List.Forall P xs /\ P x.
-Proof.
-  move=> a P x.
-  elim=> [|y ys IHys] /=.
-    by invert.
-  invert.
-  specialize (IHys H2).
-  inversion IHys.
-  split=> //.
-  constructor=> //.
 Qed.
 
 Lemma StronglySorted_inv_app : forall a R (l1 l2 : seq a),
@@ -787,6 +799,22 @@ Proof.
     by rewrite E.
   move/negbT/H2 in E.
   exact: (@Forall_ordered _ R H x y ys E H1).
+Qed.
+
+Lemma StronglySorted_impl_cons : forall a (R : a -> a -> bool) `{Transitive _ R}
+  x y (ys : seq a), StronglySorted R (x :: y :: ys) -> R x (last y ys).
+Proof.
+  move=> a R H x y ys Hsort.
+  elim: ys => [|z zs IHzs] /= in x y Hsort *.
+    by inv Hsort; inv H3.
+  apply: IHzs.
+  inv Hsort; inv H2; inv H4.
+  constructor=> //.
+    constructor=> //.
+  inv H3; inv H5.
+  constructor=> //.
+    exact: transitivity H4 H3.
+  exact: (Forall_ordered H4).
 Qed.
 
 Lemma sortBy_sorted : forall a (R : a -> a -> bool) `{Transitive _ R} xs,

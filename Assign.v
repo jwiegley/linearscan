@@ -105,7 +105,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
      intervals beginning at the next operation for the same variable.  This is
      only done if we are not at the beginning or end of a block. *)
   let atBoundary :=
-      (assnBlockBeg assn == opid) || (opid == assnBlockEnd assn) in
+      (opid <= assnBlockBeg assn) || (assnBlockEnd assn <= opid) in
   let endingTransitions :=
       if atBoundary then [::] else
       [seq (let vid := ivar (intVal j) in
@@ -181,7 +181,12 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
     opse' <-- concatMapM f opse ;;
     (* Insert resolving moves based on the mappings *)
     opsm'' <-- resolveMappings bid opsm' mappings ;;
-    pure $ setBlockOps binfo blk opsb' opsm'' opse'.
+    match opsb', opse' with
+    | b :: bs, e :: es =>
+        pure $ setBlockOps binfo blk
+          [:: b] (bs ++ opsm'' ++ belast e es) [:: last e es]
+    | _, _ => pure $ setBlockOps binfo blk opsb' opsm'' opse'
+    end.
 
 Definition assignRegNum (allocs : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets) (mappings : IntMap (BlockMoves maxReg))

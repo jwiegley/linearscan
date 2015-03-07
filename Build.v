@@ -199,6 +199,61 @@ Proof.
   by apply/orP; left.
 Defined.
 
+Program Fixpoint rangesToBoundedRanges {b e} (y : RangeSig) (ys : seq RangeSig)
+  (H1 : StronglySorted range_ltn (y :: ys)) (H2 : b.*2.+1 <= rbeg y.1)
+  (Hbound : last (rend y.1) [seq rend r.1 | r <- ys] <= e.*2.+1) :
+  NonEmpty (BoundedRange b.*2.+1 e.*2.+1) :=
+  match ys with
+  | nil => NE_Sing y
+  | cons z zs =>
+      NE_Cons y (@rangesToBoundedRanges b e z zs _ _ _)
+  end.
+Obligation 2.
+  rewrite /= in Hbound.
+  by ordered.
+Qed.
+Obligation 4.
+  apply/andP; split=> //.
+  apply StronglySorted_impl_cons in H1;
+    last exact: range_ltn_trans.
+  move: H1 Hbound.
+  rewrite [(z; H)]lock.
+  rewrite /range_ltn map_comp (last_map rend) /= last_map -lock /=.
+  move: (Range_bounded (last (z; H) zs).2).
+  by ordered.
+Qed.
+Obligation 5.
+  by inv H1.
+Qed.
+Obligation 6.
+  inv H1; inv H6.
+  rewrite /range_ltn /= in H4.
+  move: (Range_bounded H0).
+  by ordered.
+Qed.
+
+Definition compressPendingRanges `(ranges : PendingRanges b e) (H : b <= e) :
+  PendingRanges b e.
+Proof.
+  case: ranges => [r|r rs].
+    exact: [::: r].
+  pose Hsort := sortBy_sorted [::: r & rs] BoundedRange_leq_antisym.
+  specialize (Hsort BoundedRange_leq_trans).
+  rewrite NE_to_list_from_list /= in Hsort.
+  move: (compilePendingRanges H Hsort) => [[srs1 H1 H2] Hbound /= H3].
+  clear -srs1 H1 H2 H3 Hbound.
+  case E: (insert BoundedRange_leq r (sortBy BoundedRange_leq rs))
+    => [|x xs] in H3 *.
+    move: E.
+    set xs := insert _ _ _.
+    move=> E.
+    have E1 : size xs = size [::] by rewrite E.
+    by rewrite insert_size /= in E1.
+  destruct srs1 as [|y ys]; simpl in *.
+    contradiction H3.
+  exact: (rangesToBoundedRanges H1 H2 Hbound).
+Defined.
+
 Definition mergeIntoSortedRanges `(H : b <= e)
   (pmap : IntMap (PendingRanges b e)) (rmap : IntMap (SortedRanges e.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
@@ -206,8 +261,7 @@ Proof.
   apply: (IntMap_mergeWithKey _ _ _ pmap rmap).
   - (* The combining function, when entries are present in both maps. *)
     move=> _ brs srs2.
-    pose sbrs := sortBy BoundedRange_leq brs.
-    pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
+    pose Hsort := sortBy_sorted brs BoundedRange_leq_antisym.
     specialize (Hsort BoundedRange_leq_trans).
     move: (compilePendingRanges H Hsort) => [[srs1 ? ?] Hbound _].
     exact: Some (SortedRanges_cat srs2 Hbound).
@@ -215,8 +269,7 @@ Proof.
   - (* When no rmap entry are present. *)
     apply: IntMap_map _.
     move=> brs.
-    pose sbrs := sortBy BoundedRange_leq brs.
-    pose Hsort := sortBy_sorted sbrs BoundedRange_leq_antisym.
+    pose Hsort := sortBy_sorted brs BoundedRange_leq_antisym.
     specialize (Hsort BoundedRange_leq_trans).
     move: (compilePendingRanges H Hsort) => [srs1 _ _].
     exact: srs1.
@@ -337,10 +390,10 @@ Proof.
                                (rend r1.1 <= e.*2.+1) }.
     move: (NE_head range) => [r /andP [Hbeg Hend]].
     case E: (upos < head_or_end r.1).
-      pose r1 := Range_shift_down r.2 Hodd E.
-      have Hr1: r1 = Range_shift_down r.2 Hodd E by [].
+      pose r1 := Range_shift r.2 Hodd E.
+      have Hr1: r1 = Range_shift r.2 Hodd E by [].
       exists r1.
-      move: (Range_shift_down_spec Hr1) => [-> -> _].
+      move: (Range_shift_spec Hr1) => [-> -> _].
       move/eqP: Heqe => ->.
       by undoubled.
     move/negbT in E; rewrite -ltnNge /= in E.
@@ -383,10 +436,12 @@ Definition handleVars_combine {b pos e} (H : b <= pos < e) (vid : nat)
   (vars : seq (VarInfo maxReg)) (c1 : PendingRanges b e) :
   option (PendingRanges b e).
 Proof.
-  have c2 :=
-    foldl (handleOutputVar H) (Some c1) [seq k <- vars | varKind k == Output].
-  have c3 := foldl (handleVar H) c2 [seq k <- vars | varKind k != Output].
-  exact: c3.
+  have Hlt : b <= e by ordered.
+  have c2 := compressPendingRanges c1 Hlt.
+  have c3 := foldl (handleOutputVar H) (Some c2)
+                   [seq k <- vars | varKind k == Output].
+  have c4 := foldl (handleVar H) c3 [seq k <- vars | varKind k != Output].
+  exact: c4.
 Defined.
 
 (* If there is no variable reference at this position, do nothing. *)
@@ -405,12 +460,12 @@ Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) :
   IntMap (seq (VarInfo maxReg)) -> IntMap (PendingRanges b e).
 Proof.
   apply: IntMap_foldlWithKey _ emptyIntMap => m vid vars.
-  have c2 :=
-    foldl (handleOutputVar H) None [seq k <- vars | varKind k == Output].
+  have c2 := foldl (handleOutputVar H) None
+                   [seq k <- vars | varKind k == Output].
   have c3 := foldl (handleVar H) c2 [seq k <- vars | varKind k != Output].
-  case: c3 => [c3|]; last first.
-    exact: m.
-  exact: IntMap_insert vid c3 m.
+  case: c3 => [c3|].
+    exact: IntMap_insert vid c3 m.
+  exact: m.
 Defined.
 
 Definition extractVarInfo (xs : NonEmpty (VarInfo maxReg)) :

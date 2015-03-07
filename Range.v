@@ -121,7 +121,7 @@ Proof.
   by reduce_last_use; ordered.
 Qed.
 
-Definition Range_shift_down `(r : Range rd) `(Hodd : odd b)
+Definition Range_shift `(r : Range rd) `(Hodd : odd b)
   (H : b < head_or_end rd) : RangeSig.
 Proof.
   exists {| rbeg := b
@@ -144,9 +144,9 @@ Proof.
   by ordered.
 Defined.
 
-Definition Range_shift_down_spec `(r : Range rd) `(Hodd : odd b)
+Definition Range_shift_spec `(r : Range rd) `(Hodd : odd b)
   (H : b < head_or_end rd) :
-  forall r1, r1 = Range_shift_down r Hodd H
+  forall r1, r1 = Range_shift r Hodd H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
        &   ups  r1.1 = ups r ].
@@ -654,9 +654,10 @@ Proof.
 Qed.
 
 Definition rangesIntersect `(Range x) `(Range y) : bool :=
-  if rbeg x < rbeg y
-  then rbeg y < rend x
-  else rbeg x < rend y.
+  (rend x == rend y) ||
+  (if rbeg x < rbeg y
+   then rbeg y < rend x
+   else rbeg x < rend y).
 
 Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
   option oddnum :=

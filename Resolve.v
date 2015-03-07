@@ -59,7 +59,7 @@ Definition checkIntervalBoundary
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to mappings vid :=
   let mfrom_int := lookupInterval vid Output (blockLastOpId from) allocs in
-  let mto_int   := lookupInterval vid Output (blockFirstOpId to) allocs in
+  let mto_int   := lookupInterval vid Input (blockFirstOpId to) allocs in
   if checkIntervalBoundary mfrom_int mto_int vid false
     isn't Some (sreg, dreg)
   then mappings
