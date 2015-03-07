@@ -216,13 +216,13 @@ Definition allocateBlockedReg {pre} :
       return_ $ Some reg.
 
 Definition morphlen_transport {b b'} :
-  @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
+  @SSMorph maxReg b b' -> IntervalId b -> IntervalId b'.
 Proof.
-  case. case=> ? ?.
-  exact: (widen_ord _).
+  case=> H ?.
+  exact: (widen_ord H).
 Defined.
 
-Definition mt_fst b b' (sslen : SSMorphLen b b')
+Definition mt_fst b b' (sslen : SSMorph b b')
   (x : IntervalId b * PhysReg) :=
   let: (xid, reg) := x in (morphlen_transport sslen xid, reg).
 
@@ -232,12 +232,12 @@ Definition int_reg_seq sd := seq (int_reg sd).
 Definition intermediate_result (sd z : ScanStateDesc maxReg)
   (xs : int_reg_seq z)
   (f : forall sd' : ScanStateDesc maxReg, int_reg_seq sd') :=
-  { res : {z' : ScanStateDesc maxReg | SSMorphLen z z'}
-  | (ScanState InUse res.1 /\ SSMorphLen sd res.1)
+  { res : {z' : ScanStateDesc maxReg | SSMorph z z'}
+  | (ScanState InUse res.1 /\ SSMorph sd res.1)
   & subseq [seq mt_fst res.2 i | i <- xs] (f res.1) }.
 
 Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
-  (Pz : ScanState InUse z /\ SSMorphLen sd z)
+  (Pz : ScanState InUse z /\ SSMorph sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (active z)) :
   intermediate_result sd xs (@active maxReg) :=
@@ -253,7 +253,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
               then moveActiveToHandled st Hin
               else if ~~ posWithinInterval i pos
                    then moveActiveToInactive st Hin
-                   else exist2 _ _ z st (newSSMorphLen z) in
+                   else exist2 _ _ z st (newSSMorph z) in
     match ss with
     | exist2 sd' st' sslen' =>
         exist2 _ _ (sd'; sslen') (conj st' (transitivity sslen sslen')) _
@@ -266,8 +266,7 @@ Obligation 2.
     rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
-    case: sslen'.
-    case=> [? _].
+    case: sslen' => ?.
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
@@ -276,28 +275,26 @@ Obligation 2.
     rewrite /moveActiveToInactive /=.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
-    case: sslen'.
-    case=> [? _].
+    case: sslen' => ?.
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
-  case: sslen'.
-  case=> [? _].
+  case: sslen' => ?.
   rewrite map_widen_ord_refl.
   exact: subseq_impl_cons.
 Qed.
 
 Definition checkActiveIntervals {pre} (pos : nat) :
-  SState pre (@SSMorphLen maxReg) (@SSMorphLen maxReg) unit :=
+  SState pre (@SSMorph maxReg) (@SSMorph maxReg) unit :=
   withScanStatePO (maxReg:=maxReg) $ fun sd (st : ScanState InUse sd) =>
-    let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
+    let unchanged := exist2 _ _ sd st (newSSMorph sd) in
     let res : { sd' : ScanStateDesc maxReg
-              | ScanState InUse sd' /\ SSMorphLen sd sd' } :=
+              | ScanState InUse sd' /\ SSMorph sd sd' } :=
         @dep_foldl_inv (ScanStateDesc maxReg)
-          (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
-          (@SSMorphLen maxReg) _ sd (conj st (newSSMorphLen sd))
+          (fun sd' => ScanState InUse sd' /\ SSMorph sd sd')
+          (@SSMorph maxReg) _ sd (conj st (newSSMorph sd))
           (active sd) (size (active sd)) (eq_refl _)
           (@active maxReg) (subseq_refl _) mt_fst (@goActive pos sd) in
     let: exist sd' (conj st' H) := res in
@@ -311,7 +308,7 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   (Hin : x \in inactive z) :
   SSError +
   { sd' : ScanStateDesc maxReg | ScanState InUse sd'
-  & { sslen : SSMorphLen z sd'
+  & { sslen : SSMorph z sd'
     | subseq [seq mt_fst sslen i | i <- xs] (inactive sd')
     }
   } :=
@@ -325,13 +322,13 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [? _].
+  case: sslen' => ?.
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
 
 Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
-  (Pz : ScanState InUse z /\ SSMorphLen sd z)
+  (Pz : ScanState InUse z /\ SSMorph sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z)) :
   SSError + intermediate_result sd xs (@inactive maxReg) :=
@@ -348,7 +345,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
         @in_subseq_sing _ _ _ x xs _ Hsub in
     let f (sd'    : ScanStateDesc maxReg)
           (st'    : ScanState InUse sd')
-          (sslen' : SSMorphLen z sd')
+          (sslen' : SSMorph z sd')
           (Hsub'  : subseq [seq mt_fst sslen' i | i <- xs]
                            (inactive sd')) :=
         inr (exist2 _ _ (sd'; sslen')
@@ -364,12 +361,11 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
               | inr (exist2 sd' st' (exist sslen' Hsub')) =>
                   f sd' st' sslen' Hsub'
               end
-         else f z st (newSSMorphLen z) _
+         else f z st (newSSMorph z) _
   end.
 Obligation 2.
   rewrite /mt_fst /morphlen_transport /=.
-  case: sslen'.
-  case=> [? _].
+  case: sslen' => ?.
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -380,14 +376,14 @@ Obligation 3.
 Defined.
 
 Definition checkInactiveIntervals {pre} (pos : nat) :
-  SState pre (@SSMorphLen maxReg) (@SSMorphLen maxReg) unit :=
+  SState pre (@SSMorph maxReg) (@SSMorph maxReg) unit :=
   withScanStatePO (maxReg:=maxReg) $ fun sd (st : ScanState InUse sd) =>
-    let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
+    let unchanged := exist2 _ _ sd st (newSSMorph sd) in
     let eres : SSError + {sd' : ScanStateDesc maxReg
-                         | ScanState InUse sd' /\ SSMorphLen sd sd'} :=
+                         | ScanState InUse sd' /\ SSMorph sd sd'} :=
         @dep_foldl_invE SSError (ScanStateDesc maxReg)
-          (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
-          (@SSMorphLen maxReg) _ sd (conj st (newSSMorphLen sd))
+          (fun sd' => ScanState InUse sd' /\ SSMorph sd sd')
+          (@SSMorph maxReg) _ sd (conj st (newSSMorph sd))
           (inactive sd) (size (inactive sd)) (eq_refl _)
           (@inactive maxReg) (subseq_refl _) mt_fst (@goInactive pos sd) in
     match eres with
@@ -409,11 +405,6 @@ Definition handleInterval {pre} :
     if firstUsePos current is None
     then @moveUnhandledToHandled maxReg pre ;;; return_ None
     else
-      (* // check for intervals in active that are handled or inactive *)
-      liftLen (fun sd => @checkActiveIntervals sd position) ;;;
-      (* // check for intervals in inactive that are handled or active *)
-      liftLen (fun sd => @checkInactiveIntervals sd position) ;;;
-
       (* // find a register for current
          tryAllocateFreeReg
          if allocation failed then
@@ -421,10 +412,28 @@ Definition handleInterval {pre} :
          if current has a register assigned then
            add current to active (done by the helper functions) *)
       mres <<- tryAllocateFreeReg ;;
-      match mres with
-      | Some x => imap (@Some _) x
-      | None   => allocateBlockedReg
-      end.
+      mres' <<- match mres with
+                | Some x => imap (@Some _) x
+                | None   => allocateBlockedReg
+                end ;;
+
+      (* // check for intervals in active that are handled or inactive *)
+      checkActiveIntervals position.+2 ;;;
+      (* // check for intervals in inactive that are handled or active *)
+      checkInactiveIntervals position.+2 ;;;
+
+      return_ mres'.
+
+Definition finalizeScanState `(st : ScanState InUse sd) (finalPos : nat) :
+  ScanStateDesc maxReg :=
+  match (checkActiveIntervals   finalPos ;;;
+         checkInactiveIntervals finalPos)
+          {| thisDesc  := sd
+           ; thisHolds := newSSMorph sd
+           ; thisState := st |} with
+  | inl _ => sd
+  | inr (tt, ss) => thisDesc ss
+  end.
 
 Require Import Coq.Program.Wf.
 (* Include Trace. *)

@@ -64,6 +64,18 @@ Definition foldM {S A B}
 Definition forFoldM {S A B}
   (s : A) (l : list B) (f : A -> B -> State S A) : State S A := foldM f s l.
 
+Definition foldrM {S A B}
+  (f : B -> A -> State S A) (s : A) (l : list B) : State S A :=
+  let fix go xs z :=
+      match xs with
+        | nil => pure z
+        | cons y ys => go ys z >>= f y
+      end in
+  go l s.
+
+Definition forFoldrM {S A B}
+  (s : A) (l : list B) (f : B -> A -> State S A) : State S A := foldrM f s l.
+
 Fixpoint concat {A} (l : list (list A)) : list A :=
   match l with
   | nil => nil

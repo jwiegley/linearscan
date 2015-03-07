@@ -67,54 +67,6 @@ Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
   y' <-- y ;;
   pure (x', y').
 
-(*
-Definition savesAndRestores (opid : OpId) v reg int (outs : IntSet) :
-  AssnState (seq opType2 * seq opType2) :=
-  if @varId maxReg v isn't inr vid then pure ([::], [::]) else
-
-  (* Wimmer: "If a split position is moved to a block boundary, the algorithm
-     for resolving the data flow takes care of inserting the move. It is also
-     possible that no move is necessary at all because of the control flow." *)
-  assn <-- get ;;
-  (* We increment by two before checking the beginning in order to skip past
-     the label. *)
-  let knd := varKind v in
-  let atBoundary :=
-      ((knd == Input)  && (assnBlockBeg assn == opid)) ||
-      ((knd == Output) && (opid.+2 == assnBlockEnd assn)) in
-
-  (* jww (2015-03-05): This cannot be done here.  Instead of checking for
-     saveAndRestores while scanning the variable references of an operation,
-     we need to check the list of intervals at each operation to see whether
-     any are beginning or ending there. *)
-  let isFirst  := firstUsePos int == Some opid in
-  let isLast   := nextUseAfter int opid == None in
-  (* let isFirst  := ibeg int == opid in *)
-  (* let isLast   := iend int == opid in *)
-
-  (* jww (2015-02-16): We would like that only Input variables which are in
-     the "live out" set, or that are going to be re-loaded in the current
-     block, get spilled to the stack.  At the moment we spill more often than
-     is strictly necessary. *)
-  (* let save     := if IntSet_member vid outs *)
-  (*                 then saveOpM reg (Some vid) *)
-  (*                 else pure [::] in *)
-  let save     := saveOpM reg (Some vid) in
-  let msave    := if atBoundary then pure [::] else save in
-  let restore  := restoreOpM (Some vid) reg in
-  let mrestore := if atBoundary then pure [::] else restore in
-  match knd, iknd int, isFirst, isLast with
-    | Input,  LeftMost,  _,     true  => pairM (pure [::]) save
-    | Input,  Middle,    true,  true  => pairM mrestore save
-    | Input,  Middle,    true,  _     => pairM mrestore (pure [::])
-    | Input,  Middle,    _,     true  => pairM (pure [::]) save
-    | Input,  RightMost, true,  _     => pairM mrestore (pure [::])
-    | Output, LeftMost,  _,     true  => pairM (pure [::]) msave
-    | Output, Middle,    _,     true  => pairM (pure [::]) msave
-    | _,      _,         _,     _     => pure ([::], [::])
-    end.
-*)
-
 Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
   seq (VarId * PhysReg) :=
   if @varId maxReg v isn't inr vid then [::] else
@@ -125,7 +77,7 @@ Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
 Definition generateMoves
   (moves : seq (option (PhysReg + nat) * option (PhysReg + nat))) :
   AssnState (seq opType2) :=
-  forFoldM [::] moves $ fun acc mv =>
+  forFoldrM [::] moves $ fun mv acc =>
     mops <-- match mv with
       | (Some (inl sreg), Some (inl dreg)) =>
           fmap (@Some _) $ moveOpM sreg dreg
@@ -149,19 +101,35 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   let opid := assnOpId assn in
   let vars := opRefs oinfo op in
   let hereAllocs := concat $ map (varAllocs opid allocs) vars in
-  let transitions :=
-      foldl (fun acc v =>
-        if @varId maxReg v isn't inr vid
-        then acc
-        else if checkIntervalBoundary allocs opid opid.+2 vid true
-               is Some trans
-             then (varKind v, trans) :: acc
-             else acc) [::] vars in
+  (* Find all intervals for which this is the final operation, then pair them
+     intervals beginning at the next operation for the same variable.  This is
+     only done if we are not at the beginning or end of a block. *)
+  let atBoundary :=
+      (assnBlockBeg assn == opid) || (opid == assnBlockEnd assn) in
+  let endingTransitions :=
+      if atBoundary then [::] else
+      [seq (let vid := ivar (intVal j) in
+            let mto_int :=
+                getBy (fun x => (ibeg (intVal x) == opid) &&
+                                (ivar (intVal x) == vid)) allocs in
+            checkIntervalBoundary (Some j) mto_int vid true)
+      | j <- [seq i <- allocs | iend (intVal i) == opid]] in
+  let startingTransitions :=
+      if atBoundary then [::] else
+      [seq (let vid := ivar (intVal j) in
+            let mfrom_int :=
+                getBy (fun x => (iend (intVal x) == opid) &&
+                                (ivar (intVal x) == vid)) allocs in
+            checkIntervalBoundary mfrom_int (Some j) vid true)
+      | j <- [seq i <- allocs | ibeg (intVal i) == opid]] in
   let generator k :=
-      generateMoves [seq (Some (fst (snd x)), Some (snd (snd x)))
-                    | x <- transitions & fst x == k] in
-  inputs  <-- generator Input ;;
-  outputs <-- generator Output ;;
+      forFoldrM [::] k $ fun mx acc =>
+        if mx is Some x
+        then moves <-- generateMoves [:: (Some (fst x), Some (snd x))] ;;
+             pure $ moves ++ acc
+        else pure acc in
+  closing <-- generator endingTransitions ;;
+  opening <-- generator startingTransitions ;;
   let op' := applyAllocs oinfo op hereAllocs in
   (* With lenses, this would just be: assnOpId += 2 *)
   modify (fun assn' =>
@@ -169,7 +137,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
              ; assnBlockBeg := assnBlockBeg assn'
              ; assnBlockEnd := assnBlockEnd assn'
              ; assnAcc      := assnAcc assn' |}) ;;
-  pure $ inputs ++ op' ++ outputs.
+  pure $ closing ++ op' ++ opening.
 
 Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the

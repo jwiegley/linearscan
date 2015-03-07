@@ -150,24 +150,26 @@ deriving instance Show LS.UsePos
 
 instance Show ScanStateDesc where
     show sd =
-        -- "Intervals:\n"       ++
-        --     concatMap (\i -> "  " ++ showInterval i ++ "\n")
-        --               [0..nextInterval sd] ++
-        -- "Fixed Intervals:\n" ++
         "Unhandled:\n"
             ++ concatMap (\(i, _) -> "  " ++ showInterval i ++ "\n")
                          (unhandled sd) ++
         "Active:\n"
-            ++ concatMap (\(i, r) -> "  r" ++ show r ++ showInterval i ++ "\n")
+            ++ concatMap (\(i, r) ->
+                           "  r" ++ show r ++ showInterval i ++ "\n")
                          (active sd) ++
         "Inactive:\n"
-            ++ concatMap (\(i, r) -> "  r" ++ show r ++ showInterval i ++ "\n")
+            ++ concatMap (\(i, r) ->
+                           "  r" ++ show r ++ showInterval i ++ "\n")
                          (inactive sd) ++
         "Handled:\n"
-            ++ concatMap (\(i, r) -> "  r" ++ show r ++ showInterval i ++ "\n")
+            ++ concatMap (\(i, r) ->
+                           "  " ++ showReg r ++ showInterval i ++ "\n")
                          (handled sd)
       where
         showInterval i = showIntervalDesc i (intervals sd !! i)
+
+        showReg Nothing = "<stack>"
+        showReg (Just r) = "r" ++ show r
 
 showIntervalDesc :: Int -> LS.IntervalDesc -> String
 showIntervalDesc i (LS.Build_IntervalDesc iv ib ie ik rs) =

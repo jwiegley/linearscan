@@ -70,8 +70,7 @@ Definition registerWithHighestPos :
 
 Definition allocations (sd : ScanStateDesc) :=
   foldl (fun acc p => if snd p is Some r then (fst p, r) :: acc else acc)
-        [::] (handled sd)
-    ++ active sd ++ inactive sd.
+        [::] (handled sd).
 
 Definition lookupRegister `(st : ScanState sd) intid : option PhysReg :=
   forFold None (allocations sd) $ fun acc x =>

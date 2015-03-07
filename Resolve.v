@@ -22,13 +22,11 @@ Variables blockType1 blockType2 opType1 opType2 accType : Set.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg accType opType1 opType2.
 
-Definition checkIntervalBoundary (allocs : seq (Allocation maxReg))
-  (from to vid : nat) (checkIntervalKinds : bool) :
+Definition checkIntervalBoundary
+  (mfrom_int mto_int : option (Allocation maxReg)) (vid : nat)
+  (checkIntervalKinds : bool) :
   option (sum_eqType (ordinal_eqType maxReg) nat_eqType *
           sum_eqType (ordinal_eqType maxReg) nat_eqType) :=
-  let mfrom_int := lookupInterval vid Output from allocs in
-  let mto_int   := lookupInterval vid Input to allocs in
-
   (* If the intervals match, no move resolution is necessary. *)
   if option_map (@intId maxReg) mfrom_int ==
      option_map (@intId maxReg) mto_int then None else
@@ -60,23 +58,23 @@ Definition checkIntervalBoundary (allocs : seq (Allocation maxReg))
 
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to mappings vid :=
-  if checkIntervalBoundary allocs (blockLastOpId from)
-                           (blockFirstOpId to) vid false
+  let mfrom_int := lookupInterval vid Output (blockLastOpId from) allocs in
+  let mto_int   := lookupInterval vid Output (blockFirstOpId to) allocs in
+  if checkIntervalBoundary mfrom_int mto_int vid false
     isn't Some (sreg, dreg)
   then mappings
   else
     let addToGraphs e xs :=
         let: (gbeg, gend) := xs in
         if in_from
-        then (addEdge e gbeg, gend)
-        else (gbeg, addEdge e gend) in
+        then (gbeg, addEdge e gend)
+        else (addEdge e gbeg, gend) in
     let f mxs :=
-        let e := (Some sreg, Some dreg) in
-        @Some _ $ addToGraphs e
-                $ if mxs is Some xs
-                  then xs
-                  else (emptyGraph, emptyGraph) in
-    IntMap_alter f bid mappings.
+        addToGraphs (Some sreg, Some dreg) $
+          if mxs is Some xs
+          then xs
+          else (emptyGraph, emptyGraph) in
+    IntMap_alter (@Some _ \o f) bid mappings.
 
 Definition BlockMoves :=
   (Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType) *

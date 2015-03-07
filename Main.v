@@ -57,20 +57,22 @@ Definition linearScan
       liveSets' blocks1 [::] accum None None binfo oinfo
   | inr ssig =>
     (* allocate registers *)
-    match walkIntervals registers_exist ssig.2 (countOps binfo blocks1).+1
+    let finalPosition := (countOps binfo blocks1).+1 in
+    match walkIntervals registers_exist ssig.2 finalPosition
     return Details maxReg with
     | inl (err, ssig') =>
       Build_Details _ _ _ _ _ maxReg (Some (err, AllocatingRegistersFailed))
         liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1) binfo oinfo
     | inr ssig' =>
-        let allocs   := determineAllocations ssig'.1 in
+        let sd       := finalizeScanState ssig'.2 finalPosition.*2 in
+        let allocs   := determineAllocations sd in
         let mappings := resolveDataFlow binfo allocs blocks1 liveSets' in
 
         (* replace virtual registers with physical registers *)
         let: (blocks2, accum') :=
            assignRegNum binfo oinfo allocs liveSets' mappings blocks1 accum in
         Build_Details _ _ _ _ _ maxReg None liveSets' blocks1 blocks2 accum'
-          (Some ssig.1) (Some ssig'.1) binfo oinfo
+          (Some ssig.1) (Some sd) binfo oinfo
     end
   end.
 

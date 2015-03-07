@@ -44,6 +44,9 @@ Record SSMorph (sd1 sd2 : ScanStateDesc maxReg) : Prop := {
     next_interval_increases : nextInterval sd1 <= nextInterval sd2
 }.
 
+Definition newSSMorph (s : ScanStateDesc maxReg) : SSMorph s s.
+Proof. intros. constructor; auto. Defined.
+
 Arguments next_interval_increases [sd1 sd2] _.
 
 Global Program Instance SSMorph_PO : PreOrder SSMorph.
@@ -130,30 +133,6 @@ Defined.
 
 Arguments withScanStatePO {a pre P _} f _.
 
-Definition liftLen {pre a} :
-  (forall sd : ScanStateDesc maxReg, SState sd SSMorphLen SSMorphLen a)
-    -> SState pre SSMorphHasLen SSMorphHasLen a.
-Proof.
-  move=> f.
-  move=> [sd [morphlen Hempty] st].
-  pose ss := {| thisDesc  := sd
-              ; thisHolds := newSSMorphLen sd
-              ; thisState := st
-              |}.
-  case: (f sd ss) => [err|[x [sd' morphlen' st']]].
-    exact: (inl err).
-  apply: inr.
-  split; first exact: x.
-  apply: {| thisDesc  := sd'
-          ; thisHolds := _
-          ; thisState := st'
-          |}.
-  apply: Build_SSMorphHasLen.
-    exact: (transitivity morphlen morphlen').
-  case: morphlen' => [_ (* _ *) H].
-  exact: H.
-Defined.
-
 Definition weakenHasLen {pre} :
   forall sd, SSMorphHasLen pre sd -> SSMorph pre sd.
 Proof. by move=> ? [[?]]. Defined.
@@ -227,32 +206,29 @@ Defined.
 
 Definition moveActiveToHandled
   `(st : ScanState InUse sd) `(H: x \in active sd) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorph sd sd' }.
 Proof.
   pose (ScanState_moveActiveToHandled st H).
   eexists. apply s.
-  apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.
 Defined.
 
 Definition moveActiveToInactive
   `(st : ScanState InUse sd) `(H: x \in active sd) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorph sd sd' }.
 Proof.
   pose (ScanState_moveActiveToInactive st H).
   eexists. apply s.
-  apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.
 Defined.
 
 Definition moveInactiveToActive
   `(st : ScanState InUse sd) `(H : x \in inactive sd)
   (Hreg : snd x \notin [seq snd i | i <- active sd]) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorph sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToActive st H Hreg).
   eexists. apply s.
-  apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.
 Defined.
 
@@ -265,11 +241,10 @@ Proof. reflexivity. Qed.
 
 Definition moveInactiveToHandled `(st : ScanState InUse sd)
   `(H : x \in inactive sd) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorph sd sd' }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
   eexists. apply s.
-  apply Build_SSMorphLen; auto.
   apply Build_SSMorph; auto.
 Defined.
 
