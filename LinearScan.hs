@@ -144,7 +144,6 @@ data ScanStateDesc = ScanStateDesc
     }
 
 deriving instance Show LS.IntervalDesc
-deriving instance Show LS.IntervalKind
 deriving instance Show LS.RangeDesc
 deriving instance Show LS.UsePos
 
@@ -172,15 +171,9 @@ instance Show ScanStateDesc where
         showReg (Just r) = "r" ++ show r
 
 showIntervalDesc :: Int -> LS.IntervalDesc -> String
-showIntervalDesc i (LS.Build_IntervalDesc iv ib ie ik rs) =
-    "[" ++ show i ++ "]: " ++ showKind ik ++ " v" ++ show iv ++ " "
+showIntervalDesc i (LS.Build_IntervalDesc iv ib ie rs) =
+    "[" ++ show i ++ "]: " ++ " v" ++ show iv ++ " "
           ++ show ib ++ "-" ++ show ie ++ " =>" ++ showRanges rs
-
-showKind :: LS.IntervalKind -> String
-showKind LS.Whole     = "W"
-showKind LS.LeftMost  = "L"
-showKind LS.Middle    = "M"
-showKind LS.RightMost = "R"
 
 showRanges :: [LS.RangeDesc] -> String
 showRanges [] = ""

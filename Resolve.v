@@ -91,8 +91,7 @@ Definition determineMoves (moves : IntMap RawResolvingMove) :
     - A move from the stack to a register
     - A move from a register to the stack
     - A swap between two registers *)
-Definition resolvingMoves (allocs : seq Allocation) (from to : nat)
-  (checkIntervalKinds : bool) :
+Definition resolvingMoves (allocs : seq Allocation) (from to : nat) :
   IntMap RawResolvingMove :=
 
   (* First determine all of the variables which are live at [from] *at the end
@@ -104,20 +103,6 @@ Definition resolvingMoves (allocs : seq Allocation) (from to : nat)
   let liveAtTo :=
       IntMap_fromList [seq (ivar (intVal i), i) | i <- allocs
                       & ibeg (intVal i) <= to <= iend (intVal i)] in
-
-    (* if checkIntervalKinds *)
-    (* then *)
-    (*   let fromk := iknd (intVal from_int) in *)
-    (*   let tok   := iknd (intVal to_int) in *)
-    (*   if match fromk, tok with *)
-    (*      | LeftMost, RightMost => true *)
-    (*      | LeftMost, Middle    => true *)
-    (*      | Middle,   Middle    => true *)
-    (*      | Middle,   RightMost => true *)
-    (*      | _,        _         => false *)
-    (*      end *)
-    (*   then Some (sreg, dreg) *)
-    (*   else None *)
 
   IntMap_mergeWithKey
     (fun vid x y =>
@@ -135,7 +120,7 @@ Definition checkBlockBoundary (allocs : seq Allocation)
                           else acc in
   let moves := IntMap_foldlWithKey select [::] $
                resolvingMoves allocs (blockLastOpId from)
-                                     (blockFirstOpId to) false in
+                                     (blockFirstOpId to) in
   forFold mappings moves $ fun ms mv =>
     let addToGraphs e xs :=
         let: (gbeg, gend) := xs in

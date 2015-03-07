@@ -29,16 +29,6 @@ Generalizable All Variables.
     the interval is split into two or more intervals, so each interval can be
     assigned its own register. *)
 
-Inductive IntervalKind := Whole | LeftMost | Middle | RightMost.
-
-Definition splitKind (k : IntervalKind) : IntervalKind * IntervalKind :=
-  match k with
-  | Whole     => (LeftMost, RightMost)
-  | LeftMost  => (LeftMost, Middle)
-  | Middle    => (Middle, Middle)
-  | RightMost => (Middle, RightMost)
-  end.
-
 Record IntervalDesc : Set := {
   (* The [varId] is simply a number that refers to the variable for which this
      interval was created.  This number must be maintained by the caller, and
@@ -47,35 +37,29 @@ Record IntervalDesc : Set := {
   ivar : nat;
   ibeg : nat;
   iend : nat;
-  (* [ispl] is true if this interval is the left half of a split block, where
-     isplit was [false] for that block; otherwise, isplit is inherited. *)
-  iknd : IntervalKind;
   rds  : NonEmpty RangeSig
 }.
 
 (** * Interval *)
 
 Inductive Interval : IntervalDesc -> Prop :=
-  | I_Sing : forall i knd x (r : Range x),
+  | I_Sing : forall i x (r : Range x),
       Interval {| ivar := i
                 ; ibeg := rbeg x
                 ; iend := rend x
-                ; iknd := knd
                 ; rds  := NE_Sing (x; r)
                 |}
 
-  | I_Cons : forall i oknd knd xs,
+  | I_Cons : forall i xs,
       Interval {| ivar := i
                 ; ibeg := rbeg (NE_head xs).1
                 ; iend := rend (NE_last xs).1
-                ; iknd := oknd
                 ; rds  := xs
                 |}
         -> forall r (H : rend r.1 < rbeg (NE_head xs).1),
       Interval {| ivar := i
                 ; ibeg := rbeg r.1
                 ; iend := rend (NE_last xs).1
-                ; iknd := knd
                 ; rds  := NE_Cons r xs (* cons_range H *)
                 |}.
 
@@ -136,7 +120,6 @@ Lemma intervalConnected
   `(i : Interval {| ivar := iv
                   ; ibeg := ib
                   ; iend := ie
-                  ; iknd := z
                   ; rds := NE_Cons r xs |}) : rend r.1 < rbeg (NE_head xs).1.
 Proof. by inv i. Qed.
 
@@ -146,42 +129,26 @@ Proof. by inv i. Qed.
 Lemma Interval_exact_end `(i : Interval d) : iend d = rend (NE_last (rds d)).1.
 Proof. by inv i. Qed.
 
-Definition intervalSetKind `(i : Interval d) : forall k,
-  Interval {| ivar := ivar d
-            ; ibeg := ibeg d
-            ; iend := iend d
-            ; iknd := k
-            ; rds  := rds d |}.
-Proof.
-  inversion i.
-    by constructor.
-  move=> k.
-  exact: (@I_Cons _ oknd).
-Defined.
-
 Definition intervalUncons
   `(i : Interval {| ivar := iv
                   ; ibeg := ib
                   ; iend := ie
-                  ; iknd := z
                   ; rds  := NE_Cons r xs |}) :
   [ /\ Interval  {| ivar := iv
                   ; ibeg := ib
                   ; iend := rend r.1
-                  ; iknd := z
                   ; rds  := NE_Sing r |}
   &    Interval  {| ivar := iv
                   ; ibeg := rbeg (NE_head xs).1
                   ; iend := ie
-                  ; iknd := z
                   ; rds  := xs |} ].
 Proof.
   move: i.
   invert => //=; subst.
   split.
-  case: r H6 => [rd r] *.
-    exact: (I_Sing iv z r).
-  exact: (intervalSetKind H1).
+  case: r => [rd r] in H5 *.
+    exact: (I_Sing iv r).
+  exact.
 Defined.
 
 Lemma Interval_NE_sorted `(i : Interval d) :
@@ -371,7 +338,6 @@ Definition Interval_fromRanges (vid : nat) `(sr : SortedRanges b) :
   Interval {| ivar := vid
             ; ibeg := rbeg (NE_head rs').1
             ; iend := rend (NE_last rs').1
-            ; iknd := Whole
             ; rds  := rs' |}.
 Proof.
   case: sr => /= [x Hsort Hlt].
@@ -380,14 +346,14 @@ Proof.
   have: NE_StronglySorted range_ltn rds0
     by exact: NE_StronglySorted_from_list.
   elim: rds0 => //= [r'|r' rs' IHrs'].
-    move: (I_Sing vid Whole r'.2).
+    move: (I_Sing vid r'.2).
     by destruct r'; destruct x.
   invert.
   move: IHrs' => /(_ H1) i.
   have Hlt': rend r'.1 < rbeg (NE_head rs').1.
     move/NE_Forall_head in H2.
     by rewrite /range_ltn in H2.
-  exact: (@I_Cons vid _ Whole _ i _ Hlt').
+  exact: (@I_Cons vid _ i _ Hlt').
 Defined.
 
 (* Divide the ranges of an [Interval] such that the first set are entirely
@@ -592,20 +558,6 @@ Proof.
   (* If before falls within a lifetime hole for the interval, then splitting
      at that position results in two intervals that are not connected by any
      need ato save and restore variables. *)
-  case: (if intervalCoversPos i before
-         then splitKind (iknd i)
-         else (match iknd i with
-               | Whole     => Whole
-               | LeftMost  => Whole
-               | Middle    => RightMost
-               | RightMost => RightMost
-               end,
-               match iknd i with
-               | Whole     => Whole
-               | LeftMost  => LeftMost
-               | Middle    => LeftMost
-               | RightMost => Whole
-               end)) => [lknd rknd].
   case: (splitIntervalRanges i Hodd Hwithin)
     => [[[[|r1 rs1] HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // [? ? ?].
   have i1 :=
@@ -614,8 +566,7 @@ Proof.
   have i2 :=
     @Interval_fromRanges (ivar i) _ (exist2 _ _ (r2 :: rs2) HSrs2 Hbrs2)
                          r2 rs2 refl_equal.
-  apply: ((packInterval (intervalSetKind i1 lknd),
-           packInterval (intervalSetKind i2 rknd)); _).
+  apply: ((packInterval i1, packInterval i2); _).
   by constructor; rewrite /= ?NE_last_from_list ?NE_head_from_list.
 Defined.
 

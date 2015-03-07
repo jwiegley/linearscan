@@ -47,7 +47,7 @@ Proof.
     exact: inl (ENoValidSplitPosition uid). (* ERROR *)
 
   case Hint: int => [d i] in Hmid *.
-  case: d => [iv ib ie ? rds] /= in i Hint Hmid *.
+  case: d => [iv ib ie rds] /= in i Hint Hmid *.
 
   case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
 
@@ -142,7 +142,7 @@ Proof.
     exact: inl (ENoValidSplitPosition xid). (* ERROR *)
 
   case Hint: int => [d i] in Hmid *.
-  case: d => [iv ib ie ? rds] /= in i Hint Hmid *.
+  case: d => [iv ib ie rds] /= in i Hint Hmid *.
 
   case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
 

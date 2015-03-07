@@ -111,7 +111,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   transitions <--
     (if assnBlockBeg assn < opid < assnBlockEnd assn
      then generateMoves
-            (determineMoves (resolvingMoves allocs opid opid.+2 false))
+            (determineMoves (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
   (* With lenses, this would just be: assnOpId += 2 *)
