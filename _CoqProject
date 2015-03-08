@@ -10,11 +10,11 @@ IntMap.v
 Interval.v
 Lib.v
 LiveSets.v
+Loops.v
 Ltac.v
 Main.v
 Morph.v
 NonEmpty.v
-Order.v
 Range.v
 Resolve.v
 ScanState.v

@@ -279,13 +279,11 @@ Definition nextUseAfter `(i : Interval d) (pos : nat) : option oddnum :=
   else None.
 Arguments nextUseAfter [d] i pos /.
 
-Definition rangeFirstUsePos (rd : RangeDesc) : option nat :=
-  if ups rd is u :: _
-  then Some (uloc u)
-  else None.
+Definition rangeFirstUsePos (rd : RangeDesc) : option UsePos :=
+  if ups rd is u :: _ then Some u else None.
 Arguments rangeFirstUsePos rd /.
 
-Definition firstUsePos (d : IntervalDesc) : option nat :=
+Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with
         | NE_Sing x => rangeFirstUsePos x.1
@@ -294,6 +292,16 @@ Definition firstUsePos (d : IntervalDesc) : option nat :=
       end in
   go (rds d).
 Arguments firstUsePos d /.
+
+Definition lastUsePos (d : IntervalDesc) : option UsePos :=
+  let fix go xs :=
+      match xs with
+        | NE_Sing x => olast (ups x.1)
+        | NE_Cons x xs =>
+            option_choose (go xs) (olast (ups x.1))
+      end in
+  go (rds d).
+Arguments lastUsePos d /.
 
 Definition afterLifetimeHole (d : IntervalDesc) (pos : oddnum) : oddnum :=
   let f x k :=

@@ -13,6 +13,9 @@ Definition emptyIntMap {a} := @getIntMap a [::].
 
 Definition IntMap_fromList := getIntMap.
 
+Definition IntMap_size : forall a, IntMap a -> nat :=
+  fun _ m => let: getIntMap x := m in size x.
+
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
    [Data.IntMap]. *)
@@ -122,11 +125,16 @@ Arguments getIntSet _.
 
 Definition emptyIntSet := getIntSet [::].
 
+Definition IntSet_singleton (x : nat) := getIntSet [:: x].
+
 (* We needn't bother defining these in Coq, since they only matter to the
    extracted Haskell code, and there we use the definitions from
    [Data.IntMap]. *)
 Definition IntSet_member : nat -> IntSet -> bool :=
   fun k m => let: getIntSet xs := m in k \in xs.
+
+Definition IntSet_size : IntSet -> nat :=
+  fun m => let: getIntSet xs := m in size xs.
 
 Definition IntSet_insert : nat -> IntSet -> IntSet := fun k m =>
   let: getIntSet xs := m in
@@ -150,6 +158,9 @@ Definition IntSet_foldl : forall a, (a -> nat -> a) -> a -> IntSet -> a :=
 
 Definition IntSet_forFold {a} (z : a) (m : IntSet) (f: a -> nat -> a) : a :=
   IntSet_foldl f z m.
+
+Definition IntSet_toList (m : IntSet) : seq nat :=
+  let: getIntSet xs := m in xs.
 
 Section EqIntSet.
 

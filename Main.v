@@ -13,7 +13,7 @@ Require Import LinearScan.Assign.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Build.
 Require Import LinearScan.LiveSets.
-Require Import LinearScan.Order.
+Require Import LinearScan.Loops.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
@@ -43,8 +43,7 @@ Definition linearScan
   (oinfo : OpInfo maxReg accType opType1 opType2)
   (blocks : seq blockType1) (accum : accType) : Details maxReg :=
   (* order blocks and operations (including loop detection) *)
-  let blocks1 := computeBlockOrder blocks in
-  (* numberOperations blocks' ;;; *)
+  let blocks1 := computeBlockOrder binfo blocks in
 
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in

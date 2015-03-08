@@ -102,7 +102,13 @@ Definition resolvingMoves (allocs : seq Allocation) (from to : nat) :
                       & ibeg (intVal i) <= from < iend (intVal i)] in
   let liveAtTo :=
       IntMap_fromList [seq (ivar (intVal i), i) | i <- allocs
-                      & ibeg (intVal i) <= to <= iend (intVal i)] in
+                      & let int := intVal i in
+                        (ibeg int <= to) &&
+                        (if to == iend int
+                         then if lastUsePos int is Some u
+                              then to <= u
+                              else false
+                         else to < iend int)] in
 
   IntMap_mergeWithKey
     (fun vid x y =>

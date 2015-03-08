@@ -28,8 +28,7 @@ Definition nat_of_varId v := match varId v with
   | inr v => v + maxReg
   end.
 
-Inductive OpKind : Set :=
-  IsNormal | IsCall | IsBranch | IsLoopBegin | IsLoopEnd.
+Inductive OpKind : Set := IsNormal | IsCall | IsBranch.
 
 Definition OpId := nat.
 
@@ -71,10 +70,7 @@ Definition blockSize (block : blockType1) := size (allBlockOps block).
 
 (* jww (2015-01-12): Some of the things described by Wimmer in the section on
    dealing with computing of intervals have yet to be done:
-
-   - Loop handling (reordering blocks to optimize allocation)
-   - Extending of ranges for input/output variables
-*)
+    - Loop handling (reordering blocks to optimize allocation) *)
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
   foldl (fun bacc blk => foldl f bacc (allBlockOps blk)) z.
@@ -82,20 +78,4 @@ Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
 Definition countOps : seq blockType1 -> nat :=
   foldOps (fun acc _ => acc.+1) 0.
 
-(* This function not only numbers all operations for us, but adds any extra
-   administrative information that we need to process the algorithm on this
-   side, while maintaining links to the original data that was sent to us from
-   the caller.  From this point on, all functions operate on this enriched
-   data, which ultimately gets reduced back to the caller's version of the
-   data at the very end. *)
-Definition numberOperations (blocks : seq blockType1) : seq blockType1 :=
-  blocks.
-
 End Blocks.
-
-Tactic Notation "VarKind_cases" tactic(first) ident(c) :=
-  first;
-  [ Case_aux c "VarKind_Input"
-  | Case_aux c "VarKind_Temp"
-  | Case_aux c "VarKind_Output"
-  ].

@@ -65,10 +65,10 @@ library
     LinearScan.List0
     LinearScan.LiveSets
     LinearScan.Logic
+    LinearScan.Loops
     LinearScan.Main
     LinearScan.Morph
     LinearScan.NonEmpty0
-    LinearScan.Order
     LinearScan.Range
     LinearScan.Resolve
     LinearScan.ScanState

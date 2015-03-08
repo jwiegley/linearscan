@@ -52,6 +52,18 @@ Fixpoint mapM {S A B} (f : A -> State S B) (l : list A) : State S (list B) :=
   | cons x xs => liftA2 (@cons _) (f x) (mapM f xs)
   end.
 
+Definition forM {S A B} (l : list A) (f : A -> State S B) : State S (list B) :=
+  mapM f l.
+
+Fixpoint mapM_ {S A B} (f : A -> State S B) (l : list A) : State S unit :=
+  match l with
+  | nil => pure tt
+  | cons x xs => f x >>= fun _ => mapM_ f xs
+  end.
+
+Definition forM_ {S A B} (l : list A) (f : A -> State S B) : State S unit :=
+  mapM_ f l.
+
 Definition foldM {S A B}
   (f : A -> B -> State S A) (s : A) (l : list B) : State S A :=
   let fix go xs z :=

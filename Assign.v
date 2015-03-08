@@ -109,7 +109,7 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   let ops   := applyAllocs oinfo op regs in
 
   transitions <--
-    (if assnBlockBeg assn < opid < assnBlockEnd assn
+    (if assnBlockBeg assn <= opid < assnBlockEnd assn
      then generateMoves
             (determineMoves (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
