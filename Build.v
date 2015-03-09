@@ -500,12 +500,11 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
          actually pass the address they wish to call to in a variable.  Since
          this is only an input variable, it's OK to allocate it up to the
          call, since we needn't assume it will contain a value after the
-         call.  jww (2015-02-18): This solution is WRONG. *)
-      drop (size refs)
-           [seq {| varId       := inl n
-                 ; varKind     := Temp
-                 ; regRequired := true
-                 |} | n in ord_enum maxReg] ++ refs
+         call.  *)
+      [seq {| varId       := inl n
+            ; varKind     := Temp
+            ; regRequired := true
+            |} | n in ord_enum maxReg] ++ refs
     else refs in
 
   handleVars refs' Hlt ranges.
