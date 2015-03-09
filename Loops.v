@@ -27,6 +27,7 @@ Record LoopState := {
   loopEndBlocks    : IntSet;
   forwardBranches  : IntMap IntSet; (* block id -> block ids *)
   backwardBranches : IntMap IntSet; (* block id -> block ids *)
+  loopIndices      : IntMap IntSet;
   loopDepths       : IntMap (nat * nat)
 }.
 
@@ -37,6 +38,7 @@ Definition emptyLoopState :=
    ; loopEndBlocks    := emptyIntSet
    ; forwardBranches  := emptyIntMap
    ; backwardBranches := emptyIntMap
+   ; loopIndices      := emptyIntMap
    ; loopDepths       := emptyIntMap |}.
 
 Definition modifyActiveBlocks (f : IntSet -> IntSet) : State LoopState unit :=
@@ -47,6 +49,7 @@ Definition modifyActiveBlocks (f : IntSet -> IntSet) : State LoopState unit :=
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := loopDepths st |}.
 
 Definition modifyVisitedBlocks (f : IntSet -> IntSet) : State LoopState unit :=
@@ -57,6 +60,7 @@ Definition modifyVisitedBlocks (f : IntSet -> IntSet) : State LoopState unit :=
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := loopDepths st |}.
 
 Definition modifyLoopHeaderBlocks (f : seq BlockId -> seq BlockId) :
@@ -68,6 +72,7 @@ Definition modifyLoopHeaderBlocks (f : seq BlockId -> seq BlockId) :
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := loopDepths st |}.
 
 Definition modifyLoopEndBlocks (f : IntSet -> IntSet) :
@@ -79,6 +84,7 @@ Definition modifyLoopEndBlocks (f : IntSet -> IntSet) :
    ; loopEndBlocks    := f (loopEndBlocks st)
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := loopDepths st |}.
 
 Definition modifyForwardBranches
@@ -91,6 +97,7 @@ Definition modifyForwardBranches
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := f (forwardBranches st)
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := loopDepths st |}.
 
 Definition modifyBackwardBranches
@@ -102,6 +109,18 @@ Definition modifyBackwardBranches
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := f (backwardBranches st)
+   ; loopIndices      := loopIndices st
+   ; loopDepths       := loopDepths st |}.
+
+Definition setLoopIndices (indices : IntMap IntSet) : State LoopState unit :=
+  modify $ fun st =>
+  {| activeBlocks     := activeBlocks st
+   ; visitedBlocks    := visitedBlocks st
+   ; loopHeaderBlocks := loopHeaderBlocks st
+   ; loopEndBlocks    := loopEndBlocks st
+   ; forwardBranches  := forwardBranches st
+   ; backwardBranches := backwardBranches st
+   ; loopIndices      := indices
    ; loopDepths       := loopDepths st |}.
 
 Definition setLoopDepths (depths : IntMap (nat * nat)) : State LoopState unit :=
@@ -112,13 +131,14 @@ Definition setLoopDepths (depths : IntMap (nat * nat)) : State LoopState unit :=
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
    ; backwardBranches := backwardBranches st
+   ; loopIndices      := loopIndices st
    ; loopDepths       := depths |}.
 
 Definition remainingBlocks (bs : IntMap blockType1) (st : LoopState) : nat :=
   IntMap_size bs - IntSet_size (visitedBlocks st).
 
 Definition addReference (i x : nat) :
-  IntMap (IntSet) -> IntMap (IntSet) :=
+  IntMap IntSet -> IntMap IntSet :=
   IntMap_alter (fun macc => if macc is Some acc
                             then Some (IntSet_insert x acc)
                             else Some (IntSet_singleton x)) i.
@@ -151,8 +171,8 @@ Fixpoint pathToLoopHeader  (b : BlockId) (header : nat) (st : LoopState) :
 
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
-Definition computeLoopDepths (bs : IntMap blockType1) (st : LoopState) :
-  IntMap (nat * nat) :=
+Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
+  st <-- get ;;
   let m :=
     forFold emptyIntMap (IntSet_toList (loopEndBlocks st)) $ fun m endBlock =>
       if IntMap_lookup endBlock bs isn't Some b then m else
@@ -172,7 +192,25 @@ Definition computeLoopDepths (bs : IntMap blockType1) (st : LoopState) :
           then Some (minn idx loopIndex, depth.+1)
           else Some (loopIndex, 1) in
         IntMap_alter f blk m' in
-  IntMap_foldlWithKey f emptyIntMap m.
+  setLoopIndices m ;;
+  setLoopDepths (IntMap_foldlWithKey f emptyIntMap m).
+
+(* Determine all of the variables which are referenced within any loop, and
+   collect them into sets associated with each loop end block, since they will
+   be inserted as zero-length ranges making reference to each of those
+   variables. *)
+Definition computeVarReferences (bs : seq blockType1) (st : LoopState) :
+  IntMap IntSet :=
+  forFold emptyIntMap bs $ fun acc b =>
+    let bid := blockId binfo b in
+    let g acc1 loopIndex blks :=
+      if ~~ IntSet_member bid blks then acc1 else
+      let: (xs, ys, zs) := blockOps binfo b in
+      forFold acc1 (xs ++ ys ++ zs) $ fun acc2 op =>
+        forFold acc2 (opRefs oinfo op) $ fun acc3 v =>
+          if varId v isn't inr vid then acc3 else
+          addReference loopIndex vid acc3 in
+    IntMap_foldlWithKey g acc (loopIndices st).
 
 Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
   let fix go n b :=
@@ -200,8 +238,7 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
     modifyActiveBlocks (IntSet_delete bid) in
   if IntMap_toList bs is (_, b) :: _
   then go (IntMap_size bs) b ;;
-       st <-- get ;;
-       setLoopDepths (computeLoopDepths bs st)
+       computeLoopDepths bs
   else pure tt.
 
 (* jww (2015-03-08): For every block I need to know the list of loop end

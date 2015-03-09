@@ -44,17 +44,17 @@ Definition linearScan
   (oinfo : OpInfo maxReg accType opType1 opType2)
   (blocks : seq blockType1) (accum : accType) : Details maxReg :=
   (* order blocks and operations (including loop detection) *)
-  let: (lstate, blocks1) := computeBlockOrder binfo blocks in
+  let: (loops, blocks1) := computeBlockOrder binfo blocks in
 
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
   let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
-  match buildIntervals binfo oinfo blocks1 liveSets'
+  match buildIntervals binfo oinfo blocks1 loops liveSets'
   return @Details blockType1 blockType2 opType1 opType2 accType maxReg with
   | inl err =>
     Build_Details _ _ _ _ _ maxReg (Some (err, BuildingIntervalsFailed))
-      liveSets' blocks1 [::] accum None None binfo oinfo lstate
+      liveSets' blocks1 [::] accum None None binfo oinfo loops
   | inr ssig =>
     (* allocate registers *)
     let opCount := (countOps binfo blocks1).+1 in
@@ -63,7 +63,7 @@ Definition linearScan
     | inl (err, ssig') =>
       Build_Details _ _ _ _ _ maxReg (Some (err, AllocatingRegistersFailed))
         liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1)
-        binfo oinfo lstate
+        binfo oinfo loops
     | inr ssig' =>
         let sd       := finalizeScanState ssig'.2 opCount.*2 in
         let allocs   := determineAllocations sd in
@@ -73,7 +73,7 @@ Definition linearScan
         let: (blocks2, accum') :=
            assignRegNum binfo oinfo allocs liveSets' mappings blocks1 accum in
         Build_Details _ _ _ _ _ maxReg None liveSets' blocks1 blocks2 accum'
-          (Some ssig.1) (Some sd) binfo oinfo lstate
+          (Some ssig.1) (Some sd) binfo oinfo loops
     end
   end.
 

@@ -44,7 +44,7 @@ Proof.
      jww (2015-03-05): Evidence should be given so we do not need this
      check. *)
   case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
-    exact: inl (ENoValidSplitPosition uid). (* ERROR *)
+    exact: inl (ENoValidSplitPositionUnh uid splitPos). (* ERROR *)
 
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
@@ -139,7 +139,7 @@ Proof.
      jww (2015-03-05): Evidence should be given so we do not need this
      check. *)
   case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
-    exact: inl (ENoValidSplitPosition xid). (* ERROR *)
+    exact: inl (ENoValidSplitPosition xid splitPos). (* ERROR *)
 
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
@@ -179,7 +179,7 @@ Proof.
     rewrite Hunh => /=.
     case Hincr: (ibeg i1.1 <= beg).
       move=> *.
-      exact: inl (ENoValidSplitPosition xid). (* ERROR *)
+      exact: inl (ENoValidSplitPosition xid splitPos2). (* ERROR *)
     move/negbT in Hincr; rewrite -ltnNge in Hincr.
     move/(_ Hincr).
     rewrite /= => {st} st.

@@ -213,6 +213,7 @@ data LoopState = LoopState
     , loopEndBlocks    :: IntSet
     , forwardBranches  :: IntMap IntSet
     , backwardBranches :: IntMap IntSet
+    , loopIndices      :: IntMap IntSet
     , loopDepths       :: IntMap (Int, Int)
     }
 
@@ -226,14 +227,17 @@ instance Show LoopState where
                                            M.toList forwardBranches) ++
       "\n    backwardBranches = " ++ show (map (fmap S.toList) $
                                            M.toList backwardBranches) ++
+      "\n    loopIndices      = " ++ show (map (fmap S.toList) $
+                                           M.toList loopIndices) ++
       "\n    loopDepths       = " ++ show (M.toList loopDepths)
 
 toLoopState :: LS.LoopState -> LinearScan.LoopState
-toLoopState (LS.Build_LoopState a b c d e f g) =
+toLoopState (LS.Build_LoopState a b c d e f g h) =
     LoopState (S.fromList a) (S.fromList b) c (S.fromList d)
         (M.fromList (map (fmap S.fromList) e))
         (M.fromList (map (fmap S.fromList) f))
-        (M.fromList g)
+        (M.fromList (map (fmap S.fromList) g))
+        (M.fromList h)
 
 tracer :: String -> a -> a
 tracer x = Debug.Trace.trace ("====================\n" ++ x)
@@ -381,8 +385,12 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     reasonToStr r = case r of
         LS.ERegistersExhausted _ ->
             "No registers available for allocation"
-        LS.ENoValidSplitPosition _ ->
-            "No split position could be found"
+        LS.ENoValidSplitPositionUnh xid splitPos ->
+            "No split position could be found for unhandled interval "
+                ++ show xid ++ " @ " ++ show splitPos
+        LS.ENoValidSplitPosition xid splitPos ->
+            "No split position could be found for " ++ show xid
+                ++ " @ " ++ show splitPos
         LS.ECannotSplitSingleton1 n ->
             "Current interval is a singleton (err#1) (" ++ show n ++ ")"
         LS.ECannotSplitSingleton2 n ->

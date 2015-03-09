@@ -7,6 +7,7 @@ Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Morph.
 Require Import LinearScan.ScanState.
+Require Import LinearScan.Loops.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -509,7 +510,9 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
 
   handleVars refs' Hlt ranges.
 
-Definition reduceBlock {pos} (block : blockType1) :
+Definition reduceBlock {pos} (bid : BlockId) (block : blockType1)
+  (Hsz : 0 < blockSize binfo block)
+  (loops : LoopState) (varUses : IntMap IntSet) :
   let sz := blockSize binfo block in
   let b := pos in
   let e := pos + sz in
@@ -518,6 +521,34 @@ Proof.
   move=> sz b e.
   rewrite /sz /blockSize.
   set ops := allBlockOps binfo block.
+
+  have Hlt : pos <= (pos + sz).-1 < pos + sz.
+    apply/andP; split.
+      by rewrite -subn1 -addnBA // leq_plus //.
+    apply/ltP.
+    apply: Lt.lt_pred_n_n.
+    apply/ltP.
+    rewrite addn_gt0.
+    by apply/orP; right.
+
+  (* jww (2015-03-09): This code insert use positions at the ends of loops, to
+     reduce spillage of variables used within loops.  Wimmer calls these
+     "pseudo use positions", but since I don't have the concept of a
+     pseudo-position yet, this code must remain commented out.  When active,
+     it simply leads to register exhaustion. *)
+  (* move=> ranges. *)
+  (* have := *)
+  (*   if ~~ IntSet_member bid (loopEndBlocks loops) then ranges else *)
+  (*   let f acc loopIndex blks := *)
+  (*     if ~~ IntSet_member bid blks then acc else *)
+  (*     if IntMap_lookup loopIndex varUses isn't Some uses then acc else *)
+  (*     IntSet_union acc uses in *)
+  (*   let uses := IntMap_foldlWithKey f emptyIntSet (loopIndices loops) in *)
+  (*   handleVars [seq {| varId       := inr u *)
+  (*                    ; varKind     := Input *)
+  (*                    ; regRequired := true |} *)
+  (*              | u <- IntSet_toList uses] Hlt ranges. *)
+  (* clear ranges. *)
 
   have H : 0 < size ops -> b < pos + (size ops) <= e.
     rewrite /b /e /sz /blockSize.
@@ -547,8 +578,9 @@ Proof.
   exact: IHos.
 Defined.
 
-Definition reduceBlocks (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) {pos} : BuildState pos.
+Definition reduceBlocks (blocks : seq blockType1) (loops : LoopState)
+  (varUses : IntMap IntSet) (liveSets : IntMap BlockLiveSets) {pos} :
+  BuildState pos.
 Proof.
   elim: blocks => [|b blocks IHbs] in pos *.
     exact: newBuildState.
@@ -562,11 +594,9 @@ Proof.
   case E: (0 < sz);
     last exact: IHbs pos.
 
-  (* For every variable in the live out set, create an empty range covering
-     the entire span. *)
   have Hsz : pos < pos + sz by exact: ltn_plus.
-
-  have pending := reduceBlock (emptyPendingRanges Hsz outs).
+  have pending :=
+    reduceBlock bid E loops varUses (emptyPendingRanges Hsz outs).
   exact: mergeIntoSortedRanges (ltnW Hsz) pending (IHbs (pos + sz)).
 Defined.
 
@@ -588,7 +618,7 @@ Proof.
   exact: (regs, IntMap_insert vid' (packInterval i) vars).
 Defined.
 
-Definition buildIntervals (blocks : seq blockType1)
+Definition buildIntervals (blocks : seq blockType1) (loops : LoopState)
   (liveSets : IntMap BlockLiveSets) : SSError + ScanStateSig maxReg InUse :=
   let add_unhandled_interval (ss  : ScanStateSig maxReg Pending) i :=
         packScanState (ScanState_newUnhandled ss.2 i.2 I) in
@@ -596,13 +626,13 @@ Definition buildIntervals (blocks : seq blockType1)
   if blocks isn't b :: bs
   then inr $ packScanState (ScanState_finalize s0)
   else
-    (fun (bs : BuildState 0) =>
-       let: (regs, vars) := compileIntervals bs in
-       let s1 := ScanState_setFixedIntervals s0 regs in
-       let s2 := packScanState s1 in
-       let s3 := IntMap_foldl add_unhandled_interval s2 vars in
-       let s4 := ScanState_finalize s3.2 in
-       inr $ packScanState s4)
-    (reduceBlocks (b :: bs) liveSets).
+    let varUses := computeVarReferences binfo oinfo (b :: bs) loops in
+    let reduced := reduceBlocks (pos:=0) (b :: bs) loops varUses liveSets in
+    let: (regs, vars) := compileIntervals reduced in
+    let s1 := ScanState_setFixedIntervals s0 regs in
+    let s2 := packScanState s1 in
+    let s3 := IntMap_foldl add_unhandled_interval s2 vars in
+    let s4 := ScanState_finalize s3.2 in
+    inr $ packScanState s4.
 
 End Build.

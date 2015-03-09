@@ -37,111 +37,127 @@ unsafeCoerce = IOExts.unsafeCoerce
 data LoopState =
    Build_LoopState IntMap.IntSet IntMap.IntSet ([] Blocks.BlockId) IntMap.IntSet 
  (IntMap.IntMap IntMap.IntSet) (IntMap.IntMap IntMap.IntSet) (IntMap.IntMap
-                                                             ((,) Prelude.Int
-                                                             Prelude.Int))
+                                                             IntMap.IntSet) 
+ (IntMap.IntMap ((,) Prelude.Int Prelude.Int))
 
 activeBlocks :: LoopState -> IntMap.IntSet
 activeBlocks l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    activeBlocks0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> activeBlocks0}
 
 visitedBlocks :: LoopState -> IntMap.IntSet
 visitedBlocks l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    visitedBlocks0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> visitedBlocks0}
 
 loopHeaderBlocks :: LoopState -> [] Blocks.BlockId
 loopHeaderBlocks l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    loopHeaderBlocks0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> loopHeaderBlocks0}
 
 loopEndBlocks :: LoopState -> IntMap.IntSet
 loopEndBlocks l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    loopEndBlocks0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> loopEndBlocks0}
 
 forwardBranches :: LoopState -> IntMap.IntMap IntMap.IntSet
 forwardBranches l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    forwardBranches0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> forwardBranches0}
 
 backwardBranches :: LoopState -> IntMap.IntMap IntMap.IntSet
 backwardBranches l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    backwardBranches0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> backwardBranches0}
+
+loopIndices :: LoopState -> IntMap.IntMap IntMap.IntSet
+loopIndices l =
+  case l of {
+   Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> loopIndices0}
 
 loopDepths :: LoopState -> IntMap.IntMap ((,) Prelude.Int Prelude.Int)
 loopDepths l =
   case l of {
    Build_LoopState activeBlocks0 visitedBlocks0 loopHeaderBlocks0
-    loopEndBlocks0 forwardBranches0 backwardBranches0 loopDepths0 ->
-    loopDepths0}
+    loopEndBlocks0 forwardBranches0 backwardBranches0 loopIndices0
+    loopDepths0 -> loopDepths0}
 
 emptyLoopState :: LoopState
 emptyLoopState =
   Build_LoopState IntMap.emptyIntSet IntMap.emptyIntSet [] IntMap.emptyIntSet
     IntMap.emptyIntMap IntMap.emptyIntMap IntMap.emptyIntMap
+    IntMap.emptyIntMap
 
 modifyActiveBlocks :: (IntMap.IntSet -> IntMap.IntSet) -> State.State
                       LoopState ()
 modifyActiveBlocks f =
   State.modify (\st -> Build_LoopState (f (activeBlocks st))
     (visitedBlocks st) (loopHeaderBlocks st) (loopEndBlocks st)
-    (forwardBranches st) (backwardBranches st) (loopDepths st))
+    (forwardBranches st) (backwardBranches st) (loopIndices st)
+    (loopDepths st))
 
 modifyVisitedBlocks :: (IntMap.IntSet -> IntMap.IntSet) -> State.State
                        LoopState ()
 modifyVisitedBlocks f =
   State.modify (\st -> Build_LoopState (activeBlocks st)
     (f (visitedBlocks st)) (loopHeaderBlocks st) (loopEndBlocks st)
-    (forwardBranches st) (backwardBranches st) (loopDepths st))
+    (forwardBranches st) (backwardBranches st) (loopIndices st)
+    (loopDepths st))
 
 modifyLoopHeaderBlocks :: (([] Blocks.BlockId) -> [] Blocks.BlockId) ->
                           State.State LoopState ()
 modifyLoopHeaderBlocks f =
   State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
     (f (loopHeaderBlocks st)) (loopEndBlocks st) (forwardBranches st)
-    (backwardBranches st) (loopDepths st))
+    (backwardBranches st) (loopIndices st) (loopDepths st))
 
 modifyLoopEndBlocks :: (IntMap.IntSet -> IntMap.IntSet) -> State.State
                        LoopState ()
 modifyLoopEndBlocks f =
   State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
     (loopHeaderBlocks st) (f (loopEndBlocks st)) (forwardBranches st)
-    (backwardBranches st) (loopDepths st))
+    (backwardBranches st) (loopIndices st) (loopDepths st))
 
 modifyForwardBranches :: ((IntMap.IntMap IntMap.IntSet) -> IntMap.IntMap
                          IntMap.IntSet) -> State.State LoopState ()
 modifyForwardBranches f =
   State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
     (loopHeaderBlocks st) (loopEndBlocks st) (f (forwardBranches st))
-    (backwardBranches st) (loopDepths st))
+    (backwardBranches st) (loopIndices st) (loopDepths st))
 
 modifyBackwardBranches :: ((IntMap.IntMap IntMap.IntSet) -> IntMap.IntMap
                           IntMap.IntSet) -> State.State LoopState ()
 modifyBackwardBranches f =
   State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
     (loopHeaderBlocks st) (loopEndBlocks st) (forwardBranches st)
-    (f (backwardBranches st)) (loopDepths st))
+    (f (backwardBranches st)) (loopIndices st) (loopDepths st))
+
+setLoopIndices :: (IntMap.IntMap IntMap.IntSet) -> State.State LoopState ()
+setLoopIndices indices =
+  State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
+    (loopHeaderBlocks st) (loopEndBlocks st) (forwardBranches st)
+    (backwardBranches st) indices (loopDepths st))
 
 setLoopDepths :: (IntMap.IntMap ((,) Prelude.Int Prelude.Int)) -> State.State
                  LoopState ()
 setLoopDepths depths =
   State.modify (\st -> Build_LoopState (activeBlocks st) (visitedBlocks st)
     (loopHeaderBlocks st) (loopEndBlocks st) (forwardBranches st)
-    (backwardBranches st) depths)
+    (backwardBranches st) (loopIndices st) depths)
 
 addReference :: Prelude.Int -> Prelude.Int -> (IntMap.IntMap IntMap.IntSet)
                 -> IntMap.IntMap IntMap.IntSet
@@ -194,49 +210,75 @@ pathToLoopHeader b header st =
   in go (IntMap.coq_IntSet_size (visitedBlocks st)) IntMap.emptyIntSet b
 
 computeLoopDepths :: (Blocks.BlockInfo a1 a2 a3 a4) -> (IntMap.IntMap 
-                     a1) -> LoopState -> IntMap.IntMap
-                     ((,) Prelude.Int Prelude.Int)
-computeLoopDepths binfo bs st =
-  let {
-   m = Lib.forFold IntMap.emptyIntMap
-         (IntMap.coq_IntSet_toList (loopEndBlocks st)) (\m endBlock ->
-         case IntMap.coq_IntMap_lookup endBlock bs of {
-          Prelude.Just b ->
-           Lib.forFold m (unsafeCoerce (Blocks.blockSuccessors binfo b))
-             (\m' sux ->
-             let {
-              loopIndex = Seq.find (\x ->
-                            Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce x)
-                              sux) (loopHeaderBlocks st)}
-             in
-             case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce loopIndex)
-                    (unsafeCoerce (Data.List.length (loopHeaderBlocks st))) of {
-              Prelude.True -> m';
-              Prelude.False ->
-               let {mres = pathToLoopHeader endBlock (unsafeCoerce sux) st}
+                     a1) -> State.State LoopState ()
+computeLoopDepths binfo bs =
+  State.bind (\st ->
+    let {
+     m = Lib.forFold IntMap.emptyIntMap
+           (IntMap.coq_IntSet_toList (loopEndBlocks st)) (\m endBlock ->
+           case IntMap.coq_IntMap_lookup endBlock bs of {
+            Prelude.Just b ->
+             Lib.forFold m (unsafeCoerce (Blocks.blockSuccessors binfo b))
+               (\m' sux ->
+               let {
+                loopIndex = Seq.find (\x ->
+                              Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce x)
+                                sux) (loopHeaderBlocks st)}
                in
-               case mres of {
-                Prelude.Just path ->
-                 Lib.forFold m' (IntMap.coq_IntSet_toList path) (\m'' blk ->
-                   addReference loopIndex blk m'');
-                Prelude.Nothing -> m'}});
-          Prelude.Nothing -> m})}
-  in
-  let {
-   f = \acc loopIndex refs ->
-    IntMap.coq_IntSet_forFold acc refs (\m' blk ->
-      let {
-       f = \mx ->
-        case mx of {
-         Prelude.Just y ->
-          case y of {
-           (,) idx depth -> Prelude.Just ((,) (Prelude.min idx loopIndex)
-            ((Prelude.succ) depth))};
-         Prelude.Nothing -> Prelude.Just ((,) loopIndex ((Prelude.succ) 0))}}
-      in
-      IntMap.coq_IntMap_alter f blk m')}
-  in
-  IntMap.coq_IntMap_foldlWithKey f IntMap.emptyIntMap m
+               case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce loopIndex)
+                      (unsafeCoerce (Data.List.length (loopHeaderBlocks st))) of {
+                Prelude.True -> m';
+                Prelude.False ->
+                 let {mres = pathToLoopHeader endBlock (unsafeCoerce sux) st}
+                 in
+                 case mres of {
+                  Prelude.Just path ->
+                   Lib.forFold m' (IntMap.coq_IntSet_toList path)
+                     (\m'' blk -> addReference loopIndex blk m'');
+                  Prelude.Nothing -> m'}});
+            Prelude.Nothing -> m})}
+    in
+    let {
+     f = \acc loopIndex refs ->
+      IntMap.coq_IntSet_forFold acc refs (\m' blk ->
+        let {
+         f = \mx ->
+          case mx of {
+           Prelude.Just y ->
+            case y of {
+             (,) idx depth -> Prelude.Just ((,) (Prelude.min idx loopIndex)
+              ((Prelude.succ) depth))};
+           Prelude.Nothing -> Prelude.Just ((,) loopIndex ((Prelude.succ) 0))}}
+        in
+        IntMap.coq_IntMap_alter f blk m')}
+    in
+    State.bind (\x ->
+      setLoopDepths (IntMap.coq_IntMap_foldlWithKey f IntMap.emptyIntMap m))
+      (setLoopIndices m)) State.get
+
+computeVarReferences :: Prelude.Int -> (Blocks.BlockInfo a1 a2 a3 a4) ->
+                        (Blocks.OpInfo a5 a3 a4) -> ([] a1) -> LoopState ->
+                        IntMap.IntMap IntMap.IntSet
+computeVarReferences maxReg binfo oinfo bs st =
+  Lib.forFold IntMap.emptyIntMap bs (\acc b ->
+    let {bid = Blocks.blockId binfo b} in
+    let {
+     g = \acc1 loopIndex blks ->
+      case Prelude.not (IntMap.coq_IntSet_member bid blks) of {
+       Prelude.True -> acc1;
+       Prelude.False ->
+        case Blocks.blockOps binfo b of {
+         (,) p zs ->
+          case p of {
+           (,) xs ys ->
+            Lib.forFold acc1 ((Prelude.++) xs ((Prelude.++) ys zs))
+              (\acc2 op ->
+              Lib.forFold acc2 (Blocks.opRefs maxReg oinfo op) (\acc3 v ->
+                case Blocks.varId maxReg v of {
+                 Prelude.Left p0 -> acc3;
+                 Prelude.Right vid -> addReference loopIndex vid acc3}))}}}}
+    in
+    IntMap.coq_IntMap_foldlWithKey g acc (loopIndices st))
 
 findLoopEnds :: (Blocks.BlockInfo a1 a2 a3 a4) -> (IntMap.IntMap a1) ->
                 State.State LoopState ()
@@ -293,9 +335,8 @@ findLoopEnds binfo bs =
    (:) p l ->
     case p of {
      (,) n b ->
-      State.bind (\x ->
-        State.bind (\st -> setLoopDepths (computeLoopDepths binfo bs st))
-          State.get) (go (IntMap.coq_IntMap_size bs) b)}}
+      State.bind (\x -> computeLoopDepths binfo bs)
+        (go (IntMap.coq_IntMap_size bs) b)}}
 
 computeBlockOrder :: (Blocks.BlockInfo a1 a2 a3 a4) -> ([] a1) -> (,)
                      LoopState ([] a1)
