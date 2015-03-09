@@ -5,7 +5,7 @@
 
 cabal.mkDerivation (self: {
   pname = "linearscan";
-  version = "0.3.0.1";
+  version = "0.4.0.0";
   src = builtins.filterSource (path: type: type != "unknown") ./.;
   buildDepends = [ mtl transformers ];
   testDepends = [ mtl transformers free hoopl hspec hspecExpectations
