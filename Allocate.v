@@ -26,11 +26,9 @@ Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option oddnum) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let int := curIntDetails cur in
-    return_ $ vfoldl (fun mx v =>
-      option_choose mx
-        (if v is Some i
-         then intervalIntersectionPoint int.2 i.2
-         else None)) None (fixedIntervals sd).
+    return_ $ if vnth (fixedIntervals sd) reg is Some i
+              then intervalIntersectionPoint int.2 i.2
+              else None.
 
 Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
   (r : 'I_n) (p : option oddnum) : Vec (option oddnum) n :=
