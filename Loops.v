@@ -26,7 +26,8 @@ Record LoopState := {
   loopHeaderBlocks : seq BlockId;   (* loop index -> block id *)
   loopEndBlocks    : IntSet;
   forwardBranches  : IntMap IntSet; (* block id -> block ids *)
-  backwardBranches : IntMap IntSet  (* block id -> block ids *)
+  backwardBranches : IntMap IntSet; (* block id -> block ids *)
+  loopDepths       : IntMap (nat * nat)
 }.
 
 Definition emptyLoopState :=
@@ -35,7 +36,8 @@ Definition emptyLoopState :=
    ; loopHeaderBlocks := [::]
    ; loopEndBlocks    := emptyIntSet
    ; forwardBranches  := emptyIntMap
-   ; backwardBranches := emptyIntMap |}.
+   ; backwardBranches := emptyIntMap
+   ; loopDepths       := emptyIntMap |}.
 
 Definition modifyActiveBlocks (f : IntSet -> IntSet) : State LoopState unit :=
   modify $ fun st =>
@@ -44,7 +46,8 @@ Definition modifyActiveBlocks (f : IntSet -> IntSet) : State LoopState unit :=
    ; loopHeaderBlocks := loopHeaderBlocks st
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
-   ; backwardBranches := backwardBranches st |}.
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := loopDepths st |}.
 
 Definition modifyVisitedBlocks (f : IntSet -> IntSet) : State LoopState unit :=
   modify $ fun st =>
@@ -53,7 +56,8 @@ Definition modifyVisitedBlocks (f : IntSet -> IntSet) : State LoopState unit :=
    ; loopHeaderBlocks := loopHeaderBlocks st
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
-   ; backwardBranches := backwardBranches st |}.
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := loopDepths st |}.
 
 Definition modifyLoopHeaderBlocks (f : seq BlockId -> seq BlockId) :
   State LoopState unit :=
@@ -63,7 +67,8 @@ Definition modifyLoopHeaderBlocks (f : seq BlockId -> seq BlockId) :
    ; loopHeaderBlocks := f (loopHeaderBlocks st)
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
-   ; backwardBranches := backwardBranches st |}.
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := loopDepths st |}.
 
 Definition modifyLoopEndBlocks (f : IntSet -> IntSet) :
   State LoopState unit :=
@@ -73,7 +78,8 @@ Definition modifyLoopEndBlocks (f : IntSet -> IntSet) :
    ; loopHeaderBlocks := loopHeaderBlocks st
    ; loopEndBlocks    := f (loopEndBlocks st)
    ; forwardBranches  := forwardBranches st
-   ; backwardBranches := backwardBranches st |}.
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := loopDepths st |}.
 
 Definition modifyForwardBranches
   (f : IntMap (IntSet) -> IntMap (IntSet)) :
@@ -84,7 +90,8 @@ Definition modifyForwardBranches
    ; loopHeaderBlocks := loopHeaderBlocks st
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := f (forwardBranches st)
-   ; backwardBranches := backwardBranches st |}.
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := loopDepths st |}.
 
 Definition modifyBackwardBranches
   (f : IntMap (IntSet) -> IntMap (IntSet)) : State LoopState unit :=
@@ -94,7 +101,18 @@ Definition modifyBackwardBranches
    ; loopHeaderBlocks := loopHeaderBlocks st
    ; loopEndBlocks    := loopEndBlocks st
    ; forwardBranches  := forwardBranches st
-   ; backwardBranches := f (backwardBranches st) |}.
+   ; backwardBranches := f (backwardBranches st)
+   ; loopDepths       := loopDepths st |}.
+
+Definition setLoopDepths (depths : IntMap (nat * nat)) : State LoopState unit :=
+  modify $ fun st =>
+  {| activeBlocks     := activeBlocks st
+   ; visitedBlocks    := visitedBlocks st
+   ; loopHeaderBlocks := loopHeaderBlocks st
+   ; loopEndBlocks    := loopEndBlocks st
+   ; forwardBranches  := forwardBranches st
+   ; backwardBranches := backwardBranches st
+   ; loopDepths       := depths |}.
 
 Definition remainingBlocks (bs : IntMap blockType1) (st : LoopState) : nat :=
   IntMap_size bs - IntSet_size (visitedBlocks st).
@@ -104,6 +122,57 @@ Definition addReference (i x : nat) :
   IntMap_alter (fun macc => if macc is Some acc
                             then Some (IntSet_insert x acc)
                             else Some (IntSet_singleton x)) i.
+
+Fixpoint pathToLoopHeader  (b : BlockId) (header : nat) (st : LoopState) :
+  option IntSet :=
+  let fix go fuel visited b :=
+    if fuel isn't S n then None else
+    let visited' := IntSet_insert b visited in
+    let forwardPreds :=
+      if IntMap_lookup b (forwardBranches st) is Some preds
+      then IntSet_toList preds
+      else [::] in
+    let backwardPreds :=
+      if IntMap_lookup b (backwardBranches st) is Some preds
+      then IntSet_toList preds
+      else [::] in
+    let preds := forwardPreds ++ backwardPreds in
+    forFold (Some (IntSet_singleton b)) preds $ fun mxs pred =>
+      if mxs isn't Some xs then None else
+      if pred == header
+      then
+        Some (IntSet_union xs (IntSet_singleton pred))
+      else
+        if IntSet_member pred visited' then Some xs else
+        if go n visited' pred is Some ys
+        then Some (IntSet_union xs ys)
+        else None in
+  go (IntSet_size (visitedBlocks st)) emptyIntSet b.
+
+(* Compute lowest loop index and the loop depth for each block.  If the block
+   is not part of a loop, it will not be in the resulting [IntMap]. *)
+Definition computeLoopDepths (bs : IntMap blockType1) (st : LoopState) :
+  IntMap (nat * nat) :=
+  let m :=
+    forFold emptyIntMap (IntSet_toList (loopEndBlocks st)) $ fun m endBlock =>
+      if IntMap_lookup endBlock bs isn't Some b then m else
+      forFold m (blockSuccessors binfo b) $ fun m' sux =>
+        let loopIndex := find (fun x => x == sux) (loopHeaderBlocks st) in
+        if loopIndex == size (loopHeaderBlocks st) then m' else
+
+        let mres := pathToLoopHeader endBlock sux st in
+        if mres isn't Some path then m' else
+
+        forFold m' (IntSet_toList path) $ fun m'' blk =>
+          addReference loopIndex blk m'' in
+  let f acc loopIndex refs :=
+    IntSet_forFold acc refs $ fun m' blk =>
+        let f mx :=
+          if mx is Some (idx, depth)
+          then Some (minn idx loopIndex, depth.+1)
+          else Some (loopIndex, 1) in
+        IntMap_alter f blk m' in
+  IntMap_foldlWithKey f emptyIntMap m.
 
 Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
   let fix go n b :=
@@ -115,7 +184,9 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
       active <-- gets activeBlocks ;;
       (if IntSet_member sux active
        then
-         modifyLoopHeaderBlocks (cons sux) ;;
+         modifyLoopHeaderBlocks (fun l => if sux \notin l
+                                          then sux :: l
+                                          else l) ;;
          modifyLoopEndBlocks (IntSet_insert bid) ;;
          modifyBackwardBranches (addReference sux bid)
        else
@@ -128,39 +199,10 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
             else pure tt)) ;;
     modifyActiveBlocks (IntSet_delete bid) in
   if IntMap_toList bs is (_, b) :: _
-  then go (IntMap_size bs) b
+  then go (IntMap_size bs) b ;;
+       st <-- get ;;
+       setLoopDepths (computeLoopDepths bs st)
   else pure tt.
-
-Fixpoint pathToLoopHeader  (b : BlockId) (st : LoopState) :
-  option nat * IntSet :=
-  let fix go fuel b :=
-    if fuel isn't S n then (None, emptyIntSet) else
-    let idx := find (fun x => x == b) (loopHeaderBlocks st) in
-    if idx == size (loopHeaderBlocks st)
-    then
-      let preds :=
-        if IntMap_lookup b (forwardBranches st) is Some predecessors
-        then predecessors
-        else emptyIntSet in
-      forFold (None, IntSet_singleton b) (IntSet_toList preds) $ fun z pred =>
-        let: (mx, xs) := z in
-        let: (my, ys) := go n pred in
-        (option_choose mx my, IntSet_union xs ys)
-    else (Some idx, IntSet_singleton b) in
-  go (IntSet_size (visitedBlocks st)) b.
-
-(* Compute lowest loop index and the loop depth for each block.  If the block
-   is not part of a loop, it will not be in the resulting [IntMap]. *)
-Definition computeLoopDepths (st : LoopState) : IntMap (nat * nat) :=
-  forFold emptyIntMap (IntSet_toList (loopEndBlocks st)) $ fun m endBlock =>
-    let: (mloopIndex, path) := pathToLoopHeader endBlock st in
-    if mloopIndex isn't Some loopIndex then m else
-    forFold m (IntSet_toList path) $ fun m' blk =>
-      let f mx :=
-        if mx is Some (idx, depth)
-        then Some (minn idx loopIndex, depth.+1)
-        else Some (loopIndex, 1) in
-      IntMap_alter f blk m'.
 
 (* jww (2015-03-08): For every block I need to know the list of loop end
    blocks, for those loops of which it is a member.  This way I can accumulate
@@ -179,26 +221,25 @@ Definition computeBlockOrder (blocks : seq blockType1) :
   let blockMap :=
     IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks) in
   let: (_, st) := findLoopEnds blockMap emptyLoopState in
-  let depths := computeLoopDepths st in
 
   (* jww (2015-03-08): This is a somewhat simplistic computation of weighting
      for each block. *)
   let lighter x y :=
     let x_id := blockId binfo x in
     let y_id := blockId binfo y in
-    let x_depth := if IntMap_lookup x_id depths is Some (idx, depth)
+    let x_depth := if IntMap_lookup x_id (loopDepths st) is Some (idx, depth)
                    then depth else 0 in
-    let y_depth := if IntMap_lookup y_id depths is Some (idx, depth)
+    let y_depth := if IntMap_lookup y_id (loopDepths st) is Some (idx, depth)
                    then depth else 0 in
     x_depth < y_depth in
 
-  let fix go n branches blocks' work_list :=
-    if n isn't S n then blocks' else
-    if work_list isn't w :: ws then blocks' else
+  let fix go n branches work_list :=
+    if n isn't S n then [::] else
+    if work_list isn't w :: ws then [::] else
     let: (branches', ws') :=
       let bid := blockId binfo w in
       let suxs := blockSuccessors binfo w in
-      let suxs' := forFold (branches, ws) suxs $ fun acc sux =>
+      let suxs' := forFoldr (branches, ws) suxs $ fun sux acc =>
         let: (branches', ws') := acc in
         let insertion := if IntMap_lookup sux blockMap is Some s
                          then insert lighter s ws'
@@ -208,7 +249,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
               if IntSet_size incs == 1 then insertion else ws')
         else (branches', insertion) in
       suxs' in
-    go n branches' (w :: blocks') ws' in
-  (st, go (size blocks) (forwardBranches st) [::] [:: b]).
+    w :: go n branches' ws' in
+  (st, go (size blocks) (forwardBranches st) [:: b]).
 
 End Resolve.

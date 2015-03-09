@@ -213,6 +213,7 @@ data LoopState = LoopState
     , loopEndBlocks    :: IntSet
     , forwardBranches  :: IntMap IntSet
     , backwardBranches :: IntMap IntSet
+    , loopDepths       :: IntMap (Int, Int)
     }
 
 instance Show LoopState where
@@ -224,13 +225,15 @@ instance Show LoopState where
       "\n    forwardBranches  = " ++ show (map (fmap S.toList) $
                                            M.toList forwardBranches) ++
       "\n    backwardBranches = " ++ show (map (fmap S.toList) $
-                                           M.toList backwardBranches)
+                                           M.toList backwardBranches) ++
+      "\n    loopDepths       = " ++ show (M.toList loopDepths)
 
 toLoopState :: LS.LoopState -> LinearScan.LoopState
-toLoopState (LS.Build_LoopState a b c d e f) =
+toLoopState (LS.Build_LoopState a b c d e f g) =
     LoopState (S.fromList a) (S.fromList b) c (S.fromList d)
         (M.fromList (map (fmap S.fromList) e))
         (M.fromList (map (fmap S.fromList) f))
+        (M.fromList g)
 
 tracer :: String -> a -> a
 tracer x = Debug.Trace.trace ("====================\n" ++ x)
@@ -324,11 +327,11 @@ data Details blk1 blk2 op1 op2 accType = Details
 
 instance Show (Details blk1 blk2 op1 op2 accType) where
     show err = "Reason: " ++ show (reason err) ++ "\n\n"
-               ++ "+++ ScanState before allocation:\n"
+               ++ ">>> ScanState before allocation:\n"
                ++ showScanStateDesc (scanStatePre err) ++ "\n"
-               ++ "+++ ScanState after allocation:\n"
+               ++ ">>> ScanState after allocation:\n"
                ++ showScanStateDesc (scanStatePost err) ++ "\n"
-               ++ "+++ " ++ show (loopState err) ++ "\n"
+               ++ ">>> " ++ show (loopState err) ++ "\n"
       where
         showScanStateDesc Nothing = ""
         showScanStateDesc (Just sd) =
