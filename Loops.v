@@ -224,14 +224,14 @@ Definition computeBlockOrder (blocks : seq blockType1) :
 
   (* jww (2015-03-08): This is a somewhat simplistic computation of weighting
      for each block. *)
-  let lighter x y :=
+  let isHeavier x y :=
     let x_id := blockId binfo x in
     let y_id := blockId binfo y in
     let x_depth := if IntMap_lookup x_id (loopDepths st) is Some (idx, depth)
                    then depth else 0 in
     let y_depth := if IntMap_lookup y_id (loopDepths st) is Some (idx, depth)
                    then depth else 0 in
-    x_depth < y_depth in
+    x_depth > y_depth in
 
   let fix go n branches work_list :=
     if n isn't S n then [::] else
@@ -242,7 +242,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
       let suxs' := forFoldr (branches, ws) suxs $ fun sux acc =>
         let: (branches', ws') := acc in
         let insertion := if IntMap_lookup sux blockMap is Some s
-                         then insert lighter s ws'
+                         then insert isHeavier s ws'
                          else ws' in
         if IntMap_lookup sux branches' is Some incs
         then (IntMap_insert sux (IntSet_delete bid incs) branches',

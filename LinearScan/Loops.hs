@@ -310,7 +310,7 @@ computeBlockOrder binfo blocks =
     case findLoopEnds binfo blockMap emptyLoopState of {
      (,) u st ->
       let {
-       lighter = \x y ->
+       isHeavier = \x y ->
         let {x_id = Blocks.blockId binfo x} in
         let {y_id = Blocks.blockId binfo y} in
         let {
@@ -327,7 +327,7 @@ computeBlockOrder binfo blocks =
                       (,) idx depth -> depth};
                     Prelude.Nothing -> 0}}
         in
-        (Prelude.<=) ((Prelude.succ) x_depth) y_depth}
+        (Prelude.<=) ((Prelude.succ) y_depth) x_depth}
       in
       let {
        go = let {
@@ -348,7 +348,7 @@ computeBlockOrder binfo blocks =
                              insertion = case IntMap.coq_IntMap_lookup sux
                                                 blockMap of {
                                           Prelude.Just s ->
-                                           Lib.insert lighter s ws';
+                                           Lib.insert isHeavier s ws';
                                           Prelude.Nothing -> ws'}}
                             in
                             case IntMap.coq_IntMap_lookup sux branches' of {
