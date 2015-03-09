@@ -28,7 +28,7 @@ import qualified Data.IntMap as M
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
-import           Debug.Trace
+-- import           Debug.Trace
 import qualified LinearScan.Blocks as LS
 import           LinearScan.Blocks as LS
 import qualified LinearScan.IntMap as LS
@@ -239,8 +239,8 @@ toLoopState (LS.Build_LoopState a b c d e f g h) =
         (M.fromList (map (fmap S.fromList) g))
         (M.fromList h)
 
-tracer :: String -> a -> a
-tracer x = Debug.Trace.trace ("====================\n" ++ x)
+-- tracer :: String -> a -> a
+-- tracer x = Debug.Trace.trace ("====================\n" ++ x)
 
 showBlock1 :: (blk1 -> [op1])
            -> LS.BlockId
@@ -377,10 +377,14 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     put $ accumulator res'
     case reason res' of
         Just (err, _) -> reportError res' err
-        Nothing -> tracer (show res') (return (Right (allocatedBlocks res')))
+        Nothing ->
+            -- tracer (show res') $
+            return $ Right (allocatedBlocks res')
   where
-    reportError res err =
-        return $ Left $ tracer (show res) (reasonToStr err)
+    -- reportError res err =
+    --     return $ Left $ tracer (show res) $ reasonToStr err
+    reportError _res err =
+        return $ Left $ reasonToStr err
 
     reasonToStr r = case r of
         LS.ERegistersExhausted _ ->
