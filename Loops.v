@@ -111,7 +111,7 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
     let bid := blockId binfo b in
     modifyVisitedBlocks (IntSet_insert bid) ;;
     modifyActiveBlocks (IntSet_insert bid) ;;
-    forM_ (blockSuccessors binfo b) $ fun sux =>
+    (forM_ (blockSuccessors binfo b) $ fun sux =>
       active <-- gets activeBlocks ;;
       (if IntSet_member sux active
        then
@@ -125,7 +125,7 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
        then pure tt
        else if IntMap_lookup sux bs is Some x
             then go n x
-            else pure tt) ;;
+            else pure tt)) ;;
     modifyActiveBlocks (IntSet_delete bid) in
   if IntMap_toList bs is (_, b) :: _
   then go (IntMap_size bs) b
@@ -172,8 +172,9 @@ Definition computeLoopDepths (st : LoopState) : IntMap (nat * nat) :=
    should be place at the end of the loop end blocks for any variables used
    within those loops. *)
 
-Definition computeBlockOrder (blocks : seq blockType1) : seq blockType1 :=
-  if blocks isn't b :: bs then [::] else
+Definition computeBlockOrder (blocks : seq blockType1) :
+  LoopState * seq blockType1 :=
+  if blocks isn't b :: bs then (emptyLoopState, [::]) else
 
   let blockMap :=
     IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks) in
@@ -191,23 +192,23 @@ Definition computeBlockOrder (blocks : seq blockType1) : seq blockType1 :=
                    then depth else 0 in
     x_depth < y_depth in
 
-  blocks.
-  (* let fix go n branches blocks' work_list := *)
-  (*   if n isn't S n then blocks' else *)
-  (*   if work_list isn't w :: ws then blocks' else *)
-  (*   let: (branches', ws') := *)
-  (*     let bid := blockId binfo w in *)
-  (*     let suxs := blockSuccessors binfo w in *)
-  (*     forFold (branches, ws) suxs $ fun acc sux => *)
-  (*       let: (branches', ws') := acc in *)
-  (*       let insertion := if IntMap_lookup sux blockMap is Some s *)
-  (*                        then insert lighter s ws' *)
-  (*                        else ws' in *)
-  (*       if IntMap_lookup sux branches' is Some incs *)
-  (*       then (IntMap_insert sux (IntSet_delete bid incs) branches', *)
-  (*             if IntSet_size incs == 1 then insertion else ws') *)
-  (*       else (branches', insertion) in *)
-  (*   go n branches' (w :: blocks') ws' in *)
-  (* go (size blocks) (forwardBranches st) [::] [:: b]. *)
+  let fix go n branches blocks' work_list :=
+    if n isn't S n then blocks' else
+    if work_list isn't w :: ws then blocks' else
+    let: (branches', ws') :=
+      let bid := blockId binfo w in
+      let suxs := blockSuccessors binfo w in
+      let suxs' := forFold (branches, ws) suxs $ fun acc sux =>
+        let: (branches', ws') := acc in
+        let insertion := if IntMap_lookup sux blockMap is Some s
+                         then insert lighter s ws'
+                         else ws' in
+        if IntMap_lookup sux branches' is Some incs
+        then (IntMap_insert sux (IntSet_delete bid incs) branches',
+              if IntSet_size incs == 1 then insertion else ws')
+        else (branches', insertion) in
+      suxs' in
+    go n branches' (w :: blocks') ws' in
+  (st, go (size blocks) (forwardBranches st) [::] [:: b]).
 
 End Resolve.

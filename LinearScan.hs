@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -24,6 +25,8 @@ import           Control.Monad.State
 import           Data.Functor.Identity
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as M
+import           Data.IntSet (IntSet)
+import qualified Data.IntSet as S
 import qualified Data.List as L
 import           Debug.Trace
 import qualified LinearScan.Blocks as LS
@@ -31,6 +34,7 @@ import           LinearScan.Blocks as LS
 import qualified LinearScan.IntMap as LS
 import qualified LinearScan.Interval as LS
 import qualified LinearScan.LiveSets as LS
+import qualified LinearScan.Loops as LS
 import qualified LinearScan.Main as LS
 import qualified LinearScan.Morph as LS
 import qualified LinearScan.Range as LS
@@ -202,6 +206,32 @@ toScanStateDesc (LS.Build_ScanStateDesc a b c d e f g) =
     let xs = L.foldl' (\m (k, r) -> M.insert k r m) rs (e ++ f) in
     ScanStateDesc a b c d e f g xs
 
+data LoopState = LoopState
+    { activeBlocks     :: IntSet
+    , visitedBlocks    :: IntSet
+    , loopHeaderBlocks :: [BlockId]
+    , loopEndBlocks    :: IntSet
+    , forwardBranches  :: IntMap IntSet
+    , backwardBranches :: IntMap IntSet
+    }
+
+instance Show LoopState where
+  show LoopState {..} = "LoopState = " ++
+      "\n    activeBlocks     = " ++ show (S.toList activeBlocks) ++
+      "\n    visitedBlocks    = " ++ show (S.toList visitedBlocks) ++
+      "\n    loopHeaderBlocks = " ++ show loopHeaderBlocks ++
+      "\n    loopEndBlocks    = " ++ show (S.toList loopEndBlocks) ++
+      "\n    forwardBranches  = " ++ show (map (fmap S.toList) $
+                                           M.toList forwardBranches) ++
+      "\n    backwardBranches = " ++ show (map (fmap S.toList) $
+                                           M.toList backwardBranches)
+
+toLoopState :: LS.LoopState -> LinearScan.LoopState
+toLoopState (LS.Build_LoopState a b c d e f) =
+    LoopState (S.fromList a) (S.fromList b) c (S.fromList d)
+        (M.fromList (map (fmap S.fromList) e))
+        (M.fromList (map (fmap S.fromList) f))
+
 tracer :: String -> a -> a
 tracer x = Debug.Trace.trace ("====================\n" ++ x)
 
@@ -289,12 +319,16 @@ data Details blk1 blk2 op1 op2 accType = Details
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo blk1 blk2 op1 op2
     , opInfo          :: LinearScan.OpInfo accType op1 op2
+    , loopState       :: LoopState
     }
 
 instance Show (Details blk1 blk2 op1 op2 accType) where
-    show err = show (reason err) ++ "\n"
-               ++ showScanStateDesc (scanStatePre err) ++ "\n\n"
-               ++ showScanStateDesc (scanStatePost err)
+    show err = "Reason: " ++ show (reason err) ++ "\n\n"
+               ++ "+++ ScanState before allocation:\n"
+               ++ showScanStateDesc (scanStatePre err) ++ "\n"
+               ++ "+++ ScanState after allocation:\n"
+               ++ showScanStateDesc (scanStatePost err) ++ "\n"
+               ++ "+++ " ++ show (loopState err) ++ "\n"
       where
         showScanStateDesc Nothing = ""
         showScanStateDesc (Just sd) =
@@ -308,9 +342,9 @@ deriving instance Show LS.BlockLiveSets
 
 toDetails :: LS.Details blk1 blk2 op1 op2 accType
                -> Details blk1 blk2 op1 op2 accType
-toDetails (LS.Build_Details a b c d e f g h i) =
+toDetails (LS.Build_Details a b c d e f g h i j) =
     Details a b c d e (fmap toScanStateDesc f) (fmap toScanStateDesc g)
-                 (toBlockInfo h) (toOpInfo i)
+                 (toBlockInfo h) (toOpInfo i) (toLoopState j)
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register

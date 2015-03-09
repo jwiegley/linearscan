@@ -33,7 +33,8 @@ Record Details {blockType1 blockType2 opType1 opType2 accType : Set}
   scanStatePre    : option (ScanStateDesc maxReg);
   scanStatePost   : option (ScanStateDesc maxReg);
   blockInfo       : BlockInfo blockType1 blockType2 opType1 opType2;
-  opInfo          : OpInfo maxReg accType opType1 opType2
+  opInfo          : OpInfo maxReg accType opType1 opType2;
+  loopState       : LoopState
 }.
 
 Definition linearScan
@@ -43,7 +44,7 @@ Definition linearScan
   (oinfo : OpInfo maxReg accType opType1 opType2)
   (blocks : seq blockType1) (accum : accType) : Details maxReg :=
   (* order blocks and operations (including loop detection) *)
-  let blocks1 := computeBlockOrder binfo blocks in
+  let: (lstate, blocks1) := computeBlockOrder binfo blocks in
 
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
@@ -53,7 +54,7 @@ Definition linearScan
   return @Details blockType1 blockType2 opType1 opType2 accType maxReg with
   | inl err =>
     Build_Details _ _ _ _ _ maxReg (Some (err, BuildingIntervalsFailed))
-      liveSets' blocks1 [::] accum None None binfo oinfo
+      liveSets' blocks1 [::] accum None None binfo oinfo lstate
   | inr ssig =>
     (* allocate registers *)
     let opCount := (countOps binfo blocks1).+1 in
@@ -61,7 +62,8 @@ Definition linearScan
     return Details maxReg with
     | inl (err, ssig') =>
       Build_Details _ _ _ _ _ maxReg (Some (err, AllocatingRegistersFailed))
-        liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1) binfo oinfo
+        liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1)
+        binfo oinfo lstate
     | inr ssig' =>
         let sd       := finalizeScanState ssig'.2 opCount.*2 in
         let allocs   := determineAllocations sd in
@@ -71,7 +73,7 @@ Definition linearScan
         let: (blocks2, accum') :=
            assignRegNum binfo oinfo allocs liveSets' mappings blocks1 accum in
         Build_Details _ _ _ _ _ maxReg None liveSets' blocks1 blocks2 accum'
-          (Some ssig.1) (Some sd) binfo oinfo
+          (Some ssig.1) (Some sd) binfo oinfo lstate
     end
   end.
 
