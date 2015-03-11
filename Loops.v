@@ -143,10 +143,10 @@ Definition addReference (i x : nat) :
                             then Some (IntSet_insert x acc)
                             else Some (IntSet_singleton x)) i.
 
-Fixpoint pathToLoopHeader  (b : BlockId) (header : nat) (st : LoopState) :
+Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
   option IntSet :=
   let fix go fuel visited b :=
-    if fuel isn't S n then None else
+    if fuel isn't S n then (visited, None) else
     let visited' := IntSet_insert b visited in
     let forwardPreds :=
       if IntMap_lookup b (forwardBranches st) is Some preds
@@ -157,17 +157,17 @@ Fixpoint pathToLoopHeader  (b : BlockId) (header : nat) (st : LoopState) :
       then IntSet_toList preds
       else [::] in
     let preds := forwardPreds ++ backwardPreds in
-    forFold (Some (IntSet_singleton b)) preds $ fun mxs pred =>
-      if mxs isn't Some xs then None else
+    forFold (visited', Some (IntSet_singleton b)) preds $ fun mxs pred =>
+      if mxs isn't (vis, Some xs) then mxs else
       if pred == header
       then
-        Some (IntSet_union xs (IntSet_singleton pred))
+        (vis, Some (IntSet_union xs (IntSet_singleton pred)))
       else
-        if IntSet_member pred visited' then Some xs else
-        if go n visited' pred is Some ys
-        then Some (IntSet_union xs ys)
-        else None in
-  go (IntSet_size (visitedBlocks st)) emptyIntSet b.
+        if IntSet_member pred vis then (vis, Some xs) else
+        if go n vis pred is (vis', Some ys)
+        then (vis', Some (IntSet_union xs ys))
+        else (vis, None) in
+  snd (go (IntSet_size (visitedBlocks st)) emptyIntSet blk).
 
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
@@ -177,8 +177,9 @@ Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
     forFold emptyIntMap (IntSet_toList (loopEndBlocks st)) $ fun m endBlock =>
       if IntMap_lookup endBlock bs isn't Some b then m else
       forFold m (blockSuccessors binfo b) $ fun m' sux =>
-        let loopIndex := find (fun x => x == sux) (loopHeaderBlocks st) in
-        if loopIndex == size (loopHeaderBlocks st) then m' else
+        let headers := loopHeaderBlocks st in
+        let loopIndex := find (fun x => x == sux) headers in
+        if loopIndex == size headers then m' else
 
         let mres := pathToLoopHeader endBlock sux st in
         if mres isn't Some path then m' else
@@ -276,7 +277,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
     let: (branches', ws') :=
       let bid := blockId binfo w in
       let suxs := blockSuccessors binfo w in
-      let suxs' := forFoldr (branches, ws) suxs $ fun sux acc =>
+      forFold (branches, ws) suxs $ fun acc sux =>
         let: (branches', ws') := acc in
         let insertion := if IntMap_lookup sux blockMap is Some s
                          then insert isHeavier s ws'
@@ -285,7 +286,6 @@ Definition computeBlockOrder (blocks : seq blockType1) :
         then (IntMap_insert sux (IntSet_delete bid incs) branches',
               if IntSet_size incs == 1 then insertion else ws')
         else (branches', insertion) in
-      suxs' in
     w :: go n branches' ws' in
   (st, go (size blocks) (forwardBranches st) [:: b]).
 

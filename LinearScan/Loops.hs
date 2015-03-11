@@ -169,45 +169,58 @@ addReference i x =
 
 pathToLoopHeader :: Blocks.BlockId -> Prelude.Int -> LoopState ->
                     Prelude.Maybe IntMap.IntSet
-pathToLoopHeader b header st =
+pathToLoopHeader blk header st =
   let {
-   go fuel visited b0 =
-     (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
-       (\_ ->
-       Prelude.Nothing)
-       (\n ->
-       let {visited' = IntMap.coq_IntSet_insert b0 visited} in
-       let {
-        forwardPreds = case IntMap.coq_IntMap_lookup b0 (forwardBranches st) of {
-                        Prelude.Just preds -> IntMap.coq_IntSet_toList preds;
-                        Prelude.Nothing -> []}}
-       in
-       let {
-        backwardPreds = case IntMap.coq_IntMap_lookup b0
-                               (backwardBranches st) of {
-                         Prelude.Just preds -> IntMap.coq_IntSet_toList preds;
-                         Prelude.Nothing -> []}}
-       in
-       let {preds = (Prelude.++) forwardPreds backwardPreds} in
-       Lib.forFold (Prelude.Just (IntMap.coq_IntSet_singleton b0))
-         (unsafeCoerce preds) (\mxs pred ->
-         case mxs of {
-          Prelude.Just xs ->
-           case Eqtype.eq_op Ssrnat.nat_eqType pred (unsafeCoerce header) of {
-            Prelude.True -> Prelude.Just
-             (IntMap.coq_IntSet_union xs
-               (IntMap.coq_IntSet_singleton (unsafeCoerce pred)));
-            Prelude.False ->
-             case IntMap.coq_IntSet_member (unsafeCoerce pred) visited' of {
-              Prelude.True -> Prelude.Just xs;
-              Prelude.False ->
-               case unsafeCoerce go n visited' pred of {
-                Prelude.Just ys -> Prelude.Just
-                 (IntMap.coq_IntSet_union xs ys);
-                Prelude.Nothing -> Prelude.Nothing}}};
-          Prelude.Nothing -> Prelude.Nothing}))
-       fuel}
-  in go (IntMap.coq_IntSet_size (visitedBlocks st)) IntMap.emptyIntSet b
+   go = let {
+         go fuel visited b =
+           (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+             (\_ -> (,) visited
+             Prelude.Nothing)
+             (\n ->
+             let {visited' = IntMap.coq_IntSet_insert b visited} in
+             let {
+              forwardPreds = case IntMap.coq_IntMap_lookup b
+                                    (forwardBranches st) of {
+                              Prelude.Just preds ->
+                               IntMap.coq_IntSet_toList preds;
+                              Prelude.Nothing -> []}}
+             in
+             let {
+              backwardPreds = case IntMap.coq_IntMap_lookup b
+                                     (backwardBranches st) of {
+                               Prelude.Just preds ->
+                                IntMap.coq_IntSet_toList preds;
+                               Prelude.Nothing -> []}}
+             in
+             let {preds = (Prelude.++) forwardPreds backwardPreds} in
+             Lib.forFold ((,) visited' (Prelude.Just
+               (IntMap.coq_IntSet_singleton b))) (unsafeCoerce preds)
+               (\mxs pred ->
+               case mxs of {
+                (,) vis o ->
+                 case o of {
+                  Prelude.Just xs ->
+                   case Eqtype.eq_op Ssrnat.nat_eqType pred
+                          (unsafeCoerce header) of {
+                    Prelude.True -> (,) vis (Prelude.Just
+                     (IntMap.coq_IntSet_union xs
+                       (IntMap.coq_IntSet_singleton (unsafeCoerce pred))));
+                    Prelude.False ->
+                     case IntMap.coq_IntSet_member (unsafeCoerce pred) vis of {
+                      Prelude.True -> (,) vis (Prelude.Just xs);
+                      Prelude.False ->
+                       case unsafeCoerce go n vis pred of {
+                        (,) vis' o0 ->
+                         case o0 of {
+                          Prelude.Just ys -> (,) vis' (Prelude.Just
+                           (IntMap.coq_IntSet_union xs ys));
+                          Prelude.Nothing -> (,) vis Prelude.Nothing}}}};
+                  Prelude.Nothing -> mxs}}))
+             fuel}
+        in go}
+  in
+  Prelude.snd
+    (go (IntMap.coq_IntSet_size (visitedBlocks st)) IntMap.emptyIntSet blk)
 
 computeLoopDepths :: (Blocks.BlockInfo a1 a2 a3 a4) -> (IntMap.IntMap 
                      a1) -> State.State LoopState ()
@@ -220,13 +233,14 @@ computeLoopDepths binfo bs =
             Prelude.Just b ->
              Lib.forFold m (unsafeCoerce (Blocks.blockSuccessors binfo b))
                (\m' sux ->
+               let {headers = loopHeaderBlocks st} in
                let {
                 loopIndex = Seq.find (\x ->
                               Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce x)
-                                sux) (loopHeaderBlocks st)}
+                                sux) headers}
                in
                case Eqtype.eq_op Ssrnat.nat_eqType (unsafeCoerce loopIndex)
-                      (unsafeCoerce (Data.List.length (loopHeaderBlocks st))) of {
+                      (unsafeCoerce (Data.List.length headers)) of {
                 Prelude.True -> m';
                 Prelude.False ->
                  let {mres = pathToLoopHeader endBlock (unsafeCoerce sux) st}
@@ -382,7 +396,7 @@ computeBlockOrder binfo blocks =
                   (:) w ws ->
                    case let {bid = Blocks.blockId binfo w} in
                         let {suxs = Blocks.blockSuccessors binfo w} in
-                        Lib.forFoldr ((,) branches ws) suxs (\sux acc ->
+                        Lib.forFold ((,) branches ws) suxs (\acc sux ->
                           case acc of {
                            (,) branches' ws' ->
                             let {
