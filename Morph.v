@@ -18,7 +18,8 @@ Open Scope nat_scope.
 Inductive SSError : Set :=
   | ERegistersExhausted : nat -> SSError
   | ENoValidSplitPositionUnh : nat -> nat -> SSError
-  | ENoValidSplitPosition : nat -> nat -> SSError
+  | ENoValidSplitPosition1 : nat -> nat -> SSError
+  | ENoValidSplitPosition2 : nat -> nat -> SSError
   | ECannotSplitSingleton1 : nat -> SSError
   | ECannotSplitSingleton2 : nat -> SSError
   | ECannotSplitSingleton3 : nat -> SSError
@@ -226,14 +227,37 @@ Proof.
   apply Build_SSMorph; intuition.
 Defined.
 
+Definition transportUnhandled (sd sd' : ScanStateDesc maxReg)
+  (unh : seq (IntervalId sd * nat))
+  (Heqe : nextInterval sd' = nextInterval sd) :
+  seq (IntervalId sd' * nat).
+Proof.
+  elim: unh => [|[uid beg] us IHus].
+    exact: [::].
+  apply: cons.
+    split.
+      rewrite /IntervalId in uid *.
+      by rewrite Heqe.
+    exact: beg.
+  exact: IHus.
+Defined.
+
 Definition moveActiveToHandled
   `(st : ScanState InUse sd) `(H: x \in active sd) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg
+  | ScanState InUse sd'
+  & SSMorphLen sd sd' /\
+    { H : nextInterval sd = nextInterval sd'
+    | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
   pose (ScanState_moveActiveToHandled st H).
-  eexists. apply s.
-  apply Build_SSMorphLen; auto.
-  apply Build_SSMorph; auto.
+  eexists. apply s. simpl.
+  split.
+    apply Build_SSMorphLen; auto.
+    apply Build_SSMorph; auto.
+  exists refl_equal.
+  elim: (unhandled sd) => //= [[uid beg] us IHus].
+  by f_equal.
 Defined.
 
 Definition moveActiveToInactive
@@ -266,12 +290,20 @@ Proof. reflexivity. Qed.
 
 Definition moveInactiveToHandled `(st : ScanState InUse sd)
   `(H : x \in inactive sd) :
-  { sd' : ScanStateDesc maxReg | ScanState InUse sd' & SSMorphLen sd sd' }.
+  { sd' : ScanStateDesc maxReg
+  | ScanState InUse sd'
+  & SSMorphLen sd sd' /\
+    { H : nextInterval sd = nextInterval sd'
+    | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
   pose (ScanState_moveInactiveToHandled st H).
-  eexists. apply s.
-  apply Build_SSMorphLen; auto.
-  apply Build_SSMorph; auto.
+  eexists. apply s. simpl.
+  split.
+    apply Build_SSMorphLen; auto.
+    apply Build_SSMorph; auto.
+  exists refl_equal.
+  elim: (unhandled sd) => //= [[uid beg] us IHus].
+  by f_equal.
 Defined.
 
 End Morph.

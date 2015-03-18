@@ -393,8 +393,11 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
         LS.ENoValidSplitPositionUnh xid splitPos ->
             "No split position could be found for unhandled interval "
                 ++ show xid ++ " @ " ++ show splitPos
-        LS.ENoValidSplitPosition xid splitPos ->
+        LS.ENoValidSplitPosition1 xid splitPos ->
             "No split position could be found for " ++ show xid
+                ++ " @ " ++ show splitPos
+        LS.ENoValidSplitPosition2 xid splitPos ->
+            "No split position (#2) could be found for " ++ show xid
                 ++ " @ " ++ show splitPos
         LS.ECannotSplitSingleton1 n ->
             "Current interval is a singleton (err#1) (" ++ show n ++ ")"

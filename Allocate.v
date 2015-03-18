@@ -248,7 +248,8 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
   let go i : intermediate_result sd xs (@active maxReg) :=
     let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let ss := if intervalEnd i < pos
-              then moveActiveToHandled st Hin
+              then let: exist2 x H1 H2 := moveActiveToHandled st Hin in
+                   exist2 _ _ x H1 (proj1 H2)
               else if ~~ posWithinInterval i pos
                    then moveActiveToInactive st Hin
                    else exist2 _ _ z st (newSSMorphLen z) in
@@ -353,7 +354,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
                     (conj st' (transitivity sslen sslen')) Hsub') in
     if intervalEnd i < pos
     then match moveInactiveToHandled st Hin with
-         | exist2 sd' st' sslen' =>
+         | exist2 sd' st' (conj sslen' _) =>
              f sd' st' sslen' _
          end
     else if posWithinInterval i pos
