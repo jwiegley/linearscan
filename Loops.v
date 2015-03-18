@@ -238,19 +238,8 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
             else pure tt)) ;;
     modifyActiveBlocks (IntSet_delete bid) in
   if IntMap_toList bs is (_, b) :: _
-  then go (IntMap_size bs) b ;;
-       computeLoopDepths bs
+  then go (IntMap_size bs) b
   else pure tt.
-
-(* jww (2015-03-08): For every block I need to know the list of loop end
-   blocks, for those loops of which it is a member.  This way I can accumulate
-   a list of all the variables used in each loop, and create zero-length
-   ranges with use positions that force these variables to be live at the end
-   of the loop. *)
-
-(* jww (2015-03-08): After loops have been computed, artificial use positions
-   should be place at the end of the loop end blocks for any variables used
-   within those loops. *)
 
 Definition computeBlockOrder (blocks : seq blockType1) :
   LoopState * seq blockType1 :=
@@ -258,16 +247,44 @@ Definition computeBlockOrder (blocks : seq blockType1) :
 
   let blockMap :=
     IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks) in
-  let: (_, st) := findLoopEnds blockMap emptyLoopState in
+  let: (_, st0) := findLoopEnds blockMap emptyLoopState in
+
+  (* Every branch from a block with multiple successors to a block with
+     multiple predecessors is a "critical edge".  We insert a new, anonymous
+     block at this edge to hold the resolving moves for the critical edge. *)
+  let blocks' :=
+    forFoldr [::] blocks $ fun b rest =>
+      let suxs := blockSuccessors binfo b in
+      if size suxs <= 1
+      then b :: rest
+      else (fun x => let: (b', rest') := x in b' :: rest') $
+        forFoldr (b, rest) suxs $ fun sux x =>
+          let: (b', rest') := x in
+          let fsz := if IntMap_lookup sux (forwardBranches st0) is Some fwds
+                     then IntSet_size fwds else 0 in
+          let bsz := if IntMap_lookup sux (backwardBranches st0) is Some bwds
+                     then IntSet_size bwds else 0 in
+          if fsz + bsz <= 1
+          then (b', rest')
+          else
+            if IntMap_lookup sux blockMap is Some sux'
+            then let: (b'', sux'') := splitCriticalEdge binfo b' sux' in
+                 (b'', sux'' :: rest')
+            else (b', rest') in
+  let blockMap' :=
+    IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks') in
+  let: (_, st1) := findLoopEnds blockMap' emptyLoopState in
+  if blocks' isn't b' :: bs' then (emptyLoopState, [::]) else
+  let: (_, st2)  := computeLoopDepths blockMap st1 in
 
   (* jww (2015-03-08): This is a somewhat simplistic computation of weighting
      for each block. *)
   let isHeavier x y :=
     let x_id := blockId binfo x in
     let y_id := blockId binfo y in
-    let x_depth := if IntMap_lookup x_id (loopDepths st) is Some (idx, depth)
+    let x_depth := if IntMap_lookup x_id (loopDepths st2) is Some (idx, depth)
                    then depth else 0 in
-    let y_depth := if IntMap_lookup y_id (loopDepths st) is Some (idx, depth)
+    let y_depth := if IntMap_lookup y_id (loopDepths st2) is Some (idx, depth)
                    then depth else 0 in
     x_depth > y_depth in
 
@@ -279,7 +296,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
       let suxs := blockSuccessors binfo w in
       forFold (branches, ws) suxs $ fun acc sux =>
         let: (branches', ws') := acc in
-        let insertion := if IntMap_lookup sux blockMap is Some s
+        let insertion := if IntMap_lookup sux blockMap' is Some s
                          then insert isHeavier s ws'
                          else ws' in
         if IntMap_lookup sux branches' is Some incs
@@ -287,6 +304,6 @@ Definition computeBlockOrder (blocks : seq blockType1) :
               if IntSet_size incs == 1 then insertion else ws')
         else (branches', insertion) in
     w :: go n branches' ws' in
-  (st, go (size blocks) (forwardBranches st) [:: b]).
+  (st2, go (size blocks') (forwardBranches st2) [:: b']).
 
 End Resolve.

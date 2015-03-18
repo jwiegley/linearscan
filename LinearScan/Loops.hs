@@ -348,9 +348,7 @@ findLoopEnds binfo bs =
    [] -> State.pure ();
    (:) p l ->
     case p of {
-     (,) n b ->
-      State.bind (\x -> computeLoopDepths binfo bs)
-        (go (IntMap.coq_IntMap_size bs) b)}}
+     (,) n b -> go (IntMap.coq_IntMap_size bs) b}}
 
 computeBlockOrder :: (Blocks.BlockInfo a1 a2 a3 a4) -> ([] a1) -> (,)
                      LoopState ([] a1)
@@ -363,64 +361,115 @@ computeBlockOrder binfo blocks =
                   (Prelude.map (\x -> (,) (Blocks.blockId binfo x) x) blocks)}
     in
     case findLoopEnds binfo blockMap emptyLoopState of {
-     (,) u st ->
+     (,) u st0 ->
       let {
-       isHeavier = \x y ->
-        let {x_id = Blocks.blockId binfo x} in
-        let {y_id = Blocks.blockId binfo y} in
-        let {
-         x_depth = case IntMap.coq_IntMap_lookup x_id (loopDepths st) of {
-                    Prelude.Just p ->
-                     case p of {
-                      (,) idx depth -> depth};
-                    Prelude.Nothing -> 0}}
-        in
-        let {
-         y_depth = case IntMap.coq_IntMap_lookup y_id (loopDepths st) of {
-                    Prelude.Just p ->
-                     case p of {
-                      (,) idx depth -> depth};
-                    Prelude.Nothing -> 0}}
-        in
-        (Prelude.<=) ((Prelude.succ) y_depth) x_depth}
+       blocks' = Lib.forFoldr [] blocks (\b0 rest ->
+                   let {suxs = Blocks.blockSuccessors binfo b0} in
+                   case (Prelude.<=) (Data.List.length suxs) ((Prelude.succ)
+                          0) of {
+                    Prelude.True -> (:) b0 rest;
+                    Prelude.False ->
+                     let {
+                      x = Lib.forFoldr ((,) b0 rest) suxs (\sux x ->
+                            case x of {
+                             (,) b' rest' ->
+                              let {
+                               fsz = case IntMap.coq_IntMap_lookup sux
+                                            (forwardBranches st0) of {
+                                      Prelude.Just fwds ->
+                                       IntMap.coq_IntSet_size fwds;
+                                      Prelude.Nothing -> 0}}
+                              in
+                              let {
+                               bsz = case IntMap.coq_IntMap_lookup sux
+                                            (backwardBranches st0) of {
+                                      Prelude.Just bwds ->
+                                       IntMap.coq_IntSet_size bwds;
+                                      Prelude.Nothing -> 0}}
+                              in
+                              case (Prelude.<=) ((Prelude.+) fsz bsz)
+                                     ((Prelude.succ) 0) of {
+                               Prelude.True -> (,) b' rest';
+                               Prelude.False ->
+                                case IntMap.coq_IntMap_lookup sux blockMap of {
+                                 Prelude.Just sux' ->
+                                  case Blocks.splitCriticalEdge binfo b' sux' of {
+                                   (,) b'' sux'' -> (,) b'' ((:) sux'' rest')};
+                                 Prelude.Nothing -> (,) b' rest'}}})}
+                     in
+                     case x of {
+                      (,) b' rest' -> (:) b' rest'}})}
       in
       let {
-       go = let {
-             go n branches work_list =
-               (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
-                 (\_ ->
-                 [])
-                 (\n0 ->
-                 case work_list of {
-                  [] -> [];
-                  (:) w ws ->
-                   case let {bid = Blocks.blockId binfo w} in
-                        let {suxs = Blocks.blockSuccessors binfo w} in
-                        Lib.forFold ((,) branches ws) suxs (\acc sux ->
-                          case acc of {
-                           (,) branches' ws' ->
-                            let {
-                             insertion = case IntMap.coq_IntMap_lookup sux
-                                                blockMap of {
-                                          Prelude.Just s ->
-                                           Lib.insert isHeavier s ws';
-                                          Prelude.Nothing -> ws'}}
-                            in
-                            case IntMap.coq_IntMap_lookup sux branches' of {
-                             Prelude.Just incs -> (,)
-                              (IntMap.coq_IntMap_insert sux
-                                (IntMap.coq_IntSet_delete bid incs)
-                                branches')
-                              (case Eqtype.eq_op Ssrnat.nat_eqType
-                                      (unsafeCoerce
-                                        (IntMap.coq_IntSet_size incs))
-                                      (unsafeCoerce ((Prelude.succ) 0)) of {
-                                Prelude.True -> insertion;
-                                Prelude.False -> ws'});
-                             Prelude.Nothing -> (,) branches' insertion}}) of {
-                    (,) branches' ws' -> (:) w (go n0 branches' ws')}})
-                 n}
-            in go}
+       blockMap' = IntMap.coq_IntMap_fromList
+                     (Prelude.map (\x -> (,) (Blocks.blockId binfo x) x)
+                       blocks')}
       in
-      (,) st (go (Data.List.length blocks) (forwardBranches st) ((:) b []))}}
+      case findLoopEnds binfo blockMap' emptyLoopState of {
+       (,) u0 st1 ->
+        case blocks' of {
+         [] -> (,) emptyLoopState [];
+         (:) b' bs' ->
+          case computeLoopDepths binfo blockMap st1 of {
+           (,) u1 st2 ->
+            let {
+             isHeavier = \x y ->
+              let {x_id = Blocks.blockId binfo x} in
+              let {y_id = Blocks.blockId binfo y} in
+              let {
+               x_depth = case IntMap.coq_IntMap_lookup x_id (loopDepths st2) of {
+                          Prelude.Just p ->
+                           case p of {
+                            (,) idx depth -> depth};
+                          Prelude.Nothing -> 0}}
+              in
+              let {
+               y_depth = case IntMap.coq_IntMap_lookup y_id (loopDepths st2) of {
+                          Prelude.Just p ->
+                           case p of {
+                            (,) idx depth -> depth};
+                          Prelude.Nothing -> 0}}
+              in
+              (Prelude.<=) ((Prelude.succ) y_depth) x_depth}
+            in
+            let {
+             go = let {
+                   go n branches work_list =
+                     (\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))
+                       (\_ ->
+                       [])
+                       (\n0 ->
+                       case work_list of {
+                        [] -> [];
+                        (:) w ws ->
+                         case let {bid = Blocks.blockId binfo w} in
+                              let {suxs = Blocks.blockSuccessors binfo w} in
+                              Lib.forFold ((,) branches ws) suxs (\acc sux ->
+                                case acc of {
+                                 (,) branches' ws' ->
+                                  let {
+                                   insertion = case IntMap.coq_IntMap_lookup
+                                                      sux blockMap' of {
+                                                Prelude.Just s ->
+                                                 Lib.insert isHeavier s ws';
+                                                Prelude.Nothing -> ws'}}
+                                  in
+                                  case IntMap.coq_IntMap_lookup sux branches' of {
+                                   Prelude.Just incs -> (,)
+                                    (IntMap.coq_IntMap_insert sux
+                                      (IntMap.coq_IntSet_delete bid incs)
+                                      branches')
+                                    (case Eqtype.eq_op Ssrnat.nat_eqType
+                                            (unsafeCoerce
+                                              (IntMap.coq_IntSet_size incs))
+                                            (unsafeCoerce ((Prelude.succ) 0)) of {
+                                      Prelude.True -> insertion;
+                                      Prelude.False -> ws'});
+                                   Prelude.Nothing -> (,) branches' insertion}}) of {
+                          (,) branches' ws' -> (:) w (go n0 branches' ws')}})
+                       n}
+                  in go}
+            in
+            (,) st2
+            (go (Data.List.length blocks') (forwardBranches st2) ((:) b' []))}}}}}
 

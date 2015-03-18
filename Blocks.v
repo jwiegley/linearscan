@@ -49,11 +49,12 @@ Record OpInfo (accType opType1 opType2 : Set) := {
 Definition BlockId := nat.
 
 Record BlockInfo (blockType1 blockType2 opType1 opType2 : Set) := {
-  blockId         : blockType1 -> BlockId;
-  blockSuccessors : blockType1 -> seq BlockId;
-  blockOps        : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
-  setBlockOps     : blockType1 -> seq opType2 -> seq opType2 -> seq opType2
-                      -> blockType2
+  blockId           : blockType1 -> BlockId;
+  blockSuccessors   : blockType1 -> seq BlockId;
+  splitCriticalEdge : blockType1 -> blockType1 -> blockType1 * blockType1;
+  blockOps          : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
+  setBlockOps       : blockType1 -> seq opType2 -> seq opType2 -> seq opType2
+                        -> blockType2
 }.
 
 Close Scope string_scope.

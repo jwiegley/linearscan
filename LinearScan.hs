@@ -28,7 +28,7 @@ import qualified Data.IntMap as M
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
--- import           Debug.Trace
+import           Debug.Trace
 import qualified LinearScan.Blocks as LS
 import           LinearScan.Blocks as LS
 import qualified LinearScan.IntMap as LS
@@ -128,10 +128,11 @@ toOpInfo (LS.Build_OpInfo a b c d e f g h) =
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
 data BlockInfo blk1 blk2 op1 op2 = BlockInfo
-    { blockId         :: blk1 -> Int
-    , blockSuccessors :: blk1 -> [Int]
-    , blockOps        :: blk1 -> ([op1], [op1], [op1])
-    , setBlockOps     :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
+    { blockId           :: blk1 -> Int
+    , blockSuccessors   :: blk1 -> [Int]
+    , splitCriticalEdge :: blk1 -> blk1 -> (blk1, blk1)
+    , blockOps          :: blk1 -> ([op1], [op1], [op1])
+    , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
     }
 
 type IntervalId = Int
@@ -239,8 +240,8 @@ toLoopState (LS.Build_LoopState a b c d e f g h) =
         (M.fromList (map (fmap S.fromList) g))
         (M.fromList h)
 
--- tracer :: String -> a -> a
--- tracer x = Debug.Trace.trace ("====================\n" ++ x)
+tracer :: String -> a -> a
+tracer x = Debug.Trace.trace ("====================\n" ++ x)
 
 showBlock1 :: (blk1 -> [op1])
            -> LS.BlockId
@@ -308,13 +309,13 @@ showBlocks1 binfo oinfo sd ls = go 0
 
 fromBlockInfo :: LinearScan.BlockInfo blk1 blk2 op1 op2
               -> LS.BlockInfo blk1 blk2 op1 op2
-fromBlockInfo (BlockInfo a b c d) =
-    LS.Build_BlockInfo a b (\blk -> let (x, y, z) = c blk in ((x, y), z)) d
+fromBlockInfo (BlockInfo a b c d e) =
+    LS.Build_BlockInfo a b c (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 toBlockInfo :: LS.BlockInfo blk1 blk2 op1 op2
             -> LinearScan.BlockInfo blk1 blk2 op1 op2
-toBlockInfo (LS.Build_BlockInfo a b c d) =
-    BlockInfo a b (\blk -> let ((x, y), z) = c blk in (x, y, z)) d
+toBlockInfo (LS.Build_BlockInfo a b c d e) =
+    BlockInfo a b c (\blk -> let ((x, y), z) = d blk in (x, y, z)) e
 
 data Details blk1 blk2 op1 op2 accType = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
@@ -378,13 +379,13 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     case reason res' of
         Just (err, _) -> reportError res' err
         Nothing ->
-            -- tracer (show res') $
+            tracer (show res') $
             return $ Right (allocatedBlocks res')
   where
-    -- reportError res err =
-    --     return $ Left $ tracer (show res) $ reasonToStr err
-    reportError _res err =
-        return $ Left $ reasonToStr err
+    reportError res err =
+        return $ Left $ tracer (show res) $ reasonToStr err
+    -- reportError _res err =
+    --     return $ Left $ reasonToStr err
 
     reasonToStr r = case r of
         LS.ERegistersExhausted _ ->
