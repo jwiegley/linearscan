@@ -530,24 +530,23 @@ Proof.
     rewrite addn_gt0.
     by apply/orP; right.
 
-  (* jww (2015-03-09): This code insert use positions at the ends of loops, to
-     reduce spillage of variables used within loops.  Wimmer calls these
-     "pseudo use positions", but since I don't have the concept of a
-     pseudo-position yet, this code must remain commented out.  When active,
-     it simply leads to register exhaustion. *)
-  (* move=> ranges. *)
-  (* have := *)
-  (*   if ~~ IntSet_member bid (loopEndBlocks loops) then ranges else *)
-  (*   let f acc loopIndex blks := *)
-  (*     if ~~ IntSet_member bid blks then acc else *)
-  (*     if IntMap_lookup loopIndex varUses isn't Some uses then acc else *)
-  (*     IntSet_union acc uses in *)
-  (*   let uses := IntMap_foldlWithKey f emptyIntSet (loopIndices loops) in *)
-  (*   handleVars [seq {| varId       := inr u *)
-  (*                    ; varKind     := Input *)
-  (*                    ; regRequired := true |} *)
-  (*              | u <- IntSet_toList uses] Hlt ranges. *)
-  (* clear ranges. *)
+  (* If the current block is a loop end block, insert an [Input] pseudo-use
+     position at the very end of the block for every variable which was
+     referenced within that loop.  This causes the allocation algorithm to
+     split other intervals first before those used by the loop. *)
+  move=> ranges.
+  have :=
+    if ~~ IntSet_member bid (loopEndBlocks loops) then ranges else
+    let f acc loopIndex blks :=
+      if ~~ IntSet_member bid blks then acc else
+      if IntMap_lookup loopIndex varUses isn't Some uses then acc else
+      IntSet_union acc uses in
+    let uses := IntMap_foldlWithKey f emptyIntSet (loopIndices loops) in
+    handleVars [seq {| varId       := inr u
+                     ; varKind     := Input
+                     ; regRequired := false |}
+               | u <- IntSet_toList uses] Hlt ranges.
+  clear ranges.
 
   have H : 0 < size ops -> b < pos + (size ops) <= e.
     rewrite /b /e /sz /blockSize.
