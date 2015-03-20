@@ -80,12 +80,12 @@ Proof.
     (* The second interval goes back on the unhandled list, to be processed in a
        later iteration.  Note: this cannot change the head of the unhandled
        list. *)
-    have := ScanState_newUnhandled st i1.2.
-    rewrite Hunh => /=.
-    case Hincr: (ibeg i1.1 <= beg).
+    case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
       exact: inl (ENoValidSplitPosition2 xid splitPos2). (* ERROR *)
-    move/negbT in Hincr; rewrite -ltnNge in Hincr.
+
+    have := ScanState_newUnhandled st i1.2.
+    rewrite Hunh => /=.
     move/(_ Hincr).
     rewrite /= => {st} st.
 
