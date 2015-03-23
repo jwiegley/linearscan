@@ -32,7 +32,7 @@ Inductive SpillDetails : Set :=
   | SD_InactiveToHandled of nat & nat. (* interval id & reg *)
 
 Inductive SSError : Set :=
-  | ECannotInsertUnhAtCurPos of SpillDetails & nat
+  | ECannotInsertUnhAtPos of SpillDetails & nat (* pos *)
   | EIntervalBeginsBeforeUnhandled of nat
   | ENoValidSplitPositionUnh of SplitPosition & nat
   | ENoValidSplitPosition of SplitPosition & nat
@@ -256,14 +256,14 @@ Proof.
 Defined.
 
 Definition moveActiveToHandled
-  `(st : ScanState InUse sd) `(H: x \in active sd) :
+  `(st : ScanState InUse sd) (spilled : bool) `(H: x \in active sd) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'
   & SSMorphLen sd sd' /\
     { H : nextInterval sd = nextInterval sd'
     | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
-  pose (ScanState_moveActiveToHandled st H).
+  pose (ScanState_moveActiveToHandled spilled st H).
   eexists. apply s. simpl.
   split.
     apply Build_SSMorphLen; auto.
@@ -302,14 +302,14 @@ Lemma moveInactiveToActive_spec
 Proof. reflexivity. Qed.
 
 Definition moveInactiveToHandled `(st : ScanState InUse sd)
-  `(H : x \in inactive sd) :
+  (spilled : bool) `(H : x \in inactive sd) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'
   & SSMorphLen sd sd' /\
     { H : nextInterval sd = nextInterval sd'
     | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
-  pose (ScanState_moveInactiveToHandled st H).
+  pose (ScanState_moveInactiveToHandled spilled st H).
   eexists. apply s. simpl.
   split.
     apply Build_SSMorphLen; auto.

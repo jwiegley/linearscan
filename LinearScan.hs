@@ -171,7 +171,13 @@ instance Show ScanStateDesc where
         "Handled:\n"
             ++ concatMap (\(i, r) ->
                            "  " ++ showReg r ++ showInterval i ++ "\n")
-                         (handled sd)
+                         (handled sd) ++
+        "Fixed:\n"
+            ++ concatMap (\(reg, mi) ->
+                           case mi of
+                           Nothing -> ""
+                           Just i -> "  " ++ showIntervalDesc reg i ++ "\n")
+                         (zip [0..] (fixedIntervals sd))
       where
         showInterval i = showIntervalDesc i (intervals sd !! i)
 
@@ -391,10 +397,10 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     --     return $ Left $ reasonToStr err
 
     reasonToStr r = case r of
-        LS.ECannotInsertUnhAtCurPos spillDets xid ->
-            "Cannot insert interval " ++ show xid
-              ++ " onto unhandled list (begins at current position) "
-              ++ show spillDets
+        LS.ECannotInsertUnhAtPos spillDets pos ->
+            "Cannot insert interval " ++ show spillDets
+              ++ " onto unhandled list (use at position "
+              ++ show pos ++ ")"
         LS.EIntervalBeginsBeforeUnhandled xid ->
             "Cannot spill interval " ++ show xid
                 ++ " (begins before current position)"

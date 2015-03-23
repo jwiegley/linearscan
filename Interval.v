@@ -204,14 +204,6 @@ Definition intervalIntersectionPoint `(Interval i) `(Interval j) :
          None (rds j)))
     None (rds i).
 
-Definition searchInRange (r : RangeSig) (f : UsePos -> bool) :
-  option { u : UsePos | u \in ups r.1 }.
-Proof.
-  case: (findRangeUsePos r.2 f) => [x|];
-    last exact: None.
-  exact: Some _.
-Defined.
-
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in
   NE_foldl f [::] (rds d).
@@ -225,7 +217,7 @@ Proof.
   move: (Interval_exact_end i) => /=.
   destruct d.
   elim: rds0 => [r|r rs IHrs] /= i H1 H2 in i *.
-    move: (searchInRange r f) => [[u Hin]|]; last first.
+    move: (findRangeUsePos r.2 f) => [[u Hin]|]; last first.
       exact: None.
     apply: Some _.
     exists r.
@@ -248,7 +240,7 @@ Proof.
         | apply: (IHxs Hin);
           case: xs => [|? ?] in IHxs Hin Hproper *;
           by ordered ] ].
-  move: (searchInRange r f) => [[u Hin]|]; last first.
+  move: (findRangeUsePos r.2 f) => [[u Hin]|]; last first.
     apply: IHrs => //=.
       move/intervalUncons: i => [? i].
       admit.

@@ -225,14 +225,16 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        |}
 
-  | ScanState_moveActiveToHandled sd :
+  | ScanState_moveActiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in active sd ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := rem x (active sd)
        ; inactive         := inactive sd
-       ; handled          := (fst x, Some (snd x)) :: handled sd
+       ; handled          := (fst x, if spilled
+                                     then None
+                                     else Some (snd x)) :: handled sd
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
        |}
@@ -250,14 +252,16 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; fixedIntervals   := fixedIntervals sd
        |}
 
-  | ScanState_moveInactiveToHandled sd :
+  | ScanState_moveInactiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in inactive sd ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
        ; active           := active sd
        ; inactive         := rem x (inactive sd)
-       ; handled          := (fst x, Some (snd x)) :: handled sd
+       ; handled          := (fst x, if spilled
+                                     then None
+                                     else Some (snd x)) :: handled sd
        ; intervals        := intervals sd
        ; fixedIntervals   := fixedIntervals sd
        |}.

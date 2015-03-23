@@ -125,7 +125,7 @@ Definition allocateBlockedReg {pre} :
          nextUsePos[it.reg] = next use of it after start of current *)
     let go {n : nat} (v : Vec (option oddnum) n) (p : IntervalSig * 'I_n) :=
         let: (int, r) := p in
-        let atPos u := pos == uloc u in
+        let atPos u := (pos == uloc u) && regReq u in
         let pos' :=
             (* In calculating the highest use position of this register, if we
                know that it is being used at the current position, then it
@@ -249,7 +249,7 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
   let go i : intermediate_result sd xs (@active maxReg) :=
     let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let ss := if intervalEnd i < pos
-              then let: exist2 x H1 H2 := moveActiveToHandled st Hin in
+              then let: exist2 x H1 H2 := moveActiveToHandled st false Hin in
                    exist2 _ _ x H1 (proj1 H2)
               else if ~~ posWithinInterval i pos
                    then moveActiveToInactive st Hin
@@ -354,7 +354,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
         inr (exist2 _ _ (sd'; sslen')
                     (conj st' (transitivity sslen sslen')) Hsub') in
     if intervalEnd i < pos
-    then match moveInactiveToHandled st Hin with
+    then match moveInactiveToHandled st false Hin with
          | exist2 sd' st' (conj sslen' _) =>
              f sd' st' sslen' _
          end
