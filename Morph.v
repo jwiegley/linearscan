@@ -15,19 +15,32 @@ Definition PhysReg : predArgType := 'I_maxReg.
 
 Open Scope nat_scope.
 
+Inductive SplitReason :=
+  | AvailableForPart of nat
+  | IntersectsWithFixed of nat  (* gives the register *)
+  | SplittingActive of nat      (* gives the register *)
+  | SplittingInactive of nat.   (* gives the interval id *)
+
+Inductive SplitPosition : Set :=
+  | BeforePos of oddnum & SplitReason
+  | EndOfLifetimeHole of oddnum.
+
+Inductive SpillDetails : Set :=
+  | SD_NewToHandled
+  | SD_UnhandledToHandled
+  | SD_ActiveToHandled of nat & nat    (* interval id & reg *)
+  | SD_InactiveToHandled of nat & nat. (* interval id & reg *)
+
 Inductive SSError : Set :=
-  | ERegistersExhausted : nat -> SSError
-  | ENoValidSplitPositionUnh : nat -> nat -> SSError
-  | ENoValidSplitPosition1 : nat -> nat -> SSError
-  | ENoValidSplitPosition2 : nat -> nat -> SSError
-  | ECannotSplitSingleton1 : nat -> SSError
-  | ECannotSplitSingleton2 : nat -> SSError
-  | ECannotSplitSingleton3 : nat -> SSError
-  | ENoIntervalsToSplit
-  | ERegisterAlreadyAssigned : nat -> SSError
-  | ERegisterAssignmentsOverlap : nat -> SSError
-  | EFuelExhausted : SSError
-  | EUnexpectedNoMoreUnhandled : SSError.
+  | ECannotInsertUnhAtCurPos of SpillDetails & nat
+  | EIntervalBeginsBeforeUnhandled of nat
+  | ENoValidSplitPositionUnh of SplitPosition & nat
+  | ENoValidSplitPosition of SplitPosition & nat
+  | ECannotSplitSingleton of SplitPosition & nat
+  | ERegisterAlreadyAssigned of nat
+  | ERegisterAssignmentsOverlap of nat
+  | EUnexpectedNoMoreUnhandled
+  | EFuelExhausted.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :

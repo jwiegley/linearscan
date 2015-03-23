@@ -15,17 +15,13 @@ Section Split.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Inductive SplitPosition :=
-  | BeforePos of oddnum
-  | EndOfLifetimeHole of oddnum.
-
 (* Given an interval, determine its optimal split position.  If no split
    position can be found, it means the interval may be safely spilled, and all
    further variable references should be accessed directly from memory. *)
 Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
   oddnum :=
   match pos with
-  | BeforePos n         => n
+  | BeforePos n _       => n
   | EndOfLifetimeHole n => afterLifetimeHole i n
   end.
 
@@ -37,21 +33,30 @@ Inductive SpillCondition (sd : ScanStateDesc maxReg) :=
   | InactiveToHandled xid reg :
       (xid, reg) \in inactive sd -> SpillCondition sd.
 
+Definition spillConditionToDetails `(spill : SpillCondition sd) :
+  SpillDetails :=
+  match spill with
+  | NewToHandled                => SD_NewToHandled
+  | UnhandledToHandled          => SD_UnhandledToHandled
+  | ActiveToHandled xid reg _   => SD_ActiveToHandled xid reg
+  | InactiveToHandled xid reg _ => SD_InactiveToHandled xid reg
+  end.
+
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
   (xid : IntervalId sd) (Hbeg : beg <= ibeg i1.1)
   (spill : SpillCondition sd) :
-  SSError + option { ss : ScanStateSig maxReg InUse
-                   | if spill is UnhandledToHandled
-                     then SSMorph sd ss.1
-                     else SSMorphHasLen sd ss.1 }.
+  SSError + { ss : ScanStateSig maxReg InUse
+            | if spill is UnhandledToHandled
+              then SSMorph sd ss.1
+              else SSMorphHasLen sd ss.1 }.
 Proof.
-  (* Is there a use position requiring a register in the second interval?  If
-     yes, then split it again; otherwise, spill it. *)
+  (* Is there a use position requiring a register in the interval?  If yes,
+     then split it again; otherwise, spill it. *)
   case: (firstUseReqReg i1.2) => [[[splitPos2 Hodd2] /= Hmid2] |]; last first.
     case: spill => [||? ? Hin|? ? Hin].
     - move: (ScanState_newHandled st i1.2) => st'.
-      apply: inr (Some _).
+      apply: inr _.
       exists (_; st').
       apply Build_SSMorphHasLen => //=;
       try apply Build_SSMorphLen => //=;
@@ -60,17 +65,17 @@ Proof.
     - destruct sd; simpl in *.
       rewrite Hunh in st.
       move: (ScanState_moveUnhandledToHandled st) => st'.
-      apply: inr (Some _).
+      apply: inr _.
       exists (_; st').
       exact: Build_SSMorph.
     - move: (moveActiveToHandled st Hin) => [sd' st' [[[?] H] [Heqe Heqe2]]].
-      apply: inr (Some _).
+      apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
       apply H.
       by rewrite Hunh.
     - move: (moveInactiveToHandled st Hin) => [sd' st' [[[?] H] [Heqe Heqe2]]].
-      apply: inr (Some _).
+      apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
       apply H.
@@ -82,14 +87,15 @@ Proof.
        list. *)
     case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
-      exact: inl (ENoValidSplitPosition2 xid splitPos2). (* ERROR *)
+      set det := spillConditionToDetails spill.
+      exact: inl (ECannotInsertUnhAtCurPos det xid). (* ERROR *)
 
     have := ScanState_newUnhandled st i1.2.
     rewrite Hunh => /=.
     move/(_ Hincr).
     rewrite /= => {st} st.
 
-    apply: inr (Some (packScanState st; _)).
+    apply: inr (packScanState st; _).
     case: spill => [||*|*];
     apply Build_SSMorphHasLen => //=;
     try apply Build_SSMorphLen => //=;
@@ -134,7 +140,7 @@ Proof.
      to indicate a spill. *)
   case: spill => [||xid' reg' Hin|xid' reg' Hin].
   - move: (ScanState_newHandled st i1.2) => st'.
-    apply: inr (Some _).
+    apply: inr _.
     exists (_; st').
     apply Build_SSMorphHasLen => //=;
     try apply Build_SSMorphLen => //=;
@@ -150,7 +156,7 @@ Proof.
       set b := lebf _ _ _.
       by case: b; discriminate.
     move: (ScanState_moveUnhandledToHandled st) => st'.
-    apply: inr (Some _).
+    apply: inr _.
     exists (_; st').
     apply Build_SSMorph => //=;
     try by rewrite size_map insert_size.
@@ -158,7 +164,7 @@ Proof.
       rewrite /sd' /= mem_map //=.
       exact: widen_fst_inj.
     move: (moveActiveToHandled st Hin') => [sd'' st'' [[[?] H] [Heqe Heqe2]]].
-    apply: inr (Some _).
+    apply: inr _.
     exists (sd''; st'').
     apply Build_SSMorphHasLen => //=;
     try apply Build_SSMorphLen => //=;
@@ -170,7 +176,7 @@ Proof.
       rewrite /sd' /= mem_map //=.
       exact: widen_fst_inj.
     move: (moveInactiveToHandled st Hin') => [sd'' st'' [[[?] H] [Heqe Heqe2]]].
-    apply: inr (Some _).
+    apply: inr _.
     exists (sd''; st'').
     apply Build_SSMorphHasLen => //=;
     try apply Build_SSMorphLen => //=;
@@ -180,9 +186,34 @@ Proof.
     + admit.
 Defined.
 
+Definition spillCurrentInterval {pre} :
+  SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
+Proof.
+  move=> ssi.
+  case: ssi => sd.
+  case=> H. case: H => /=; case.
+  case Hunh: (unhandled sd) => //= [[uid beg] us].
+  move=> H1 H2 H3.
+  have := getInterval uid.
+  set d := (X in Interval X).
+  move=> i st.
+  case Hbeg2: (beg <= ibeg d); last first.
+    exact: inl (EIntervalBeginsBeforeUnhandled uid). (* ERROR *)
+  case: (spillInterval st Hunh uid Hbeg2
+           (UnhandledToHandled sd)) => [err|[ss [/= ?]]].
+    exact: inl err.
+  apply: inr (tt, _).
+  apply: (Build_SSInfo _ st).
+  apply Build_SSMorphHasLen => //=;
+  try apply Build_SSMorphHasLen => //=;
+  try apply Build_SSMorphLen => //=;
+  try apply Build_SSMorph => //=;
+  by rewrite Hunh.
+Defined.
+
 Definition splitUnhandledInterval `(st : ScanState InUse sd)
   `(Hunh : unhandled sd = (uid, beg) :: us) (pos : SplitPosition) :
-  SSError + option { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
+  SSError + { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
   case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
@@ -196,19 +227,18 @@ Proof.
      check. *)
   case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
     case Hbeg2: (beg <= ibeg int.1); last first.
-      exact: inl (ENoValidSplitPositionUnh uid splitPos). (* ERROR *)
+      exact: inl (ENoValidSplitPositionUnh pos uid). (* ERROR *)
 
     move: st.
     set sd := (X in ScanState _ X).
     move=> st.
 
     case: (spillInterval st Hunh uid Hbeg2
-             (UnhandledToHandled sd)) => [err|[[ss [/= ?]]|]].
-    - exact: inl err.
-    - apply: inr (Some (ss; _)).
-      apply Build_SSMorphLen => //=.
-      admit.
-    - exact: inr None.
+             (UnhandledToHandled sd)) => [err|[ss [/= ?]]].
+      exact: inl err.
+    apply: inr (ss; _).
+    apply Build_SSMorphLen => //=.
+    admit.
 
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
@@ -251,7 +281,7 @@ Proof.
   move/(_ Hincr).
   rewrite /= => {st} st.
 
-  apply: inr (Some (packScanState st; _)).
+  apply: inr (packScanState st; _).
   apply Build_SSMorphLen.
   apply Build_SSMorph => //=.
   by rewrite insert_size.
@@ -269,21 +299,18 @@ Proof.
   move=> H1 H2 H3.
   move/splitUnhandledInterval/(_ uid beg us Hunh pos).
   case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
-  case=> [err|[[[sd st] [[/= ? H]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton1 uid). (* ERROR *)
-  - apply: (inr (tt, _)).
-    apply: (Build_SSInfo _ st).
-    rewrite Hunh /= in H.
-    specialize (H (ltn0Sn _)).
-    apply Build_SSMorphHasLen;
-    try apply Build_SSMorphHasLen;
-    try apply Build_SSMorphLen;
-    try apply Build_SSMorphLen;
-    try apply Build_SSMorph;
-    rewrite ?insert_size ?size_map //;
-    try move=> Hpre;
-    exact: (leq_trans H1 _).
-  - exact: inl err.
+  case=> [err|[[sd st] [[/= ? H]]]].
+    exact: inl err.
+  apply: (inr (tt, _)).
+  apply: (Build_SSInfo _ st).
+  rewrite Hunh /= in H.
+  specialize (H (ltn0Sn _)).
+  apply Build_SSMorphHasLen;
+  try apply Build_SSMorphLen;
+  try apply Build_SSMorph;
+  rewrite ?insert_size ?size_map //;
+  try move=> Hpre;
+  exact: (leq_trans H1 _).
 Defined.
 
 Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
@@ -291,7 +318,7 @@ Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
   (xid : IntervalId sd) (pos : SplitPosition) (reg : PhysReg)
   (Hbeg : beg <= (splitPosition (getInterval xid) pos).1)
   (Hin : ((xid, reg) \in active sd) + ((xid, reg) \in inactive sd)) :
-  SSError + option { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
+  SSError + { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
 Proof.
   case: sd => /= [ni ints ? unh ? ? ?] in st uid us xid Hunh Hbeg Hin *.
   set int := vnth ints xid.
@@ -332,19 +359,17 @@ Proof.
        we can try to spill the first part of the interval (or all of it, if
        there are no use positions requiring registers). *)
     case Hbeg2: (beg <= ibeg int.1); last first.
-      exact: inl (ENoValidSplitPosition1 xid splitPos). (* ERROR *)
+      exact: inl (ENoValidSplitPosition pos xid). (* ERROR *)
 
     case: Hin => [Hin|Hin].
       case: (spillInterval st Hunh xid Hbeg2 (ActiveToHandled Hin))
-        => [err|[[ss [[[/= ?] ?] ?]]|]].
-      - exact: inl err.
-      - exact: inr (Some (ss; _)).
-      - exact: inr None.
+        => [err|[ss [[[/= ?] ?] ?]]].
+        exact: inl err.
+      exact: inr (ss; _).
     case: (spillInterval st Hunh xid Hbeg2 (InactiveToHandled Hin))
-      => [err|[[ss [[[/= ?] ?] ?]]|]].
-    - exact: inl err.
-    - exact: inr (Some (ss; _)).
-    - exact: inr None.
+      => [err|[ss [[[/= ?] ?] ?]]].
+      exact: inl err.
+    exact: inr (ss; _).
 
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
@@ -385,18 +410,16 @@ Proof.
       rewrite /sd /= in Hle *.
       by rewrite widen_ord_spec.
     case: (spillInterval st Hunh xid Hbeg2 (ActiveToHandled Hin'))
-      => [err|[[ss [[[/= ?] ?] ?]]|]].
-    - exact: inl err.
-    - exact: inr (Some (ss; _)).
-    - exact: inr None.
+      => [err|[ss [[[/= ?] ?] ?]]].
+      exact: inl err.
+    exact: inr (ss; _).
   have Hin' : (widen_ord Hle xid, reg) \in inactive sd.
     rewrite /sd /= in Hle *.
     by rewrite widen_ord_spec.
   case: (spillInterval st Hunh xid Hbeg2 (InactiveToHandled Hin'))
-    => [err|[[ss [[[/= ?] ?] ?]]|]].
-  - exact: inl err.
-  - exact: inr (Some (ss; _)).
-  - exact: inr None.
+    => [err|[ss [[[/= ?] ?] ?]]].
+    exact: inl err.
+  exact: inr (ss; _).
 Defined.
 
 (** If [pos] is [None], it means "split at the end of its lifetime hole". *)
@@ -432,7 +455,7 @@ Proof.
     by rewrite Hunh.
 
   case Hbeg: (beg <= (splitPosition (getInterval aid) pos).1); last first.
-    exact: inl (ECannotSplitSingleton2 aid). (* ERROR *)
+    exact: inl (ECannotSplitSingleton pos aid). (* ERROR *)
 
   move/splitActiveOrInactiveInterval: st
     => /(_ uid beg us Hunh aid pos reg Hbeg) /=.
@@ -446,40 +469,39 @@ Proof.
     exact: inr _.
   move=> /(_ Hin') {Hin'}.
 
-  case=> [err|[[[sd st] [[/= [Hincr] H ?]]] |]]; last first.
-  - exact: inl (ECannotSplitSingleton3 aid). (* ERROR *)
-  - apply: (inr (tt, _)).
+  case=> [err|[[sd st] [[/= [Hincr] H ?]]]].
+    exact: inl err.
+  apply: (inr (tt, _)).
 
-    (* When splitting an active interval, we must move the first half over to
-       the inactive list, since it no longer intersects with the current
-       position.  This is only valid when [trueForActives] is [true], and only
-       if [splitAtInterval] does not modify the actives list.  It doesn't hurt
-       to always check whether it's a member, though we should prove that
-       [splitAtInterval] has the right behavior. *)
-    case E: ((widen_ord Hincr aid, reg) \in active sd) => //;
-      first
-        (have /= := ScanState_moveActiveToInactive st E;
-         move=> {st};
-         set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _;
-         simpl in act_to_inact;
-         move=> st);
+  (* When splitting an active interval, we must move the first half over to
+     the inactive list, since it no longer intersects with the current
+     position.  This is only valid when [trueForActives] is [true], and only
+     if [splitAtInterval] does not modify the actives list.  It doesn't hurt
+     to always check whether it's a member, though we should prove that
+     [splitAtInterval] has the right behavior. *)
+  case E: ((widen_ord Hincr aid, reg) \in active sd) => //;
+    first
+      (have /= := ScanState_moveActiveToInactive st E;
+       move=> {st};
+       set act_to_inact := Build_ScanStateDesc _ _ _ _ _ _;
+       simpl in act_to_inact;
+       move=> st);
 
-    rewrite Hunh /= in H;
-    specialize (H (ltn0Sn _));
-    apply: (Build_SSInfo _ st);
-    apply Build_SSMorphHasLen;
-    try apply Build_SSMorphHasLen;
-    try apply Build_SSMorphLen;
-    try apply Build_SSMorph;
-    rewrite ?insert_size ?size_map //;
-    try move=> Hpre;
-    exact: (leq_trans H1 _).
-  - exact: inl err.
+  rewrite Hunh /= in H;
+  specialize (H (ltn0Sn _));
+  apply: (Build_SSInfo _ st);
+  apply Build_SSMorphHasLen;
+  try apply Build_SSMorphHasLen;
+  try apply Build_SSMorphLen;
+  try apply Build_SSMorph;
+  rewrite ?insert_size ?size_map //;
+  try move=> Hpre;
+  exact: (leq_trans H1 _).
 Defined.
 
 Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
-  splitAssignedIntervalForReg reg (BeforePos pos) true.
+  splitAssignedIntervalForReg reg (BeforePos pos (SplittingActive reg)) true.
 
 Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.

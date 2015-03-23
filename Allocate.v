@@ -102,7 +102,8 @@ Definition tryAllocateFreeReg {pre} :
         else @Some _ $
           if intervalEnd current < n.1
           then success
-          else splitCurrentInterval (BeforePos n) ;;;
+          else splitCurrentInterval
+                 (BeforePos n (AvailableForPart (fst (curId cur)))) ;;;
                success
       end.
 
@@ -169,8 +170,7 @@ Definition allocateBlockedReg {pre} :
            assign spill slot to current
            split current before its first use position that requires a
              register *)
-      let p := firstUseReqRegOrEnd current in
-      splitCurrentInterval (BeforePos p) ;;;
+      @spillCurrentInterval maxReg pre ;;;
 
       (* // make sure that current does not intersect with
          // the fixed interval for reg
@@ -206,7 +206,8 @@ Definition allocateBlockedReg {pre} :
          position? *)
       mloc <<- intersectsWithFixedInterval reg ;;
       match mloc with
-      | Some n => splitCurrentInterval (BeforePos n)
+      | Some n => splitCurrentInterval
+                    (BeforePos n (IntersectsWithFixed reg))
       | None   => return_ tt
       end ;;;
 

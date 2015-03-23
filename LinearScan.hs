@@ -151,6 +151,9 @@ data ScanStateDesc = ScanStateDesc
 deriving instance Show LS.IntervalDesc
 deriving instance Show LS.RangeDesc
 deriving instance Show LS.UsePos
+deriving instance Show LS.SplitReason
+deriving instance Show LS.SpillDetails
+deriving instance Show LS.SplitPosition
 
 instance Show ScanStateDesc where
     show sd =
@@ -388,29 +391,24 @@ allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
     --     return $ Left $ reasonToStr err
 
     reasonToStr r = case r of
-        LS.ERegistersExhausted _ ->
-            "No registers available for allocation"
-        LS.ENoValidSplitPositionUnh xid splitPos ->
-            "No split position could be found for unhandled interval "
-                ++ show xid ++ " @ " ++ show splitPos
-        LS.ENoValidSplitPosition1 xid splitPos ->
-            "No split position could be found for " ++ show xid
+        LS.ECannotInsertUnhAtCurPos spillDets xid ->
+            "Cannot insert interval " ++ show xid
+              ++ " onto unhandled list (begins at current position) "
+              ++ show spillDets
+        LS.EIntervalBeginsBeforeUnhandled xid ->
+            "Cannot spill interval " ++ show xid
+                ++ " (begins before current position)"
+        LS.ENoValidSplitPositionUnh splitPos xid ->
+            "No split position found for unhandled interval " ++ show xid
                 ++ " @ " ++ show splitPos
-        LS.ENoValidSplitPosition2 xid splitPos ->
-            "No split position (#2) could be found for " ++ show xid
-                ++ " @ " ++ show splitPos
-        LS.ECannotSplitSingleton1 n ->
-            "Current interval is a singleton (err#1) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton2 n ->
-            "Current interval is a singleton (err#2) (" ++ show n ++ ")"
-        LS.ECannotSplitSingleton3 n ->
-            "Current interval is a singleton (err#3) (" ++ show n ++ ")"
-        LS.ENoIntervalsToSplit ->
-            "There are no intervals to split"
-        LS.ERegisterAlreadyAssigned n ->
-            "Register is already assigned (" ++ show n ++ ")"
-        LS.ERegisterAssignmentsOverlap n ->
-            "Register assignments overlap (" ++ show n ++ ")"
-        LS.EFuelExhausted -> "Fuel was exhausted"
+        LS.ENoValidSplitPosition splitPos xid ->
+            "No split position found for " ++ show xid ++ " @ " ++ show splitPos
+        LS.ECannotSplitSingleton splitPos xid ->
+            "Interval " ++ show xid ++ " is a singleton @ " ++ show splitPos
+        LS.ERegisterAlreadyAssigned reg ->
+            "Register " ++ show reg ++ " already assigned"
+        LS.ERegisterAssignmentsOverlap reg ->
+            "Register assignments overlap at " ++ show reg
         LS.EUnexpectedNoMoreUnhandled ->
             "The unexpected happened: no more unhandled intervals"
+        LS.EFuelExhausted -> "Fuel was exhausted"
