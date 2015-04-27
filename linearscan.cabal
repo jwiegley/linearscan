@@ -67,6 +67,7 @@ library
     LinearScan.Logic
     LinearScan.Loops
     LinearScan.Main
+    LinearScan.Monad
     LinearScan.Morph
     LinearScan.NonEmpty0
     LinearScan.Range
@@ -89,3 +90,4 @@ library
                   , containers
                   , transformers
                   , mtl
+                  , ghc-prim

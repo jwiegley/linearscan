@@ -60,7 +60,12 @@ Proof.
         ; curExists := first_nonempty |} as p.
   specialize (f thisDesc p).
   apply f.
-  exact: Build_SSInfo.
+  apply: Build_SSInfo.
+    apply: Build_SSMorphHasLen.
+      apply: Build_SSMorphLen; auto.
+      exact: len_is_SSMorph.
+    auto.
+  exact: thisState.
 Defined.
 
 End Cursor.

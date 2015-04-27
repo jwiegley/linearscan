@@ -181,7 +181,6 @@ Proof.
   split. apply tt.
   destruct HS.
   apply: Build_SSInfo.
-  - exact: thisDesc0.
   - exact: thisHolds0.
   - by [].
 Defined.
@@ -324,7 +323,7 @@ End Morph.
 Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
 
 Notation "X <<- A ;; B" := (A >>>= (fun X => B))
-  (right associativity, at level 84, A1 at next level).
+  (right associativity, at level 84, A at next level).
 
 Notation "A ;;; B" := (_ <<- A ;; B)
-  (right associativity, at level 84, A1 at next level).
+  (right associativity, at level 84).

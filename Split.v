@@ -187,7 +187,7 @@ Proof.
     + by ordered.
     + admit.
     + admit.
-Defined.
+Admitted.
 
 Definition spillCurrentInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
@@ -288,7 +288,7 @@ Proof.
   apply Build_SSMorphLen.
   apply Build_SSMorph => //=.
   by rewrite insert_size.
-Defined.
+Admitted.
 
 (** If [reg] is some value, it means we allocate the first part of the split
    interval to that register; otherwise, we spill it. *)

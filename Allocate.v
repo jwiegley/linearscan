@@ -286,7 +286,8 @@ Obligation 2.
   case: sslen'.
   case=> [? _].
   rewrite map_widen_ord_refl.
-  exact: subseq_impl_cons.
+  apply: subseq_impl_cons.
+  exact Hsub.
 Qed.
 
 Definition checkActiveIntervals {pre} (pos : nat) :
@@ -376,7 +377,8 @@ Defined.
 Obligation 3.
   rewrite /mt_fst /morphlen_transport /=.
   rewrite map_widen_ord_refl.
-  exact: subseq_impl_cons.
+  apply: subseq_impl_cons.
+  exact Hsub.
 Defined.
 
 Definition checkInactiveIntervals {pre} (pos : nat) :

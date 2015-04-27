@@ -44,7 +44,7 @@ Notation "X <-- A ;; B" := (A >>= (fun X => B))
   (right associativity, at level 84, A at next level).
 
 Notation "A ;; B" := (_ <-- A ;; B)
-  (right associativity, at level 84, A1 at next level).
+  (right associativity, at level 84).
 
 Fixpoint mapM {S A B} (f : A -> State S B) (l : list A) : State S (list B) :=
   match l with

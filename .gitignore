@@ -4,6 +4,7 @@
 .*.aux
 /.coq-native/
 /LinearScan/Allocate.hs
+/LinearScan/Ascii.hs
 /LinearScan/Assign.hs
 /LinearScan/Blocks.hs
 /LinearScan/Build.hs
@@ -20,8 +21,11 @@
 /LinearScan/List0.hs
 /LinearScan/LiveSets.hs
 /LinearScan/Logic.hs
+/LinearScan/Loops.hs
 /LinearScan/Main.hs
+/LinearScan/Monad.hs
 /LinearScan/Morph.hs
+/LinearScan/Nat.hs
 /LinearScan/NonEmpty0.hs
 /LinearScan/Order.hs
 /LinearScan/Peano.hs
@@ -37,6 +41,7 @@
 /LinearScan/Ssrfun.hs
 /LinearScan/Ssrnat.hs
 /LinearScan/State.hs
+/LinearScan/String0.hs
 /LinearScan/UsePos.hs
 /LinearScan/Vector0.hs
 /LinearScan/choice.hs

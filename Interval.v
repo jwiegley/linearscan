@@ -251,7 +251,7 @@ Proof.
   exists u.
     assumption.
   admit.
-Defined.
+Admitted.
 
 Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
   option { u : oddnum | ibeg d <= u.1 <= iend d }.

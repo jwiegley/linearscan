@@ -840,7 +840,7 @@ Proof.
     constructor=> //.
   inv H3; inv H5.
   constructor=> //.
-    exact: transitivity H4 H3.
+    by transitivity y.
   exact: (Forall_ordered H4).
 Qed.
 
@@ -972,7 +972,9 @@ Proof.
   move/negP in E.
   move/negP in E.
   apply: IHys.
-  exact: subseq_in_cons.
+  apply: subseq_in_cons.
+    exact Hsub.
+  exact E.
 Qed.
 
 Lemma in_subseq_sing : forall {E : eqType} (s : seq E) v (y : E) ys,
@@ -995,7 +997,8 @@ Proof.
   case: (y == z).
     move=> Hsub.
     specialize (IHzs Hsub).
-    exact: subseq_impl_cons.
+    apply: subseq_impl_cons.
+    exact IHzs.
   exact.
 Qed.
 
@@ -1006,7 +1009,8 @@ Proof.
   elim=> // [y ys IHys] s Hsub.
   rewrite /=.
   case: (y == x).
-    exact: subseq_impl_cons.
+    apply: subseq_impl_cons.
+    exact Hsub.
   exact.
 Qed.
 
@@ -1099,8 +1103,8 @@ Program Fixpoint dep_foldl_inv
   | _ => exist P b Pb
   end.
 Obligation 2.
-  inversion Heq_anonymous.
-  clear Heq_anonymous0.
+  inversion Heq_anonymous0.
+  clear Heq_anonymous.
   rewrite -H1 in Hn.
   rewrite -H0 in Hn.
   simpl in Hn.
@@ -1146,8 +1150,8 @@ Program Fixpoint dep_foldl_invE
   | _ => inr (exist P b Pb)
   end.
 Obligation 2.
-  inversion Heq_anonymous.
-  clear Heq_anonymous0.
+  inversion Heq_anonymous0.
+  clear Heq_anonymous.
   rewrite -H1 -H0 in Hn.
   simpl in Hn.
   move: eqSS Hn => /= -> /eqP ->.

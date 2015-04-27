@@ -108,7 +108,7 @@ Proof.
   - Case "ScanState_moveActiveToHandled". exact: IHst.
   - Case "ScanState_moveInactiveToActive". exact: IHst.
   - Case "ScanState_moveInactiveToHandled".  exact: IHst.
-Qed.
+Admitted.
 
 End UnhandledSorted.
 
@@ -161,7 +161,7 @@ Proof.
   (* uniq_reorg s2 sd Huniq *)
   (*   (rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA *)
   (*            perm_cat2l -!map_cat perm_eq_sym). *)
-Qed.
+Admitted.
 
 Lemma move_inactive_to_active : forall maxReg sd x,
   uniq (@unhandledIds maxReg sd ++
@@ -186,7 +186,7 @@ Proof.
   move=> ? sd x Huniq Hin.
   admit.
   (* uniq_reorg s2 sd Huniq (rewrite 2!perm_cat2l -!map_cat). *)
-Qed.
+Admitted.
 
 Theorem lists_are_unique `(st : @ScanState maxReg b sd) :
   uniq (all_state_lists sd).
@@ -235,7 +235,7 @@ Proof.
     exact: (@move_inactive_to_active _ _ x IHst H).
   - Case "ScanState_moveInactiveToHandled".
     exact: (@move_inactive_to_handled _ _ x IHst H).
-Qed.
+Admitted.
 
 Theorem actives_are_unique `(st : @ScanState maxReg b sd) :
   uniq (active sd).
@@ -278,22 +278,26 @@ Proof.
   - Case "ScanState_moveActiveToInactive".
     rewrite size_rem; last assumption.
     rewrite addSn addnS -addSn prednK //.
-    exact: has_size.
+    apply: has_size.
+    exact H.
 
   - Case "ScanState_moveActiveToHandled".
     rewrite size_rem; last assumption.
     rewrite 2!addnS -addSn prednK //.
-    exact: has_size.
+    apply: has_size.
+    exact H.
 
   - Case "ScanState_moveInactiveToActive".
     rewrite size_rem; last assumption.
     rewrite addSn -addnS -addSn prednK //.
-    exact: has_size.
+    apply: has_size.
+    exact H.
 
   - Case "ScanState_moveInactiveToHandled".
     rewrite size_rem; last assumption.
     rewrite addnS -addSn prednK //.
-    exact: has_size.
+    apply: has_size.
+    exact H.
 Qed.
 
 (* Lemma in_rem : forall (a : eqType) (y x : a) xs, *)

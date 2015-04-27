@@ -95,16 +95,14 @@ Definition compilePendingRanges {b e} (Hlt : b <= e)
     else True}.
 Proof.
   elim: ranges => [|r1 rs IHrs] in H *.
-    apply: exist2 _ _ _ _ _.
-    exists [::].
+    apply: exist2 _ _ (exist2 _ _ [::] _ _) _ _.
     - by constructor.
     - by [].
     - by undoubled.
-    - exact: I.
+    - intros; exact: I.
 
   destruct rs as [|r2 rs2] eqn:R2.
-    apply: exist2 _ _ _ _ _.
-    exists [:: r1.1].
+    apply: exist2 _ _ (exist2 _ _ [:: r1.1] _ _) _ _.
     - by constructor; constructor.
     - clear -r1.
       case: r1 => [H1 H2] /=.
@@ -132,8 +130,7 @@ Proof.
      overlap and adjacency. *)
   case E: (range_ltn r1.1 r2').
     rewrite /=.
-    apply: exist2 _ _ _ _ _.
-    exists [:: r1.1, r2' & rs2'].
+    apply: exist2 _ _ (exist2 _ _ [:: r1.1, r2' & rs2'] _ _) _ _.
     - constructor.
         exact: H2a.
       constructor.
@@ -151,9 +148,8 @@ Proof.
 
   (* Otherwise, if the ranges are directly adjacent, or overlap, coalesce them
      into a single range. *)
-  apply: exist2 _ _ _ _ _.
-  apply: exist2 _ _ [:: _ & rs2'] _ _.
-  apply: (packRange (Range_merge r1 r2')).
+  apply: exist2 _ _
+    (exist2 _ _ [:: packRange (Range_merge r1 r2') & rs2'] _ _) _ _.
 
   (* Prove that sorting over range_ltn has been established. *)
   rewrite /range_ltn /= in E *.
@@ -189,6 +185,7 @@ Proof.
   by ordered.
 
   rewrite /=.
+  intros.
   apply: (last_leq H3).
   rewrite geq_max.
   inv H4.
@@ -317,8 +314,9 @@ Proof.
   case: (uloc u == rend rd) => // in Hend;
   try exact/ltnW;
   try exact: Forall_ordered;
-  move/ltnW in Hend;
-  exact: Forall_ordered.
+  try move/ltnW in Hend;
+  apply: Forall_ordered; rewrite /upos_le;
+  try exact Hend; auto.
 Defined.
 
 Definition makeNewRange {b pos e} (H : b <= pos < e)
@@ -339,9 +337,7 @@ Proof.
                end
      ; ups  := [:: upos ] |}.
 
-  apply: (_; _).
-  apply: (_; _).
-   exact: rd.
+  apply: ((rd; _); _).
    constructor=> /=.
    + move/eqP in Heqe; rewrite {}Heqe.
      case: (uvar upos) in rd *;
@@ -350,7 +346,7 @@ Proof.
    + by case: (uvar upos); exact: odd_double_plus.
    + by apply/andP; split.
 
-  rewrite /=.
+  rewrite /= => r.
   case: (uvar upos).
   + case U: (pos.*2.+1 == pos.*2.+2).
       move/eqP in U.

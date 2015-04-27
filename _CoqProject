@@ -13,6 +13,7 @@ LiveSets.v
 Loops.v
 Ltac.v
 Main.v
+Monad.v
 Morph.v
 NonEmpty.v
 Range.v
