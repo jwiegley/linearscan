@@ -2,6 +2,7 @@
 *.glob
 *.vo
 .*.aux
+/.coq-native/
 /LinearScan/Allocate.hs
 /LinearScan/Assign.hs
 /LinearScan/Blocks.hs
@@ -23,6 +24,7 @@
 /LinearScan/Morph.hs
 /LinearScan/NonEmpty0.hs
 /LinearScan/Order.hs
+/LinearScan/Peano.hs
 /LinearScan/Proto.hs
 /LinearScan/Range.hs
 /LinearScan/Resolve.hs
@@ -55,4 +57,3 @@
 Setup
 dist
 html
-/LinearScan/Peano.hs
