@@ -172,8 +172,8 @@ Proof.
     try apply Build_SSMorphLen => //=;
     try apply Build_SSMorph => //=.
     + by ordered.
-    + admit.
-    + admit.
+    + apply undefined.
+    + apply undefined.
   - have Hin' : widen_fst (xid, reg) \in inactive sd'.
       rewrite /sd' /= mem_map //=.
       exact: widen_fst_inj.
@@ -185,9 +185,9 @@ Proof.
     try apply Build_SSMorphLen => //=;
     try apply Build_SSMorph => //=.
     + by ordered.
-    + admit.
-    + admit.
-Admitted.
+    + apply undefined.
+    + apply undefined.
+Defined.
 
 Definition spillCurrentInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
@@ -241,7 +241,7 @@ Proof.
       exact: inl err.
     apply: inr (ss; _).
     apply Build_SSMorphLen => //=.
-    admit.
+    apply undefined.
 
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
@@ -288,7 +288,7 @@ Proof.
   apply Build_SSMorphLen.
   apply Build_SSMorph => //=.
   by rewrite insert_size.
-Admitted.
+Defined.
 
 (** If [reg] is some value, it means we allocate the first part of the split
    interval to that register; otherwise, we spill it. *)

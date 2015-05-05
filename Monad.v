@@ -1,3 +1,6 @@
+Require Import Ssr.
+Require Import FunctionalExtensionality.
+
 Generalizable All Variables.
 
 Definition State (s a : Type) := s -> (a * s).
@@ -8,102 +11,187 @@ Definition put  {s} x   : State s unit := fun _ => (tt, x).
 
 Definition modify {s} (f : s -> s) : State s unit := fun i => (tt, f i).
 
-Record Monad (m : Type -> Type) := {
-  fmap : forall a b, (a -> b) -> m a -> m b;
-  pure : forall a, a -> m a;
-  ap   : forall a b, m (a -> b) -> m a -> m b;
-  join : forall a, m (m a) -> m a
+Class Functor (f : Type -> Type) := {
+  fmap : forall {a b}, (a -> b) -> f a -> f b;
+
+  fun_id   : forall a, fmap (@id a) =1 id;
+  fun_comp : forall a b c f g, @fmap b c f \o @fmap a b g =1 @fmap a c (f \o g)
 }.
 
-Arguments fmap {m} _ {a b} f x.
-Arguments pure {m} _ {a} _.
-Arguments ap   {m} _ {a b} f x.
-Arguments join {m} _ {a} _.
+Arguments fmap {f _ a b} _ x.
 
-Definition State_Monad {S} :=
-  {| fmap := fun A B f (x : State S A) => fun st => match x st with
-       | (a,st') => (f a, st')
-       end
+Reserved Notation "f <*> g" (at level 28, left associativity).
 
-   ; pure := fun _ x => fun st => (x, st)
+Class Applicative (f : Type -> Type) := {
+  is_functor :> Functor f;
 
-   ; ap := fun _ _ f x => fun st => match f st with
-       | (f', st') =>
-           match x st' with
-           | (x', st'') => (f' x', st'')
-           end
-       end
+  pure : forall {a}, a -> f a;
+  ap   : forall {a b}, f (a -> b) -> f a -> f b
+    where "f <*> g" := (ap f g);
 
-   ; join := fun _ x => fun st => match x st with
-       | (y, st') => match y st' with
-         | (a, st'') => (a, st'')
-         end
-       end
-   |}.
+  ap_id : forall a, ap (pure (@id a)) =1 id;
+  ap_comp : forall a b c (v : f (a -> b)) (u : f (b -> c)) (w : f a),
+    pure (funcomp tt) <*> u <*> v <*> w = u <*> (v <*> w);
+  ap_homo : forall a b (x : a) (f : a -> b), pure f <*> pure x = pure (f x);
+  ap_interchange : forall a b (y : a) (u : f (a -> b)),
+    u <*> pure y = pure (fun f => f y) <*> u;
 
-Definition bind `(d : Monad m) {X Y} (f : (X -> m Y)) (x : m X) : m Y :=
-  join d (fmap d f x).
+  ap_fmap : forall a b (f : a -> b), ap (pure f) =1 @fmap _ is_functor _ _ f
+}.
 
-Definition liftA2 `(d : Monad m) {A B C}
-  (f : A -> B -> C) (x : m A) (y : m B) : m C := ap d (fmap d f x) y.
+Arguments pure {f _ _} _.
+Arguments ap   {f _ _ _} _ x.
 
-Notation "m >>=[ d ] f" := (bind d f m) (at level 25, left associativity).
+Class Monad (m : Type -> Type) := {
+  is_applicative :> Applicative m;
 
-Notation "X <-- A ;;[ d ] B" := (A >>=[d] (fun X => B))
+  join : forall {a}, m (m a) -> m a;
+
+  join_fmap_join : forall a, join \o fmap (@join a) =1 join \o join;
+  join_fmap_pure : forall a, join \o fmap (pure (a:=a)) =1 id;
+  join_pure      : forall a, join \o pure =1 @id (m a);
+  join_fmap_fmap : forall a b (f : a -> b),
+    join \o fmap (fmap f) =1 fmap f \o join
+}.
+
+Arguments join {m _ _} _.
+
+Program Instance State_Functor {S} : Functor (State S) := {
+  fmap := fun A B f (x : State S A) => fun st => match x st with
+    | (a,st') => (f a, st')
+    end
+}.
+Obligation 1.
+  move=> x.
+  extensionality st.
+  by case: (x st).
+Qed.
+Obligation 2.
+  rewrite /funcomp => x.
+  extensionality st.
+  by case: (x st).
+Qed.
+
+Program Instance State_Applicative {S} : Applicative (State S) := {
+  pure := fun _ x => fun st => (x, st);
+
+  ap := fun _ _ f x => fun st => match f st with
+    | (f', st') =>
+        match x st' with
+        | (x', st'') => (f' x', st'')
+        end
+    end
+}.
+Obligation 1.
+  move=> x.
+  extensionality st.
+  by case: (x st).
+Qed.
+Obligation 2.
+  extensionality st.
+  case: (u st) => f' st'.
+  case: (v st') => f'' st''.
+  by case: (w st'').
+Qed.
+
+Program Instance State_Monad {S} : Monad (State S) := {
+  join := fun _ x => fun st => match x st with
+    | (y, st') => match y st' with
+      | (a, st'') => (a, st'')
+      end
+    end
+}.
+Obligation 1.
+  move=> f.
+  extensionality st.
+  rewrite /funcomp /=.
+  case: (f st) => f' st'.
+  case: (f' st') => f'' st''.
+  by case: (f'' st'') => f''' st'''.
+Qed.
+Obligation 2.
+  move=> f.
+  extensionality st.
+  rewrite /funcomp /=.
+  by case: (f st) => f' st'.
+Qed.
+Obligation 3.
+  move=> f.
+  extensionality st.
+  rewrite /funcomp /=.
+  by case: (f st) => f' st'.
+Qed.
+Obligation 4.
+  move=> x.
+  extensionality st.
+  rewrite /funcomp /=.
+  case: (x st) => f' st'.
+  by case: (f' st') => f'' st''.
+Qed.
+
+Definition bind `{Monad m} {X Y} (f : (X -> m Y)) (x : m X) : m Y :=
+  join (fmap f x).
+
+Definition liftA2 `{Monad m} {A B C}
+  (f : A -> B -> C) (x : m A) (y : m B) : m C := ap (fmap f x) y.
+
+Notation "m >>= f" := (bind f m) (at level 25, left associativity).
+
+Notation "X <-- A ;; B" := (A >>= (fun X => B))
   (right associativity, at level 84, A at next level).
 
-Notation "A ;;[ d ] B" := (_ <-- A ;;[d] B)
+Notation "A ;; B" := (_ <-- A ;; B)
   (right associativity, at level 84).
 
-Fixpoint mapM `(d : Monad m) {A B} (f : A -> m B) (l : list A) :
+Fixpoint mapM `{Monad m} {A B} (f : A -> m B) (l : list A) :
   m (list B) :=
   match l with
-  | nil => pure d nil
-  | cons x xs => liftA2 d (@cons _) (f x) (mapM d f xs)
+  | nil => pure nil
+  | cons x xs => liftA2 (@cons _) (f x) (mapM f xs)
   end.
 
-Definition forM `(d : Monad m) {A B} (l : list A) (f : A -> m B) : m (list B) :=
-  mapM d f l.
+Definition forM `{Monad m} {A B} (l : list A) (f : A -> m B) : m (list B) :=
+  mapM f l.
 
-Fixpoint mapM_ `(d : Monad m) {A B} (f : A -> m B) (l : list A) : m unit :=
+Fixpoint mapM_ `{Monad m} {A B} (f : A -> m B) (l : list A) : m unit :=
   match l with
-  | nil => pure d tt
-  | cons x xs => f x >>=[d] fun _ => mapM_ d f xs
+  | nil => pure tt
+  | cons x xs => f x >>= fun _ => mapM_ f xs
   end.
 
-Definition forM_ `(d : Monad m) {A B} (l : list A) (f : A -> m B) : m unit :=
-  mapM_ d f l.
+Definition forM_ `{Monad m} {A B} (l : list A) (f : A -> m B) : m unit :=
+  mapM_ f l.
 
-Definition foldM `(d : Monad m) {A B}
+Definition foldM `{Monad m} {A B}
   (f : A -> B -> m A) (s : A) (l : list B) : m A :=
   let fix go xs z :=
       match xs with
-        | nil => pure d z
-        | cons y ys => f z y >>=[d] go ys
+        | nil => pure z
+        | cons y ys => f z y >>= go ys
       end in
   go l s.
 
-Definition forFoldM `(d : Monad m) {A B}
-  (s : A) (l : list B) (f : A -> B -> m A) : m A := foldM d f s l.
+Definition forFoldM `{Monad m} {A B}
+  (s : A) (l : list B) (f : A -> B -> m A) : m A := foldM f s l.
 
-Definition foldrM `(d : Monad m) {A B}
+Definition foldrM `{Monad m} {A B}
   (f : B -> A -> m A) (s : A) (l : list B) : m A :=
   let fix go xs z :=
       match xs with
-        | nil => pure d z
-        | cons y ys => go ys z >>=[d] f y
+        | nil => pure z
+        | cons y ys => go ys z >>= f y
       end in
   go l s.
 
-Definition forFoldrM `(d : Monad m) {A B}
-  (s : A) (l : list B) (f : B -> A -> m A) : m A := foldrM d f s l.
+Definition forFoldrM `{Monad m} {A B}
+  (s : A) (l : list B) (f : B -> A -> m A) : m A := foldrM f s l.
 
-Fixpoint concat `(d : Monad m) {A} (l : list (list A)) : list A :=
+Fixpoint concat {A} (l : list (list A)) : list A :=
   match l with
   | nil => nil
-  | cons x xs => app x (concat d xs)
+  | cons x xs => app x (concat xs)
   end.
 
-Definition concatMapM `(d : Monad m) {A B}
+Definition concatMapM `{Monad m} {A B}
   (f : A -> m (list B)) (l : list A) : m (list B) :=
-  fmap d (concat d) (mapM d f l).
+  fmap (concat) (mapM f l).

@@ -243,15 +243,15 @@ Proof.
   move: (findRangeUsePos r.2 f) => [[u Hin]|]; last first.
     apply: IHrs => //=.
       move/intervalUncons: i => [? i].
-      admit.
-    admit.
+      apply undefined.
+    apply undefined.
   clear IHrs.
   apply: Some _.
   exists r.
   exists u.
     assumption.
-  admit.
-Admitted.
+  apply undefined.
+Defined.
 
 Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
   option { u : oddnum | ibeg d <= u.1 <= iend d }.
