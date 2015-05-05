@@ -172,8 +172,12 @@ Proof.
     try apply Build_SSMorphLen => //=;
     try apply Build_SSMorph => //=.
     + by ordered.
-    + apply undefined.
-    + apply undefined.
+    + replace (unhandled sd') with unh' in H; last by auto.
+      rewrite /unh' insert_size /= in H.
+      by auto.
+    + replace (unhandled sd') with unh' in H; last by auto.
+      rewrite /unh' insert_size /= in H.
+      by auto.
   - have Hin' : widen_fst (xid, reg) \in inactive sd'.
       rewrite /sd' /= mem_map //=.
       exact: widen_fst_inj.
@@ -185,8 +189,12 @@ Proof.
     try apply Build_SSMorphLen => //=;
     try apply Build_SSMorph => //=.
     + by ordered.
-    + apply undefined.
-    + apply undefined.
+    + replace (unhandled sd') with unh' in H; last by auto.
+      rewrite /unh' insert_size /= in H.
+      by auto.
+    + replace (unhandled sd') with unh' in H; last by auto.
+      rewrite /unh' insert_size /= in H.
+      by auto.
 Defined.
 
 Definition spillCurrentInterval {pre} :
