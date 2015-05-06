@@ -3,7 +3,6 @@ Require Import LinearScan.IntMap.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
-Require Import LinearScan.State.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -15,10 +14,12 @@ Section Resolve.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 accType : Set.
+Variables blockType1 blockType2 opType1 opType2 : Set.
+Variables mType : Set -> Set.
+Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2.
+Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Record LoopState := {
   activeBlocks     : IntSet;
@@ -242,43 +243,44 @@ Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
   else pure tt.
 
 Definition computeBlockOrder (blocks : seq blockType1) :
-  LoopState * seq blockType1 :=
-  if blocks isn't b :: bs then (emptyLoopState, [::]) else
+  mType (LoopState * seq blockType1) :=
+  if blocks isn't b :: bs then pure (emptyLoopState, [::]) else
 
   let blockMap :=
     IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks) in
   let: (_, st0) := findLoopEnds blockMap emptyLoopState in
 
-  (* Every branch from a block with multiple successors to a block with
-     multiple predecessors is a "critical edge".  We insert a new, anonymous
-     block at this edge to hold the resolving moves for the critical edge. *)
-  let blocks' :=
-    forFoldr [::] blocks $ fun b rest =>
+  (* Every branch from a block with multiple successors to a block with *)
+  (* multiple predecessors is a "critical edge".  We insert a new, anonymous *)
+  (* block at this edge to hold the resolving moves for the critical edge. *)
+  blocks' <--
+    forFoldrM [::] blocks (fun b rest =>
       let suxs := blockSuccessors binfo b in
       if size suxs <= 1
-      then b :: rest
-      else (fun x => let: (b', rest') := x in b' :: rest') $
-        forFoldr (b, rest) suxs $ fun sux x =>
+      then pure $ b :: rest
+      else (fun x => let: (b', rest') := x in b' :: rest') <$>
+        forFoldrM (b, rest) suxs (fun sux x =>
           let: (b', rest') := x in
           let fsz := if IntMap_lookup sux (forwardBranches st0) is Some fwds
                      then IntSet_size fwds else 0 in
           let bsz := if IntMap_lookup sux (backwardBranches st0) is Some bwds
                      then IntSet_size bwds else 0 in
           if fsz + bsz <= 1
-          then (b', rest')
+          then pure (b', rest')
           else
             if IntMap_lookup sux blockMap is Some sux'
-            then let: (b'', sux'') := splitCriticalEdge binfo b' sux' in
-                 (b'', sux'' :: rest')
-            else (b', rest') in
+            then z <-- splitCriticalEdge binfo b' sux' ;;
+                 let: (b'', sux'') := z in
+                 pure (b'', sux'' :: rest')
+            else pure (b', rest'))) ;;
   let blockMap' :=
     IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks') in
   let: (_, st1) := findLoopEnds blockMap' emptyLoopState in
-  if blocks' isn't b' :: bs' then (emptyLoopState, [::]) else
+  if blocks' isn't b' :: bs' then pure (emptyLoopState, [::]) else
   let: (_, st2)  := computeLoopDepths blockMap st1 in
 
-  (* jww (2015-03-08): This is a somewhat simplistic computation of weighting
-     for each block. *)
+  (* jww (2015-03-08): This is a somewhat simplistic computation of weighting *)
+  (*    for each block. *)
   let isHeavier x y :=
     let x_id := blockId binfo x in
     let y_id := blockId binfo y in
@@ -304,6 +306,6 @@ Definition computeBlockOrder (blocks : seq blockType1) :
               if IntSet_size incs == 1 then insertion else ws')
         else (branches', insertion) in
     w :: go n branches' ws' in
-  (st2, go (size blocks') (forwardBranches st2) [:: b']).
+  pure (st2, go (size blocks') (forwardBranches st2) [:: b']).
 
 End Resolve.

@@ -80,7 +80,6 @@ library
     LinearScan.Ssreflect
     LinearScan.Ssrfun
     LinearScan.Ssrnat
-    LinearScan.State
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0

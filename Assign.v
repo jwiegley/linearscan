@@ -20,57 +20,54 @@ Section Assign.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 accType : Set.
+Variables blockType1 blockType2 opType1 opType2 : Set.
+Variables mType : Set -> Set.
+Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2.
+Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Record AssnStateInfo := {
   assnOpId     : OpId;
   assnBlockBeg : OpId;
-  assnBlockEnd : OpId;
-  assnAcc      : accType
+  assnBlockEnd : OpId
 }.
 
-Definition AssnState := State AssnStateInfo.
+Definition AssnState := StateT AssnStateInfo mType.
 
 Definition swapOpM sreg dreg : AssnState (seq opType2) :=
-  assn <-- get ;;
-  let: (mop, acc') := swapOp oinfo sreg dreg (assnAcc assn) in
-  put {| assnOpId     := assnOpId assn
-       ; assnBlockBeg := assnBlockBeg assn
-       ; assnBlockEnd := assnBlockEnd assn
-       ; assnAcc      := acc' |} ;;
+  assn <-- getT ;;
+  mop <-- lift $ swapOp oinfo sreg dreg ;;
+  putT {| assnOpId     := assnOpId assn
+        ; assnBlockBeg := assnBlockBeg assn
+        ; assnBlockEnd := assnBlockEnd assn |} ;;
   pure mop.
 
 Definition moveOpM sreg dreg : AssnState (seq opType2) :=
-  assn <-- get ;;
-  let: (mop, acc') := moveOp oinfo sreg dreg (assnAcc assn) in
-  put {| assnOpId     := assnOpId assn
-       ; assnBlockBeg := assnBlockBeg assn
-       ; assnBlockEnd := assnBlockEnd assn
-       ; assnAcc      := acc' |} ;;
+  assn <-- getT ;;
+  mop <-- lift $ moveOp oinfo sreg dreg ;;
+  putT {| assnOpId     := assnOpId assn
+        ; assnBlockBeg := assnBlockBeg assn
+        ; assnBlockEnd := assnBlockEnd assn |} ;;
   pure mop.
 
 Definition saveOpM vid reg : AssnState (seq opType2) :=
-  assn <-- get ;;
-  let: (sop, acc') := saveOp oinfo vid reg (assnAcc assn) in
-  put {| assnOpId     := assnOpId assn
-       ; assnBlockBeg := assnBlockBeg assn
-       ; assnBlockEnd := assnBlockEnd assn
-       ; assnAcc      := acc' |} ;;
+  assn <-- getT ;;
+  sop <-- lift $ saveOp oinfo vid reg ;;
+  putT {| assnOpId     := assnOpId assn
+        ; assnBlockBeg := assnBlockBeg assn
+        ; assnBlockEnd := assnBlockEnd assn |} ;;
   pure sop.
 
 Definition restoreOpM vid reg : AssnState (seq opType2) :=
-  assn <-- get ;;
-  let: (rop, acc') := restoreOp oinfo vid reg (assnAcc assn) in
-  put {| assnOpId     := assnOpId assn
-       ; assnBlockBeg := assnBlockBeg assn
-       ; assnBlockEnd := assnBlockEnd assn
-       ; assnAcc      := acc' |} ;;
+  assn <-- getT ;;
+  rop <-- lift $ restoreOp oinfo vid reg ;;
+  putT {| assnOpId     := assnOpId assn
+        ; assnBlockBeg := assnBlockBeg assn
+        ; assnBlockEnd := assnBlockEnd assn |} ;;
   pure rop.
 
-Definition pairM {A B : Type} (x : AssnState A) (y : AssnState B) :
+Definition pairM {A B : Set} (x : AssnState A) (y : AssnState B) :
   AssnState (A * B)%type :=
   x' <-- x ;;
   y' <-- y ;;
@@ -102,7 +99,7 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
 
 Definition doAllocations (allocs : seq (Allocation maxReg)) op :
   AssnState (seq opType2) :=
-  assn <-- get ;;
+  assn <-- getT ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varAllocs opid allocs) vars in
@@ -115,11 +112,10 @@ Definition doAllocations (allocs : seq (Allocation maxReg)) op :
      else pure [::]) ;;
 
   (* With lenses, this would just be: assnOpId += 2 *)
-  modify (fun assn' : AssnStateInfo =>
-            {| assnOpId     := opid.+2
-             ; assnBlockBeg := assnBlockBeg assn'
-             ; assnBlockEnd := assnBlockEnd assn'
-             ; assnAcc      := assnAcc assn' |}) ;;
+  modifyT (fun assn' : AssnStateInfo =>
+             {| assnOpId     := opid.+2
+              ; assnBlockBeg := assnBlockBeg assn'
+              ; assnBlockEnd := assnBlockEnd assn' |}) ;;
 
   pure $ ops ++ transitions.
 
@@ -138,7 +134,8 @@ Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
   pure opsm''.
 
 Definition considerOps (f : opType1 -> AssnState (seq opType2))
-  (liveSets : IntMap BlockLiveSets) mappings :=
+  (liveSets : IntMap BlockLiveSets) mappings :
+  seq blockType1 -> AssnState (seq blockType2) :=
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
@@ -149,11 +146,11 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
                 else emptyIntSet in
 
     let: (opsb, opsm, opse) := ops in
-    modify (fun assn =>
-              {| assnOpId     := assnOpId assn
-               ; assnBlockBeg := assnOpId assn + (size opsb).*2
-               ; assnBlockEnd := assnOpId assn + (size opsb + size opsm).*2
-               ; assnAcc      := assnAcc assn |}) ;;
+    modifyT (fun assn =>
+               {| assnOpId     := assnOpId assn
+                ; assnBlockBeg := assnOpId assn + (size opsb).*2
+                ; assnBlockEnd :=
+                    assnOpId assn + (size opsb + size opsm).*2 |}) ;;
     opsb' <-- concatMapM f opsb ;;
     opsm' <-- concatMapM f opsm ;;
     opse' <-- concatMapM f opse ;;
@@ -168,8 +165,8 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
 
 Definition assignRegNum (allocs : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets) (mappings : IntMap (BlockMoves maxReg))
-  (blocks : seq blockType1) (acc : accType) : seq blockType2 * accType :=
-  let: (blocks', assn) :=
+  (blocks : seq blockType1) : mType (seq blockType2) :=
+  fst <$>
     considerOps
       (doAllocations allocs)
       liveSets
@@ -177,8 +174,6 @@ Definition assignRegNum (allocs : seq (Allocation maxReg))
       blocks
       {| assnOpId     := 1
        ; assnBlockBeg := 1
-       ; assnBlockEnd := 1
-       ; assnAcc      := acc |} in
-  (blocks', assnAcc assn).
+       ; assnBlockEnd := 1 |}.
 
 End Assign.

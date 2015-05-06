@@ -19,60 +19,63 @@ Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
 Require Import String.
 
+Generalizable All Variables.
+
 Inductive FinalStage :=
   | BuildingIntervalsFailed
   | AllocatingRegistersFailed.
 
-Record Details {blockType1 blockType2 opType1 opType2 accType : Set}
+Record Details `{dict : Monad} {blockType1 blockType2 opType1 opType2 : Set}
   (maxReg : nat) := {
   reason          : option (SSError * FinalStage);
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
   allocatedBlocks : seq blockType2;
-  accumulator     : accType;
   scanStatePre    : option (ScanStateDesc maxReg);
   scanStatePost   : option (ScanStateDesc maxReg);
   blockInfo       : BlockInfo blockType1 blockType2 opType1 opType2;
-  opInfo          : OpInfo maxReg accType opType1 opType2;
+  opInfo          : @OpInfo maxReg m dict opType1 opType2;
   loopState       : LoopState
 }.
 
 Definition linearScan
-  {blockType1 blockType2 opType1 opType2 accType : Set}
+  `{dict : Monad m} {blockType1 blockType2 opType1 opType2 : Set}
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
-  (oinfo : OpInfo maxReg accType opType1 opType2)
-  (blocks : seq blockType1) (accum : accType) : Details maxReg :=
+  (oinfo : @OpInfo maxReg m dict opType1 opType2)
+  (blocks : seq blockType1) : m (Details maxReg) :=
   (* order blocks and operations (including loop detection) *)
-  let: (loops, blocks1) := computeBlockOrder binfo blocks in
+  z <-- computeBlockOrder binfo blocks ;;
+  let: (loops, blocks1) := z in
 
   (* create intervals with live ranges *)
   let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
   let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
   match buildIntervals binfo oinfo blocks1 loops liveSets'
-  return @Details blockType1 blockType2 opType1 opType2 accType maxReg with
+  return m (@Details m dict blockType1 blockType2
+                         opType1 opType2 maxReg) with
   | inl err =>
-    Build_Details _ _ _ _ _ maxReg (Some (err, BuildingIntervalsFailed))
-      liveSets' blocks1 [::] accum None None binfo oinfo loops
+    pure $ Build_Details _ _ _ _ _ _ maxReg
+      (Some (err, BuildingIntervalsFailed)) liveSets' blocks1 [::]
+      None None binfo oinfo loops
   | inr ssig =>
     (* allocate registers *)
     let opCount := (countOps binfo blocks1).+1 in
     match walkIntervals registers_exist ssig.2 opCount
-    return Details maxReg with
+    return m (Details maxReg) with
     | inl (err, ssig') =>
-      Build_Details _ _ _ _ _ maxReg (Some (err, AllocatingRegistersFailed))
-        liveSets' blocks1 [::] accum (Some ssig.1) (Some ssig'.1)
-        binfo oinfo loops
+      pure $ Build_Details _ _ _ _ _ _ maxReg
+        (Some (err, AllocatingRegistersFailed)) liveSets' blocks1 [::]
+        (Some ssig.1) (Some ssig'.1) binfo oinfo loops
     | inr ssig' =>
         let sd       := finalizeScanState ssig'.2 opCount.*2 in
         let allocs   := determineAllocations sd in
         let mappings := resolveDataFlow binfo allocs blocks1 liveSets' in
 
         (* replace virtual registers with physical registers *)
-        let: (blocks2, accum') :=
-           assignRegNum binfo oinfo allocs liveSets' mappings blocks1 accum in
-        Build_Details _ _ _ _ _ maxReg None liveSets' blocks1 blocks2 accum'
+        blocks2 <-- assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
+        pure $ Build_Details _ _ _ _ _ _ maxReg None liveSets' blocks1 blocks2
           (Some ssig.1) (Some sd) binfo oinfo loops
     end
   end.

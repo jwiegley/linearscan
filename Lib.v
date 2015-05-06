@@ -2,6 +2,7 @@ Require Export LinearScan.Ssr.
 Require Export LinearScan.Ltac.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
+Require Export LinearScan.Monad.
 
 Require Export Coq.Program.Wf.
 Require Export Coq.Sorting.Sorted.
@@ -20,8 +21,6 @@ Tactic Notation "invert" "as" simple_intropattern(pat) :=
   intros top; inversion top as pat; clear top.
 
 Definition undefined {a : Type} : a. Admitted.
-
-Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
 
 Definition flip `(f : a -> b -> c) : b -> a -> c := fun y x => f x y.
 

@@ -70,10 +70,12 @@ Section LiveSets.
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg : predArgType := 'I_maxReg.
 
-Variables blockType1 blockType2 opType1 opType2 accType : Set.
+Variables blockType1 blockType2 opType1 opType2 : Set.
+Variables mType : Set -> Set.
+Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg accType opType1 opType2.
+Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
   IntMap BlockLiveSets :=

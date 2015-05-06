@@ -74,13 +74,13 @@ toVarInfo (LS.Build_VarInfo a b c) = VarInfo a b c
 --   and restore all registers around a call, but indication of loops is
 --   optional, as it's merely avoids reloading of spilled variables inside
 --   loop bodies.
-data OpInfo accType op1 op2 = OpInfo
+data OpInfo m op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
     , opRefs      :: op1 -> [LinearScan.VarInfo]
-    , moveOp      :: PhysReg   -> PhysReg   -> State accType [op2]
-    , swapOp      :: PhysReg   -> PhysReg   -> State accType [op2]
-    , saveOp      :: PhysReg   -> Maybe Int -> State accType [op2]
-    , restoreOp   :: Maybe Int -> PhysReg   -> State accType [op2]
+    , moveOp      :: PhysReg   -> PhysReg   -> m [op2]
+    , swapOp      :: PhysReg   -> PhysReg   -> m [op2]
+    , saveOp      :: PhysReg   -> Maybe Int -> m [op2]
+    , restoreOp   :: Maybe Int -> PhysReg   -> m [op2]
     , applyAllocs :: op1 -> [(Int, PhysReg)] -> [op2]
     , showOp1     :: op1 -> String
     }
@@ -109,28 +109,20 @@ showOp1' showop pos ins outs o =
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: LinearScan.OpInfo accType op1 op2 -> LS.OpInfo accType op1 op2
+fromOpInfo :: LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m [op2]) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
-    LS.Build_OpInfo a (map fromVarInfo . b)
-        ((runState .) . c)
-        ((runState .) . d)
-        ((runState .) . e)
-        ((runState .) . f) g h
+    LS.Build_OpInfo a (map fromVarInfo . b) c d e f g h
 
-toOpInfo :: LS.OpInfo accType op1 op2 -> LinearScan.OpInfo accType op1 op2
+toOpInfo :: LS.OpInfo (m [op2]) op1 op2 -> LinearScan.OpInfo m op1 op2
 toOpInfo (LS.Build_OpInfo a b c d e f g h) =
-    OpInfo a (map toVarInfo . b)
-        ((StateT .) . fmap (fmap (fmap Identity)) c)
-        ((StateT .) . fmap (fmap (fmap Identity)) d)
-        ((StateT .) . fmap (fmap (fmap Identity)) e)
-        ((StateT .) . fmap (fmap (fmap Identity)) f) g h
+    OpInfo a (map toVarInfo . b) c d e f g h
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
-data BlockInfo blk1 blk2 op1 op2 = BlockInfo
+data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
     { blockId           :: blk1 -> Int
     , blockSuccessors   :: blk1 -> [Int]
-    , splitCriticalEdge :: blk1 -> blk1 -> (blk1, blk1)
+    , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
     , blockOps          :: blk1 -> ([op1], [op1], [op1])
     , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
     }
@@ -296,8 +288,8 @@ showOps1 oinfo sd pos (o:os) =
     showOp1' (showOp1 oinfo) (pos*2+1) begs' ends' o
         ++ showOps1 oinfo sd (pos+1) os
 
-showBlocks1 :: LinearScan.BlockInfo blk1 blk2 op1 op2
-            -> LinearScan.OpInfo accType op1 op2
+showBlocks1 :: LinearScan.BlockInfo m blk1 blk2 op1 op2
+            -> LinearScan.OpInfo m op1 op2
             -> ScanStateDesc
             -> LS.IntMap LS.BlockLiveSets
             -> [blk1]
@@ -316,30 +308,29 @@ showBlocks1 binfo oinfo sd ls = go 0
         showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b
             ++ go (pos + length (allops b)) bs
 
-fromBlockInfo :: LinearScan.BlockInfo blk1 blk2 op1 op2
-              -> LS.BlockInfo blk1 blk2 op1 op2
+fromBlockInfo :: LinearScan.BlockInfo m blk1 blk2 op1 op2
+              -> LS.BlockInfo (m (blk1, blk1)) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
     LS.Build_BlockInfo a b c (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
-toBlockInfo :: LS.BlockInfo blk1 blk2 op1 op2
-            -> LinearScan.BlockInfo blk1 blk2 op1 op2
+toBlockInfo :: LS.BlockInfo (m (blk1, blk1)) blk1 blk2 op1 op2
+            -> LinearScan.BlockInfo m blk1 blk2 op1 op2
 toBlockInfo (LS.Build_BlockInfo a b c d e) =
     BlockInfo a b c (\blk -> let ((x, y), z) = d blk in (x, y, z)) e
 
-data Details blk1 blk2 op1 op2 accType = Details
+data Details m blk1 blk2 op1 op2 = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , inputBlocks     :: [blk1]
     , allocatedBlocks :: [blk2]
-    , accumulator     :: accType
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
-    , blockInfo       :: LinearScan.BlockInfo blk1 blk2 op1 op2
-    , opInfo          :: LinearScan.OpInfo accType op1 op2
+    , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
+    , opInfo          :: LinearScan.OpInfo m op1 op2
     , loopState       :: LoopState
     }
 
-instance Show (Details blk1 blk2 op1 op2 accType) where
+instance Show (Details m blk1 blk2 op1 op2) where
     show err = "Reason: " ++ show (reason err) ++ "\n\n"
                ++ ">>> ScanState before allocation:\n"
                ++ showScanStateDesc (scanStatePre err) ++ "\n"
@@ -357,11 +348,10 @@ deriving instance Show LS.SSError
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
 
-toDetails :: LS.Details blk1 blk2 op1 op2 accType
-               -> Details blk1 blk2 op1 op2 accType
-toDetails (LS.Build_Details a b c d e f g h i j) =
-    Details a b c d e (fmap toScanStateDesc f) (fmap toScanStateDesc g)
-                 (toBlockInfo h) (toOpInfo i) (toLoopState j)
+toDetails :: LS.Details (m ()) blk1 blk2 op1 op2 -> Details m blk1 blk2 op1 op2
+toDetails (LS.Build_Details a b c d e f g h i) =
+    Details a b c d (fmap toScanStateDesc e) (fmap toScanStateDesc f)
+            (toBlockInfo g) (toOpInfo h) (toLoopState i)
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register
@@ -375,16 +365,15 @@ toDetails (LS.Build_Details a b c d e f g h i j) =
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
 allocate :: Int                  -- ^ Maximum number of registers to use
-         -> LinearScan.BlockInfo blk1 blk2 op1 op2
-         -> LinearScan.OpInfo accType op1 op2
+         -> LinearScan.BlockInfo m blk1 blk2 op1 op2
+         -> LinearScan.OpInfo m op1 op2
          -> [blk1]
-         -> State accType (Either String [blk2])
+         -> m (Either String [blk2])
 allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
 allocate _ _ _ [] = return $ Left "No basic blocks were provided"
 allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
-    res <- gets (LS.linearScan maxReg binfo oinfo blocks)
+    res <- LS.linearScan _ maxReg binfo oinfo blocks
     let res' = toDetails res
-    put $ accumulator res'
     case reason res' of
         Just (err, _) -> reportError res' err
         Nothing ->
