@@ -17,7 +17,7 @@ Generalizable All Variables.
 Section Build.
 
 Variable maxReg : nat.          (* max number of registers *)
-Definition PhysReg : predArgType := 'I_maxReg.
+Definition PhysReg := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 : Set.
 Variables mType : Set -> Set.

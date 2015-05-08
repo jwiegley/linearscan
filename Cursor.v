@@ -12,7 +12,7 @@ Generalizable All Variables.
 Section Cursor.
 
 Variable maxReg : nat.          (* max number of registers *)
-Definition PhysReg : predArgType := 'I_maxReg.
+Definition PhysReg := 'I_maxReg.
 
 (** ** ScanStateCursor *)
 

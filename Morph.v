@@ -11,7 +11,7 @@ Generalizable All Variables.
 Section Morph.
 
 Variable maxReg : nat.          (* max number of registers *)
-Definition PhysReg : predArgType := 'I_maxReg.
+Definition PhysReg := 'I_maxReg.
 
 Open Scope nat_scope.
 

@@ -16,7 +16,7 @@ Generalizable All Variables.
 Section Resolve.
 
 Variable maxReg : nat.          (* max number of registers *)
-Definition PhysReg : predArgType := 'I_maxReg.
+Definition PhysReg := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 : Set.
 Variables mType : Set -> Set.
@@ -36,7 +36,7 @@ Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
         ; intVal := getIntervalDesc (getInterval (fst x))
         ; intReg := snd x |} | x <- handled sd].
 
-Definition RawResolvingMove := (option PhysReg * option PhysReg)%type.
+Definition RawResolvingMove : Set := (option PhysReg * option PhysReg)%type.
 
 Inductive ResolvingMove :=
   | Move of PhysReg & PhysReg

@@ -159,27 +159,27 @@ Notation "X <-- A ;; B" := (A >>= (fun X => B))
 Notation "A ;; B" := (_ <-- A ;; B)
   (right associativity, at level 84).
 
-Fixpoint mapM `{Applicative m} {A B} (f : A -> m B) (l : list A) :
-  m (list B) :=
+Fixpoint mapM `{Applicative m} {A B} (f : A -> m B) (l : seq A) :
+  m (seq B) :=
   match l with
   | nil => pure nil
   | cons x xs => liftA2 (@cons _) (f x) (mapM f xs)
   end.
 
-Definition forM `{Applicative m} {A B} (l : list A) (f : A -> m B) :
-  m (list B) := mapM f l.
+Definition forM `{Applicative m} {A B} (l : seq A) (f : A -> m B) :
+  m (seq B) := mapM f l.
 
-Fixpoint mapM_ `{Applicative m} {A B} (f : A -> m B) (l : list A) : m unit :=
+Fixpoint mapM_ `{Applicative m} {A B} (f : A -> m B) (l : seq A) : m unit :=
   match l with
   | nil => pure tt
   | cons x xs => f x >> mapM_ f xs
   end.
 
-Definition forM_ `{Applicative m} {A B} (l : list A) (f : A -> m B) : m unit :=
+Definition forM_ `{Applicative m} {A B} (l : seq A) (f : A -> m B) : m unit :=
   mapM_ f l.
 
 Definition foldM `{Monad m} {A B : Set}
-  (f : A -> B -> m A) (s : A) (l : list B) : m A :=
+  (f : A -> B -> m A) (s : A) (l : seq B) : m A :=
   let fix go xs z :=
       match xs with
         | nil => pure z
@@ -187,11 +187,11 @@ Definition foldM `{Monad m} {A B : Set}
       end in
   go l s.
 
-Definition forFoldM `{Monad m} {A B : Set}
-  (s : A) (l : list B) (f : A -> B -> m A) : m A := foldM f s l.
+Definition forFoldM `{Monad m} {A : Set} {B}
+  (s : A) (l : seq B) (f : A -> B -> m A) : m A := foldM f s l.
 
 Definition foldrM `{Monad m} {A B : Set}
-  (f : B -> A -> m A) (s : A) (l : list B) : m A :=
+  (f : B -> A -> m A) (s : A) (l : seq B) : m A :=
   let fix go xs z :=
       match xs with
         | nil => pure z
@@ -199,17 +199,17 @@ Definition foldrM `{Monad m} {A B : Set}
       end in
   go l s.
 
-Definition forFoldrM `{Monad m} {A B : Set}
-  (s : A) (l : list B) (f : B -> A -> m A) : m A := foldrM f s l.
+Definition forFoldrM `{Monad m} {A : Set} {B}
+  (s : A) (l : seq B) (f : B -> A -> m A) : m A := foldrM f s l.
 
-Fixpoint concat {A : Set} (l : list (list A)) : list A :=
+Fixpoint concat {A : Set} (l : seq (seq A)) : seq A :=
   match l with
   | nil => nil
   | cons x xs => x ++ concat xs
   end.
 
 Definition concatMapM `{Applicative m} {A B : Set}
-  (f : A -> m (list B)) (l : list A) : m (list B) :=
+  (f : A -> m (seq B)) (l : seq A) : m (seq B) :=
   fmap (concat) (mapM f l).
 
 (******************************************************************************

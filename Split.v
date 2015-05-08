@@ -13,7 +13,7 @@ Generalizable All Variables.
 Section Split.
 
 Variable maxReg : nat.          (* max number of registers *)
-Definition PhysReg : predArgType := 'I_maxReg.
+Definition PhysReg := 'I_maxReg.
 
 (* Given an interval, determine its optimal split position.  If no split
    position can be found, it means the interval may be safely spilled, and all
