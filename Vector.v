@@ -2,10 +2,10 @@ Require Import LinearScan.Ssr.
 
 Section Vector.
 
-Variable A : Type.
+Variable A : Set.
 
-Definition Vec : nat -> Type :=
-  fix vec n := match n return Type with
+Definition Vec : nat -> Set :=
+  fix vec n := match n return Set with
                | O   => unit
                | S n => prod A (vec n)
                end.
@@ -211,7 +211,7 @@ Qed.
 
 End Vector.
 
-Definition vmap {A B : Type} {n} (f : A -> B) (v : Vec A n) : Vec B n.
+Definition vmap {A B : Set} {n} (f : A -> B) (v : Vec A n) : Vec B n.
 Proof.
   elim: n => // [n IHn] in v *.
   elim/vecn_rect: v => [x|sz x xs IHxs] in IHn *.

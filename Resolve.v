@@ -36,7 +36,7 @@ Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
         ; intVal := getIntervalDesc (getInterval (fst x))
         ; intReg := snd x |} | x <- handled sd].
 
-Definition RawResolvingMove : Set := (option PhysReg * option PhysReg)%type.
+Definition RawResolvingMove := (option PhysReg * option PhysReg)%type.
 
 Inductive ResolvingMove :=
   | Move of PhysReg & PhysReg

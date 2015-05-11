@@ -21,7 +21,7 @@ Context `{mDict : Monad mType}.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
-Record LoopState := {
+Record LoopState : Set := {
   activeBlocks     : IntSet;
   visitedBlocks    : IntSet;
   loopHeaderBlocks : seq BlockId;   (* loop index -> block id *)

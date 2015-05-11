@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -21,6 +22,7 @@ module LinearScan
     , PhysReg
     ) where
 
+import           Control.Applicative
 import           Control.Monad.State
 import           Data.Functor.Identity
 import           Data.IntMap (IntMap)
@@ -36,11 +38,13 @@ import qualified LinearScan.Interval as LS
 import qualified LinearScan.LiveSets as LS
 import qualified LinearScan.Loops as LS
 import qualified LinearScan.Main as LS
+import qualified LinearScan.Monad as LS
 import qualified LinearScan.Morph as LS
 import qualified LinearScan.Range as LS
 import qualified LinearScan.ScanState as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
+import qualified Unsafe.Coerce as U
 
 -- | Each variable has associated allocation details, and a flag to indicate
 --   whether it must be loaded into a register at its point of use.  Variables
@@ -109,13 +113,13 @@ showOp1' showop pos ins outs o =
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m [op2]) op1 op2
+fromOpInfo :: LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m ()) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
-    LS.Build_OpInfo a (map fromVarInfo . b) c d e f g h
+    LS.Build_OpInfo a (map fromVarInfo . b) (U.unsafeCoerce c) (U.unsafeCoerce d) (U.unsafeCoerce e) (U.unsafeCoerce f) (U.unsafeCoerce g) h
 
-toOpInfo :: LS.OpInfo (m [op2]) op1 op2 -> LinearScan.OpInfo m op1 op2
+toOpInfo :: LS.OpInfo (m ()) op1 op2 -> LinearScan.OpInfo m op1 op2
 toOpInfo (LS.Build_OpInfo a b c d e f g h) =
-    OpInfo a (map toVarInfo . b) c d e f g h
+    OpInfo a (map toVarInfo . b) (U.unsafeCoerce c) (U.unsafeCoerce d) (U.unsafeCoerce e) (U.unsafeCoerce f) (U.unsafeCoerce g) h
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -199,8 +203,8 @@ showUsePositions (u:us) = go u ++ " " ++ showUsePositions us
   where
     go (LS.Build_UsePos n req _v) = show n ++ (if req then "" else "?")
 
-toScanStateDesc :: LS.ScanStateDesc -> ScanStateDesc
-toScanStateDesc (LS.Build_ScanStateDesc a b c d e f g) =
+toScanStateDesc :: LS.ScanStateDescSet -> ScanStateDesc
+toScanStateDesc (LS.Build_ScanStateDescSet a b c d e f g) =
     let rs = L.foldl' (\m (k, mx) -> case mx of
                             Nothing -> m
                             Just r -> M.insert k r m)
@@ -309,14 +313,14 @@ showBlocks1 binfo oinfo sd ls = go 0
             ++ go (pos + length (allops b)) bs
 
 fromBlockInfo :: LinearScan.BlockInfo m blk1 blk2 op1 op2
-              -> LS.BlockInfo (m (blk1, blk1)) blk1 blk2 op1 op2
+              -> LS.BlockInfo (m ()) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
-    LS.Build_BlockInfo a b c (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
+    LS.Build_BlockInfo a b (U.unsafeCoerce c) (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
-toBlockInfo :: LS.BlockInfo (m (blk1, blk1)) blk1 blk2 op1 op2
+toBlockInfo :: LS.BlockInfo (m ()) blk1 blk2 op1 op2
             -> LinearScan.BlockInfo m blk1 blk2 op1 op2
 toBlockInfo (LS.Build_BlockInfo a b c d e) =
-    BlockInfo a b c (\blk -> let ((x, y), z) = d blk in (x, y, z)) e
+    BlockInfo a b (U.unsafeCoerce c) (\blk -> let ((x, y), z) = d blk in (x, y, z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
@@ -348,10 +352,13 @@ deriving instance Show LS.SSError
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
 
-toDetails :: LS.Details (m ()) blk1 blk2 op1 op2 -> Details m blk1 blk2 op1 op2
-toDetails (LS.Build_Details a b c d e f g h i) =
+toDetails :: LS.Details blk1 blk2
+          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
+          -> LinearScan.OpInfo m op1 op2
+          -> Details m blk1 blk2 op1 op2
+toDetails (LS.Build_Details a b c d e f g) binfo oinfo =
     Details a b c d (fmap toScanStateDesc e) (fmap toScanStateDesc f)
-            (toBlockInfo g) (toOpInfo h) (toLoopState i)
+            binfo oinfo (toLoopState g)
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register
@@ -364,22 +371,37 @@ toDetails (LS.Build_Details a b c d e f g h i) =
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: Int                  -- ^ Maximum number of registers to use
+allocate :: Monad m
+         => Int                  -- ^ Maximum number of registers to use
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
          -> [blk1]
          -> m (Either String [blk2])
 allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
 allocate _ _ _ [] = return $ Left "No basic blocks were provided"
-allocate maxReg (fromBlockInfo -> binfo) (fromOpInfo -> oinfo) blocks = do
-    res <- LS.linearScan _ maxReg binfo oinfo blocks
-    let res' = toDetails res
-    case reason res' of
-        Just (err, _) -> reportError res' err
-        Nothing ->
-            tracer (show res') $
-            return $ Right (allocatedBlocks res')
+allocate maxReg binfo oinfo blocks =
+     U.unsafeCoerce $ LS.linearScan dict maxReg
+        (fromBlockInfo binfo)
+        (fromOpInfo oinfo) blocks $ \res -> do
+            let res' = toDetails res binfo oinfo
+            case reason res' of
+                Just (err, _) ->
+                    U.unsafeCoerce $ reportError res' err
+                Nothing ->
+                    U.unsafeCoerce $ tracer (show res') $
+                    return $ Right (allocatedBlocks res')
   where
+    dict :: LS.Monad (m ())
+    dict = LS.Build_Monad
+        (LS.Build_Applicative
+         (\_ _ f x ->
+           U.unsafeCoerce (fmap (U.unsafeCoerce f) (U.unsafeCoerce x)
+                              :: (a -> b) -> m a -> m b))
+         (\_ x -> U.unsafeCoerce (pure (U.unsafeCoerce x) :: a -> m a))
+         (\_ _ f x -> U.unsafeCoerce (U.unsafeCoerce f <*> U.unsafeCoerce x
+                                     :: m (a -> b) -> m a -> m b)))
+        (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x) :: m (m a) -> m a))
+
     reportError res err =
         return $ Left $ tracer (show res) $ reasonToStr err
     -- reportError _res err =

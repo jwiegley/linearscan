@@ -3,13 +3,17 @@ Require Import FunctionalExtensionality.
 
 Generalizable All Variables.
 
-Class Functor (f : Set -> Set) := {
-  fmap : forall {a b : Set}, (a -> b) -> f a -> f b;
+Class Functor (f : Type -> Type) := {
+  fmap : forall {a b : Type}, (a -> b) -> f a -> f b;
 
-  fmap_id   : forall a : Set, fmap (@id a) =1 id;
-  fmap_comp : forall (a b c : Set) (f : b -> c) (g : a -> b),
+  fmap_id   : forall a : Type, fmap (@id a) =1 id;
+  fmap_comp : forall (a b c : Type) (f : b -> c) (g : a -> b),
     fmap f \o fmap g =1 fmap (f \o g)
 }.
+
+Axiom fmap_cps :
+  forall `{Functor f} a b c (k : forall r, (a -> r) -> f r)
+    (g : b -> c) (h : a -> b), fmap g (k _ h) = k _ (g \o h).
 
 Arguments fmap {f _ a b} _ x.
 
@@ -17,7 +21,7 @@ Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
 
 Definition apply `(f : a -> b) (x : a) : b := f x.
 
-Definition compose {a b c : Set} (f : b -> c) (g : a -> b) : a -> c := f \o g.
+Definition compose {a b c : Type} (f : b -> c) (g : a -> b) : a -> c := f \o g.
 
 Definition first `(f : a -> b) `(x : a * z) : b * z :=
   match x with (a, z) => (f a, z) end.
@@ -49,11 +53,11 @@ Notation "f <$> x" :=
 Notation "x <&> f" :=
   (fmap f x) (at level 28, left associativity, only parsing).
 
-Corollary fmap_id_x `{Functor f} : forall (a : Set) x, fmap (@id a) x = x.
+Corollary fmap_id_x `{Functor f} : forall (a : Type) x, fmap (@id a) x = x.
 Proof. exact: fmap_id. Qed.
 
 Corollary fmap_comp_x `{Functor F} :
-  forall (a b c : Set) (f : b -> c) (g : a -> b) x,
+  forall (a b c : Type) (f : b -> c) (g : a -> b) x,
   fmap f (fmap g x) = fmap (fun y => f (g y)) x.
 Proof. exact: fmap_comp. Qed.
 
@@ -66,28 +70,28 @@ Ltac recomp :=
     end.
 
 Corollary fmap_docomp `{Functor F} :
-  forall (a b c : Set) (f : b -> c) (g : a -> b) x,
+  forall (a b c : Type) (f : b -> c) (g : a -> b) x,
   fmap f (fmap g x) = (fmap f \o fmap g) x.
 Proof. by rewrite /funcomp. Qed.
 
 Reserved Notation "f <*> g" (at level 28, left associativity).
 
-Class Applicative (f : Set -> Set) := {
+Class Applicative (f : Type -> Type) := {
   is_functor :> Functor f;
 
-  pure : forall {a : Set}, a -> f a;
-  ap   : forall {a b : Set}, f (a -> b) -> f a -> f b
+  pure : forall {a : Type}, a -> f a;
+  ap   : forall {a b : Type}, f (a -> b) -> f a -> f b
     where "f <*> g" := (ap f g);
 
-  ap_id : forall a : Set, ap (pure (@id a)) =1 id;
-  ap_comp : forall (a b c : Set) (v : f (a -> b)) (u : f (b -> c)) (w : f a),
+  ap_id : forall a : Type, ap (pure (@id a)) =1 id;
+  ap_comp : forall (a b c : Type) (v : f (a -> b)) (u : f (b -> c)) (w : f a),
     pure compose <*> u <*> v <*> w = u <*> (v <*> w);
-  ap_homo : forall (a b : Set) (x : a) (f : a -> b),
+  ap_homo : forall (a b : Type) (x : a) (f : a -> b),
     pure f <*> pure x = pure (f x);
-  ap_interchange : forall (a b : Set) (y : a) (u : f (a -> b)),
+  ap_interchange : forall (a b : Type) (y : a) (u : f (a -> b)),
     u <*> pure y = pure (fun f => f y) <*> u;
 
-  ap_fmap : forall (a b : Set) (f : a -> b),
+  ap_fmap : forall (a b : Type) (f : a -> b),
     ap (pure f) =1 @fmap _ is_functor _ _ f
 }.
 
@@ -96,7 +100,7 @@ Arguments ap   {f _ _ _} _ x.
 
 Notation "f <*> g" := (ap f g) (at level 28, left associativity).
 
-Corollary fmap_pure `{Applicative m} : forall (a b : Set) (f : a -> b),
+Corollary fmap_pure `{Applicative m} : forall (a b : Type) (f : a -> b),
   fmap f \o pure =1 pure \o f.
 Proof.
   move=> a b f x.
@@ -104,19 +108,19 @@ Proof.
   exact: ap_homo.
 Qed.
 
-Corollary fmap_pure_x `{Applicative m} : forall (a b : Set) (f : a -> b) x,
+Corollary fmap_pure_x `{Applicative m} : forall (a b : Type) (f : a -> b) x,
   fmap f (pure x) = pure (f x).
 Proof. exact: fmap_pure. Qed.
 
-Class Monad (m : Set -> Set) := {
+Class Monad (m : Type -> Type) := {
   is_applicative :> Applicative m;
 
-  join : forall {a : Set}, m (m a) -> m a;
+  join : forall {a : Type}, m (m a) -> m a;
 
-  join_fmap_join : forall a : Set, join \o fmap (@join a) =1 join \o join;
-  join_fmap_pure : forall a : Set, join \o fmap (pure (a:=a)) =1 id;
-  join_pure      : forall a : Set, join \o pure =1 @id (m a);
-  join_fmap_fmap : forall (a b : Set) (f : a -> b),
+  join_fmap_join : forall a : Type, join \o fmap (@join a) =1 join \o join;
+  join_fmap_pure : forall a : Type, join \o fmap (pure (a:=a)) =1 id;
+  join_pure      : forall a : Type, join \o pure =1 @id (m a);
+  join_fmap_fmap : forall (a b : Type) (f : a -> b),
     join \o fmap (fmap f) =1 fmap f \o join
 }.
 
@@ -134,21 +138,21 @@ Corollary join_pure_x `{Monad m} : forall a x,
   join (pure x) = @id (m a) x.
 Proof. exact: join_pure. Qed.
 
-Corollary join_fmap_fmap_x `{Monad m} : forall (a b : Set) (f : a -> b) x,
-    join (fmap (fmap f) x) = fmap f (join x).
+Corollary join_fmap_fmap_x `{Monad m} : forall (a b : Type) (f : a -> b) x,
+  join (fmap (fmap f) x) = fmap f (join x).
 Proof. exact: join_fmap_fmap. Qed.
 
-Definition liftA2 `{Applicative m} {A B C : Set}
+Definition liftA2 `{Applicative m} {A B C : Type}
   (f : A -> B -> C) (x : m A) (y : m B) : m C := ap (fmap f x) y.
 
-Definition const {A B : Set} (x : B) : A -> B := fun _ => x.
+Definition const {A B : Type} (x : B) : A -> B := fun _ => x.
 
 Definition chain `{Applicative m} {X Y} (a : m X) (b : m Y) : m Y :=
   fmap const b <*> a.
 
 Notation "a >> b" := (chain a b) (at level 25, left associativity).
 
-Definition bind `{Monad m} {X Y : Set} (f : (X -> m Y)) : m X -> m Y :=
+Definition bind `{Monad m} {X Y : Type} (f : (X -> m Y)) : m X -> m Y :=
   join \o fmap f.
 
 Notation "m >>= f" := (bind f m) (at level 25, left associativity).
@@ -178,7 +182,7 @@ Fixpoint mapM_ `{Applicative m} {A B} (f : A -> m B) (l : seq A) : m unit :=
 Definition forM_ `{Applicative m} {A B} (l : seq A) (f : A -> m B) : m unit :=
   mapM_ f l.
 
-Definition foldM `{Monad m} {A B : Set}
+Definition foldM `{Monad m} {A : Type} {B : Type}
   (f : A -> B -> m A) (s : A) (l : seq B) : m A :=
   let fix go xs z :=
       match xs with
@@ -187,10 +191,10 @@ Definition foldM `{Monad m} {A B : Set}
       end in
   go l s.
 
-Definition forFoldM `{Monad m} {A : Set} {B}
+Definition forFoldM `{Monad m} {A : Type} {B : Type}
   (s : A) (l : seq B) (f : A -> B -> m A) : m A := foldM f s l.
 
-Definition foldrM `{Monad m} {A B : Set}
+Definition foldrM `{Monad m} {A : Type} {B : Type}
   (f : B -> A -> m A) (s : A) (l : seq B) : m A :=
   let fix go xs z :=
       match xs with
@@ -199,16 +203,16 @@ Definition foldrM `{Monad m} {A B : Set}
       end in
   go l s.
 
-Definition forFoldrM `{Monad m} {A : Set} {B}
+Definition forFoldrM `{Monad m} {A : Type} {B : Type}
   (s : A) (l : seq B) (f : B -> A -> m A) : m A := foldrM f s l.
 
-Fixpoint concat {A : Set} (l : seq (seq A)) : seq A :=
+Fixpoint concat {A} (l : seq (seq A)) : seq A :=
   match l with
   | nil => nil
   | cons x xs => x ++ concat xs
   end.
 
-Definition concatMapM `{Applicative m} {A B : Set}
+Definition concatMapM `{Applicative m} {A B}
   (f : A -> m (seq B)) (l : seq A) : m (seq B) :=
   fmap (concat) (mapM f l).
 
@@ -216,15 +220,15 @@ Definition concatMapM `{Applicative m} {A B : Set}
  * The State Monad
  *)
 
-Definition State (s a : Set) := s -> (a * s).
+Definition State (s a : Type) := s -> (a * s).
 
-Definition get  {s : Set}     : State s s := fun i => (i, i).
-Definition gets {s a : Set} f : State s a := fun s => (f s, s).
-Definition put  {s : Set} x   : State s unit := fun _ => (tt, x).
+Definition get  {s : Type}     : State s s := fun i => (i, i).
+Definition gets {s a : Type} f : State s a := fun s => (f s, s).
+Definition put  {s : Type} x   : State s unit := fun _ => (tt, x).
 
-Definition modify {s : Set} (f : s -> s) : State s unit := fun i => (tt, f i).
+Definition modify {s : Type} (f : s -> s) : State s unit := fun i => (tt, f i).
 
-Program Instance State_Functor {s : Set} : Functor (State s) := {
+Program Instance State_Functor {s : Type} : Functor (State s) := {
   fmap := fun A B f (x : State s A) => fun st => match x st with
     | (a,st') => (f a, st')
     end
@@ -240,7 +244,7 @@ Obligation 2.
   by case: (x st).
 Qed.
 
-Program Instance State_Applicative {s : Set} : Applicative (State s) := {
+Program Instance State_Applicative {s : Type} : Applicative (State s) := {
   pure := fun _ x => fun st => (x, st);
 
   ap := fun _ _ f x => fun st => match f st with
@@ -262,7 +266,7 @@ Obligation 2.
   by case: (w st'').
 Qed.
 
-Program Instance State_Monad {s : Set} : Monad (State s) := {
+Program Instance State_Monad {s : Type} : Monad (State s) := {
   join := fun _ x => fun st => match x st with
     | (y, st') => match y st' with
       | (a, st'') => (a, st'')
@@ -302,17 +306,17 @@ Qed.
  *)
 
 
-Definition StateT (s : Set) (m : Set -> Set) (a : Set):=
+Definition StateT (s : Type) (m : Type -> Type) (a : Type):=
   s -> m (a * s)%type.
 
-Definition getT  `{Applicative m} {s : Set}     : StateT s m s :=
+Definition getT  `{Applicative m} {s : Type}     : StateT s m s :=
   fun i => pure (i, i).
-Definition getsT `{Applicative m} {s a : Set} f : StateT s m a :=
+Definition getsT `{Applicative m} {s a : Type} f : StateT s m a :=
   fun s => pure (f s, s).
-Definition putT  `{Applicative m} {s : Set} x   : StateT s m unit :=
+Definition putT  `{Applicative m} {s : Type} x   : StateT s m unit :=
   fun _ => pure (tt, x).
 
-Definition modifyT `{Applicative m} {s : Set} (f : s -> s) : StateT s m unit :=
+Definition modifyT `{Applicative m} {s : Type} (f : s -> s) : StateT s m unit :=
   fun i => pure (tt, f i).
 
 Program Instance StateT_Functor {s} `{Functor m} : Functor (StateT s m) := {
@@ -336,13 +340,13 @@ Obligation 2.
   by case: y.
 Qed.
 
-Definition StateT_ap `{Monad m} {s : Set} {a b : Set}
+Definition StateT_ap `{Monad m} {s : Type} {a b : Type}
   (f : StateT s m (a -> b)) (x : StateT s m a) : StateT s m b := fun st =>
   join $ f st <&> fun z => match z with
     | (f', st') => x st' <&> first f'
     end.
 
-Program Instance StateT_Applicative `{Monad m} {s : Set} :
+Program Instance StateT_Applicative `{Monad m} {s : Type} :
   Applicative (StateT s m) := {
   pure := fun _ x => fun st => pure (x, st);
   ap   := @StateT_ap m _ s
@@ -404,10 +408,10 @@ Obligation 5.
   f_equal.
 Qed.
 
-Definition StateT_join `{Monad m} {s a : Set} (x : StateT s m (StateT s m a)) :
+Definition StateT_join `{Monad m} {s a : Type} (x : StateT s m (StateT s m a)) :
   StateT s m a := join \o fmap (curry apply) \o x.
 
-Program Instance StateT_Monad `{Monad m} {s : Set} : Monad (StateT s m) := {
+Program Instance StateT_Monad `{Monad m} {s : Type} : Monad (StateT s m) := {
   join := @StateT_join m _ s
 }.
 Obligation 1.

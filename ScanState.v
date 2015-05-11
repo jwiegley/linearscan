@@ -24,15 +24,15 @@ Record ScanStateDesc : Type := {
     nextInterval : nat;
     IntervalId := 'I_nextInterval;
 
-    intervals : Vec { d : IntervalDesc | Interval d } nextInterval;
+    intervals : Vec IntervalSig nextInterval;
     fixedIntervals : FixedIntervalsType;
 
     (* The [nat] in this member indicates the beginning position of the
        interval. *)
-    unhandled : list (IntervalId * nat);     (* starts after pos *)
-    active    : list (IntervalId * PhysReg); (* ranges over pos *)
-    inactive  : list (IntervalId * PhysReg); (* falls in lifetime hole *)
-    handled   : list (IntervalId * option PhysReg); (* ends before pos *)
+    unhandled : seq (IntervalId * nat);     (* starts after pos *)
+    active    : seq (IntervalId * PhysReg); (* ranges over pos *)
+    inactive  : seq (IntervalId * PhysReg); (* falls in lifetime hole *)
+    handled   : seq (IntervalId * option PhysReg); (* ends before pos *)
 
     unhandledIds := [seq fst i | i <- unhandled];
     activeIds    := [seq fst i | i <- active];
