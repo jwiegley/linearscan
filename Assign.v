@@ -36,11 +36,10 @@ Definition AssnState := StateT AssnStateInfo mType.
 
 Definition swapOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  (* The [id] parameter at the end is due to the fact that swapOp returns
-     Yoneda m a, rather than m a, so we pass [id] to recover [m a]. This is
-     necessary to work around a limitation with type formers and extraction:
-     https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
-  mop <-- lift $ swapOp oinfo sreg dreg id ;;
+  (* The [iso_to] is due to the fact that swapOp returns [Yoneda m a], rather
+     than [m a]. This is necessary to work around a limitation with type
+     formers and extraction: https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
+  mop <-- lift $ iso_to $ swapOp oinfo sreg dreg ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -48,7 +47,7 @@ Definition swapOpM sreg dreg : AssnState (seq opType2) :=
 
 Definition moveOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  mop <-- lift $ moveOp oinfo sreg dreg id ;;
+  mop <-- lift $ iso_to $ moveOp oinfo sreg dreg ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -56,7 +55,7 @@ Definition moveOpM sreg dreg : AssnState (seq opType2) :=
 
 Definition saveOpM vid reg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  sop <-- lift $ saveOp oinfo vid reg id ;;
+  sop <-- lift $ iso_to $ saveOp oinfo vid reg ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -64,7 +63,7 @@ Definition saveOpM vid reg : AssnState (seq opType2) :=
 
 Definition restoreOpM vid reg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  rop <-- lift $ restoreOp oinfo vid reg id ;;
+  rop <-- lift $ iso_to $ restoreOp oinfo vid reg ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;

@@ -269,7 +269,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
           then pure (b', rest')
           else
             if IntMap_lookup sux blockMap is Some sux'
-            then z <-- splitCriticalEdge binfo b' sux' id ;;
+            then z <-- iso_to $ splitCriticalEdge binfo b' sux' ;;
                  let: (b'', sux'') := z in
                  pure (b'', sux'' :: rest')
             else pure (b', rest'))) ;;
