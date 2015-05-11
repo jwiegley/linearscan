@@ -3,7 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wall -Werror -fno-warn-orphans #-}
 
@@ -22,9 +21,7 @@ module LinearScan
     , PhysReg
     ) where
 
-import           Control.Applicative
 import           Control.Monad.State
-import           Data.Functor.Identity
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as M
 import           Data.IntSet (IntSet)
@@ -41,9 +38,9 @@ import qualified LinearScan.Main as LS
 import qualified LinearScan.Monad as LS
 import qualified LinearScan.Morph as LS
 import qualified LinearScan.Range as LS
-import qualified LinearScan.ScanState as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
+import           LinearScan.Yoneda (Any)
 import qualified Unsafe.Coerce as U
 
 -- | Each variable has associated allocation details, and a flag to indicate
@@ -63,9 +60,6 @@ deriving instance Show LS.VarKind
 
 fromVarInfo :: LinearScan.VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
-
-toVarInfo :: LS.VarInfo -> LinearScan.VarInfo
-toVarInfo (LS.Build_VarInfo a b c) = VarInfo a b c
 
 -- | Every operation may reference multiple variables and/or specific physical
 --   registers.  If a physical register is referenced, then that register is
@@ -113,23 +107,14 @@ showOp1' showop pos ins outs o =
 deriving instance Eq OpKind
 deriving instance Show OpKind
 
-fromOpInfo :: LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m ()) op1 op2
+fromOpInfo :: Monad m
+           => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
-    LS.Build_OpInfo a (map fromVarInfo . b) (U.unsafeCoerce c) (U.unsafeCoerce d) (U.unsafeCoerce e) (U.unsafeCoerce f) (U.unsafeCoerce g) h
-
-toOpInfo :: LS.OpInfo (m ()) op1 op2 -> LinearScan.OpInfo m op1 op2
-toOpInfo (LS.Build_OpInfo a b c d e f g h) =
-    OpInfo a (map toVarInfo . b) (U.unsafeCoerce c) (U.unsafeCoerce d) (U.unsafeCoerce e) (U.unsafeCoerce f) (U.unsafeCoerce g) h
-
--- | From the point of view of this library, a basic block is nothing more
---   than an ordered sequence of operations.
-data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
-    { blockId           :: blk1 -> Int
-    , blockSuccessors   :: blk1 -> [Int]
-    , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
-    , blockOps          :: blk1 -> ([op1], [op1], [op1])
-    , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
-    }
+    LS.Build_OpInfo a (map fromVarInfo . b)
+        (\r1 r2 _ k -> liftM k (c r1 r2))
+        (\r1 r2 _ k -> liftM k (d r1 r2))
+        (\r1 r2 _ k -> liftM k (e r1 r2))
+        (\r1 r2 _ k -> liftM k (f r1 r2)) g h
 
 type IntervalId = Int
 
@@ -292,6 +277,16 @@ showOps1 oinfo sd pos (o:os) =
     showOp1' (showOp1 oinfo) (pos*2+1) begs' ends' o
         ++ showOps1 oinfo sd (pos+1) os
 
+-- | From the point of view of this library, a basic block is nothing more
+--   than an ordered sequence of operations.
+data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
+    { blockId           :: blk1 -> Int
+    , blockSuccessors   :: blk1 -> [Int]
+    , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
+    , blockOps          :: blk1 -> ([op1], [op1], [op1])
+    , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
+    }
+
 showBlocks1 :: LinearScan.BlockInfo m blk1 blk2 op1 op2
             -> LinearScan.OpInfo m op1 op2
             -> ScanStateDesc
@@ -312,15 +307,13 @@ showBlocks1 binfo oinfo sd ls = go 0
         showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b
             ++ go (pos + length (allops b)) bs
 
-fromBlockInfo :: LinearScan.BlockInfo m blk1 blk2 op1 op2
-              -> LS.BlockInfo (m ()) blk1 blk2 op1 op2
+fromBlockInfo :: Monad m
+              => LinearScan.BlockInfo m blk1 blk2 op1 op2
+              -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
-    LS.Build_BlockInfo a b (U.unsafeCoerce c) (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
-
-toBlockInfo :: LS.BlockInfo (m ()) blk1 blk2 op1 op2
-            -> LinearScan.BlockInfo m blk1 blk2 op1 op2
-toBlockInfo (LS.Build_BlockInfo a b c d e) =
-    BlockInfo a b (U.unsafeCoerce c) (\blk -> let ((x, y), z) = d blk in (x, y, z)) e
+    LS.Build_BlockInfo a b
+        (\r1 r2 _ k -> liftM k (c r1 r2))
+        (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
@@ -386,26 +379,20 @@ allocate maxReg binfo oinfo blocks =
             let res' = toDetails res binfo oinfo
             case reason res' of
                 Just (err, _) ->
-                    U.unsafeCoerce $ reportError res' err
+                    tracer (show res') $ Left (reasonToStr err)
                 Nothing ->
-                    U.unsafeCoerce $ tracer (show res') $
-                    return $ Right (allocatedBlocks res')
+                    tracer (show res') $ Right (allocatedBlocks res')
   where
-    dict :: LS.Monad (m ())
+    dict :: LS.Monad (m a)
     dict = LS.Build_Monad
         (LS.Build_Applicative
          (\_ _ f x ->
            U.unsafeCoerce (fmap (U.unsafeCoerce f) (U.unsafeCoerce x)
-                              :: (a -> b) -> m a -> m b))
+                               :: (a -> b) -> m a -> m b))
          (\_ x -> U.unsafeCoerce (pure (U.unsafeCoerce x) :: a -> m a))
          (\_ _ f x -> U.unsafeCoerce (U.unsafeCoerce f <*> U.unsafeCoerce x
                                      :: m (a -> b) -> m a -> m b)))
         (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x) :: m (m a) -> m a))
-
-    reportError res err =
-        return $ Left $ tracer (show res) $ reasonToStr err
-    -- reportError _res err =
-    --     return $ Left $ reasonToStr err
 
     reasonToStr r = case r of
         LS.ECannotInsertUnhAtPos spillDets pos ->

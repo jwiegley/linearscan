@@ -3,6 +3,7 @@ Require Export LinearScan.Ltac.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 Require Export LinearScan.Monad.
+Require Export LinearScan.Yoneda.
 
 Require Export Coq.Program.Wf.
 Require Export Coq.Sorting.Sorted.

@@ -44,6 +44,7 @@
 /LinearScan/String0.hs
 /LinearScan/UsePos.hs
 /LinearScan/Vector0.hs
+/LinearScan/Yoneda.hs
 /LinearScan/choice.hs
 /LinearScan/eqtype.hs
 /LinearScan/fintype.hs

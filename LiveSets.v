@@ -71,7 +71,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 : Set.
-Variables mType : Set -> Set.
+Variables mType : Type -> Type.
 Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.

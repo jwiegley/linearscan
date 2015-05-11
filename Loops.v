@@ -15,7 +15,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 : Set.
-Variables mType : Set -> Set.
+Variables mType : Type -> Type.
 Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
@@ -269,7 +269,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
           then pure (b', rest')
           else
             if IntMap_lookup sux blockMap is Some sux'
-            then z <-- splitCriticalEdge binfo b' sux' ;;
+            then z <-- splitCriticalEdge binfo b' sux' id ;;
                  let: (b'', sux'') := z in
                  pure (b'', sux'' :: rest')
             else pure (b', rest'))) ;;

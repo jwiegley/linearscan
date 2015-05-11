@@ -83,6 +83,7 @@ library
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
+    LinearScan.Yoneda
   cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
   ghc-options:      -fno-warn-deprecated-flags
   build-depends:    base >=4.7 && <5.0

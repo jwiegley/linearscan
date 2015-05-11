@@ -8,7 +8,6 @@ Require Import LinearScan.LiveSets.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Allocate.
-Require Import LinearScan.Monad.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -21,7 +20,7 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
 Variables blockType1 blockType2 opType1 opType2 : Set.
-Variables mType : Set -> Set.
+Variables mType : Type -> Type.
 Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
@@ -37,7 +36,11 @@ Definition AssnState := StateT AssnStateInfo mType.
 
 Definition swapOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  mop <-- lift $ swapOp oinfo sreg dreg ;;
+  (* The [id] parameter at the end is due to the fact that swapOp returns
+     Yoneda m a, rather than m a, so we pass [id] to recover [m a]. This is
+     necessary to work around a limitation with type formers and extraction:
+     https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
+  mop <-- lift $ swapOp oinfo sreg dreg id ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -45,7 +48,7 @@ Definition swapOpM sreg dreg : AssnState (seq opType2) :=
 
 Definition moveOpM sreg dreg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  mop <-- lift $ moveOp oinfo sreg dreg ;;
+  mop <-- lift $ moveOp oinfo sreg dreg id ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -53,7 +56,7 @@ Definition moveOpM sreg dreg : AssnState (seq opType2) :=
 
 Definition saveOpM vid reg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  sop <-- lift $ saveOp oinfo vid reg ;;
+  sop <-- lift $ saveOp oinfo vid reg id ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;
@@ -61,7 +64,7 @@ Definition saveOpM vid reg : AssnState (seq opType2) :=
 
 Definition restoreOpM vid reg : AssnState (seq opType2) :=
   assn <-- getT ;;
-  rop <-- lift $ restoreOp oinfo vid reg ;;
+  rop <-- lift $ restoreOp oinfo vid reg id ;;
   putT {| assnOpId     := assnOpId assn
         ; assnBlockBeg := assnBlockBeg assn
         ; assnBlockEnd := assnBlockEnd assn |} ;;

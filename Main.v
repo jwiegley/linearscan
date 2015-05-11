@@ -71,11 +71,11 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
 }.
 
 Definition linearScan
-  `{dict : Monad m} {blockType1 blockType2 opType1 opType2 r : Set}
+  `{dict : Monad m} {blockType1 blockType2 opType1 opType2 : Set}
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : @OpInfo maxReg m dict opType1 opType2)
-  (blocks : seq blockType1) (k : Details maxReg -> m r) : m r :=
+  (blocks : seq blockType1) : Yoneda m (Details maxReg) := fun _ k =>
   (* order blocks and operations (including loop detection) *)
   z <-- computeBlockOrder binfo blocks ;;
   let: (loops, blocks1) := z in
@@ -84,19 +84,17 @@ Definition linearScan
   let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
   let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
-  match buildIntervals binfo oinfo blocks1 loops liveSets'
-  return m r with
+  match buildIntervals binfo oinfo blocks1 loops liveSets' with
   | inl err =>
-    k $ Build_Details _ _ maxReg
+    pure $ k $ Build_Details _ _ maxReg
       (Some (err, BuildingIntervalsFailed)) liveSets' blocks1 [::]
       None None loops
   | inr ssig =>
     (* allocate registers *)
     let opCount := (countOps binfo blocks1).+1 in
-    match walkIntervals registers_exist ssig.2 opCount
-    return m r with
+    match walkIntervals registers_exist ssig.2 opCount with
     | inl (err, ssig') =>
-      k $ Build_Details _ _ maxReg
+      pure $ k $ Build_Details _ _ maxReg
         (Some (err, AllocatingRegistersFailed)) liveSets' blocks1 [::]
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet ssig'.1)) loops
@@ -108,7 +106,7 @@ Definition linearScan
         (* replace virtual registers with physical registers *)
         blocks2 <--
           assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
-        k $ Build_Details _ _ maxReg None liveSets' blocks1 blocks2
+        pure $ k $ Build_Details _ _ maxReg None liveSets' blocks1 blocks2
           (Some (toScanStateDescSet ssig.1))
           (Some (toScanStateDescSet sd)) loops
     end
