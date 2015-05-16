@@ -46,7 +46,11 @@ Definition inbound  := connections (@snd _ _).
 
 Fixpoint tsort' fuel l roots g :=
   (* The fuel represents the fact that we must only call tsort' once for
-     each vertex in the graph. *)
+     each vertex in the graph.
+
+     jww (2015-05-13): It would be far more satisfying to have a real proof of
+     termination, since any error in choice of fuel is not propagated, making
+     this function useless in the context of proof. *)
   if fuel isn't S fuel then rev l else
   if edges g isn't (se, de) :: es then rev l else
 
