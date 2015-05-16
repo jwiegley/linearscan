@@ -21,6 +21,7 @@ module LinearScan
     , PhysReg
     ) where
 
+import           Control.Applicative
 import           Control.Monad.State
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as M
@@ -364,35 +365,33 @@ toDetails (LS.Build_Details a b c d e f g) binfo oinfo =
 --   If allocation is found to be impossible -- for example if there are
 --   simply not enough registers -- a 'Left' value is returned, with a string
 --   describing the error.
-allocate :: Monad m
-         => Int                  -- ^ Maximum number of registers to use
+allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
+         => Int        -- ^ Maximum number of registers to use
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
-         -> [blk1]
-         -> m (Either String [blk2])
+         -> [blk1] -> m (Either String [blk2])
 allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
 allocate _ _ _ [] = return $ Left "No basic blocks were provided"
-allocate maxReg binfo oinfo blocks =
-     U.unsafeCoerce $ LS.linearScan dict maxReg
-        (fromBlockInfo binfo)
-        (fromOpInfo oinfo) blocks $ \res -> do
-            let res' = toDetails res binfo oinfo
-            case reason res' of
-                Just (err, _) ->
-                    tracer (show res') $ Left (reasonToStr err)
-                Nothing ->
-                    tracer (show res') $ Right (allocatedBlocks res')
+allocate maxReg binfo oinfo blocks = do
+    x <- LS.linearScan dict maxReg
+       (fromBlockInfo binfo) (fromOpInfo oinfo) blocks $ \res ->
+       let res' = toDetails res binfo oinfo in
+       tracer (show res') $ case reason res' of
+           Just (err, _) -> Left  $ reasonToStr err
+           Nothing       -> Right $ allocatedBlocks res'
+    let eres = U.unsafeCoerce (x :: Any) :: Either String [blk2]
+    return eres
   where
-    dict :: LS.Monad (m a)
+    dict :: LS.Monad (m Any)
     dict = LS.Build_Monad
         (LS.Build_Applicative
-         (\_ _ f x ->
-           U.unsafeCoerce (fmap (U.unsafeCoerce f) (U.unsafeCoerce x)
-                               :: (a -> b) -> m a -> m b))
-         (\_ x -> U.unsafeCoerce (pure (U.unsafeCoerce x) :: a -> m a))
-         (\_ _ f x -> U.unsafeCoerce (U.unsafeCoerce f <*> U.unsafeCoerce x
-                                     :: m (a -> b) -> m a -> m b)))
-        (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x) :: m (m a) -> m a))
+         (\(_ :: ()) (_ :: ()) (f :: Any -> Any) x ->
+           U.unsafeCoerce (fmap f (U.unsafeCoerce x :: m Any)))
+         (\(_ :: ()) -> pure)
+         (\(_ :: ()) (_ :: ()) f x ->
+           U.unsafeCoerce (U.unsafeCoerce f <*> U.unsafeCoerce x :: m Any)))
+        (\(_ :: ()) x ->
+          U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
         LS.ECannotInsertUnhAtPos spillDets pos ->
