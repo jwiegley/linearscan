@@ -148,7 +148,7 @@ Definition BlockMoves :=
 
 Definition resolveDataFlow (allocs : seq Allocation)
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
-  IntMap BlockMoves :=
+  mType (IntMap BlockMoves) :=
   (* for each block from in blocks do
        for each successor to of from do
          // collect all resolving moves necessary between the blocks from
@@ -174,19 +174,20 @@ Definition resolveDataFlow (allocs : seq Allocation)
          resolver.resolve_mappings()
        end for
      end for *)
-  forFold emptyIntMap blocks $ fun mappings b =>
-    let bid := blockId binfo b in
+  iso_to $ forFoldM emptyIntMap blocks $ fun mappings b =>
+    bid <-- blockId binfo b ;;
     (* jww (2015-01-28): Failure here should be impossible *)
-    if IntMap_lookup bid liveSets isn't Some from then mappings else
-    (fun successors =>
+    if IntMap_lookup bid liveSets isn't Some from
+    then pure mappings
+    else
+      suxs <-- blockSuccessors binfo b ;;
       (* If [in_from] is [true], resolving moves are inserted at the end of
          the [from] block, rather than the beginning of the [to] block. *)
-      let in_from := size successors <= 1 in
-      forFold mappings successors $ fun ms s_bid =>
+      let in_from := size suxs <= 1 in
+      pure $ forFold mappings suxs $ fun ms s_bid =>
         (* jww (2015-01-28): Failure here should be impossible *)
         if IntMap_lookup s_bid liveSets isn't Some to then ms else
         let key := if in_from then bid else s_bid in
-        checkBlockBoundary allocs key in_from from to (blockLiveIn to) ms)
-    (blockSuccessors binfo b).
+        checkBlockBoundary allocs key in_from from to (blockLiveIn to) ms.
 
 End Resolve.

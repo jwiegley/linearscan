@@ -170,23 +170,34 @@ Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
         else (vis, None) in
   snd (go (IntSet_size (visitedBlocks st)) emptyIntSet blk).
 
+Definition liftStateT `{Monad m} `(x : State s a) : StateT s m a :=
+  st <-- getT ;;
+  let (a, st') := x st in
+  putT st' ;;
+  pure a.
+
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
-Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
-  st <-- get ;;
-  let m :=
-    forFold emptyIntMap (IntSet_toList (loopEndBlocks st)) $ fun m endBlock =>
-      if IntMap_lookup endBlock bs isn't Some b then m else
-      forFold m (blockSuccessors binfo b) $ fun m' sux =>
-        let headers := loopHeaderBlocks st in
-        let loopIndex := find (fun x => x == sux) headers in
-        if loopIndex == size headers then m' else
+Definition computeLoopDepths (bs : IntMap blockType1) :
+  StateT LoopState mType unit :=
+  st <-- getT ;;
+  m <-- lift $ iso_to $
+    forFoldM emptyIntMap (IntSet_toList (loopEndBlocks st))
+      (fun m endBlock =>
+        if IntMap_lookup endBlock bs isn't Some b
+        then pure m
+        else
+          suxs <-- blockSuccessors binfo b ;;
+          pure $ forFold m suxs $ fun m' sux =>
+            let headers   := loopHeaderBlocks st in
+            let loopIndex := find (fun x => x == sux) headers in
+            if loopIndex == size headers then m' else
 
-        let mres := pathToLoopHeader endBlock sux st in
-        if mres isn't Some path then m' else
+            let mres := pathToLoopHeader endBlock sux st in
+            if mres isn't Some path then m' else
 
-        forFold m' (IntSet_toList path) $ fun m'' blk =>
-          addReference loopIndex blk m'' in
+            forFold m' (IntSet_toList path) $ fun m'' blk =>
+              addReference loopIndex blk m'') ;;
   let f acc loopIndex refs :=
     IntSet_forFold acc refs $ fun m' blk =>
         let f mx :=
@@ -194,17 +205,18 @@ Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
           then Some (minn idx loopIndex, depth.+1)
           else Some (loopIndex, 1) in
         IntMap_alter f blk m' in
-  setLoopIndices m ;;
-  setLoopDepths (IntMap_foldlWithKey f emptyIntMap m).
+  liftStateT
+    (setLoopIndices m ;;
+     setLoopDepths (IntMap_foldlWithKey f emptyIntMap m)).
 
 (* Determine all of the variables which are referenced within any loop, and
    collect them into sets associated with each loop end block, since they will
    be inserted as zero-length ranges making reference to each of those
    variables. *)
 Definition computeVarReferences (bs : seq blockType1) (st : LoopState) :
-  IntMap IntSet :=
-  forFold emptyIntMap bs $ fun acc b =>
-    let bid := blockId binfo b in
+  mType (IntMap IntSet) :=
+  iso_to $ forFoldM emptyIntMap bs $ fun acc b =>
+    bid <-- blockId binfo b ;;
     let g acc1 loopIndex blks :=
       if ~~ IntSet_member bid blks then acc1 else
       let: (xs, ys, zs) := blockOps binfo b in
@@ -212,32 +224,36 @@ Definition computeVarReferences (bs : seq blockType1) (st : LoopState) :
         forFold acc2 (opRefs oinfo op) $ fun acc3 v =>
           if varId v isn't inr vid then acc3 else
           addReference loopIndex vid acc3 in
-    IntMap_foldlWithKey g acc (loopIndices st).
+    pure $ IntMap_foldlWithKey g acc (loopIndices st).
 
-Definition findLoopEnds (bs : IntMap blockType1) : State LoopState unit :=
+Definition findLoopEnds (bs : IntMap blockType1) :
+  StateT LoopState mType unit :=
   let fix go n b :=
     if n isn't S n then pure tt else
-    let bid := blockId binfo b in
-    modifyVisitedBlocks (IntSet_insert bid) ;;
-    modifyActiveBlocks (IntSet_insert bid) ;;
-    (forM_ (blockSuccessors binfo b) $ fun sux =>
-      active <-- gets activeBlocks ;;
-      (if IntSet_member sux active
-       then
-         modifyLoopHeaderBlocks (fun l => if sux \notin l
-                                          then sux :: l
-                                          else l) ;;
-         modifyLoopEndBlocks (IntSet_insert bid) ;;
-         modifyBackwardBranches (addReference sux bid)
-       else
-         modifyForwardBranches (addReference sux bid)) ;;
-      visited <-- gets visitedBlocks ;;
+    bid <-- lift $ iso_to $ blockId binfo b ;;
+    liftStateT
+      (modifyVisitedBlocks (IntSet_insert bid) ;;
+       modifyActiveBlocks (IntSet_insert bid)) ;;
+    suxs <-- lift $ iso_to $ blockSuccessors binfo b ;;
+    (forM_ suxs $ fun sux =>
+      active <-- getsT activeBlocks ;;
+      liftStateT
+        (if IntSet_member sux active
+         then
+           modifyLoopHeaderBlocks (fun l => if sux \notin l
+                                            then sux :: l
+                                            else l) ;;
+           modifyLoopEndBlocks (IntSet_insert bid) ;;
+           modifyBackwardBranches (addReference sux bid)
+         else
+           modifyForwardBranches (addReference sux bid)) ;;
+      visited <-- getsT visitedBlocks ;;
       (if IntSet_member sux visited
        then pure tt
        else if IntMap_lookup sux bs is Some x
             then go n x
             else pure tt)) ;;
-    modifyActiveBlocks (IntSet_delete bid) in
+    liftStateT (modifyActiveBlocks (IntSet_delete bid)) in
   if IntMap_toList bs is (_, b) :: _
   then go (IntMap_size bs) b
   else pure tt.
@@ -246,16 +262,18 @@ Definition computeBlockOrder (blocks : seq blockType1) :
   mType (LoopState * seq blockType1) :=
   if blocks isn't b :: bs then pure (emptyLoopState, [::]) else
 
-  let blockMap :=
-    IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks) in
-  let: (_, st0) := findLoopEnds blockMap emptyLoopState in
+  keys <-- mapM (fun x => bid <-- iso_to $ blockId binfo x ;;
+                          pure (bid, x)) blocks ;;
+  let blockMap := IntMap_fromList keys in
+  z <-- findLoopEnds blockMap emptyLoopState ;;
+  let: (_, st0) := z in
 
   (* Every branch from a block with multiple successors to a block with *)
   (* multiple predecessors is a "critical edge".  We insert a new, anonymous *)
   (* block at this edge to hold the resolving moves for the critical edge. *)
   blocks' <--
     forFoldrM [::] blocks (fun b rest =>
-      let suxs := blockSuccessors binfo b in
+      suxs <-- iso_to $ blockSuccessors binfo b ;;
       if size suxs <= 1
       then pure $ b :: rest
       else (fun x => let: (b', rest') := x in b' :: rest') <$>
@@ -273,39 +291,46 @@ Definition computeBlockOrder (blocks : seq blockType1) :
                  let: (b'', sux'') := z in
                  pure (b'', sux'' :: rest')
             else pure (b', rest'))) ;;
-  let blockMap' :=
-    IntMap_fromList (map (fun x => (blockId binfo x, x)) blocks') in
-  let: (_, st1) := findLoopEnds blockMap' emptyLoopState in
+  keys' <-- mapM (fun x => bid <-- iso_to $ blockId binfo x ;;
+                           pure (bid, x)) blocks' ;;
+  let blockMap' := IntMap_fromList keys' in
+  z' <-- findLoopEnds blockMap' emptyLoopState ;;
+  let: (_, st1) := z' in
   if blocks' isn't b' :: bs' then pure (emptyLoopState, [::]) else
-  let: (_, st2)  := computeLoopDepths blockMap st1 in
+  w <-- computeLoopDepths blockMap st1 ;;
+  let: (_, st2) := w in
 
   (* jww (2015-03-08): This is a somewhat simplistic computation of weighting *)
   (*    for each block. *)
   let isHeavier x y :=
-    let x_id := blockId binfo x in
-    let y_id := blockId binfo y in
+    x_id <-- iso_to $ blockId binfo x ;;
+    y_id <-- iso_to $ blockId binfo y ;;
     let x_depth := if IntMap_lookup x_id (loopDepths st2) is Some (idx, depth)
                    then depth else 0 in
     let y_depth := if IntMap_lookup y_id (loopDepths st2) is Some (idx, depth)
                    then depth else 0 in
-    x_depth > y_depth in
+    pure (x_depth > y_depth) in
 
   let fix go n branches work_list :=
-    if n isn't S n then [::] else
-    if work_list isn't w :: ws then [::] else
-    let: (branches', ws') :=
-      let bid := blockId binfo w in
-      let suxs := blockSuccessors binfo w in
-      forFold (branches, ws) suxs $ fun acc sux =>
+    if n isn't S n then pure [::] else
+    if work_list isn't w :: ws then pure [::] else
+    bid  <-- iso_to $ blockId binfo w ;;
+    suxs <-- iso_to $ blockSuccessors binfo w ;;
+    x <--
+      forFoldM (branches, ws) suxs (fun acc sux =>
         let: (branches', ws') := acc in
-        let insertion := if IntMap_lookup sux blockMap' is Some s
-                         then insert isHeavier s ws'
-                         else ws' in
-        if IntMap_lookup sux branches' is Some incs
-        then (IntMap_insert sux (IntSet_delete bid incs) branches',
-              if IntSet_size incs == 1 then insertion else ws')
-        else (branches', insertion) in
-    w :: go n branches' ws' in
-  pure (st2, go (size blocks') (forwardBranches st2) [:: b']).
+        insertion <--
+          (if IntMap_lookup sux blockMap' is Some s
+           then insertM isHeavier s ws'
+           else pure ws') ;;
+        pure
+          (if IntMap_lookup sux branches' is Some incs
+           then (IntMap_insert sux (IntSet_delete bid incs) branches',
+                 if IntSet_size incs == 1 then insertion else ws')
+           else (branches', insertion))) ;;
+    let: (branches', ws') := x in
+    cons w <$> go n branches' ws' in
+  res <-- go (size blocks') (forwardBranches st2) [:: b'] ;;
+  pure (st2, res).
 
 End Resolve.

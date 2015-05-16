@@ -216,6 +216,17 @@ Definition concatMapM `{Applicative m} {A B}
   (f : A -> m (seq B)) (l : seq A) : m (seq B) :=
   fmap (concat) (mapM f l).
 
+Fixpoint insertM `{Monad m} {a} (P : a -> a -> m bool)
+  (z : a) (l : list a) : m (list a) :=
+  if l is x :: xs
+  then
+    b <-- P x z ;;
+    if b
+    then cons x <$> insertM P z xs
+    else pure (z :: x :: xs)
+  else pure [:: z].
+Arguments insertM {m H a} P z l : simpl never.
+
 (******************************************************************************
  * The State Monad
  *)

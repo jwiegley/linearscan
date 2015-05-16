@@ -281,38 +281,42 @@ showOps1 oinfo sd pos (o:os) =
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
 data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
-    { blockId           :: blk1 -> Int
-    , blockSuccessors   :: blk1 -> [Int]
+    { blockId           :: blk1 -> m Int
+    , blockSuccessors   :: blk1 -> m [Int]
     , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
     , blockOps          :: blk1 -> ([op1], [op1], [op1])
     , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
     }
 
-showBlocks1 :: LinearScan.BlockInfo m blk1 blk2 op1 op2
+showBlocks1 :: Monad m
+            => LinearScan.BlockInfo m blk1 blk2 op1 op2
             -> LinearScan.OpInfo m op1 op2
             -> ScanStateDesc
             -> LS.IntMap LS.BlockLiveSets
             -> [blk1]
-            -> String
+            -> m String
 showBlocks1 binfo oinfo sd ls = go 0
   where
-    go _ [] = ""
-    go pos (b:bs) =
-        let bid = LinearScan.blockId binfo b in
+    go _ [] = return ""
+    go pos (b:bs) = do
+        bid <- LinearScan.blockId binfo b
         let (liveIn, liveOut) =
                  case LS.coq_IntMap_lookup bid ls of
                      Nothing -> (LS.emptyIntSet, LS.emptyIntSet)
-                     Just s  -> (LS.blockLiveIn s, LS.blockLiveOut s) in
-        let allops blk = let (x, y, z) = LinearScan.blockOps binfo blk in
-                         x ++ y ++ z in
-        showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b
-            ++ go (pos + length (allops b)) bs
+                     Just s  -> (LS.blockLiveIn s, LS.blockLiveOut s)
+        let allops blk =
+                let (x, y, z) = LinearScan.blockOps binfo blk in
+                x ++ y ++ z
+        (showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b ++)
+            `liftM` go (pos + length (allops b)) bs
 
 fromBlockInfo :: Monad m
               => LinearScan.BlockInfo m blk1 blk2 op1 op2
               -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
-    LS.Build_BlockInfo a b
+    LS.Build_BlockInfo
+        (\r1 _ k -> liftM k (a r1))
+        (\r1 _ k -> liftM k (b r1))
         (\r1 r2 _ k -> liftM k (c r1 r2))
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
@@ -328,19 +332,23 @@ data Details m blk1 blk2 op1 op2 = Details
     , loopState       :: LoopState
     }
 
-instance Show (Details m blk1 blk2 op1 op2) where
-    show err = "Reason: " ++ show (reason err) ++ "\n\n"
-               ++ ">>> ScanState before allocation:\n"
-               ++ showScanStateDesc (scanStatePre err) ++ "\n"
-               ++ ">>> ScanState after allocation:\n"
-               ++ showScanStateDesc (scanStatePost err) ++ "\n"
-               ++ ">>> " ++ show (loopState err) ++ "\n"
-      where
-        showScanStateDesc Nothing = ""
-        showScanStateDesc (Just sd) =
-            showBlocks1 (blockInfo err) (opInfo err) sd
-                        (liveSets err) (inputBlocks err)
-                ++ "\n" ++ show sd
+showDetails :: Monad m => Details m blk1 blk2 op1 op2 -> m String
+showDetails err = do
+    pre  <- showScanStateDesc (scanStatePre err)
+    post <- showScanStateDesc (scanStatePost err)
+    return $ "Reason: " ++ show (reason err) ++ "\n\n"
+          ++ ">>> ScanState before allocation:\n"
+          ++ pre ++ "\n"
+          ++ ">>> ScanState after allocation:\n"
+          ++ post ++ "\n"
+          ++ ">>> " ++ show (loopState err) ++ "\n"
+  where
+    showScanStateDesc Nothing = return ""
+    showScanStateDesc (Just sd) =
+        liftM2 (++)
+            (showBlocks1 (blockInfo err) (opInfo err) sd
+                         (liveSets err) (inputBlocks err))
+            (return ("\n" ++ show sd))
 
 deriving instance Show LS.SSError
 deriving instance Show LS.FinalStage
@@ -375,12 +383,12 @@ allocate _ _ _ [] = return $ Left "No basic blocks were provided"
 allocate maxReg binfo oinfo blocks = do
     x <- LS.linearScan dict maxReg
        (fromBlockInfo binfo) (fromOpInfo oinfo) blocks $ \res ->
-       let res' = toDetails res binfo oinfo in
-       tracer (show res') $ case reason res' of
-           Just (err, _) -> Left  $ reasonToStr err
-           Nothing       -> Right $ allocatedBlocks res'
-    let eres = U.unsafeCoerce (x :: Any) :: Either String [blk2]
-    return eres
+       toDetails res binfo oinfo
+    let res' = U.unsafeCoerce (x :: Any) :: Details m blk1 blk2 op1 op2
+    dets <- showDetails res'
+    return $ tracer dets $ case reason res' of
+        Just (err, _) -> Left  $ reasonToStr err
+        Nothing       -> Right $ allocatedBlocks res'
   where
     dict :: LS.Monad (m Any)
     dict = LS.Build_Monad

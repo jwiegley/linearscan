@@ -81,10 +81,11 @@ Definition linearScan
   let: (loops, blocks1) := z in
 
   (* create intervals with live ranges *)
-  let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
-  let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
+  liveSets <-- computeLocalLiveSets binfo oinfo blocks1 ;;
+  liveSets' <-- computeGlobalLiveSetsRecursively binfo blocks1 liveSets ;;
 
-  match buildIntervals binfo oinfo blocks1 loops liveSets' with
+  ints <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
+  match ints with
   | inl err =>
     pure $ k $ Build_Details _ _ maxReg
       (Some (err, BuildingIntervalsFailed)) liveSets' blocks1 [::]
@@ -99,9 +100,10 @@ Definition linearScan
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet ssig'.1)) loops
     | inr ssig' =>
-        let sd       := finalizeScanState ssig'.2 opCount.*2 in
-        let allocs   := determineAllocations sd in
-        let mappings := resolveDataFlow binfo allocs blocks1 liveSets' in
+        let sd     := finalizeScanState ssig'.2 opCount.*2 in
+        let allocs := determineAllocations sd in
+
+        mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
 
         (* replace virtual registers with physical registers *)
         blocks2 <--

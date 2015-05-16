@@ -141,7 +141,7 @@ Definition considerOps (f : opType1 -> AssnState (seq opType2))
   mapM $ fun blk =>
     (* First apply all allocations *)
     let ops := blockOps binfo blk in
-    let bid := blockId binfo blk in
+    bid <-- lift $ iso_to $ blockId binfo blk ;;
 
     let outs := if IntMap_lookup bid liveSets is Some ls
                 then blockLiveOut ls

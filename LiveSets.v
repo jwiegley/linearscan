@@ -78,7 +78,7 @@ Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
-  IntMap BlockLiveSets :=
+  mType (IntMap BlockLiveSets) :=
   (* for each block b in blocks do
        b.live_gen  = { }
        b.live_kill = { }
@@ -100,8 +100,7 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
          end for
        end for
      end for *)
-  @snd _ _ $
-  forFold (1, emptyIntMap) blocks $ fun acc b =>
+  iso_to $ @snd _ _ <$> forFoldM (1, emptyIntMap) blocks (fun acc b =>
     let: (idx, m) := acc in
     let: (opsb, opsm, opse) := blockOps binfo b in
     let liveSet :=
@@ -148,10 +147,11 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
           ; blockLastOpId  := lastIdx
           |})
       in
-    (lastIdx', IntMap_insert (blockId binfo b) liveSet3 m).
+    k <-- blockId binfo b ;;
+    pure (lastIdx', IntMap_insert k liveSet3 m)).
 
 Definition computeGlobalLiveSets (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
+  (liveSets : IntMap BlockLiveSets) : mType (IntMap BlockLiveSets) :=
   (* do
        for each block b in blocks in reverse order do
          b.live_out = { }
@@ -162,13 +162,13 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
          b.live_in = (b.live_out – b.live_kill) ∪ b.live_gen
        end for
      while change occurred in any live set *)
-  forFoldr liveSets blocks $ fun b liveSets1 =>
-    let bid := blockId binfo b in
+  iso_to $ forFoldrM liveSets blocks $ fun b liveSets1 =>
+    bid <-- blockId binfo b ;;
     match IntMap_lookup bid liveSets1 with
-    | None => liveSets1       (* jww (2015-02-14): should never happen *)
+    | None => pure liveSets1    (* jww (2015-02-14): should never happen *)
     | Some liveSet =>
-      let liveSet2 :=
-        forFold liveSet (blockSuccessors binfo b) $ fun liveSet2 s_bid =>
+      suxs <-- blockSuccessors binfo b ;;
+      let liveSet2 := forFold liveSet suxs $ fun liveSet2 s_bid =>
           match IntMap_lookup s_bid liveSets1 with
           | None => liveSet2  (* jww (2015-02-14): should never happen *)
           | Some sux =>
@@ -182,7 +182,7 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
              |}
           end
         in
-      IntMap_insert bid
+      pure $ IntMap_insert bid
         {| blockLiveGen   := blockLiveGen liveSet2
          ; blockLiveKill  := blockLiveKill liveSet2
          ; blockLiveIn    :=
@@ -196,13 +196,15 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
     end.
 
 Definition computeGlobalLiveSetsRecursively (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
+  (liveSets : IntMap BlockLiveSets) : mType (IntMap BlockLiveSets) :=
   let fix go n previous :=
-    if n isn't S n then previous else
-    let computed := computeGlobalLiveSets blocks previous in
-    if previous == computed
-    then computed
-    else go n computed in
+    if n isn't S n
+    then pure previous
+    else
+      computed <-- computeGlobalLiveSets blocks previous ;;
+      if previous == computed
+      then pure computed
+      else go n computed in
   go (size blocks) liveSets.
 
 End LiveSets.
