@@ -212,7 +212,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
             (determineMoves (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  _assnOpId += 2 ;;
+  modifyT (_assnOpId .~ opid.+2) ;;
 
   pure $ ops ++ transitions.
 
@@ -233,8 +233,10 @@ Definition considerOps
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
-    _assnBlockBeg += (size opsb).*2 ;;
-    _assnBlockEnd += (size opsb + size opsm).*2 ;;
+    modifyT (fun assn =>
+      let opid := assn ^_ _assnOpId in
+      assn &+ _assnBlockBeg .~ opid + (size opsb).*2
+           &+ _assnBlockEnd .~ opid + (size opsb + size opsm).*2) ;;
 
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
@@ -250,14 +252,14 @@ Definition considerOps
     | b :: bs, e :: es =>
         pure $ setBlockOps binfo blk
           [:: b] (bs ++ opsm'' ++ belast e es) [:: last e es]
-    (* | b :: bs, _ => *)
-    (*     pure $ setBlockOps binfo blk *)
-    (*       [:: b] (bs ++ opsm'') [::] *)
-    (* | _, e :: es => *)
-    (*     pure $ setBlockOps binfo blk *)
-    (*       [::] (opsm'' ++ belast e es) [:: last e es] *)
-    | _, _ =>
-        pure $ setBlockOps binfo blk opsb' opsm'' opse'
+    | b :: bs, [::] =>
+        pure $ setBlockOps binfo blk
+          [:: b] (bs ++ opsm'') [::]
+    | [::], e :: es =>
+        pure $ setBlockOps binfo blk
+          [::] (opsm'' ++ belast e es) [:: last e es]
+    | [::], [::] =>
+        pure $ setBlockOps binfo blk [::] opsm'' [::]
     end.
 
 Definition compatibleAllocStates (bb be : BlockId) (x y : AllocState) :
