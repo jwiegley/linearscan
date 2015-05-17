@@ -4,6 +4,7 @@ Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 Require Export LinearScan.Monad.
 Require Export LinearScan.Yoneda.
+Require Export LinearScan.Lens.
 
 Require Export Coq.Program.Wf.
 Require Export Coq.Sorting.Sorted.

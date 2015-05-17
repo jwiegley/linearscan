@@ -31,7 +31,7 @@ Definition Lens s t a b := forall `{Functor f}, (a -> f b) -> s -> f t.
 Definition Lens' s a := Lens s s a a.
 
 Notation "x &+ f" := (f x) (at level 71, only parsing).
-Notation "f \O g" := (fun t h => f t h \o g t h) (at level 71, only parsing).
+Notation "f \o+ g" := (fun t h => f t h \o g t h) (at level 71, only parsing).
 
 Definition set `(l : Lens s t a b) (x : b) : s -> t :=
   l _ _ (fun _ => x).
@@ -66,7 +66,7 @@ Proof. reflexivity. Qed.
 Example lens_ex3 : (10, 20) ^_ _2 == 20.
 Proof. reflexivity. Qed.
 
-Example lens_ex4 : (1, (2, (3, 4))) ^_ (_2 \O _2 \O _2) == 4.
+Example lens_ex4 : (1, (2, (3, 4))) ^_ (_2 \o+ _2 \o+ _2) == 4.
 Proof. reflexivity. Qed.
 
 Example lens_ex5 : ((10, 20) &+ _1 .~ 500) == (500, 20).

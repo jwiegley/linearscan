@@ -81,7 +81,13 @@ Definition determineMoves (moves : IntMap RawResolvingMove) :
     - A move from one register to another
     - A move from the stack to a register
     - A move from a register to the stack
-    - A swap between two registers *)
+    - A swap between two registers
+
+   Note: if a variable is not live in [from] but is live in [to], or vice
+   versa, this is not considered and is just regarded as how the program was
+   written. There is no contention in this case, even if it might actually
+   mean that the program is assuming the variable is live somehow in a
+   register or on the stack. *)
 Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
   IntMap RawResolvingMove :=
 

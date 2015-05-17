@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Lens.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
 Require Import LinearScan.UsePos.
@@ -80,8 +79,7 @@ Definition _assnOpId : Lens' AssnStateInfo OpId := fun _ _ f s =>
      ; assnBlockExitAllocs  := assnBlockExitAllocs s
      ; assnErrors           := assnErrors s
      |}) (f (assnOpId s)).
-
-Program Instance Lens__assnOpId : CorrectLens (s:=AssnStateInfo) _assnOpId.
+Program Instance Lens__assnOpId : CorrectLens _assnOpId.
 Obligation 2. by case: x. Qed.
 
 Definition _assnBlockBeg : Lens' AssnStateInfo OpId := fun _ _ f s =>
@@ -94,9 +92,7 @@ Definition _assnBlockBeg : Lens' AssnStateInfo OpId := fun _ _ f s =>
      ; assnBlockExitAllocs  := assnBlockExitAllocs s
      ; assnErrors           := assnErrors s
      |}) (f (assnBlockBeg s)).
-
-Program Instance Lens__assnBlockBeg :
-  CorrectLens (s:=AssnStateInfo) _assnBlockBeg.
+Program Instance Lens__assnBlockBeg : CorrectLens _assnBlockBeg.
 Obligation 2. by case: x. Qed.
 
 Definition _assnBlockEnd : Lens' AssnStateInfo OpId := fun _ _ f s =>
@@ -109,9 +105,59 @@ Definition _assnBlockEnd : Lens' AssnStateInfo OpId := fun _ _ f s =>
      ; assnBlockExitAllocs  := assnBlockExitAllocs s
      ; assnErrors           := assnErrors s
      |}) (f (assnBlockEnd s)).
+Program Instance Lens__assnBlockEnd : CorrectLens _assnBlockEnd.
+Obligation 2. by case: x. Qed.
 
-Program Instance Lens__assnBlockEnd :
-  CorrectLens (s:=AssnStateInfo) _assnBlockEnd.
+Definition _assnAllocState : Lens' AssnStateInfo AllocState := fun _ _ f s =>
+  fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := assnBlockBeg s
+     ; assnBlockEnd         := assnBlockEnd s
+     ; assnAllocState       := x
+     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
+     ; assnBlockExitAllocs  := assnBlockExitAllocs s
+     ; assnErrors           := assnErrors s
+     |}) (f (assnAllocState s)).
+Program Instance Lens__assnAllocState : CorrectLens _assnAllocState.
+Obligation 2. by case: x. Qed.
+
+Definition _assnBlockEntryAllocs : Lens' AssnStateInfo (IntMap AllocState) :=
+  fun _ _ f s => fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := assnBlockBeg s
+     ; assnBlockEnd         := assnBlockEnd s
+     ; assnAllocState       := assnAllocState s
+     ; assnBlockEntryAllocs := x
+     ; assnBlockExitAllocs  := assnBlockExitAllocs s
+     ; assnErrors           := assnErrors s
+     |}) (f (assnBlockEntryAllocs s)).
+Program Instance Lens__assnBlockEntryAllocs : CorrectLens _assnBlockEntryAllocs.
+Obligation 2. by case: x. Qed.
+
+Definition _assnBlockExitAllocs : Lens' AssnStateInfo (IntMap AllocState) :=
+  fun _ _ f s => fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := assnBlockBeg s
+     ; assnBlockEnd         := assnBlockEnd s
+     ; assnAllocState       := assnAllocState s
+     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
+     ; assnBlockExitAllocs  := x
+     ; assnErrors           := assnErrors s
+     |}) (f (assnBlockExitAllocs s)).
+Program Instance Lens__assnBlockExitAllocs : CorrectLens _assnBlockExitAllocs.
+Obligation 2. by case: x. Qed.
+
+Definition _assnErrors : Lens' AssnStateInfo (seq AllocError) := fun _ _ f s =>
+  fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := assnBlockBeg s
+     ; assnBlockEnd         := assnBlockEnd s
+     ; assnAllocState       := assnAllocState s
+     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
+     ; assnBlockExitAllocs  := assnBlockExitAllocs s
+     ; assnErrors           := x
+     |}) (f (assnErrors s)).
+Program Instance Lens__assnErrors : CorrectLens _assnErrors.
 Obligation 2. by case: x. Qed.
 
 Definition AssnState := StateT AssnStateInfo mType.
@@ -124,7 +170,7 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
        type formers and extraction:
        https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
     let k := fmap (@Some _) \o lift \o iso_to in
-    mops <-- match mv return AssnState (option (seq opType2)) with
+    mops <-- match mv with
       | Swap    sreg dreg => k $ swapOp oinfo sreg dreg
       | Move    sreg dreg => k $ moveOp oinfo sreg dreg
       | Spill   sreg vid  => k $ saveOp oinfo sreg (Some vid)
@@ -191,7 +237,7 @@ Definition considerOps (allocs : seq (Allocation maxReg))
     opse' <-- concatMapM k opse ;;
 
     (* Insert resolving moves based on the mappings *)
-    bid  <-- lift $ iso_to $ blockId binfo blk ;;
+    bid    <-- lift $ iso_to $ blockId binfo blk ;;
     opsm'' <-- resolveMappings bid opsm' mappings ;;
 
     match opsb', opse' with
