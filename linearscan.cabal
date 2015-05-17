@@ -61,6 +61,7 @@ library
     LinearScan.IState
     LinearScan.IntMap
     LinearScan.Interval
+    LinearScan.Lens
     LinearScan.Lib
     LinearScan.List0
     LinearScan.LiveSets

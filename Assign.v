@@ -162,14 +162,21 @@ Obligation 2. by case: x. Qed.
 
 Definition AssnState := StateT AssnStateInfo mType.
 
+Definition use `(l : Lens' s a) `{Monad m} : StateT s m a := view l <$> getT.
+
+Definition plusStateT `(l : Lens' s nat) (n : nat) `{Monad m} :
+  StateT s m unit := modifyT (l %~ plus n).
+
+Notation "l += n" := (plusStateT l n) (at level 71).
+
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
-  AssnState (seq opType2) :=
+  mType (seq opType2) :=
   forFoldrM [::] moves $ fun mv acc =>
     (* The [iso_to] is due to the fact that swapOp returns [Yoneda m a],
        rather than [m a]. This is necessary to work around a limitation with
        type formers and extraction:
        https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
-    let k := fmap (@Some _) \o lift \o iso_to in
+    let k := fmap (@Some _) \o iso_to in
     mops <-- match mv with
       | Swap    sreg dreg => k $ swapOp oinfo sreg dreg
       | Move    sreg dreg => k $ moveOp oinfo sreg dreg
@@ -201,50 +208,56 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
-     then generateMoves
+     then lift $ generateMoves
             (determineMoves (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  modifyT (_assnOpId %~ plus 2) ;;
+  _assnOpId += 2 ;;
 
   pure $ ops ++ transitions.
 
-Definition resolveMappings bid opsm mappings : AssnState (seq opType2) :=
+Definition resolveMappings bid opsm mappings : mType (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
   if IntMap_lookup bid mappings isn't Some graphs then pure opsm else
-
   let: (gbeg, gend) := graphs in
-
   bmoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gbeg)) ;;
-  let opsm' := bmoves ++ opsm in
-
   emoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gend)) ;;
-  let opsm'' := opsm' ++ emoves in
-  pure opsm''.
+  pure $ bmoves ++ opsm ++ emoves.
 
-Definition considerOps (allocs : seq (Allocation maxReg))
-  (liveSets : IntMap BlockLiveSets) mappings :
+Definition considerOps
+  (allocs : seq (Allocation maxReg))
+  (liveSets : IntMap BlockLiveSets)
+  (mappings : IntMap (BlockMoves maxReg)) :
   seq blockType1 -> AssnState (seq blockType2) :=
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
-    modifyT (_assnBlockBeg %~ plus (size opsb).*2) ;;
-    modifyT (_assnBlockEnd %~ plus (size opsb + size opsm).*2) ;;
+
+    _assnBlockBeg += (size opsb).*2 ;;
+    _assnBlockEnd += (size opsb + size opsm).*2 ;;
 
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
     opsm' <-- concatMapM k opsm ;;
     opse' <-- concatMapM k opse ;;
 
-    (* Insert resolving moves based on the mappings *)
+    (* Insert resolving moves at the beginning or end of [opsm'] based on the
+       mappings. *)
     bid    <-- lift $ iso_to $ blockId binfo blk ;;
-    opsm'' <-- resolveMappings bid opsm' mappings ;;
+    opsm'' <-- lift $ resolveMappings bid opsm' mappings ;;
 
     match opsb', opse' with
     | b :: bs, e :: es =>
         pure $ setBlockOps binfo blk
           [:: b] (bs ++ opsm'' ++ belast e es) [:: last e es]
-    | _, _ => pure $ setBlockOps binfo blk opsb' opsm'' opse'
+    (* | b :: bs, _ => *)
+    (*     pure $ setBlockOps binfo blk *)
+    (*       [:: b] (bs ++ opsm'') [::] *)
+    (* | _, e :: es => *)
+    (*     pure $ setBlockOps binfo blk *)
+    (*       [::] (opsm'' ++ belast e es) [:: last e es] *)
+    | _, _ =>
+        pure $ setBlockOps binfo blk opsb' opsm'' opse'
     end.
 
 Definition compatibleAllocStates (bb be : BlockId) (x y : AllocState) :
