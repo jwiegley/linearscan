@@ -70,7 +70,7 @@ Definition newAssnStateInfo :=
    ; assnErrors           := [::]
    |}.
 
-Definition _assnOpId `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
+Definition _assnOpId : Lens' AssnStateInfo OpId := fun _ _ f s =>
   fmap (fun x =>
     {| assnOpId             := x
      ; assnBlockBeg         := assnBlockBeg s
@@ -81,11 +81,10 @@ Definition _assnOpId `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
      ; assnErrors           := assnErrors s
      |}) (f (assnOpId s)).
 
-Program Instance Lens__assnOpId :
-  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnOpId).
+Program Instance Lens__assnOpId : CorrectLens (s:=AssnStateInfo) _assnOpId.
 Obligation 2. by case: x. Qed.
 
-Definition _assnBlockBeg `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
+Definition _assnBlockBeg : Lens' AssnStateInfo OpId := fun _ _ f s =>
   fmap (fun x =>
     {| assnOpId             := assnOpId s
      ; assnBlockBeg         := x
@@ -97,10 +96,10 @@ Definition _assnBlockBeg `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
      |}) (f (assnBlockBeg s)).
 
 Program Instance Lens__assnBlockBeg :
-  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnBlockBeg).
+  CorrectLens (s:=AssnStateInfo) _assnBlockBeg.
 Obligation 2. by case: x. Qed.
 
-Definition _assnBlockEnd `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
+Definition _assnBlockEnd : Lens' AssnStateInfo OpId := fun _ _ f s =>
   fmap (fun x =>
     {| assnOpId             := assnOpId s
      ; assnBlockBeg         := assnBlockBeg s
@@ -112,7 +111,7 @@ Definition _assnBlockEnd `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
      |}) (f (assnBlockEnd s)).
 
 Program Instance Lens__assnBlockEnd :
-  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnBlockEnd).
+  CorrectLens (s:=AssnStateInfo) _assnBlockEnd.
 Obligation 2. by case: x. Qed.
 
 Definition AssnState := StateT AssnStateInfo mType.
