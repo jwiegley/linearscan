@@ -59,19 +59,19 @@ Program Instance Lens__1 : CorrectLens (s:=a * b) (fun _ _ => _1).
 Program Instance Lens__2 : CorrectLens (s:=a * b) (fun _ _ => _2).
 
 Example lens_ex1 : view _1 (10, 20) == 10.
-Proof. done. Qed.
+Proof. reflexivity. Qed.
 
 Example lens_ex2 : view _2 (10, 20) == 20.
-Proof. done. Qed.
+Proof. reflexivity. Qed.
 
 Example lens_ex3 : (10, 20) ^_ _2 == 20.
-Proof. done. Qed.
+Proof. reflexivity. Qed.
 
 Example lens_ex4 : (1, (2, (3, 4))) ^_ (_2 \o _2 \o _2) == 4.
-Proof. done. Qed.
+Proof. reflexivity. Qed.
 
 Example lens_ex5 : ((10, 20) &+ _1 .~ 500) == (500, 20).
-Proof. done. Qed.
+Proof. reflexivity. Qed.
 
 Example lens_ex6 : ((10, 20) &+ _1 %~ plus 1) == (11, 20).
-Proof. done. Qed.
+Proof. reflexivity. Qed.
