@@ -81,6 +81,9 @@ Definition _assnOpId `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
      ; assnErrors           := assnErrors s
      |}) (f (assnOpId s)).
 
+Program Instance Lens__assnOpId :
+  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnOpId).
+
 Definition AssnState := StateT AssnStateInfo mType.
 
 Definition swapOpM sreg dreg : AssnState (seq opType2) :=
