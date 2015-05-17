@@ -25,24 +25,13 @@ Context `{mDict : Monad mType}.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
-Record Allocation := {
-  intId  : nat;
-  intVal : IntervalDesc;
-  intReg : option PhysReg
-}.
-
-Definition determineAllocations (sd : @ScanStateDesc maxReg) : seq Allocation :=
-  [seq {| intId  := nat_of_ord (fst x)
-        ; intVal := getIntervalDesc (getInterval (fst x))
-        ; intReg := snd x |} | x <- handled sd].
-
 Definition RawResolvingMove := (option PhysReg * option PhysReg)%type.
 
 Inductive ResolvingMove :=
-  | Move of PhysReg & PhysReg
-  | Swap of PhysReg & PhysReg
-  | Spill of PhysReg & VarId
-  | Restore of VarId & PhysReg
+  | Move    of PhysReg & PhysReg
+  | Swap    of PhysReg & PhysReg
+  | Spill   of PhysReg & VarId
+  | Restore of VarId   & PhysReg
   | Nop.
 
 Definition determineMove vid (x : RawResolvingMove) : ResolvingMove :=
@@ -93,7 +82,7 @@ Definition determineMoves (moves : IntMap RawResolvingMove) :
     - A move from the stack to a register
     - A move from a register to the stack
     - A swap between two registers *)
-Definition resolvingMoves (allocs : seq Allocation) (from to : nat) :
+Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
   IntMap RawResolvingMove :=
 
   (* First determine all of the variables which are live at [from] *at the end
@@ -121,7 +110,7 @@ Definition resolvingMoves (allocs : seq Allocation) (from to : nat) :
     (fun _ => emptyIntMap)
     liveAtFrom liveAtTo.
 
-Definition checkBlockBoundary (allocs : seq Allocation)
+Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to liveIn mappings :=
   let select acc vid x := if IntSet_member vid liveIn
                           then (vid, x) :: acc
@@ -146,7 +135,7 @@ Definition BlockMoves :=
   (Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType) *
    Graph (sum_eqType (ordinal_eqType maxReg) nat_eqType))%type.
 
-Definition resolveDataFlow (allocs : seq Allocation)
+Definition resolveDataFlow (allocs : seq (Allocation maxReg))
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
   mType (IntMap BlockMoves) :=
   (* for each block from in blocks do

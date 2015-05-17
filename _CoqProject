@@ -8,6 +8,7 @@ Graph.v
 IState.v
 IntMap.v
 Interval.v
+Lens.v
 Lib.v
 LiveSets.v
 Loops.v

@@ -22,6 +22,9 @@ Definition IntMap_size : forall a, IntMap a -> nat :=
 Definition IntMap_lookup : forall a, nat -> IntMap a -> option a :=
   fun _ k m => let: getIntMap x := m in maybeLookup x k.
 
+Definition IntMap_member : forall a, nat -> IntMap a -> bool :=
+  fun _ k m => if IntMap_lookup k m is Some _ then true else false.
+
 Definition IntMap_alter : forall a,
   (option a -> option a) -> nat -> IntMap a -> IntMap a :=
   fun _ f k m =>
