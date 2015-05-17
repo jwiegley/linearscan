@@ -83,72 +83,53 @@ Definition _assnOpId `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
 
 Program Instance Lens__assnOpId :
   CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnOpId).
+Obligation 2. by case: x. Qed.
+
+Definition _assnBlockBeg `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
+  fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := x
+     ; assnBlockEnd         := assnBlockEnd s
+     ; assnAllocState       := assnAllocState s
+     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
+     ; assnBlockExitAllocs  := assnBlockExitAllocs s
+     ; assnErrors           := assnErrors s
+     |}) (f (assnBlockBeg s)).
+
+Program Instance Lens__assnBlockBeg :
+  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnBlockBeg).
+Obligation 2. by case: x. Qed.
+
+Definition _assnBlockEnd `{Functor f} : Lens' AssnStateInfo OpId := fun f s =>
+  fmap (fun x =>
+    {| assnOpId             := assnOpId s
+     ; assnBlockBeg         := assnBlockBeg s
+     ; assnBlockEnd         := x
+     ; assnAllocState       := assnAllocState s
+     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
+     ; assnBlockExitAllocs  := assnBlockExitAllocs s
+     ; assnErrors           := assnErrors s
+     |}) (f (assnBlockEnd s)).
+
+Program Instance Lens__assnBlockEnd :
+  CorrectLens (s:=AssnStateInfo) (fun _ _ => _assnBlockEnd).
+Obligation 2. by case: x. Qed.
 
 Definition AssnState := StateT AssnStateInfo mType.
-
-Definition swapOpM sreg dreg : AssnState (seq opType2) :=
-  assn <-- getT ;;
-  (* The [iso_to] is due to the fact that swapOp returns [Yoneda m a], rather
-     than [m a]. This is necessary to work around a limitation with type
-     formers and extraction: https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
-  mop <-- lift $ iso_to $ swapOp oinfo sreg dreg ;;
-  putT {| assnOpId     := assnOpId assn
-        ; assnBlockBeg := assnBlockBeg assn
-        ; assnBlockEnd := assnBlockEnd assn
-        ; assnAllocState       := assnAllocState assn
-        ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-        ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-        ; assnErrors           := assnErrors assn
-        |} ;;
-  pure mop.
-
-Definition moveOpM sreg dreg : AssnState (seq opType2) :=
-  assn <-- getT ;;
-  mop <-- lift $ iso_to $ moveOp oinfo sreg dreg ;;
-  putT {| assnOpId     := assnOpId assn
-        ; assnBlockBeg := assnBlockBeg assn
-        ; assnBlockEnd := assnBlockEnd assn
-        ; assnAllocState       := assnAllocState assn
-        ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-        ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-        ; assnErrors           := assnErrors assn
-        |} ;;
-  pure mop.
-
-Definition saveOpM vid reg : AssnState (seq opType2) :=
-  assn <-- getT ;;
-  sop <-- lift $ iso_to $ saveOp oinfo vid reg ;;
-  putT {| assnOpId     := assnOpId assn
-        ; assnBlockBeg := assnBlockBeg assn
-        ; assnBlockEnd := assnBlockEnd assn
-        ; assnAllocState       := assnAllocState assn
-        ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-        ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-        ; assnErrors           := assnErrors assn
-        |} ;;
-  pure sop.
-
-Definition restoreOpM vid reg : AssnState (seq opType2) :=
-  assn <-- getT ;;
-  rop <-- lift $ iso_to $ restoreOp oinfo vid reg ;;
-  putT {| assnOpId     := assnOpId assn
-        ; assnBlockBeg := assnBlockBeg assn
-        ; assnBlockEnd := assnBlockEnd assn
-        ; assnAllocState       := assnAllocState assn
-        ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-        ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-        ; assnErrors           := assnErrors assn
-        |} ;;
-  pure rop.
 
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   AssnState (seq opType2) :=
   forFoldrM [::] moves $ fun mv acc =>
+    (* The [iso_to] is due to the fact that swapOp returns [Yoneda m a],
+       rather than [m a]. This is necessary to work around a limitation with
+       type formers and extraction:
+       https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
+    let k := fmap (@Some _) \o lift \o iso_to in
     mops <-- match mv return AssnState (option (seq opType2)) with
-      | Swap    sreg dreg => fmap (@Some _) $ swapOpM sreg dreg
-      | Move    sreg dreg => fmap (@Some _) $ moveOpM sreg dreg
-      | Spill   sreg vid  => fmap (@Some _) $ saveOpM sreg (Some vid)
-      | Restore vid  dreg => fmap (@Some _) $ restoreOpM (Some vid) dreg
+      | Swap    sreg dreg => k $ swapOp oinfo sreg dreg
+      | Move    sreg dreg => k $ moveOp oinfo sreg dreg
+      | Spill   sreg vid  => k $ saveOp oinfo sreg (Some vid)
+      | Restore vid  dreg => k $ restoreOp oinfo (Some vid) dreg
       | Nop               => pure None
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
@@ -179,16 +160,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
             (determineMoves (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  (* With lenses, this would just be: assnOpId += 2 *)
-  modifyT (fun assn' : AssnStateInfo =>
-    {| assnOpId     := opid.+2
-     ; assnBlockBeg := assnBlockBeg assn'
-     ; assnBlockEnd := assnBlockEnd assn'
-     ; assnAllocState       := assnAllocState assn
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-     ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-     ; assnErrors           := assnErrors assn
-     |}) ;;
+  modifyT (_assnOpId %~ plus 2) ;;
 
   pure $ ops ++ transitions.
 
@@ -210,17 +182,9 @@ Definition considerOps (allocs : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets) mappings :
   seq blockType1 -> AssnState (seq blockType2) :=
   mapM $ fun blk =>
-    bid  <-- lift $ iso_to $ blockId binfo blk ;;
-    assn <-- getT ;;
     let: (opsb, opsm, opse) := blockOps binfo blk in
-    putT {| assnOpId     := assnOpId assn
-          ; assnBlockBeg := assnOpId assn + (size opsb).*2
-          ; assnBlockEnd := assnOpId assn + (size opsb + size opsm).*2
-          ; assnAllocState       := assnAllocState assn
-          ; assnBlockEntryAllocs := assnBlockEntryAllocs assn
-          ; assnBlockExitAllocs  := assnBlockExitAllocs assn
-          ; assnErrors           := assnErrors assn
-          |} ;;
+    modifyT (_assnBlockBeg %~ plus (size opsb).*2) ;;
+    modifyT (_assnBlockEnd %~ plus (size opsb + size opsm).*2) ;;
 
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
@@ -228,6 +192,7 @@ Definition considerOps (allocs : seq (Allocation maxReg))
     opse' <-- concatMapM k opse ;;
 
     (* Insert resolving moves based on the mappings *)
+    bid  <-- lift $ iso_to $ blockId binfo blk ;;
     opsm'' <-- resolveMappings bid opsm' mappings ;;
 
     match opsb', opse' with
@@ -274,14 +239,6 @@ Definition assignRegNum
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
   (blocks   : seq blockType1) : mType (seq blockType2) :=
-  fst <$> considerOps allocs liveSets mappings blocks
-    {| assnOpId     := 1
-     ; assnBlockBeg := 1
-     ; assnBlockEnd := 1
-     ; assnAllocState       := newAllocState
-     ; assnBlockEntryAllocs := emptyIntMap
-     ; assnBlockExitAllocs  := emptyIntMap
-     ; assnErrors           := [::]
-     |}.
+  fst <$> considerOps allocs liveSets mappings blocks newAssnStateInfo.
 
 End Assign.
