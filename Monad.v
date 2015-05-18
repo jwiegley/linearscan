@@ -421,16 +421,14 @@ Program Instance StateT_Monad `{Monad m} {s : Type} : Monad (StateT s m) := {
 Obligation 1.
   move=> f.
   extensionality st.
-Admitted.
-(*   rewrite /StateT_join /= -!ap_fmap -ap_comp !ap_homo *)
-(*           curry_apply_first !ap_fmap -join_fmap_fmap_x *)
-(*           -join_fmap_join_x fmap_comp_x. *)
-(*   f_equal. *)
-(*   rewrite fmap_comp_x. *)
-(*   f_equal. *)
-(*   extensionality y. *)
-(*   by case: y => f' st'. *)
-(* Qed. *)
+  rewrite /StateT_join /= -!ap_fmap -ap_comp !ap_homo
+          !ap_fmap -join_fmap_fmap_x -join_fmap_join_x fmap_comp_x.
+  f_equal.
+  rewrite fmap_comp_x.
+  f_equal.
+  extensionality y.
+  by case: y => f' st'.
+Qed.
 Obligation 2.
   move=> f.
   extensionality st.
