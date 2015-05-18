@@ -145,21 +145,16 @@ Definition liftA2 `{Applicative m} {A B C : Type}
 
 Definition const {A B : Type} (x : B) : A -> B := fun _ => x.
 
-Definition chain `{Applicative m} {X Y} (a : m X) (b : m Y) : m Y :=
-  fmap const b <*> a.
-
-Notation "a >> b" := (chain a b) (at level 25, left associativity).
-
 Definition bind `{Monad m} {X Y : Type} (f : (X -> m Y)) : m X -> m Y :=
   join \o fmap f.
 
 Notation "m >>= f" := (bind f m) (at level 25, left associativity).
+Notation "a >> b" := (a >>= fun _ => b) (at level 25, left associativity).
 
 Notation "X <-- A ;; B" := (A >>= (fun X => B))
-  (right associativity, at level 84, A at next level).
+  (right associativity, at level 92, A at next level).
 
-Notation "A ;; B" := (_ <-- A ;; B)
-  (right associativity, at level 84).
+Notation "A ;; B" := (_ <-- A ;; B) (at level 92, right associativity).
 
 Fixpoint mapM `{Applicative m} {A B} (f : A -> m B) (l : seq A) :
   m (seq B) :=
@@ -171,13 +166,13 @@ Fixpoint mapM `{Applicative m} {A B} (f : A -> m B) (l : seq A) :
 Definition forM `{Applicative m} {A B} (l : seq A) (f : A -> m B) :
   m (seq B) := mapM f l.
 
-Fixpoint mapM_ `{Applicative m} {A B} (f : A -> m B) (l : seq A) : m unit :=
+Fixpoint mapM_ `{Monad m} {A B} (f : A -> m B) (l : seq A) : m unit :=
   match l with
   | nil => pure tt
   | cons x xs => f x >> mapM_ f xs
   end.
 
-Definition forM_ `{Applicative m} {A B} (l : seq A) (f : A -> m B) : m unit :=
+Definition forM_ `{Monad m} {A B} (l : seq A) (f : A -> m B) : m unit :=
   mapM_ f l.
 
 Definition foldM `{Monad m} {A : Type} {B : Type}
