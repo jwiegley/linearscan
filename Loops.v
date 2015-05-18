@@ -240,8 +240,9 @@ Definition findLoopEnds (bs : IntMap blockType1) :
       liftStateT
         (if IntSet_member sux active
          then
-           modifyLoopHeaderBlocks
-             (fun l => if sux \notin l then sux :: l else l) ;;
+           modifyLoopHeaderBlocks (fun l => if sux \notin l
+                                            then sux :: l
+                                            else l) ;;
            modifyLoopEndBlocks (IntSet_insert bid) ;;
            modifyBackwardBranches (addReference sux bid)
          else

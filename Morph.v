@@ -320,9 +320,10 @@ Defined.
 
 End Morph.
 
-Notation "m >>>= f" := (stbind f m) (at level 25, right associativity).
+Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
 
-Notation "X <<- A ;;; B" := (A >>>= (fun X => B))
-  (at level 92, A at next level, right associativity).
+Notation "X <<- A ;; B" := (A >>>= (fun X => B))
+  (right associativity, at level 84, A at next level).
 
-Notation "A ;;; B" := (_ <<- A ;;; B) (at level 92, right associativity).
+Notation "A ;;; B" := (_ <<- A ;; B)
+  (right associativity, at level 84).

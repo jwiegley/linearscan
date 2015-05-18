@@ -204,7 +204,7 @@ Definition allocateBlockedReg {pre} :
            split current before this intersection *)
       (* jww (2015-01-30): What if the fixed interval begins at the current
          position? *)
-      mloc <<- intersectsWithFixedInterval reg ;;;
+      mloc <<- intersectsWithFixedInterval reg ;;
       match mloc with
       | Some n => splitCurrentInterval
                     (BeforePos n (IntersectsWithFixed reg))
@@ -422,7 +422,7 @@ Definition handleInterval {pre} :
            allocateBlockedReg
          if current has a register assigned then
            add current to active (done by the helper functions) *)
-      mres <<- tryAllocateFreeReg ;;;
+      mres <<- tryAllocateFreeReg ;;
       match mres with
       | Some x => imap (@Some _) x
       | None   => allocateBlockedReg
