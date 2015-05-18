@@ -17,8 +17,6 @@ Axiom fmap_cps :
 
 Arguments fmap {f _ a b} _ x.
 
-Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
-
 Definition apply `(f : a -> b) (x : a) : b := f x.
 
 Definition compose {a b c : Type} (f : b -> c) (g : a -> b) : a -> c := f \o g.
@@ -353,9 +351,9 @@ Qed.
 
 Definition StateT_ap `{Monad m} {s : Type} {a b : Type}
   (f : StateT s m (a -> b)) (x : StateT s m a) : StateT s m b := fun st =>
-  join $ f st <&> fun z => match z with
+  join (f st <&> fun z => match z with
     | (f', st') => x st' <&> first f'
-    end.
+    end).
 
 Program Instance StateT_Applicative `{Monad m} {s : Type} :
   Applicative (StateT s m) := {

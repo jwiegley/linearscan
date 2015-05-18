@@ -24,6 +24,8 @@ Tactic Notation "invert" "as" simple_intropattern(pat) :=
 
 Definition undefined {a : Type} : a. Admitted.
 
+Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
+
 Definition flip `(f : a -> b -> c) : b -> a -> c := fun y x => f x y.
 
 Notation "p .1" := (proj1_sig p)
