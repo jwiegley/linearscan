@@ -244,8 +244,8 @@ Proof.
     set sd := (X in ScanState _ X).
     move=> st.
 
-    case: (spillInterval st Hunh Hbeg2
-             (UnhandledToHandled sd)) => [err|[ss [/= ?]]].
+    case: (spillInterval st Hunh Hbeg2 (UnhandledToHandled sd))
+      => [err|[ss [/= ?]]].
       exact: inl err.
     apply: inr (ss; _).
     apply Build_SSMorphLen => //=.
