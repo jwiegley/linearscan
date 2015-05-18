@@ -80,7 +80,7 @@ data OpInfo m op1 op2 = OpInfo
     , swapOp      :: PhysReg   -> PhysReg   -> m [op2]
     , saveOp      :: PhysReg   -> Maybe Int -> m [op2]
     , restoreOp   :: Maybe Int -> PhysReg   -> m [op2]
-    , applyAllocs :: op1 -> [(Int, PhysReg)] -> [op2]
+    , applyAllocs :: op1 -> [(Int, PhysReg)] -> m [op2]
     , showOp1     :: op1 -> String
     }
 
@@ -115,7 +115,8 @@ fromOpInfo (OpInfo a b c d e f g h) =
         (\r1 r2 _ k -> liftM k (c r1 r2))
         (\r1 r2 _ k -> liftM k (d r1 r2))
         (\r1 r2 _ k -> liftM k (e r1 r2))
-        (\r1 r2 _ k -> liftM k (f r1 r2)) g h
+        (\r1 r2 _ k -> liftM k (f r1 r2))
+        (\r1 r2 _ k -> liftM k (g r1 r2)) h
 
 type IntervalId = Int
 

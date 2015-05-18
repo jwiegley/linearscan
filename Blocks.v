@@ -42,7 +42,7 @@ Record OpInfo `{Monad m} (opType1 opType2 : Set) := {
   swapOp      : PhysReg -> PhysReg -> Yoneda m (seq opType2);
   saveOp      : PhysReg -> option VarId -> Yoneda m (seq opType2);
   restoreOp   : option VarId -> PhysReg -> Yoneda m (seq opType2);
-  applyAllocs : opType1 -> seq (VarId * PhysReg) -> seq opType2;
+  applyAllocs : opType1 -> seq (VarId * PhysReg) -> Yoneda m (seq opType2);
   showOp      : opType1 -> string
 }.
 

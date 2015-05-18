@@ -204,7 +204,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varAllocs opid allocs) vars in
-  let ops   := applyAllocs oinfo op regs in
+  ops <-- lift $ iso_to $ applyAllocs oinfo op regs ;;
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
