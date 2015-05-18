@@ -209,14 +209,24 @@ Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   NE_foldl f [::] (rds d).
 Arguments allUsePos d /.
 
+Lemma NE_StronglySorted_inv : forall (A : Set) a l (R : A -> A -> Prop),
+  NE_StronglySorted R (NE_Cons a l)
+    -> NE_StronglySorted R l /\ NE_Forall (R a) l.
+Proof. intros; inversion H; auto. Qed.
+
 Definition findIntervalUsePos `(i : Interval d) (f : UsePos -> bool) :
   option { r' : RangeSig & { u : UsePos | u \in ups r'.1
                                         & ibeg d <= u <= iend d } }.
 Proof.
   move: (Interval_exact_beg i).
   move: (Interval_exact_end i) => /=.
-  destruct d.
-  elim: rds0 => [r|r rs IHrs] /= i H1 H2 in i *.
+  move: (Interval_NE_sorted i) => /=.
+  move=> H3 H1 H2.
+  move/eqP in H1; rewrite eqn_leq in H1.
+  move/andP: H1 => [_ H1].
+  move/eqP in H2; rewrite eqn_leq in H2.
+  move/andP: H2 => [H2 _].
+  elim: (rds d) => [r|r rs IHrs] /= in H1 H2 H3 *.
     move: (findRangeUsePos r.2 f) => [[u Hin]|]; last first.
       exact: None.
     apply: Some _.
@@ -224,7 +234,7 @@ Proof.
     exists u.
       assumption.
     move: (Range_proper r.2) => Hproper.
-    rewrite /validRangeBounds -H1 -H2 in Hproper.
+    rewrite /validRangeBounds in Hproper.
     elim: (ups r.1) => //= [x xs IHxs] in Hin Hproper *.
     case: (uvar x) in Hproper;
     case E: (uloc u == uloc x);
@@ -241,16 +251,41 @@ Proof.
           case: xs => [|? ?] in IHxs Hin Hproper *;
           by ordered ] ].
   move: (findRangeUsePos r.2 f) => [[u Hin]|]; last first.
+    rewrite /= in IHrs.
+    apply NE_StronglySorted_inv in H3.
+    move: H3 => [H3 H4].
+    move/NE_Forall_head in H4.
+    rewrite /range_ltn in H4.
     apply: IHrs => //=.
-      move/intervalUncons: i => [? i].
-      apply undefined.
-    apply undefined.
+    move: (Range_bounded r.2).
+    by ordered.
   clear IHrs.
   apply: Some _.
   exists r.
   exists u.
     assumption.
-  apply undefined.
+  move: (Range_proper r.2) => Hproper.
+  rewrite /validRangeBounds in Hproper.
+  apply NE_StronglySorted_inv in H3.
+  move: H3 => [H3 H4].
+  move/NE_Forall_last in H4.
+  rewrite /range_ltn in H4.
+  move: (Range_bounded (NE_last rs).2).
+  elim: (ups r.1) => //= [x xs IHxs] in Hin Hproper *.
+  case: (uvar x) in Hproper;
+  case E: (uloc u == uloc x);
+  first
+    [ move/eqP in E; rewrite E;
+      by ordered
+    | rewrite in_cons in Hin;
+      move/orP: Hin => [Hin|Hin];
+      [ move/eqP in Hin;
+        destruct u; destruct x; simpl in *;
+        inversion Hin;
+        by rewrite H0 eq_refl in E
+      | apply: (IHxs Hin);
+        case: xs => [|? ?] in IHxs Hin Hproper *;
+        by ordered ] ].
 Defined.
 
 Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
