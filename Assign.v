@@ -209,10 +209,11 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
      then lift $ generateMoves
-            (determineMoves (resolvingMoves allocs opid opid.+2))
+                   (determineMoves
+                      (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  modifyT (_assnOpId .~ opid.+2) ;;
+  modifyT $ _assnOpId .~ opid.+2 ;;
 
   pure $ ops ++ transitions.
 

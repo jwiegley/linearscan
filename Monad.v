@@ -17,8 +17,6 @@ Axiom fmap_cps :
 
 Arguments fmap {f _ a b} _ x.
 
-Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
-
 Definition apply `(f : a -> b) (x : a) : b := f x.
 
 Definition compose {a b c : Type} (f : b -> c) (g : a -> b) : a -> c := f \o g.
@@ -150,18 +148,17 @@ Definition const {A B : Type} (x : B) : A -> B := fun _ => x.
 Definition chain `{Applicative m} {X Y} (a : m X) (b : m Y) : m Y :=
   fmap const b <*> a.
 
-Notation "a >> b" := (chain a b) (at level 25, left associativity).
+Notation "a >> b" := (chain a b) (at level 25, right associativity).
 
 Definition bind `{Monad m} {X Y : Type} (f : (X -> m Y)) : m X -> m Y :=
   join \o fmap f.
 
-Notation "m >>= f" := (bind f m) (at level 25, left associativity).
+Notation "m >>= f" := (bind f m) (at level 25, right associativity).
 
 Notation "X <-- A ;; B" := (A >>= (fun X => B))
-  (right associativity, at level 84, A at next level).
+  (right associativity, at level 92, A at next level).
 
-Notation "A ;; B" := (_ <-- A ;; B)
-  (right associativity, at level 84).
+Notation "A ;; B" := (chain A B) (at level 92, right associativity).
 
 Fixpoint mapM `{Applicative m} {A B} (f : A -> m B) (l : seq A) :
   m (seq B) :=
@@ -353,9 +350,9 @@ Qed.
 
 Definition StateT_ap `{Monad m} {s : Type} {a b : Type}
   (f : StateT s m (a -> b)) (x : StateT s m a) : StateT s m b := fun st =>
-  join $ f st <&> fun z => match z with
+  join (f st <&> fun z => match z with
     | (f', st') => x st' <&> first f'
-    end.
+    end).
 
 Program Instance StateT_Applicative `{Monad m} {s : Type} :
   Applicative (StateT s m) := {
