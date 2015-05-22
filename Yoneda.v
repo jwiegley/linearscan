@@ -22,7 +22,13 @@ Infix "≅" := Isomorphism (at level 30) : type_scope.
 
 Definition Iso (A B : Type) : Prop := inhabited (A ≅ B).
 
-Program Instance Yoneda_lemma `{Functor f} : forall a, Yoneda f a ≅ f a := {
+(* This is a parametricity theorem. *)
+Axiom fmap_cps :
+  forall `{Functor f} a b c (k : forall r, (a -> r) -> f r)
+    (g : b -> c) (h : a -> b), fmap g (k _ h) = k _ (g \o h).
+
+Program Instance Yoneda_lemma `{Functor f} :
+  forall a, Yoneda f a ≅ f a := {
     iso_to   := fun x => x _ id;
     iso_from := fun x => fun _ k => fmap k x
 }.

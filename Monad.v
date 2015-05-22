@@ -11,10 +11,6 @@ Class Functor (f : Type -> Type) := {
     fmap f \o fmap g =1 fmap (f \o g)
 }.
 
-Axiom fmap_cps :
-  forall `{Functor f} a b c (k : forall r, (a -> r) -> f r)
-    (g : b -> c) (h : a -> b), fmap g (k _ h) = k _ (g \o h).
-
 Arguments fmap {f _ a b} _ x.
 
 Definition apply `(f : a -> b) (x : a) : b := f x.
