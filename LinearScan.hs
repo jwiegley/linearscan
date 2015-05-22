@@ -423,4 +423,8 @@ allocate maxReg binfo oinfo blocks = do
             "Register assignments overlap at " ++ show reg
         LS.EUnexpectedNoMoreUnhandled ->
             "The unexpected happened: no more unhandled intervals"
+        LS.ECannotSpillIfRegisterRequired i ->
+            "Cannot spill interval " ++ show i
+                ++ " with use positions requiring registers"
         LS.EFuelExhausted -> "Fuel was exhausted"
+        LS.ENotYetImplemented n -> "Not Yet Implemented (#" ++ show n ++ ")"

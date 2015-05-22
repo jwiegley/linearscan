@@ -134,6 +134,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
 
   | ScanState_newHandled sd :
     ScanState InUse sd -> forall `(i : Interval d),
+    firstUseReqReg i == None ->
     ScanState InUse
       {| nextInterval     := (nextInterval sd).+1
        ; unhandled        := map widen_fst (unhandled sd)
@@ -203,6 +204,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
        ; intervals        := ints
        ; fixedIntervals   := fixints
        |} ->
+    firstUseReqReg (vnth ints (fst x)).2 == None ->
     ScanState InUse
       {| nextInterval     := ni
        ; unhandled        := unh
@@ -227,6 +229,9 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
 
   | ScanState_moveActiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in active sd ->
+    (if spilled
+     then firstUseReqReg (getInterval (fst x)) == None
+     else true) ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -254,6 +259,9 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
 
   | ScanState_moveInactiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in inactive sd ->
+    (if spilled
+     then firstUseReqReg (getInterval (fst x)) == None
+     else true) ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd

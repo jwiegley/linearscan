@@ -184,7 +184,6 @@ Definition allocateBlockedReg {pre} :
 
       (* The allocation failed, so we had to spill some part of the current
          interval instead. *)
-      @moveUnhandledToHandled maxReg pre ;;;
       return_ None
     else
       (* // spill intervals that currently block reg
@@ -249,7 +248,9 @@ Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
   let go i : intermediate_result sd xs (@active maxReg) :=
     let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let ss := if intervalEnd i < pos
-              then let: exist2 x H1 H2 := moveActiveToHandled st false Hin in
+              then let: exist2 x H1 H2 :=
+                      moveActiveToHandled st Hin (spilled:=false)
+                                          is_true_true in
                    exist2 _ _ x H1 (proj1 H2)
               else if ~~ posWithinInterval i pos
                    then moveActiveToInactive st Hin
@@ -355,7 +356,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
         inr (exist2 _ _ (sd'; sslen')
                     (conj st' (transitivity sslen sslen')) Hsub') in
     if intervalEnd i < pos
-    then match moveInactiveToHandled st false Hin with
+    then match moveInactiveToHandled st Hin (spilled:=false) is_true_true with
          | exist2 sd' st' (conj sslen' _) =>
              f sd' st' sslen' _
          end
@@ -451,8 +452,10 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
-  if positions is S n
-  then let fix go count ss :=
+  if positions isn't S n
+  then inl (EFuelExhausted, packScanState st)
+       (* jww (2015-01-20): Should be provably impossible *)
+  else let fix go count ss :=
     (* trace "walkIntervals: go" $ *)
     if count is S cnt
     then
@@ -495,10 +498,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
         | inl err => inl err
         | inr ss  => walkIntervals (thisState ss) n
         end
-    end
-
-  (* jww (2015-01-20): Should be provably impossible *)
-  else inl (EFuelExhausted, packScanState st).
+    end.
 
 Record Allocation := {
   intId  : nat;                 (* the interval ident *)

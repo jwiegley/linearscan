@@ -27,7 +27,7 @@ Inductive SplitPosition : Set :=
 
 Inductive SpillDetails : Set :=
   | SD_NewToHandled
-  | SD_UnhandledToHandled
+  | SD_UnhandledToHandled of nat
   | SD_ActiveToHandled of nat & nat    (* interval id & reg *)
   | SD_InactiveToHandled of nat & nat. (* interval id & reg *)
 
@@ -40,7 +40,9 @@ Inductive SSError : Set :=
   | ERegisterAlreadyAssigned of nat
   | ERegisterAssignmentsOverlap of nat
   | EUnexpectedNoMoreUnhandled
-  | EFuelExhausted.
+  | ECannotSpillIfRegisterRequired of nat
+  | EFuelExhausted
+  | ENotYetImplemented of nat.
 
 Definition stbind {P Q R a b}
   (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
@@ -209,9 +211,12 @@ Proof.
   destruct len_is_SSMorph0.
   destruct unhandled; first by [].
   destruct p.
+  case E: (firstUseReqReg (vnth intervals i).2 == None); last first.
+    apply inl.
+    exact: (ECannotSpillIfRegisterRequired i).
   apply inr.
   split. apply tt.
-  pose (ScanState_moveUnhandledToHandled thisState0).
+  pose (ScanState_moveUnhandledToHandled thisState0 E).
   eapply {| thisState := s |}.
   Grab Existential Variables.
   apply Build_SSMorph; intuition.
@@ -255,14 +260,17 @@ Proof.
 Defined.
 
 Definition moveActiveToHandled
-  `(st : ScanState InUse sd) (spilled : bool) `(H: x \in active sd) :
+  `(st : ScanState InUse sd) (spilled : bool) `(H: x \in active sd)
+  (Hreq : if spilled
+          then firstUseReqReg (getInterval (fst x)) == None
+          else true) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'
   & SSMorphLen sd sd' /\
     { H : nextInterval sd = nextInterval sd'
     | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
-  pose (ScanState_moveActiveToHandled spilled st H).
+  pose (ScanState_moveActiveToHandled st H Hreq).
   eexists. apply s. simpl.
   split.
     apply Build_SSMorphLen; auto.
@@ -271,6 +279,8 @@ Proof.
   elim: (unhandled sd) => //= [[uid beg] us IHus].
   by f_equal.
 Defined.
+
+Arguments moveActiveToHandled {sd} st spilled {x} H Hreq.
 
 Definition moveActiveToInactive
   `(st : ScanState InUse sd) `(H: x \in active sd) :
@@ -301,14 +311,17 @@ Lemma moveInactiveToActive_spec
 Proof. reflexivity. Qed.
 
 Definition moveInactiveToHandled `(st : ScanState InUse sd)
-  (spilled : bool) `(H : x \in inactive sd) :
+  (spilled : bool) `(H : x \in inactive sd)
+  (Hreq : if spilled
+          then firstUseReqReg (getInterval (fst x)) == None
+          else true) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'
   & SSMorphLen sd sd' /\
     { H : nextInterval sd = nextInterval sd'
     | unhandled sd = transportUnhandled (unhandled sd') H } }.
 Proof.
-  pose (ScanState_moveInactiveToHandled spilled st H).
+  pose (ScanState_moveInactiveToHandled st H Hreq).
   eexists. apply s. simpl.
   split.
     apply Build_SSMorphLen; auto.
@@ -317,6 +330,8 @@ Proof.
   elim: (unhandled sd) => //= [[uid beg] us IHus].
   by f_equal.
 Defined.
+
+Arguments moveInactiveToHandled {sd} st spilled {x} H Hreq.
 
 End Morph.
 

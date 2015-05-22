@@ -300,6 +300,14 @@ Proof.
     exact H.
 Qed.
 
+(* Theorem no_regreq_use_positions_on_stack `(st : @ScanState maxReg b sd) : *)
+(*   forall x, x \in handled sd -> *)
+(*     (snd x != None) || (firstUseReqReg (getInterval (fst x)) == None). *)
+(* Proof. *)
+(*   move=> [i [r|]] //= Hin. *)
+(*   case Heqe: (findIntervalUsePos (getInterval i) UsePos.regReq) *)
+(*     => [[[rd r] [u H1 H2]]|] //=. *)
+
 (* Lemma in_rem : forall (a : eqType) (y x : a) xs, *)
 (*   y \in rem x xs -> x != y -> y \in xs. *)
 (* Proof. *)
@@ -555,10 +563,10 @@ Proof.
     exact: eq_irrelevance.
   - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_newHandled".
-    move/mapP: Hin => [[? ?] H Hin].
+    move/mapP: Hin => [[? ?] H0 Hin].
     rewrite /widen_fst /= in Hin.
     inversion Hin => /=.
-    rewrite ?vnth_vshiftin -H2 in H *.
+    rewrite ?vnth_vshiftin -H3 in H0 *.
     exact: IHst.
   - Case "ScanState_setInterval".
     case E: (xid == uid).
