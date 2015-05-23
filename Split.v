@@ -204,8 +204,17 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
-    move/(_ Hint).
-    rewrite /= => {Hint st} st.
+    have Hend : iend i1_0.1 <=
+                iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
+                           (widen_ord Hle uid)).1.
+      have ->: widen_ord Hle uid = widen_id uid.
+        rewrite /widen_id.
+        f_equal.
+        exact: eq_irrelevance.
+      rewrite vnth_vshiftin Heqe.
+      by ordered.
+    move/(_ Hint Hend).
+    rewrite /= => {Hint Hend st} st.
 
     rewrite /sd' in st.
     case U: unh' => [|u' us'] in sd' Hle st.
@@ -251,8 +260,17 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
-    move/(_ Hint).
-    rewrite /= => {Hint st} st.
+    have Hend : iend i1_0.1 <=
+                iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
+                           (widen_ord Hle xid)).1.
+      have ->: widen_ord Hle xid = widen_id xid.
+        rewrite /widen_id.
+        f_equal.
+        exact: eq_irrelevance.
+      rewrite vnth_vshiftin Heqe.
+      by ordered.
+    move/(_ Hint Hend).
+    rewrite /= => {Hint Hend st} st.
 
     move: st.
     set sd'' := (X in ScanState _ X).
@@ -303,8 +321,17 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
-    move/(_ Hint).
-    rewrite /= => {Hint st} st.
+    have Hend : iend i1_0.1 <=
+                iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
+                           (widen_ord Hle xid)).1.
+      have ->: widen_ord Hle xid = widen_id xid.
+        rewrite /widen_id.
+        f_equal.
+        exact: eq_irrelevance.
+      rewrite vnth_vshiftin Heqe.
+      by ordered.
+    move/(_ Hint Hend).
+    rewrite /= => {Hint Hend st} st.
 
     move: st.
     set sd'' := (X in ScanState _ X).
@@ -412,6 +439,11 @@ Proof.
   move: (ScanState_setInterval st) => /= /(_ uid i0.1 i0.2).
   move: Hint; rewrite /int => ->.
   move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+  have Hend : iend i0.1 <= ie.
+    rewrite H3.
+    move: (Interval_bounded i1.2).
+    by ordered.
+  move/(_ Hend).
   rewrite /= => {st} st.
 
   (* Establish that beg == ibeg i0.1. *)
@@ -519,6 +551,11 @@ Proof.
   move: (ScanState_setInterval st) => /= /(_ xid i0.1 i0.2).
   move: Hint; rewrite /int => ->.
   move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+  have Hend : iend i0.1 <= ie.
+    rewrite H3.
+    move: (Interval_bounded i1.2).
+    by ordered.
+  move/(_ Hend).
   rewrite /= => {Heqe sd st} st.
 
   move: st.
