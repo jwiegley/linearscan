@@ -325,6 +325,7 @@ data Details m blk1 blk2 op1 op2 = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , inputBlocks     :: [blk1]
+    , orderedBlocks   :: [blk1]
     , allocatedBlocks :: [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
@@ -335,8 +336,8 @@ data Details m blk1 blk2 op1 op2 = Details
 
 showDetails :: Monad m => Details m blk1 blk2 op1 op2 -> m String
 showDetails err = do
-    pre  <- showScanStateDesc (scanStatePre err)
-    post <- showScanStateDesc (scanStatePost err)
+    pre  <- showPreScanStateDesc (scanStatePre err)
+    post <- showPostScanStateDesc (scanStatePost err)
     return $ "Reason: " ++ show (reason err) ++ "\n\n"
           ++ ">>> ScanState before allocation:\n"
           ++ pre ++ "\n"
@@ -344,8 +345,19 @@ showDetails err = do
           ++ post ++ "\n"
           ++ ">>> " ++ show (loopState err) ++ "\n"
   where
-    showScanStateDesc Nothing = return ""
-    showScanStateDesc (Just sd) =
+    showPreScanStateDesc Nothing = return ""
+    showPreScanStateDesc (Just sd) =
+        liftM2 (++)
+            (liftM2 (++)
+                (showBlocks1 (blockInfo err) (opInfo err) sd
+                             (liveSets err) (inputBlocks err))
+                (showBlocks1 (blockInfo err) (opInfo err) sd
+                             (liveSets err) (orderedBlocks err)))
+            (return ("\n" ++ show sd))
+
+    -- jww (2015-05-23): Show allocatedBlocks here?
+    showPostScanStateDesc Nothing = return ""
+    showPostScanStateDesc (Just sd) =
         liftM2 (++)
             (showBlocks1 (blockInfo err) (opInfo err) sd
                          (liveSets err) (inputBlocks err))
@@ -359,9 +371,9 @@ toDetails :: LS.Details blk1 blk2
           -> LinearScan.BlockInfo m blk1 blk2 op1 op2
           -> LinearScan.OpInfo m op1 op2
           -> Details m blk1 blk2 op1 op2
-toDetails (LS.Build_Details a b c d e f g) binfo oinfo =
-    Details a b c d (fmap toScanStateDesc e) (fmap toScanStateDesc f)
-            binfo oinfo (toLoopState g)
+toDetails (LS.Build_Details a b c d e f g h) binfo oinfo =
+    Details a b c d e (fmap toScanStateDesc f) (fmap toScanStateDesc g)
+            binfo oinfo (toLoopState h)
 
 -- | Transform a list of basic blocks containing variable references, into an
 --   equivalent list where each reference is associated with a register

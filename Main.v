@@ -64,6 +64,7 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   reason          : option (SSError * FinalStage);
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
+  orderedBlocks   : seq blockType1;
   allocatedBlocks : seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
@@ -88,7 +89,8 @@ Definition linearScan
   match ints with
   | inl err =>
     pure $ k $ Build_Details _ _ maxReg
-      (Some (err, BuildingIntervalsFailed)) liveSets' blocks1 [::]
+      (Some (err, BuildingIntervalsFailed))
+      liveSets' blocks blocks1 [::]
       None None loops
   | inr ssig =>
     (* allocate registers *)
@@ -96,7 +98,8 @@ Definition linearScan
     match walkIntervals registers_exist ssig.2 opCount with
     | inl (err, ssig') =>
       pure $ k $ Build_Details _ _ maxReg
-        (Some (err, AllocatingRegistersFailed)) liveSets' blocks1 [::]
+        (Some (err, AllocatingRegistersFailed))
+        liveSets' blocks blocks1 [::]
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet ssig'.1)) loops
     | inr ssig' =>
@@ -108,7 +111,8 @@ Definition linearScan
         (* replace virtual registers with physical registers *)
         blocks2 <--
           assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
-        pure $ k $ Build_Details _ _ maxReg None liveSets' blocks1 blocks2
+        pure $ k $ Build_Details _ _ maxReg None
+          liveSets' blocks blocks1 blocks2
           (Some (toScanStateDescSet ssig.1))
           (Some (toScanStateDescSet sd)) loops
     end
