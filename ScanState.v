@@ -149,6 +149,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
     ScanState InUse sd -> forall xid `(i : Interval d),
     let xi := (vnth (intervals sd) xid).2 in
     intervalStart i == intervalStart xi ->
+    intervalEnd i   <  intervalEnd xi   ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd

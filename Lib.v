@@ -910,26 +910,27 @@ Lemma proj_rem_uniq (a b : eqType) (f : a -> b) : forall x xs,
 Proof. by move=> x xs; apply/subseq_uniq/map_subseq/rem_subseq. Qed.
 
 Lemma in_proj : forall (a b : eqType) (x : a) (y : b) (xs : seq (a * b)),
-  x \notin [seq fst i | i <- xs] ->
-  y \notin [seq snd i | i <- xs] -> (x, y) \notin xs.
+  (x \notin [seq fst i | i <- xs]) ||
+  (y \notin [seq snd i | i <- xs]) -> (x, y) \notin xs.
 Proof.
   move=> a b x y.
-  elim=> //= [z zs IHzs] H1 H2.
-  rewrite in_cons.
-  rewrite in_cons in H1.
-  rewrite in_cons in H2.
-  apply/norP.
-  move/norP: H1 => [H3 H4].
-  move/norP: H2 => [H5 H6].
-  split.
-    case: z => /= [j k] in H3 H5 *.
-    move/eqP in H3.
-    move/eqP in H5.
-    apply/eqP.
-    move=> Hneg.
-    inversion Hneg.
-    contradiction.
-  apply: IHzs; by [].
+  elim=> //= [z zs IHzs] H1.
+  move/orP: H1 => [H1|H1];
+  rewrite in_cons;
+  rewrite in_cons in H1;
+  apply/norP;
+  move/norP: H1 => [H2 H3];
+  (split;
+   [ case: z => /= [j k] in H2 *;
+     move/eqP in H2;
+     apply/eqP;
+     move=> Hneg;
+     inversion Hneg;
+     contradiction
+   | apply: IHzs;
+     apply/orP ]).
+    by left.
+  by right.
 Qed.
 
 Lemma uniq_proj : forall (a b : eqType) (xs : seq (a * b)),
@@ -940,7 +941,8 @@ Proof.
   elim=> //= [x xs IHxs] /andP [H1 H2] /andP [H3 H4].
   case: x => /= [j k] in H1 H3 *.
   apply/andP; split; last exact: IHxs.
-  exact: in_proj.
+  apply: in_proj.
+  apply/orP; by left.
 Qed.
 
 Lemma subseq_in_cons : forall (a : eqType) x y (xs ys : seq a),

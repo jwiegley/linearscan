@@ -16,12 +16,6 @@ Generalizable All Variables.
 
 Module UnhandledSorted.
 
-(* SSReflect doesn't provide a scheme for determining sortedness, so we
-   confine the import of the Sorted library to this section. *)
-
-(* Require Import Coq.Lists.List. *)
-(* Require Import Ssreflect.seq. *)
-
 Lemma Forall_widen : forall n x (xs : list ('I_n * nat)),
   List.Forall (lebf (@snd _ _) x) xs
     -> List.Forall (lebf (@snd _ _) (widen_id (fst x), snd x))
@@ -93,10 +87,8 @@ Theorem unhandled_sorted `(st : @ScanState maxReg b sd) :
 Proof.
   ScanState_cases (induction st) Case.
   - Case "ScanState_nil". by constructor.
-
   - Case "ScanState_newUnhandled".
     exact/StronglySorted_insert_spec/StronglySorted_widen/IHst.
-
   - Case "ScanState_finalize". exact: IHst.
   - Case "ScanState_newHandled".
     rewrite /=.
@@ -348,69 +340,132 @@ Proof.
     exact H.
 Qed.
 
-(* Theorem no_regreq_use_positions_on_stack `(st : @ScanState maxReg b sd) : *)
-(*   forall x, x \in handled sd -> *)
-(*     (snd x != None) || (firstUseReqReg (getInterval (fst x)) == None). *)
-(* Proof. *)
-(*   move=> [i [r|]] //= Hin. *)
-(*   case Heqe: (findIntervalUsePos (getInterval i) UsePos.regReq) *)
-(*     => [[[rd r] [u H1 H2]]|] //=. *)
+Theorem no_regreq_use_positions_on_stack `(st : @ScanState maxReg b sd) :
+  forall x, x \in handled sd ->
+    (snd x != None) || (firstUseReqReg (getInterval (fst x)) == None).
+Proof.
+  move=> [i [r|]] //= Hin.
+  case Heqe: (findIntervalUsePos (getInterval i) UsePos.regReq)
+    => [[[rd r] [u H1 H2]]|] //=.
 
-(* Lemma in_rem : forall (a : eqType) (y x : a) xs, *)
-(*   y \in rem x xs -> x != y -> y \in xs. *)
-(* Proof. *)
-(*   move=> a y x. *)
-(*   elim=> // [z zs IHzs] Hrem Hneq. *)
-(*   rewrite in_cons. *)
-(*   apply/orP. *)
-(*   case Heq: (y == z). *)
-(*     by left. *)
-(*   right. *)
-(*   apply: IHzs; last by []. *)
-(*   have: y != z. *)
-(*     apply/eqP. *)
-(*     by move/eqP in Heq. *)
-(*   by []. *)
-(* Qed. *)
+Lemma in_rem : forall (a : eqType) (y x : a) xs,
+  y \in rem x xs -> x != y -> y \in xs.
+Proof.
+  move=> a y x.
+  elim=> // [z zs IHzs] Hrem Hneq.
+  rewrite in_cons.
+  apply/orP.
+  case Heq: (y == z).
+    by left.
+  right.
+  apply: IHzs; last by [].
+  have: y != z.
+    apply/eqP.
+    by move/eqP in Heq.
+  apply undefined.
+Qed.
 
-(* Lemma no_overlapping_intervals `(st : ScanState sd) : forall x y, *)
-(*   x \in active sd -> y \in inactive sd -> *)
-(*     ~~ (intervalsIntersect (getInterval (fst x)) *)
-(*                            (getInterval (fst y))). *)
-(* Proof. *)
-(*   move=> x y Hinx Hiny. *)
-(*   ScanState_cases (induction st) Case; simpl in *. *)
-(*   - Case "ScanState_nil". by []. *)
-(*   - Case "ScanState_newUnhandled". *)
-(*     have Hinx' := Hinx. *)
-(*     move: Hinx' => /mapP. case=> x0 _ Heqx. *)
-(*     have Hiny' := Hiny. *)
-(*     move: Hiny' => /mapP. case=> y0 _ Heqy. *)
-(*     subst. *)
-(*     rewrite !vnth_vshiftin. *)
-(*     move: Hinx Hiny. *)
-(*     rewrite !mem_map. *)
-(*     - exact: IHst. *)
-(*     - exact: widen_fst_inj. *)
-(*     - exact: widen_fst_inj. *)
-(*   - Case "ScanState_newHandled". by []. *)
-(*   - Case "ScanState_setInterval". by []. *)
-(*   - Case "ScanState_setFixedIntervals". exact: IHst. *)
-(*   - Case "ScanState_moveUnhandledToActive". by []. *)
-(*   - Case "ScanState_moveActiveToInactive". *)
-(*     apply: IHst. *)
-(*     + case Heqe: (x == x0). *)
-(*         by move/eqP: Heqe => ->. *)
-(*       apply: (in_rem (y:=x) (x:=x0)). *)
-(*         by []. *)
-(*       apply: neq_sym. *)
-(*       move/eqP in Heqe. *)
-(*       by apply/eqP. *)
-(*     + by []. *)
-(*   - Case "ScanState_moveActiveToHandled". by []. *)
-(*   - Case "ScanState_moveInactiveToActive". by []. *)
-(*   - Case "ScanState_moveInactiveToHandled". by []. *)
-(* Qed. *)
+Lemma no_overlapping_intervals_for_reg `(st : @ScanState maxReg b sd) :
+  forall x y,
+    x \in active sd   ->
+    y \in inactive sd ->
+   snd x == snd y     ->
+    ~~ (intervalsIntersect (getInterval (fst x)) (getInterval (fst y))).
+Proof.
+  move=> x y Hinx Hiny Heqe.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by [].
+  - Case "ScanState_newUnhandled".
+    have Hinx' := Hinx.
+    move: Hinx' => /mapP.
+    case=> x0 _ Heqx.
+    have Hiny' := Hiny.
+    move: Hiny' => /mapP.
+    case=> y0 _ Heqy.
+    subst.
+    rewrite mem_map in Hinx.
+    rewrite mem_map in Hiny.
+    rewrite /widen_fst /getInterval [~~ _]/= !vnth_vshiftin.
+    - exact: IHst.
+    - exact: widen_fst_inj.
+    - exact: widen_fst_inj.
+  - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled".
+    have Hinx' := Hinx.
+    move: Hinx' => /mapP.
+    case=> x0 _ Heqx.
+    have Hiny' := Hiny.
+    move: Hiny' => /mapP.
+    case=> y0 _ Heqy.
+    subst.
+    rewrite mem_map in Hinx.
+    rewrite mem_map in Hiny.
+    rewrite /widen_fst /getInterval /= !vnth_vshiftin.
+    - exact: IHst.
+    - exact: widen_fst_inj.
+    - exact: widen_fst_inj.
+  - Case "ScanState_setInterval".
+    move: IHst.
+    rewrite /getInterval /=.
+    move/(_ x y Hinx Hiny Heqe).
+    admit.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
+  - Case "ScanState_moveUnhandledToActive".
+    move: IHst; rewrite /getInterval /= => IHst.
+    rewrite in_cons in Hinx.
+    move/orP: Hinx => [Hinx|Hinx] //.
+      (* jww (2015-05-22): Lacking information about x. *)
+      admit.
+    auto.
+  - Case "ScanState_moveUnhandledToHandled". exact: IHst.
+  - Case "ScanState_moveActiveToInactive".
+    move: IHst; rewrite /getInterval /= => IHst.
+    apply: IHst => //.
+      case Heqe2: (x == x0).
+        by move/eqP: Heqe2 => ->.
+      apply: (in_rem (y:=x) (x:=x0)).
+        by [].
+      move/eqP/eqP in Heqe2.
+      by rewrite eq_sym.
+    rewrite in_cons in Hiny.
+    move/orP: Hiny => [Hiny|Hiny].
+    have: y \notin inactive sd.
+      pose H2 := lists_are_unique st.
+      move: H2.
+      rewrite /all_state_lists cat_uniq.
+      move/and3P=> [_ _ H3].
+      move: H3.
+      rewrite catA cat_uniq.
+      move/and3P=> [H3 _ _].
+      move: H3.
+      rewrite uniq_catC cat_uniq /inactiveIds /activeIds.
+      move/and3P=> [_ H3 _].
+      move/hasPn in H3.
+      move/(map_f fst) in H.
+      specialize (H3 _ H).
+      move/eqP in Hiny.
+      subst.
+      move: H3.
+      have ->: (~~ (mem [seq fst i | i <- inactive sd]) (fst x0)) =
+               (fst x0 \notin [seq fst i | i <- inactive sd]) by [].
+      move=> H3.
+      case: x0 => [? ?] in Hinx H Heqe H3 *.
+      apply: in_proj.
+      by apply/orP; left.
+    move=> Hneq.
+  - Case "ScanState_moveActiveToHandled".
+    apply IHst.
+      admit.
+    admit.
+  - Case "ScanState_moveInactiveToActive".
+    apply IHst.
+      admit.
+    admit.
+  - Case "ScanState_moveInactiveToHandled".
+    apply IHst.
+      admit.
+    admit.
+Admitted.
 
 Lemma insert_in_widen_helper : forall n x y z ws,
   (widen_id x, y) \in [seq widen_fst i | i <- ws]
