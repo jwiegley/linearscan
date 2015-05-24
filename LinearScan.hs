@@ -29,9 +29,11 @@ import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
 import           Debug.Trace
+import qualified LinearScan.Applicative as LS
 import qualified LinearScan.Blocks as LS
 import           LinearScan.Blocks as LS
 import qualified LinearScan.IntMap as LS
+import qualified LinearScan.IntSet as LS
 import qualified LinearScan.Interval as LS
 import qualified LinearScan.LiveSets as LS
 import qualified LinearScan.Loops as LS

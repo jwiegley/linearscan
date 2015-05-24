@@ -49,6 +49,8 @@ library
     LinearScan
   other-modules:
     LinearScan.Allocate
+    LinearScan.Applicative
+    LinearScan.Ascii
     LinearScan.Assign
     LinearScan.Blocks
     LinearScan.Build
@@ -57,20 +59,26 @@ library
     LinearScan.Datatypes
     LinearScan.Eqtype
     LinearScan.Fintype
+    LinearScan.Functor
     LinearScan.Graph
     LinearScan.IState
     LinearScan.IntMap
+    LinearScan.IntSet
     LinearScan.Interval
+    LinearScan.Iso
     LinearScan.Lens
     LinearScan.Lib
     LinearScan.List0
+    LinearScan.List1
     LinearScan.LiveSets
     LinearScan.Logic
     LinearScan.Loops
     LinearScan.Main
     LinearScan.Monad
     LinearScan.Morph
-    LinearScan.NonEmpty0
+    LinearScan.Nat
+    LinearScan.NonEmpty
+    LinearScan.Prelude0
     LinearScan.Range
     LinearScan.Resolve
     LinearScan.ScanState
@@ -81,6 +89,9 @@ library
     LinearScan.Ssreflect
     LinearScan.Ssrfun
     LinearScan.Ssrnat
+    LinearScan.State
+    LinearScan.State0
+    LinearScan.String0
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
