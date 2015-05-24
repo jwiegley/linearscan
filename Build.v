@@ -499,10 +499,11 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
          this is only an input variable, it's OK to allocate it up to the
          call, since we needn't assume it will contain a value after the
          call.  *)
-      [seq {| varId       := inl n
-            ; varKind     := Temp
-            ; regRequired := true
-            |} | n in ord_enum maxReg] ++ refs
+      [seq x <- [seq {| varId       := inl n
+                      ; varKind     := Temp
+                      ; regRequired := true
+                      |} | n in ord_enum maxReg]
+           | varId x \notin map (@varId maxReg) refs ] ++ refs
     else refs in
 
   handleVars refs' Hlt ranges.
