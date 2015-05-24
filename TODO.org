@@ -1,12 +1,12 @@
-* TODO 22 Tempest cases are still failing
-* TODO "Another resolution case" unit test fails
+* TODO 21 Tempest cases are still failing
+* TODO Implement a VM for verifying allocations
+* TODO Fix performance issues
+* TODO Enter TODO items for all jww comments
+* TODO Write more edge-case tests
+* DONE "Another resolution case" unit test fails
 There's an issue demonstrated by my unit tests that shows incorrect move
 resolution at loop header blocks.  I've written to Christian about this, since
 I'm quite puzzled on this one.  This is the last bit of work needed for
 feature completeness on the Coq side.
-* TODO Implement a VM for verifying allocations
-* TODO Insert pseudo-use positions at loop end blocks
-* TODO Resolve admits
-* TODO Fix performance issues
-* TODO Enter TODO items for all jww comments
-* TODO Write more edge-case tests
+* DONE Insert pseudo-use positions at loop end blocks
+* DONE Resolve admits
