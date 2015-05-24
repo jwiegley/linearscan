@@ -1,18 +1,14 @@
 Require Import Ssr.
 Require Import Monad.
-Require Import FunctionalExtensionality.
 
 Generalizable All Variables.
 
 Definition Yoneda (f : Type -> Type) (a : Type) :=
-  forall {r : Type}, (a -> r) -> f r.
+  forall r : Type, (a -> r) -> f r.
 
 Class Isomorphism (A B : Type) : Type := {
     iso_to   : A -> B;
-    iso_from : B -> A;
-
-    iso_to_id   : iso_from \o iso_to =1 id;
-    iso_from_id : iso_to \o iso_from =1 id
+    iso_from : B -> A
 }.
 
 Arguments iso_to   {A} {B} {Isomorphism} _.
@@ -22,16 +18,51 @@ Infix "≅" := Isomorphism (at level 30) : type_scope.
 
 Definition Iso (A B : Type) : Prop := inhabited (A ≅ B).
 
-(* This is a parametricity theorem. *)
-Axiom fmap_cps :
-  forall `{Functor f} a b c (k : forall r, (a -> r) -> f r)
-    (g : b -> c) (h : a -> b), fmap g (k _ h) = k _ (g \o h).
+Module IsomorphismLaws.
+
+Class IsomorphismLaws (A B : Type) `{A ≅ B} : Type := {
+    iso_to_id   : iso_from \o iso_to =1 id;
+    iso_from_id : iso_to \o iso_from =1 id
+}.
+
+End IsomorphismLaws.
 
 Program Instance Yoneda_lemma `{Functor f} :
   forall a, Yoneda f a ≅ f a := {
     iso_to   := fun x => x _ id;
     iso_from := fun x => fun _ k => fmap k x
 }.
+
+Program Instance Yoneda_Functor {f : Type -> Type} : Functor (Yoneda f) := {
+  fmap := fun _ _ g k => fun _ h => k _ (h \o g)
+}.
+
+Program Instance Yoneda_Applicative `{Applicative f} :
+  Applicative (Yoneda f) := {
+  pure := fun _ x => fun _ k => pure (k x);
+  ap   := fun a b g x => fun _ k => g _ (comp k) <*> iso_to x
+}.
+
+Definition Yoneda_join `{Monad m} `(k : Yoneda m (Yoneda m a)) : Yoneda m a :=
+  fun _ h => join (k _ (fun y => y _ h)).
+
+Program Instance Yoneda_Monad `{Monad m} : Monad (Yoneda m) := {
+  join := @Yoneda_join m _
+}.
+
+Module YonedaLaws.
+
+Require Import FunctionalExtensionality.
+
+Include IsomorphismLaws.
+Include MonadLaws.
+
+(* Parametricity theorem. *)
+Axiom fmap_cps : forall `{Functor f} a b c (k : forall r, (a -> r) -> f r)
+  (g : b -> c) (h : a -> b), fmap g (k _ h) = k _ (g \o h).
+
+Program Instance Yoneda_lemma `{FunctorLaws f} :
+  forall a, @IsomorphismLaws (Yoneda f a) (f a) (Yoneda_lemma a).
 Obligation 1.
   move=> x /=.
   extensionality r.
@@ -43,15 +74,10 @@ Obligation 2.
   by rewrite /funcomp fmap_id.
 Qed.
 
-Program Instance Yoneda_Functor {f : Type -> Type} : Functor (Yoneda f) := {
-  fmap := fun _ _ g k => fun _ h => k _ (h \o g)
-}.
+Program Instance Yoneda_Functor {f : Type -> Type} : FunctorLaws (Yoneda f).
 
-Program Instance Yoneda_Applicative `{Applicative f} :
-  Applicative (Yoneda f) := {
-  pure := fun _ x => fun _ k => pure (k x);
-  ap   := fun a b g x => fun _ k => g _ (comp k) <*> iso_to x
-}.
+Program Instance Yoneda_Applicative `{ApplicativeLaws f} :
+  ApplicativeLaws (Yoneda f).
 Obligation 1.
   move=> x /=.
   extensionality r.
@@ -86,12 +112,7 @@ Obligation 5.
   f_equal.
 Qed.
 
-Definition Yoneda_join `{Monad m} `(k : Yoneda m (Yoneda m a)) : Yoneda m a :=
-  fun _ h => join (k _ (fun y => y _ h)).
-
-Program Instance Yoneda_Monad `{Monad m} : Monad (Yoneda m) := {
-  join := @Yoneda_join m _
-}.
+Program Instance Yoneda_Monad `{MonadLaws m} : MonadLaws (Yoneda m).
 Obligation 1.
   move=> k /=.
   rewrite /Yoneda_join.
@@ -113,3 +134,5 @@ Obligation 3.
   extensionality h.
   by rewrite join_pure_x.
 Qed.
+
+End YonedaLaws.
