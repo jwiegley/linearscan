@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IntMap.
+Require Import Hask.Control.Monad.State.
+Require Import Hask.Control.Monad.Trans.State.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
@@ -169,12 +170,6 @@ Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
         then (vis', Some (IntSet_union xs ys))
         else (vis, None) in
   snd (go (IntSet_size (visitedBlocks st)) emptyIntSet blk).
-
-Definition liftStateT `{Monad m} `(x : State s a) : StateT s m a :=
-  st <-- getT ;;
-  let (a, st') := x st in
-  putT st' ;;
-  pure a.
 
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)

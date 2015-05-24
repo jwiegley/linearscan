@@ -1,5 +1,5 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IntMap.
+Require Import Hask.Data.IntMap.
 Require Import LinearScan.UsePos.
 
 Set Implicit Arguments.

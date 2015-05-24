@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IntMap.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.
 Require Import LinearScan.Interval.

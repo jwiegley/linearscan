@@ -4,12 +4,12 @@ MISSING  = \
                 ! -name '*2.v'                                   |	\
 		xargs egrep -i -Hn '(abort|admit|undefined)'     |	\
 		      egrep -v 'Definition undefined'            |	\
-		      egrep -v '(old|new)/'
+		      egrep -v '(old|new|research)/'
 
-VFILES = $(wildcard *.v)
+VFILES = $(wildcard src/*.v)
 VOFILES = $(patsubst %.v,%.vo,$(VFILES))
 
-all: $(VOFILES)	LinearScan/Main.hs		\
+all: $(VOFILES) LinearScan/Main.hs		\
      LinearScan/Eqtype.hs			\
      LinearScan/Choice.hs			\
      LinearScan/Fintype.hs			\
@@ -24,7 +24,7 @@ all: $(VOFILES)	LinearScan/Main.hs		\
 	@$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
 	@$(MAKE) LinearScan/Main.hs
 
-LinearScan/Main.hs: Main.vo
+LinearScan/Main.hs: src/Main.vo
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
 	@perl -i fixcode.pl LinearScan/*.hs

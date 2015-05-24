@@ -7,7 +7,6 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
 Require Import LinearScan.Lib.
-Require Import LinearScan.IntMap.
 Require Import LinearScan.Allocate.
 Require Import LinearScan.Assign.
 Require Import LinearScan.Blocks.
@@ -18,7 +17,6 @@ Require Import LinearScan.Loops.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
-Require Import String.
 
 Generalizable All Variables.
 
@@ -82,7 +80,7 @@ Definition linearScan
   let: (loops, blocks1) := z in
 
   (* create intervals with live ranges *)
-  liveSets <-- computeLocalLiveSets binfo oinfo blocks1 ;;
+  liveSets  <-- computeLocalLiveSets binfo oinfo blocks1 ;;
   liveSets' <-- computeGlobalLiveSetsRecursively binfo blocks1 liveSets ;;
 
   ints <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
@@ -118,41 +116,13 @@ Definition linearScan
     end
   end.
 
-Extraction Language Haskell.
-
-Unset Extraction KeepSingleton.
-Set Extraction AutoInline.
-Set Extraction Optimize.
-Set Extraction AccessOpaque.
-
-(** Danger!  Using Int is efficient, but requires we know we won't exceed its
-    bounds. *)
-Extract Inductive Datatypes.nat => "Prelude.Int" ["0" "(Prelude.succ)"]
-  "(\fO fS n -> if n Prelude.<= 0 then fO () else fS (n Prelude.- 1))".
-
-Extract Inductive String.string => "Prelude.String" ["[]" "(:)"].
-
-Extract Inductive comparison =>
-  "Prelude.Ordering" ["Prelude.LT" "Prelude.EQ" "Prelude.GT"].
-
-Extract Inlined Constant safe_hd => "Prelude.head".
-Extract Inlined Constant sumlist => "Data.List.sum".
-(* Extract Inlined Constant lebf    => "Data.Ord.comparing". *)
-(* Extract Inlined Constant insert  => "Data.List.insertBy". *)
-
-Extract Inlined Constant Arith.Plus.tail_plus => "(Prelude.+)".
+Require Import Hask.Haskell.
 
 Extraction Implicit widen_id [ n ].
 Extraction Implicit widen_fst [ n ].
 
-Extract Inlined Constant widen_id           => "".
-Extract Inlined Constant widen_fst          => "Prelude.id".
-Extract Inlined Constant List.destruct_list => "LinearScan.Utils.uncons".
-Extract Inlined Constant list_membership    => "Prelude.const".
-
-Extract Inductive NonEmpty => "[]" ["(:[])" "(:)"].
-
-Extraction Blacklist String List Vector NonEmpty.
+Extract Inlined Constant widen_id  => "".
+Extract Inlined Constant widen_fst => "Prelude.id".
 
 Separate Extraction linearScan.
 

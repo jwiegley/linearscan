@@ -1,5 +1,4 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.Vector.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 

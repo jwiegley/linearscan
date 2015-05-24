@@ -2,8 +2,9 @@
 *.glob
 *.vo
 .*.aux
-/.coq-native/
+.coq-native/
 /LinearScan/Allocate.hs
+/LinearScan/Applicative.hs
 /LinearScan/Ascii.hs
 /LinearScan/Assign.hs
 /LinearScan/Blocks.hs
@@ -13,12 +14,17 @@
 /LinearScan/Datatypes.hs
 /LinearScan/Eqtype.hs
 /LinearScan/Fintype.hs
+/LinearScan/Functor.hs
 /LinearScan/Graph.hs
 /LinearScan/IState.hs
 /LinearScan/IntMap.hs
+/LinearScan/IntSet.hs
 /LinearScan/Interval.hs
+/LinearScan/Iso.hs
+/LinearScan/Lens.hs
 /LinearScan/Lib.hs
 /LinearScan/List0.hs
+/LinearScan/List1.hs
 /LinearScan/LiveSets.hs
 /LinearScan/Logic.hs
 /LinearScan/Loops.hs
@@ -29,6 +35,7 @@
 /LinearScan/NonEmpty0.hs
 /LinearScan/Order.hs
 /LinearScan/Peano.hs
+/LinearScan/Prelude.hs
 /LinearScan/Proto.hs
 /LinearScan/Range.hs
 /LinearScan/Resolve.hs
@@ -41,6 +48,7 @@
 /LinearScan/Ssrfun.hs
 /LinearScan/Ssrnat.hs
 /LinearScan/State.hs
+/LinearScan/State0.hs
 /LinearScan/String0.hs
 /LinearScan/UsePos.hs
 /LinearScan/Vector0.hs
@@ -63,4 +71,3 @@
 Setup
 dist
 html
-/LinearScan/Lens.hs

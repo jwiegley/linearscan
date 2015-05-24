@@ -1,9 +1,9 @@
 Require Import LinearScan.Lib.
+Require Import Hask.Control.Monad.Trans.State.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
-Require Import LinearScan.IntMap.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
