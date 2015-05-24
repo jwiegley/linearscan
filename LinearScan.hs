@@ -360,7 +360,7 @@ showDetails err = do
     showPostScanStateDesc (Just sd) =
         liftM2 (++)
             (showBlocks1 (blockInfo err) (opInfo err) sd
-                         (liveSets err) (inputBlocks err))
+                         (liveSets err) (orderedBlocks err))
             (return ("\n" ++ show sd))
 
 deriving instance Show LS.SSError
