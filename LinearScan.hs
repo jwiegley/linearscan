@@ -324,7 +324,7 @@ fromBlockInfo (BlockInfo a b c d e) =
 data Details m blk1 blk2 op1 op2 = Details
     { reason          :: Maybe (LS.SSError, LS.FinalStage)
     , liveSets        :: [(Int, LS.BlockLiveSets)]
-    , inputBlocks     :: [blk1]
+    , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
     , allocatedBlocks :: [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
@@ -348,11 +348,8 @@ showDetails err = do
     showPreScanStateDesc Nothing = return ""
     showPreScanStateDesc (Just sd) =
         liftM2 (++)
-            (liftM2 (++)
-                (showBlocks1 (blockInfo err) (opInfo err) sd
-                             (liveSets err) (inputBlocks err))
-                (showBlocks1 (blockInfo err) (opInfo err) sd
-                             (liveSets err) (orderedBlocks err)))
+            (showBlocks1 (blockInfo err) (opInfo err) sd
+                         (liveSets err) (orderedBlocks err))
             (return ("\n" ++ show sd))
 
     -- jww (2015-05-23): Show allocatedBlocks here?
