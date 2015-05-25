@@ -398,8 +398,8 @@ allocate maxReg binfo oinfo blocks = do
        toDetails res binfo oinfo
     let res' = U.unsafeCoerce (x :: Any) :: Details m blk1 blk2 op1 op2
     dets <- showDetails res'
-    return $ tracer dets $ case reason res' of
-        Just (err, _) -> Left  $ reasonToStr err
+    return $ case reason res' of
+        Just (err, _) -> Left  $ tracer dets $ reasonToStr err
         Nothing       -> Right $ allocatedBlocks res'
   where
     dict :: LS.Monad (m Any)
