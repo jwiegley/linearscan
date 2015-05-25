@@ -264,21 +264,21 @@ showOps1 oinfo sd pos (o:os) =
              if LS.iend i == here
              then (idx, Right (LS.ivar i), mreg) : eacc
              else eacc) in
-    let r _idx acc Nothing = acc
-        r idx (bacc, eacc) (Just i) =
-            let mreg = M.lookup idx allocs in
-            (if LS.ibeg i == here
-             then (idx, Left idx, mreg) : bacc
-             else bacc,
-             if LS.iend i == here
-             then (idx, Left idx, mreg) : eacc
-             else eacc) in
+    -- let r _idx acc Nothing = acc
+    --     r idx (bacc, eacc) (Just i) =
+    --         let mreg = M.lookup idx allocs in
+    --         (if LS.ibeg i == here
+    --          then (idx, Left idx, mreg) : bacc
+    --          else bacc,
+    --          if LS.iend i == here
+    --          then (idx, Left idx, mreg) : eacc
+    --          else eacc) in
     let (begs, ends) =
             LS.vfoldl'_with_index (0 :: Int) k ([], []) (intervals sd) in
-    let (begs', ends') =
-            LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
-                                  (fixedIntervals sd) in
-    showOp1' (showOp1 oinfo) (pos*2+1) begs' ends' o
+    -- let (begs', ends') =
+    --         LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
+    --                               (fixedIntervals sd) in
+    showOp1' (showOp1 oinfo) (pos*2+1) begs ends o
         ++ showOps1 oinfo sd (pos+1) os
 
 -- | From the point of view of this library, a basic block is nothing more
