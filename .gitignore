@@ -73,3 +73,4 @@ dist
 html
 /LinearScan/NonEmpty.hs
 /LinearScan/Prelude0.hs
+/LinearScan/Spill.hs

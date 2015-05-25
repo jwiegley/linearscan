@@ -16,5 +16,6 @@ src/Range.v
 src/Resolve.v
 src/ScanState.v
 src/Spec.v
+src/Spill.v
 src/Split.v
 src/UsePos.v

@@ -84,6 +84,7 @@ library
     LinearScan.ScanState
     LinearScan.Seq
     LinearScan.Specif
+    LinearScan.Spill
     LinearScan.Split
     LinearScan.Ssrbool
     LinearScan.Ssreflect

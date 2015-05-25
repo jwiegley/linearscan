@@ -7,6 +7,7 @@ Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
 Require Import LinearScan.Cursor.
 Require Import LinearScan.Spec.
+Require Import LinearScan.Spill.
 Require Import LinearScan.Split.
 
 Set Implicit Arguments.
