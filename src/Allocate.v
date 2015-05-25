@@ -67,6 +67,10 @@ Definition tryAllocateFreeReg {pre} :
     let freeUntilPos'' :=
         foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
           freeUntilPos' intersectingIntervals in
+
+    (* Make sure that if there's a fixed interval that intersection with the
+       current interval, that we indicate that the register is only free up
+       until that point. *)
     let freeUntilPos :=
         vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
           if mint is Some int
@@ -150,7 +154,17 @@ Definition allocateBlockedReg {pre} :
                then (int, reg) :: acc
                else acc
           else acc) [::] (fixedIntervals sd) in
-    let nextUsePos := foldl go nextUsePos' intersectingIntervals in
+    let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
+
+    (* Make sure that if there's a fixed interval that intersection with the
+       current interval, that we indicate that the register is only free up
+       until that point. *)
+    let nextUsePos :=
+        vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
+          if mint is Some int
+          then updateRegisterPos acc reg
+                 (intervalIntersectionPoint int.2 current)
+          else acc) nextUsePos'' (fixedIntervals sd) in
 
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
