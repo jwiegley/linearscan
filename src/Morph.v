@@ -16,6 +16,14 @@ Definition PhysReg := 'I_maxReg.
 Open Scope nat_scope.
 
 Inductive SSTrace : Set :=
+  | EMoveUnhandledToActive of nat          (* register *)
+  | ESplitActiveIntervalForReg of nat      (* register *)
+  | ESplitAnyInactiveIntervalForReg of nat (* register *)
+  | ESpillCurrentInterval
+  | ESplitCurrentInterval of nat           (* split pos *)
+  | ETryAllocateFreeReg of nat             (* interval id *)
+  | EAllocateBlockedReg of nat             (* interval id *)
+  | ERemoveUnhandledInterval of nat        (* interval id *)
   | ECannotInsertUnhAtPos of nat
   | EIntervalBeginsBeforeUnhandled of nat
   | ENoValidSplitPosition of nat

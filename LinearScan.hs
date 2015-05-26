@@ -411,6 +411,22 @@ allocate maxReg binfo oinfo blocks = do
           U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
+        LS.EMoveUnhandledToActive reg ->
+            "Allocating unhandled interval at register " ++ show reg
+        LS.ESplitActiveIntervalForReg reg ->
+            "Splitting active interval for register " ++ show reg
+        LS.ESplitAnyInactiveIntervalForReg reg ->
+            "Splitting any inactive interval for register " ++ show reg
+        LS.ESpillCurrentInterval ->
+            "Spilling current interval"
+        LS.ESplitCurrentInterval pos ->
+            "Spilling current interval before " ++ show pos
+        LS.ETryAllocateFreeReg xid ->
+            "Trying to allocate free registers for interval " ++ show xid
+        LS.EAllocateBlockedReg xid ->
+            "Trying to allocate a blocked register for interval " ++ show xid
+        LS.ERemoveUnhandledInterval xid ->
+            "Removing unhandled interval " ++ show xid
         LS.ECannotInsertUnhAtPos pos ->
             "Cannot insert interval onto unhandled list (use at position "
               ++ show pos ++ ")"
