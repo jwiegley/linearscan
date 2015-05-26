@@ -39,8 +39,8 @@ import qualified LinearScan.LiveSets as LS
 import qualified LinearScan.Loops as LS
 import qualified LinearScan.Main as LS
 import qualified LinearScan.Monad as LS
-import qualified LinearScan.Morph as LS
 import qualified LinearScan.Range as LS
+import qualified LinearScan.Trace as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
 import           LinearScan.Yoneda (Any)
@@ -359,9 +359,12 @@ showDetails err = do
                          (liveSets err) (orderedBlocks err))
             (return ("\n" ++ show sd))
 
-deriving instance Show LS.SSTrace
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
+
+deriving instance Show LS.SpillConditionT
+deriving instance Show LS.SplitPositionT
+deriving instance Show LS.SSTrace
 
 toDetails :: LS.Details blk1 blk2
           -> LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -415,8 +418,8 @@ allocate maxReg binfo oinfo blocks = do
             "Splitting assigned interval for register " ++ show reg
         LS.ESplitActiveOrInactiveInterval b ->
             "Splitting " ++ (if b then "active" else "inactive") ++ " interval"
-        LS.ESpillInterval ->
-            "Spilling interval"
+        LS.ESpillInterval cond ->
+            "Spilling interval " ++ show cond
         LS.ESplitUnhandledInterval ->
             "Splitting unhandled interval"
         LS.EIntervalHasUsePosReqReg pos ->

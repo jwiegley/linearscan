@@ -75,3 +75,4 @@ html
 /LinearScan/Prelude0.hs
 /LinearScan/Spill.hs
 /LinearScan/Context.hs
+/LinearScan/Trace.hs

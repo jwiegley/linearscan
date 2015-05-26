@@ -21,6 +21,12 @@ Inductive SplitPosition : Set :=
   | BeforePos of oddnum
   | EndOfLifetimeHole of oddnum.
 
+Definition SplitPositionToT (x : SplitPosition) :=
+  match x with
+  | BeforePos n         => BeforePosT n.1
+  | EndOfLifetimeHole n => EndOfLifetimeHoleT n.1
+  end.
+
 (* Given an interval, determine its optimal split position.  If no split
    position can be found, it means the interval may be safely spilled, and all
    further variable references should be accessed directly from memory. *)
@@ -36,7 +42,7 @@ Definition splitUnhandledInterval `(st : ScanState InUse sd)
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
-  pose e2 := ESplitUnhandledInterval :: e.
+  have e2 := ESplitUnhandledInterval :: e.
   case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
 
@@ -120,11 +126,12 @@ Definition splitCurrentInterval {pre} (pos : SplitPosition) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ssi.
+  have e2 := ESplitCurrentInterval (SplitPositionToT pos) :: e.
   case: ssi => desc.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
   move=> H1 H2 H3.
-  move/splitUnhandledInterval/(_ uid beg us Hunh pos e).
+  move/splitUnhandledInterval/(_ uid beg us Hunh pos e2).
   case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
   case=> [err|[[sd st] [[/= ? H]]]].
     exact: inl err.
@@ -230,7 +237,7 @@ Definition splitAssignedIntervalForReg {pre}
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ssi.
-  pose e2 := ESplitAssignedIntervalForReg reg :: e.
+  have e2 := ESplitAssignedIntervalForReg reg :: e.
   case: ssi => desc.
   case=> H. case: H => /=; case.
 
@@ -311,7 +318,7 @@ Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ss.
-  pose e2 := ESplitAnyInactiveIntervalForReg reg :: e.
+  have e2 := ESplitAnyInactiveIntervalForReg reg :: e.
   have := splitAssignedIntervalForReg reg (EndOfLifetimeHole pos) false.
   move=> /(_ pre e2 ss).
   case=> [err|[_ ss']]; right; split; try constructor.

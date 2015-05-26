@@ -18,4 +18,5 @@ src/ScanState.v
 src/Spec.v
 src/Spill.v
 src/Split.v
+src/Trace.v
 src/UsePos.v

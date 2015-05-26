@@ -2,6 +2,7 @@ Require Import LinearScan.Lib.
 Require Import LinearScan.Context.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
+Require Export LinearScan.Trace.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -14,32 +15,6 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
 Open Scope nat_scope.
-
-Inductive SSTrace : Set :=
-  | ESplitAssignedIntervalForReg of nat    (* register *)
-  | ESplitActiveOrInactiveInterval of bool (* true for active *)
-  | EIntervalHasUsePosReqReg of nat
-  | EIntervalBeginsAtSplitPosition
-  | EMoveUnhandledToActive of nat          (* register *)
-  | ESplitActiveIntervalForReg of nat      (* register *)
-  | ESplitAnyInactiveIntervalForReg of nat (* register *)
-  | ESpillInterval
-  | ESpillCurrentInterval
-  | ESplitUnhandledInterval
-  | ESplitCurrentInterval of nat           (* split pos *)
-  | ETryAllocateFreeReg of nat             (* interval id *)
-  | EAllocateBlockedReg of nat             (* interval id *)
-  | ERemoveUnhandledInterval of nat        (* interval id *)
-  | ECannotInsertUnhandled
-  | EIntervalBeginsBeforeUnhandled of nat
-  | ENoValidSplitPosition of nat
-  | ECannotSplitSingleton of nat
-  | ERegisterAlreadyAssigned of nat
-  | ERegisterAssignmentsOverlap of nat
-  | EUnexpectedNoMoreUnhandled
-  | ECannotSpillIfRegisterRequired of nat
-  | EFuelExhausted
-  | ENotYetImplemented of nat.
 
 (** ** SSMorph *)
 

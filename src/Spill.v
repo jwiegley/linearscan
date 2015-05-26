@@ -27,6 +27,14 @@ Inductive SpillCondition (sd : ScanStateDesc maxReg) (uid : IntervalId sd)
       vnth (intervals sd) xid = i ->
       (xid, reg) \in inactive sd -> SpillCondition uid i.
 
+Definition SpillConditionToT `(x : @SpillCondition sd uid i) :=
+  match x with
+  | NewToHandled                  => NewToHandledT uid
+  | UnhandledToHandled _          => UnhandledToHandledT uid
+  | ActiveToHandled xid reg _ _   => ActiveToHandledT xid reg
+  | InactiveToHandled xid reg _ _ => InactiveToHandledT xid reg
+  end.
+
 Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "NewToHandled"
@@ -46,7 +54,7 @@ Definition spillInterval `(st : ScanState InUse sd)
            else SSMorph sd ss.1
       else SSMorphHasLen sd ss.1 }.
 Proof.
-  pose e2 := (ESpillInterval :: e).
+  have e2 := ESpillInterval (SpillConditionToT spill) :: e.
 
   (* Is there a use position requiring a register in the interval?  If yes,
      then split it again; otherwise, spill it. *)
@@ -97,7 +105,7 @@ Proof.
       apply H.
       by rewrite Hunh.
 
-  pose e3 := EIntervalHasUsePosReqReg splitPos2 :: e2.
+  have e3 := EIntervalHasUsePosReqReg splitPos2 :: e2.
 
   case E: (ibeg i1.1 == splitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
@@ -367,7 +375,7 @@ Definition spillCurrentInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) unit.
 Proof.
   move=> e ssi.
-  pose e2 := ESpillCurrentInterval :: e.
+  have e2 := ESpillCurrentInterval :: e.
   case: ssi => sd.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled sd) => //= [[uid beg] us].
