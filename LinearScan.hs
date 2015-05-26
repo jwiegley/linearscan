@@ -423,9 +423,9 @@ allocate maxReg binfo oinfo blocks = do
         LS.ESplitUnhandledInterval ->
             "Splitting unhandled interval"
         LS.EIntervalHasUsePosReqReg pos ->
-            "Interval has use position requiring register at pos " ++ show pos
+            "Interval has use position requiring register at " ++ show pos
         LS.EIntervalBeginsAtSplitPosition ->
-            "Interval begins at the split position"
+            "Interval begins at split position"
         LS.EMoveUnhandledToActive reg ->
             "Allocating unhandled interval at register " ++ show reg
         LS.ESplitActiveIntervalForReg reg ->
@@ -435,7 +435,7 @@ allocate maxReg binfo oinfo blocks = do
         LS.ESpillCurrentInterval ->
             "Spilling current interval"
         LS.ESplitCurrentInterval pos ->
-            "Spilling current interval before " ++ show pos
+            "Spilling current interval " ++ show pos
         LS.ETryAllocateFreeReg xid ->
             "Trying to allocate free registers for interval " ++ show xid
         LS.EAllocateBlockedReg xid ->
