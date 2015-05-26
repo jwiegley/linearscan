@@ -1,5 +1,5 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IState.
+Require Import LinearScan.Context.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 
@@ -15,42 +15,17 @@ Definition PhysReg := 'I_maxReg.
 
 Open Scope nat_scope.
 
-Inductive SplitReason :=
-  | AvailableForPart of nat
-  | IntersectsWithFixed of nat  (* gives the register *)
-  | SplittingActive of nat      (* gives the register *)
-  | SplittingInactive of nat.   (* gives the interval id *)
-
-Inductive SplitPosition : Set :=
-  | BeforePos of oddnum & SplitReason
-  | EndOfLifetimeHole of oddnum.
-
-Inductive SpillDetails : Set :=
-  | SD_NewToHandled
-  | SD_UnhandledToHandled of nat
-  | SD_ActiveToHandled of nat & nat    (* interval id & reg *)
-  | SD_InactiveToHandled of nat & nat. (* interval id & reg *)
-
-Inductive SSError : Set :=
-  | ECannotInsertUnhAtPos of SpillDetails & nat (* pos *)
+Inductive SSTrace : Set :=
+  | ECannotInsertUnhAtPos of nat
   | EIntervalBeginsBeforeUnhandled of nat
-  | ENoValidSplitPositionUnh of SplitPosition & nat
-  | ENoValidSplitPosition of SplitPosition & nat
-  | ECannotSplitSingleton of SplitPosition & nat
+  | ENoValidSplitPosition of nat
+  | ECannotSplitSingleton of nat
   | ERegisterAlreadyAssigned of nat
   | ERegisterAssignmentsOverlap of nat
   | EUnexpectedNoMoreUnhandled
   | ECannotSpillIfRegisterRequired of nat
   | EFuelExhausted
   | ENotYetImplemented of nat.
-
-Definition stbind {P Q R a b}
-  (f : (a -> IState SSError Q R b)) (x : IState SSError P Q a) :
-  IState SSError P R b := @ijoin _ P Q R b (@imap _ P Q _ _ f x).
-
-Definition error_ {I O X} err : IState SSError I O X :=
-  fun (_ : I) => inl err.
-Definition return_ {I O X} := @ipure I O X.
 
 (** ** SSMorph *)
 
@@ -111,28 +86,59 @@ Arguments thisHolds {_ P} _.
 Arguments thisState {_ P} _.
 
 Definition SState (sd : ScanStateDesc maxReg) P Q :=
-  IState SSError (SSInfo sd P) (SSInfo sd Q).
+  Context SSTrace (SSInfo sd P) (SSInfo sd Q).
+
+Definition error_ {sd P Q a} err : SState sd P Q a := fun _ _ => inl err.
+
+Definition conseqSState `(x : SState sd P2 Q2 a)
+  `(f : forall a b, P1 a b -> P2 a b) `(g : forall a b, Q2 a b -> Q1 a b) :
+  SState sd P1 Q1 a :=
+  conseq x
+    (fun p => match p with
+       {| thisDesc  := desc
+        ; thisHolds := holds
+        ; thisState := state |} =>
+       {| thisDesc  := desc
+        ; thisHolds := f sd desc holds
+        ; thisState := state |}
+       end)
+    (fun q => match q with
+       {| thisDesc  := desc
+        ; thisHolds := holds
+        ; thisState := state |} =>
+       {| thisDesc  := desc
+        ; thisHolds := g sd desc holds
+        ; thisState := state |}
+       end).
+
+Definition strengthenSState `(x : SState sd P2 Q a)
+  `(f : forall a b, P1 a b -> P2 a b) : SState sd P1 Q a :=
+  conseqSState x f (fun _ _ => id).
+
+Definition weakenSState `(x : SState sd P Q2 a)
+  `(g : forall a b, Q2 a b -> Q1 a b) : SState sd P Q1 a :=
+  conseqSState x (fun _ _ => id) g.
 
 Definition withScanState {a pre} {P Q}
   (f : forall sd : ScanStateDesc maxReg, ScanState InUse sd
          -> SState pre P Q a) : SState pre P Q a :=
-  stbind (fun i => f (thisDesc i) (thisState i)) (iget SSError).
+  ibind (fun i => f (thisDesc i) (thisState i)) iget.
 
-Arguments withScanState {a pre P Q} f _.
+Arguments withScanState {a pre P Q} f _ _.
 
 Definition withScanStatePO {a pre P} `{PO : PreOrder _ P}
   (f : forall sd : ScanStateDesc maxReg, ScanState InUse sd
          -> SState sd P P a) : SState pre P P a.
 Proof.
-  intros i.
+  intros e i.
   destruct i.
   specialize (f thisDesc0 thisState0).
   assert (SSInfo thisDesc0 P).
     eapply {| thisDesc  := _
             ; thisHolds := _ |}.
-  apply f in X.
-  destruct X.
-    apply (inl s).
+  apply (f e) in X.
+  destruct X as [err|p].
+    apply (inl err).
   apply inr.
   destruct p.
   split. apply a0.
@@ -145,20 +151,20 @@ Proof.
   reflexivity.
 Defined.
 
-Arguments withScanStatePO {a pre P _} f _.
+Arguments withScanStatePO {a pre P _} f _ _.
 
 Definition liftLen {pre a} :
   (forall sd : ScanStateDesc maxReg, SState sd SSMorphLen SSMorphLen a)
     -> SState pre SSMorphHasLen SSMorphHasLen a.
 Proof.
   move=> f.
-  move=> [sd [morphlen Hempty] st].
+  move=> e [sd [morphlen Hempty] st].
   pose ss := {| thisDesc  := sd
               ; thisHolds := newSSMorphLen sd
               ; thisState := st
               |}.
-  case: (f sd ss) => [err|[x [sd' morphlen' st']]].
-    exact: (inl err).
+  case: (f sd e ss) => [err|[x [sd' morphlen' st']]].
+    exact: inl err.
   apply: inr.
   split; first exact: x.
   apply: {| thisDesc  := sd'
@@ -171,14 +177,13 @@ Proof.
   exact: H.
 Defined.
 
-Definition weakenHasLen {pre} :
-  forall sd, SSMorphHasLen pre sd -> SSMorph pre sd.
+Definition weakenHasLen {pre} : forall sd,
+  SSMorphHasLen pre sd -> SSMorph pre sd.
 Proof. by move=> ? [[?]]. Defined.
 
-Definition weakenHasLen_ {pre} :
-  SState pre SSMorphHasLen SSMorph unit.
+Definition weakenHasLen_ {pre} : SState pre SSMorphHasLen SSMorph unit.
 Proof.
-  intros HS.
+  intros e HS.
   apply inr.
   split. apply tt.
   destruct HS.
@@ -187,8 +192,8 @@ Proof.
   - by [].
 Defined.
 
-Definition strengthenHasLen {pre} :
-  forall sd, SSMorph pre sd -> option (SSMorphHasLen pre sd).
+Definition strengthenHasLen {pre} : forall sd,
+  SSMorph pre sd -> option (SSMorphHasLen pre sd).
 Proof.
   move=> sd H.
   case E: (unhandled sd).
@@ -202,8 +207,7 @@ Defined.
 
 Definition moveUnhandledToHandled {pre} : SState pre SSMorphHasLen SSMorph unit.
 Proof.
-  intros.
-  intro X.
+  intros e X.
   destruct X.
   destruct thisDesc0.
   destruct thisHolds0.
@@ -211,9 +215,8 @@ Proof.
   destruct len_is_SSMorph0.
   destruct unhandled; first by [].
   destruct p.
-  case E: (firstUseReqReg (vnth intervals i).2 == None); last first.
-    apply inl.
-    exact: (ECannotSpillIfRegisterRequired i).
+  case E: (firstUseReqReg (vnth intervals i).2 == None);
+    last exact: inl (ECannotSpillIfRegisterRequired i :: e).
   apply inr.
   split. apply tt.
   pose (ScanState_moveUnhandledToHandled thisState0 E).
@@ -225,8 +228,7 @@ Defined.
 Definition moveUnhandledToActive {pre} (reg : PhysReg) :
   SState pre SSMorphHasLen SSMorph unit.
 Proof.
-  intros.
-  intro X.
+  intros e X.
   destruct X.
   destruct thisDesc0.
   destruct thisHolds0.
@@ -235,7 +237,7 @@ Proof.
   destruct unhandled; first by [].
   destruct p.
   case H: (reg \notin [seq snd i | i <- active]);
-    last exact: (inl (ERegisterAlreadyAssigned reg)).
+    last exact: inl (ERegisterAlreadyAssigned reg :: e).
   apply inr.
   split. apply tt.
   pose (ScanState_moveUnhandledToActive thisState0 H).
@@ -334,10 +336,3 @@ Defined.
 Arguments moveInactiveToHandled {sd} st spilled {x} H Hreq.
 
 End Morph.
-
-Notation "m >>>= f" := (stbind f m) (at level 25, left associativity).
-
-Notation "X <<- A ;;; B" := (A >>>= (fun X => B))
-  (at level 92, A at next level, right associativity).
-
-Notation "A ;;; B" := (_ <<- A ;;; B) (at level 92, right associativity).

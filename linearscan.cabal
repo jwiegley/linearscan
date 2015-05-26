@@ -55,13 +55,13 @@ library
     LinearScan.Blocks
     LinearScan.Build
     LinearScan.Choice
+    LinearScan.Context
     LinearScan.Cursor
     LinearScan.Datatypes
     LinearScan.Eqtype
     LinearScan.Fintype
     LinearScan.Functor
     LinearScan.Graph
-    LinearScan.IState
     LinearScan.IntMap
     LinearScan.IntSet
     LinearScan.Interval

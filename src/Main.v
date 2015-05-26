@@ -59,7 +59,7 @@ Definition toScanStateDescSet `(sd : ScanStateDesc maxReg) :
    |}.
 
 Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
-  reason          : option (SSError * FinalStage);
+  reason          : option (seq SSTrace * FinalStage);
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
@@ -83,37 +83,29 @@ Definition linearScan
   liveSets  <-- computeLocalLiveSets binfo oinfo blocks1 ;;
   liveSets' <-- computeGlobalLiveSetsRecursively binfo blocks1 liveSets ;;
 
-  ints <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
-  match ints with
-  | inl err =>
+  ssig <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
+  (* allocate registers *)
+  let opCount := (countOps binfo blocks1).+1 in
+  match walkIntervals registers_exist ssig.2 opCount with
+  | inl (err, ssig') =>
     pure $ k $ Build_Details _ _ maxReg
-      (Some (err, BuildingIntervalsFailed))
+      (Some (err, AllocatingRegistersFailed))
       liveSets' blocks blocks1 [::]
-      None None loops
-  | inr ssig =>
-    (* allocate registers *)
-    let opCount := (countOps binfo blocks1).+1 in
-    match walkIntervals registers_exist ssig.2 opCount with
-    | inl (err, ssig') =>
-      pure $ k $ Build_Details _ _ maxReg
-        (Some (err, AllocatingRegistersFailed))
-        liveSets' blocks blocks1 [::]
+      (Some (toScanStateDescSet ssig.1))
+      (Some (toScanStateDescSet ssig'.1)) loops
+  | inr ssig' =>
+      let sd     := finalizeScanState ssig'.2 opCount.*2 in
+      let allocs := determineAllocations sd in
+
+      mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
+
+      (* replace virtual registers with physical registers *)
+      blocks2 <--
+        assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
+      pure $ k $ Build_Details _ _ maxReg None
+        liveSets' blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))
-        (Some (toScanStateDescSet ssig'.1)) loops
-    | inr ssig' =>
-        let sd     := finalizeScanState ssig'.2 opCount.*2 in
-        let allocs := determineAllocations sd in
-
-        mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-
-        (* replace virtual registers with physical registers *)
-        blocks2 <--
-          assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
-        pure $ k $ Build_Details _ _ maxReg None
-          liveSets' blocks blocks1 blocks2
-          (Some (toScanStateDescSet ssig.1))
-          (Some (toScanStateDescSet sd)) loops
-    end
+        (Some (toScanStateDescSet sd)) loops
   end.
 
 Require Import Hask.Haskell.

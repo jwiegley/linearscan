@@ -35,24 +35,16 @@ Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
   | Case_aux c "InactiveToHandled"
   ].
 
-Definition spillConditionToDetails `(spill : @SpillCondition sd uid i) :
-  SpillDetails :=
-  match spill with
-  | NewToHandled                  => SD_NewToHandled
-  | UnhandledToHandled _          => SD_UnhandledToHandled uid
-  | ActiveToHandled xid reg _ _   => SD_ActiveToHandled xid reg
-  | InactiveToHandled xid reg _ _ => SD_InactiveToHandled xid reg
-  end.
-
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
-  (Hbeg : beg <= ibeg i1.1) (spill : SpillCondition uid i1) :
-  SSError + { ss : ScanStateSig maxReg InUse
-            | if spill is UnhandledToHandled _
-              then if firstUseReqReg i1.2 is Some _
-                   then SSMorphLen sd ss.1
-                   else SSMorph sd ss.1
-              else SSMorphHasLen sd ss.1 }.
+  (Hbeg : beg <= ibeg i1.1) (spill : SpillCondition uid i1) (e : seq SSTrace) :
+  seq SSTrace +
+    { ss : ScanStateSig maxReg InUse
+    | if spill is UnhandledToHandled _
+      then if firstUseReqReg i1.2 is Some _
+           then SSMorphLen sd ss.1
+           else SSMorph sd ss.1
+      else SSMorphHasLen sd ss.1 }.
 Proof.
   (* Is there a use position requiring a register in the interval?  If yes,
      then split it again; otherwise, spill it. *)
@@ -109,8 +101,7 @@ Proof.
        list. *)
     case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
-      set det := spillConditionToDetails spill.
-      exact: inl (ECannotInsertUnhAtPos det beg). (* ERROR *)
+      exact: inl (ECannotInsertUnhAtPos beg :: e).
 
     have := ScanState_newUnhandled st i1.2.
     rewrite Hunh => /=.
@@ -146,7 +137,7 @@ Proof.
      evidence for now, from the first use of [firstUseReqReg] and then
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
-    exact: inl (ECannotSpillIfRegisterRequired pos.1).
+    exact: inl (ECannotSpillIfRegisterRequired pos.1 :: e).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 
@@ -370,7 +361,7 @@ Defined.
 Definition spillCurrentInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) unit.
 Proof.
-  move=> ssi.
+  move=> e ssi.
   case: ssi => sd.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled sd) => //= [[uid beg] us].
@@ -379,8 +370,8 @@ Proof.
   set d := (X in Interval X).
   move=> i st.
   case Hbeg2: (beg <= ibeg d); last first.
-    exact: inl (EIntervalBeginsBeforeUnhandled uid). (* ERROR *)
-  case: (spillInterval st Hunh Hbeg2 (UnhandledToHandled (refl_equal _)))
+    exact: inl (EIntervalBeginsBeforeUnhandled uid :: e).
+  case: (spillInterval st Hunh Hbeg2 (UnhandledToHandled (refl_equal _)) e)
     => [err|[[sd' st'] H]].
     exact: inl err.
   apply: inr (tt, _).

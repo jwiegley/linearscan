@@ -136,9 +136,6 @@ data ScanStateDesc = ScanStateDesc
 deriving instance Show LS.IntervalDesc
 deriving instance Show LS.RangeDesc
 deriving instance Show LS.UsePos
-deriving instance Show LS.SplitReason
-deriving instance Show LS.SpillDetails
-deriving instance Show LS.SplitPosition
 
 instance Show ScanStateDesc where
     show sd =
@@ -324,7 +321,7 @@ fromBlockInfo (BlockInfo a b c d e) =
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
-    { reason          :: Maybe (LS.SSError, LS.FinalStage)
+    { reason          :: Maybe ([LS.SSTrace], LS.FinalStage)
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
@@ -362,7 +359,7 @@ showDetails err = do
                          (liveSets err) (orderedBlocks err))
             (return ("\n" ++ show sd))
 
-deriving instance Show LS.SSError
+deriving instance Show LS.SSTrace
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
 
@@ -389,9 +386,9 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
          => Int        -- ^ Maximum number of registers to use
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
-         -> [blk1] -> m (Either String [blk2])
-allocate 0 _ _ _  = return $ Left "Cannot allocate with no registers"
-allocate _ _ _ [] = return $ Left "No basic blocks were provided"
+         -> [blk1] -> m (Either [String] [blk2])
+allocate 0 _ _ _  = return $ Left ["Cannot allocate with no registers"]
+allocate _ _ _ [] = return $ Left ["No basic blocks were provided"]
 allocate maxReg binfo oinfo blocks = do
     x <- LS.linearScan dict maxReg
        (fromBlockInfo binfo) (fromOpInfo oinfo) blocks $ \res ->
@@ -399,7 +396,7 @@ allocate maxReg binfo oinfo blocks = do
     let res' = U.unsafeCoerce (x :: Any) :: Details m blk1 blk2 op1 op2
     dets <- showDetails res'
     return $ case reason res' of
-        Just (err, _) -> Left  $ tracer dets $ reasonToStr err
+        Just (err, _) -> Left  $ tracer dets $ map reasonToStr err
         Nothing       -> Right $ allocatedBlocks res'
   where
     dict :: LS.Monad (m Any)
@@ -414,20 +411,16 @@ allocate maxReg binfo oinfo blocks = do
           U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
-        LS.ECannotInsertUnhAtPos spillDets pos ->
-            "Cannot insert interval " ++ show spillDets
-              ++ " onto unhandled list (use at position "
+        LS.ECannotInsertUnhAtPos pos ->
+            "Cannot insert interval onto unhandled list (use at position "
               ++ show pos ++ ")"
         LS.EIntervalBeginsBeforeUnhandled xid ->
             "Cannot spill interval " ++ show xid
                 ++ " (begins before current position)"
-        LS.ENoValidSplitPositionUnh splitPos xid ->
-            "No split position found for unhandled interval " ++ show xid
-                ++ " @ " ++ show splitPos
-        LS.ENoValidSplitPosition splitPos xid ->
-            "No split position found for " ++ show xid ++ " @ " ++ show splitPos
-        LS.ECannotSplitSingleton splitPos xid ->
-            "Interval " ++ show xid ++ " is a singleton @ " ++ show splitPos
+        LS.ENoValidSplitPosition xid ->
+            "No split position found for " ++ show xid
+        LS.ECannotSplitSingleton xid ->
+            "Interval " ++ show xid ++ " is a singleton"
         LS.ERegisterAlreadyAssigned reg ->
             "Register " ++ show reg ++ " already assigned"
         LS.ERegisterAssignmentsOverlap reg ->

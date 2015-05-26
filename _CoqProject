@@ -5,7 +5,7 @@ src/Blocks.v
 src/Build.v
 src/Cursor.v
 src/Graph.v
-src/IState.v
+src/Context.v
 src/Interval.v
 src/Lib.v
 src/LiveSets.v

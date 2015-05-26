@@ -1,5 +1,5 @@
 Require Import LinearScan.Lib.
-Require Import LinearScan.IState.
+Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
@@ -27,9 +27,9 @@ Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option oddnum) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let int := curIntDetails cur in
-    return_ $ if vnth (fixedIntervals sd) reg is Some i
-              then intervalIntersectionPoint int.2 i.2
-              else None.
+    ipure $ if vnth (fixedIntervals sd) reg is Some i
+            then intervalIntersectionPoint int.2 i.2
+            else None.
 
 Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
   (r : 'I_n) (p : option oddnum) : Vec (option oddnum) n :=
@@ -86,9 +86,9 @@ Definition tryAllocateFreeReg {pre} :
         [unhandled] list to the [active] list in the current [ScanStateDesc],
         it also assigns a register to the newly active interval that can be
         accessed by calling [getAssignment]. *)
-    let success := moveUnhandledToActive reg ;;; return_ reg in
+    let success := moveUnhandledToActive reg ;;; ipure reg in
 
-    return_ $
+    ipure $
       match mres with
       | None => Some success
       | Some n =>
@@ -107,9 +107,7 @@ Definition tryAllocateFreeReg {pre} :
         else @Some _ $
           if intervalEnd current < n.1
           then success
-          else splitCurrentInterval
-                 (BeforePos n (AvailableForPart (fst (curId cur)))) ;;;
-               success
+          else splitCurrentInterval (BeforePos n) ;;; success
       end.
 
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
@@ -194,12 +192,12 @@ Definition allocateBlockedReg {pre} :
       (* mloc <<- intersectsWithFixedInterval reg ;; *)
       (* match mloc with *)
       (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
-      (* | None   => return_ tt *)
+      (* | None   => ipure tt *)
       (* end ;;; *)
 
       (* The allocation failed, so we had to spill some part of the current
          interval instead. *)
-      return_ None
+      ipure None
     else
       (* // spill intervals that currently block reg
          current.reg = reg
@@ -220,13 +218,12 @@ Definition allocateBlockedReg {pre} :
          position? *)
       mloc <<- intersectsWithFixedInterval reg ;;;
       match mloc with
-      | Some n => splitCurrentInterval
-                    (BeforePos n (IntersectsWithFixed reg))
-      | None   => return_ tt
+      | Some n => splitCurrentInterval (BeforePos n)
+      | None   => ipure tt
       end ;;;
 
       moveUnhandledToActive reg ;;;
-      return_ $ Some reg.
+      ipure $ Some reg.
 
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
@@ -318,15 +315,15 @@ Definition checkActiveIntervals {pre} (pos : nat) :
           (active sd) (size (active sd)) (eq_refl _)
           (@active maxReg) (subseq_refl _) mt_fst (@goActive pos sd) in
     let: exist sd' (conj st' H) := res in
-    IState.iput SSError {| thisDesc  := sd'
-                         ; thisHolds := H
-                         ; thisState := st' |}.
+    Context.iput {| thisDesc  := sd'
+                  ; thisHolds := H
+                  ; thisState := st' |}.
 
 Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z))
-  (Hin : x \in inactive z) :
-  SSError +
+  (Hin : x \in inactive z) (e : seq SSTrace) :
+  seq SSTrace +
   { sd' : ScanStateDesc maxReg | ScanState InUse sd'
   & { sslen : SSMorphLen z sd'
     | subseq [seq mt_fst sslen i | i <- xs] (inactive sd')
@@ -338,7 +335,7 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
       | exist2 sd' st' sslen' =>
           inr (exist2 _ _ sd' st' (sslen'; _))
       end
-  | false => inl (ERegisterAssignmentsOverlap (snd x : PhysReg))
+  | false => inl (ERegisterAssignmentsOverlap (snd x : PhysReg) :: e)
   end.
 Obligation 2.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
@@ -347,11 +344,12 @@ Obligation 2.
   exact: subseq_cons_rem.
 Defined.
 
-Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
+Program Definition goInactive (pos : nat) (sd : ScanStateDesc maxReg)
+  (e : seq SSTrace) (z : ScanStateDesc maxReg)
   (Pz : ScanState InUse z /\ SSMorphLen sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (inactive z)) :
-  SSError + intermediate_result sd xs (@inactive maxReg) :=
+  seq SSTrace + intermediate_result sd xs (@inactive maxReg) :=
   (* for each interval it in inactive do
        if it ends before position then
          move it from inactive to handled
@@ -359,7 +357,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
          move it from inactive to active *)
   let: conj st sslen := Pz in
   match getInterval (fst x)
-  return SSError + intermediate_result sd xs (@inactive maxReg) with
+  return seq SSTrace + intermediate_result sd xs (@inactive maxReg) with
   | i =>
     let Hin : x \in inactive z :=
         @in_subseq_sing _ _ _ x xs _ Hsub in
@@ -376,7 +374,7 @@ Program Definition goInactive (pos : nat) (sd z : ScanStateDesc maxReg)
              f sd' st' sslen' _
          end
     else if posWithinInterval i pos
-         then match moveInactiveToActive' st Hsub Hin with
+         then match moveInactiveToActive' st Hsub Hin e with
               | inl err => inl err
               | inr (exist2 sd' st' (exist sslen' Hsub')) =>
                   f sd' st' sslen' Hsub'
@@ -400,20 +398,21 @@ Defined.
 Definition checkInactiveIntervals {pre} (pos : nat) :
   SState pre (@SSMorphLen maxReg) (@SSMorphLen maxReg) unit :=
   withScanStatePO (maxReg:=maxReg) $ fun sd (st : ScanState InUse sd) =>
+    e <<- Context.iask ;;;
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let eres : SSError + {sd' : ScanStateDesc maxReg
-                         | ScanState InUse sd' /\ SSMorphLen sd sd'} :=
-        @dep_foldl_invE SSError (ScanStateDesc maxReg)
+    let eres : seq SSTrace + { sd' : ScanStateDesc maxReg
+                             | ScanState InUse sd' /\ SSMorphLen sd sd'} :=
+        @dep_foldl_invE (seq SSTrace) (ScanStateDesc maxReg)
           (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
           (@SSMorphLen maxReg) _ sd (conj st (newSSMorphLen sd))
           (inactive sd) (size (inactive sd)) (eq_refl _)
-          (@inactive maxReg) (subseq_refl _) mt_fst (@goInactive pos sd) in
+          (@inactive maxReg) (subseq_refl _) mt_fst (@goInactive pos sd e) in
     match eres with
     | inl err => error_ err
     | inr (exist sd' (conj st' H)) =>
-        IState.iput SSError {| thisDesc  := sd'
-                             ; thisHolds := H
-                             ; thisState := st' |}
+        Context.iput {| thisDesc  := sd'
+                      ; thisHolds := H
+                      ; thisState := st' |}
     end.
 
 Definition handleInterval {pre} :
@@ -425,7 +424,7 @@ Definition handleInterval {pre} :
 
     (* Remove any empty intervals from the unhandled list *)
     if firstUsePos current is None
-    then @moveUnhandledToHandled maxReg pre ;;; return_ None
+    then @moveUnhandledToHandled maxReg pre ;;; ipure None
     else
       (* // check for intervals in active that are handled or inactive *)
       liftLen (fun sd => @checkActiveIntervals sd position) ;;;
@@ -447,7 +446,7 @@ Definition handleInterval {pre} :
 Definition finalizeScanState `(st : ScanState InUse sd) (finalPos : nat) :
   ScanStateDesc maxReg :=
   match (checkActiveIntervals   finalPos ;;;
-         checkInactiveIntervals finalPos)
+         checkInactiveIntervals finalPos) [::]
           {| thisDesc  := sd
            ; thisHolds := newSSMorphLen sd
            ; thisState := st |} with
@@ -463,19 +462,19 @@ Require Import Coq.Program.Wf.
    final result will be a [ScanState] whose [handled] list represents the
    final allocations for each interval. *)
 Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
-  (SSError * ScanStateSig maxReg InUse) + ScanStateSig maxReg InUse :=
+  (seq SSTrace * ScanStateSig maxReg InUse) + ScanStateSig maxReg InUse :=
   (* while unhandled /= { } do
        current = pick and remove first interval from unhandled
        HANDLE_INTERVAL (current) *)
   if positions isn't S n
-  then inl (EFuelExhausted, packScanState st)
+  then inl ([:: EFuelExhausted], packScanState st)
        (* jww (2015-01-20): Should be provably impossible *)
   else let fix go count ss :=
     (* trace "walkIntervals: go" $ *)
     if count is S cnt
     then
       (* trace "walkIntervals: count > 0" $ *)
-      match handleInterval ss with
+      match handleInterval [::] ss with
       | inl err => inl (err, packScanState (thisState ss))
       | inr (_, ss') =>
         (* A [ScanState InUse] may not insert new unhandled intervals at the
@@ -488,7 +487,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
            evaluated. *)
         match strengthenHasLen (thisHolds ss') with
         | None => if cnt is S _
-                  then inl (EUnexpectedNoMoreUnhandled,
+                  then inl ([:: EUnexpectedNoMoreUnhandled],
                             packScanState (thisState ss'))
                   else inr ss'
         | Some holds' =>

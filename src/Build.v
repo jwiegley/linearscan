@@ -622,12 +622,12 @@ Defined.
 
 Definition buildIntervals (blocks : seq blockType1) (loops : LoopState)
   (liveSets : IntMap BlockLiveSets) :
-  mType (SSError + ScanStateSig maxReg InUse) :=
+  mType (ScanStateSig maxReg InUse) :=
   let add_unhandled_interval (ss  : ScanStateSig maxReg Pending) i :=
         packScanState (ScanState_newUnhandled ss.2 i.2 I) in
   let s0 := ScanState_nil maxReg in
   if blocks isn't b :: bs
-  then pure $ inr $ packScanState (ScanState_finalize s0)
+  then pure $ packScanState (ScanState_finalize s0)
   else
     varUses <-- computeVarReferences binfo oinfo (b :: bs) loops ;;
     reduced <-- reduceBlocks (pos:=0) (b :: bs) loops varUses liveSets ;;
@@ -636,6 +636,6 @@ Definition buildIntervals (blocks : seq blockType1) (loops : LoopState)
     let s2 := packScanState s1 in
     let s3 := IntMap_foldl add_unhandled_interval s2 vars in
     let s4 := ScanState_finalize s3.2 in
-    pure $ inr $ packScanState s4.
+    pure $ packScanState s4.
 
 End Build.

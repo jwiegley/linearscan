@@ -53,13 +53,14 @@ Definition withCursor {Q a pre}
          -> SState pre (@SSMorphHasLen maxReg) Q a) :
   SState pre (@SSMorphHasLen maxReg) Q a.
 Proof.
+  intro e.
   destruct 1.
   destruct thisHolds.
   destruct haslen_is_SSMorphLen.
   pose {| curState  := thisState
         ; curExists := first_nonempty |} as p.
   specialize (f thisDesc p).
-  apply f.
+  apply (f e).
   apply: Build_SSInfo.
     apply: Build_SSMorphHasLen.
       apply: Build_SSMorphLen; auto.
