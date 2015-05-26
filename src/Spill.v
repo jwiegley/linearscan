@@ -46,6 +46,8 @@ Definition spillInterval `(st : ScanState InUse sd)
            else SSMorph sd ss.1
       else SSMorphHasLen sd ss.1 }.
 Proof.
+  pose e2 := (ESpillInterval :: e).
+
   (* Is there a use position requiring a register in the interval?  If yes,
      then split it again; otherwise, spill it. *)
   case S: (firstUseReqReg i1.2) => [[[splitPos2 Hodd2] /= Hmid2] |]; last first.
@@ -95,13 +97,16 @@ Proof.
       apply H.
       by rewrite Hunh.
 
+  pose e3 := EIntervalHasUsePosReqReg splitPos2 :: e2.
+
   case E: (ibeg i1.1 == splitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
        later iteration. Note: this cannot change the head of the unhandled
        list. *)
     case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
-      exact: inl (ECannotInsertUnhAtPos beg :: e).
+      exact: inl (ECannotInsertUnhandled ::
+                  EIntervalBeginsAtSplitPosition :: e3).
 
     have := ScanState_newUnhandled st i1.2.
     rewrite Hunh => /=.
@@ -137,7 +142,7 @@ Proof.
      evidence for now, from the first use of [firstUseReqReg] and then
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
-    exact: inl (ECannotSpillIfRegisterRequired pos.1 :: e).
+    exact: inl (ECannotSpillIfRegisterRequired pos.1 :: e3).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 
@@ -362,6 +367,7 @@ Definition spillCurrentInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) unit.
 Proof.
   move=> e ssi.
+  pose e2 := ESpillCurrentInterval :: e.
   case: ssi => sd.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled sd) => //= [[uid beg] us].

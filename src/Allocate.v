@@ -86,33 +86,32 @@ Definition tryAllocateFreeReg {pre} :
         [unhandled] list to the [active] list in the current [ScanStateDesc],
         it also assigns a register to the newly active interval that can be
         accessed by calling [getAssignment]. *)
-    let success := context (EMoveUnhandledToActive reg) $
-                     moveUnhandledToActive reg ;;; ipure reg in
+    let success := moveUnhandledToActive reg ;;; ipure reg in
 
-    ipure $
-      match mres with
-      | None => Some success
-      | Some n =>
-        (* if freeUntilPos[reg] = 0 then
-             // no register available without spilling
-             allocation failed
-           else if current ends before freeUntilPos[reg] then
-             // register available for the whole interval
-             current.reg = reg
-           else
-             // register available for the first part of the interval
-             current.reg = reg
-             split current before freeUntilPos[reg] *)
-        if n.1 <= pos
-        then None
-        else @Some _ $
-          if intervalEnd current < n.1
-          then success
-          else
-            context (ESplitCurrentInterval n.1) $
-              splitCurrentInterval (BeforePos n) ;;;
-            success
-      end.
+    let cid := curId cur in
+    context (EAllocateBlockedReg (fst cid)) $
+      ipure $
+        match mres with
+        | None => Some success
+        | Some n =>
+          (* if freeUntilPos[reg] = 0 then
+               // no register available without spilling
+               allocation failed
+             else if current ends before freeUntilPos[reg] then
+               // register available for the whole interval
+               current.reg = reg
+             else
+               // register available for the first part of the interval
+               current.reg = reg
+               split current before freeUntilPos[reg] *)
+          if n.1 <= pos
+          then None
+          else @Some _ $
+            if intervalEnd current < n.1
+            then success
+            else splitCurrentInterval (BeforePos n) ;;;
+                 success
+        end.
 
 (** If [allocateBlockedReg] fails, it's possible no register was assigned and
     that the only outcome was to split one or more intervals.  In either case,
@@ -172,67 +171,65 @@ Definition allocateBlockedReg {pre} :
     (* mres = highest use position of the found register *)
     let (reg, mres) := registerWithHighestPos registers_exist nextUsePos in
 
-    if (match mres with
-        | None   => false
-        | Some n =>
-            n.1 < if lookupUsePos current (fun u => pos <= uloc u)
-                    is Some (nextUse; _)
-                  then nextUse.1
-                  else intervalEnd current
-        end)
-    then
-      (* if first usage of current is after nextUsePos[reg] then
-           // all other intervals are used before current, so it is best
-           // to spill current itself
-           assign spill slot to current
-           split current before its first use position that requires a
-             register *)
-      context ESpillCurrentInterval $
+    let cid := curId cur in
+    context (EAllocateBlockedReg (fst cid)) $
+      if (match mres with
+          | None   => false
+          | Some n =>
+              n.1 < if lookupUsePos current (fun u => pos <= uloc u)
+                      is Some (nextUse; _)
+                    then nextUse.1
+                    else intervalEnd current
+          end)
+      then
+        (* if first usage of current is after nextUsePos[reg] then
+             // all other intervals are used before current, so it is best
+             // to spill current itself
+             assign spill slot to current
+             split current before its first use position that requires a
+               register *)
         @spillCurrentInterval maxReg pre ;;;
 
-      (* // make sure that current does not intersect with
-         // the fixed interval for reg
-         if current intersects with the fixed interval for reg then
-           split current before this intersection *)
-      (* mloc <<- intersectsWithFixedInterval reg ;; *)
-      (* match mloc with *)
-      (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
-      (* | None   => ipure tt *)
-      (* end ;;; *)
+        (* // make sure that current does not intersect with
+           // the fixed interval for reg
+           if current intersects with the fixed interval for reg then
+             split current before this intersection *)
+        (* mloc <<- intersectsWithFixedInterval reg ;; *)
+        (* match mloc with *)
+        (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
+        (* | None   => ipure tt *)
+        (* end ;;; *)
 
-      (* The allocation failed, so we had to spill some part of the current
-         interval instead. *)
-      ipure None
-    else
-      (* // spill intervals that currently block reg
-         current.reg = reg
-         split active interval for reg at position
-         split any inactive interval for reg at the end of its lifetime hole *)
-      let oddpos := (pos; posOdd) in
-      context (ESplitAnyInactiveIntervalForReg reg) $
+        (* The allocation failed, so we had to spill some part of the current
+           interval instead. *)
+        ipure None
+      else
+        (* // spill intervals that currently block reg
+           current.reg = reg
+           split active interval for reg at position
+           split any inactive interval for reg at the end of its lifetime
+             hole *)
+        let oddpos := (pos; posOdd) in
         splitAnyInactiveIntervalForReg reg oddpos ;;;
-      context (ESplitActiveIntervalForReg reg) $
         splitActiveIntervalForReg reg oddpos ;;;
 
-      (* The remaining part of these active and inactive intervals go back
-         onto the unhandled list; the former part goes onto the inact list. *)
+        (* The remaining part of these active and inactive intervals go back
+           onto the unhandled list; the former part goes onto the inact list. *)
 
-      (* // make sure that current does not intersect with
-         // the fixed interval for reg
-         if current intersects with the fixed interval for reg then
-           split current before this intersection *)
-      (* jww (2015-01-30): What if the fixed interval begins at the current
-         position? *)
-      mloc <<- intersectsWithFixedInterval reg ;;;
-      match mloc with
-      | Some n => context (ESplitCurrentInterval n.1) $
-                    splitCurrentInterval (BeforePos n)
-      | None   => ipure tt
-      end ;;;
+        (* // make sure that current does not intersect with
+           // the fixed interval for reg
+           if current intersects with the fixed interval for reg then
+             split current before this intersection *)
+        (* jww (2015-01-30): What if the fixed interval begins at the current
+           position? *)
+        mloc <<- intersectsWithFixedInterval reg ;;;
+        match mloc with
+        | Some n => splitCurrentInterval (BeforePos n)
+        | None   => ipure tt
+        end ;;;
 
-      context (EMoveUnhandledToActive reg) $
         moveUnhandledToActive reg ;;;
-      ipure $ Some reg.
+        ipure $ Some reg.
 
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
@@ -434,9 +431,7 @@ Definition handleInterval {pre} :
 
     (* Remove any empty intervals from the unhandled list *)
     if firstUsePos current is None
-    then
-      context (ERemoveUnhandledInterval (fst cid)) $
-        @moveUnhandledToHandled maxReg pre ;;; ipure None
+    then @moveUnhandledToHandled maxReg pre ;;; ipure None
     else
       (* // check for intervals in active that are handled or inactive *)
       liftLen (fun sd => @checkActiveIntervals sd position) ;;;
@@ -449,12 +444,10 @@ Definition handleInterval {pre} :
            allocateBlockedReg
          if current has a register assigned then
            add current to active (done by the helper functions) *)
-      mres <<- context (ETryAllocateFreeReg (fst cid))
-                 tryAllocateFreeReg ;;;
+      mres <<- tryAllocateFreeReg ;;;
       match mres with
       | Some x => imap (@Some _) x
-      | None   => context (EAllocateBlockedReg (fst cid))
-                    allocateBlockedReg
+      | None   => allocateBlockedReg
       end.
 
 Definition finalizeScanState `(st : ScanState InUse sd) (finalPos : nat) :

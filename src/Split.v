@@ -4,6 +4,7 @@ Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Spec.
 Require Import LinearScan.Morph.
+Require Import LinearScan.Context.
 Require Import LinearScan.Spill.
 
 Set Implicit Arguments.
@@ -35,6 +36,7 @@ Definition splitUnhandledInterval `(st : ScanState InUse sd)
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
+  pose e2 := ESplitUnhandledInterval :: e.
   case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
 
@@ -146,6 +148,8 @@ Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
 Proof.
+  have e2 := ESplitActiveOrInactiveInterval
+               (match Hin with inl _ => true | inr _ => false end) :: e.
   case: sd => /= [ni ints ? unh ? ? ?] in st uid us xid Hunh Hbeg Hin *.
   set int := vnth ints xid.
 
@@ -163,14 +167,14 @@ Proof.
        we can try to spill the first part of the interval (or all of it, if
        there are no use positions requiring registers). *)
     case Hbeg2: (beg <= ibeg int.1); last first.
-      exact: inl (ENoValidSplitPosition xid :: e).
+      exact: inl (ENoValidSplitPosition xid :: e2).
 
     case: Hin => [Hin|Hin].
-      case: (spillInterval st Hunh Hbeg2 (ActiveToHandled uid Heqe Hin) e)
+      case: (spillInterval st Hunh Hbeg2 (ActiveToHandled uid Heqe Hin) e2)
         => [err|[ss [[[/= ?] ?] ?]]].
         exact: inl err.
       exact: inr (ss; _).
-    case: (spillInterval st Hunh Hbeg2 (InactiveToHandled uid Heqe Hin) e)
+    case: (spillInterval st Hunh Hbeg2 (InactiveToHandled uid Heqe Hin) e2)
       => [err|[ss [[[/= ?] ?] ?]]].
       exact: inl err.
     exact: inr (ss; _).
@@ -214,7 +218,7 @@ Proof.
   (* Spill the second interval, unless it has a use position that requires a
      register, in which case we spill the first place and add the second part
      back onto the unhandled list for processing later. *)
-  case: (spillInterval st Hunh Hbeg2 (NewToHandled _ i1) e)
+  case: (spillInterval st Hunh Hbeg2 (NewToHandled _ i1) e2)
     => [err|[ss [[[/= ?] ?] ?]]].
     exact: inl err.
   exact: inr (ss; _).
@@ -226,6 +230,7 @@ Definition splitAssignedIntervalForReg {pre}
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ssi.
+  pose e2 := ESplitAssignedIntervalForReg reg :: e.
   case: ssi => desc.
   case=> H. case: H => /=; case.
 
@@ -253,7 +258,7 @@ Proof.
     by rewrite Hunh.
 
   case Hbeg: (beg <= (splitPosition (getInterval aid) pos).1); last first.
-    exact: inl (ECannotSplitSingleton aid :: e).
+    exact: inl (ECannotSplitSingleton aid :: e2).
 
   move/splitActiveOrInactiveInterval: st
     => /(_ uid beg us Hunh aid pos reg Hbeg) /=.
@@ -265,7 +270,7 @@ Proof.
     rewrite Hintlist in H.
       exact: inl _.
     exact: inr _.
-  move=> /(_ Hin' e) {Hin'}.
+  move=> /(_ Hin' e2) {Hin'}.
 
   case=> [err|[[sd st] [[/= [Hincr] H ?]]]].
     exact: inl err.
@@ -299,14 +304,16 @@ Defined.
 
 Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
-  splitAssignedIntervalForReg reg (BeforePos pos) true.
+  context (ESplitActiveIntervalForReg reg) $
+    splitAssignedIntervalForReg reg (BeforePos pos) true.
 
 Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ss.
+  pose e2 := ESplitAnyInactiveIntervalForReg reg :: e.
   have := splitAssignedIntervalForReg reg (EndOfLifetimeHole pos) false.
-  move=> /(_ pre e ss).
+  move=> /(_ pre e2 ss).
   case=> [err|[_ ss']]; right; split; try constructor.
     exact: ss.
   exact: ss'.

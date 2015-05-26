@@ -411,6 +411,18 @@ allocate maxReg binfo oinfo blocks = do
           U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
+        LS.ESplitAssignedIntervalForReg reg ->
+            "Splitting assigned interval for register " ++ show reg
+        LS.ESplitActiveOrInactiveInterval b ->
+            "Splitting " ++ (if b then "active" else "inactive") ++ " interval"
+        LS.ESpillInterval ->
+            "Spilling interval"
+        LS.ESplitUnhandledInterval ->
+            "Splitting unhandled interval"
+        LS.EIntervalHasUsePosReqReg pos ->
+            "Interval has use position requiring register at pos " ++ show pos
+        LS.EIntervalBeginsAtSplitPosition ->
+            "Interval begins at the split position"
         LS.EMoveUnhandledToActive reg ->
             "Allocating unhandled interval at register " ++ show reg
         LS.ESplitActiveIntervalForReg reg ->
@@ -427,9 +439,9 @@ allocate maxReg binfo oinfo blocks = do
             "Trying to allocate a blocked register for interval " ++ show xid
         LS.ERemoveUnhandledInterval xid ->
             "Removing unhandled interval " ++ show xid
-        LS.ECannotInsertUnhAtPos pos ->
-            "Cannot insert interval onto unhandled list (use at position "
-              ++ show pos ++ ")"
+
+        LS.ECannotInsertUnhandled ->
+            "Cannot insert interval onto unhandled list"
         LS.EIntervalBeginsBeforeUnhandled xid ->
             "Cannot spill interval " ++ show xid
                 ++ " (begins before current position)"
