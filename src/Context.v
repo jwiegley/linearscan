@@ -13,6 +13,10 @@ Variable errType : Set.
 Definition Context (i o a : Type) := seq errType -> i -> seq errType + (a * o).
 
 Definition iask {i} : Context i i (seq errType) := fun e i => inr (e, i).
+
+Definition context {i o a} (c : errType) (x : Context i o a) :
+  Context i o a := fun e => x (c :: e).
+
 Definition iget {i} : Context i i i := fun _ i => inr (i, i).
 Definition iput {i o} (x : o) : Context i o unit := fun _ _ => inr (tt, x).
 
