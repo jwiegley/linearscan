@@ -29,6 +29,7 @@ Inductive SplitPositionT : Set :=
 Definition TrueIfActiveT : Set := bool.
 
 Inductive SSTrace : Set :=
+  | EIntersectsWithFixedInterval of nat & PhysRegT
   | ESplitAssignedIntervalForReg of PhysRegT
   | ESplitActiveOrInactiveInterval of TrueIfActiveT
   | EIntervalHasUsePosReqReg of IntervalIdT
@@ -40,8 +41,8 @@ Inductive SSTrace : Set :=
   | ESpillCurrentInterval
   | ESplitUnhandledInterval
   | ESplitCurrentInterval of SplitPositionT
-  | ETryAllocateFreeReg of IntervalIdT
-  | EAllocateBlockedReg of IntervalIdT
+  | ETryAllocateFreeReg of PhysRegT & option nat & IntervalIdT
+  | EAllocateBlockedReg of PhysRegT & option nat & IntervalIdT
   | ERemoveUnhandledInterval of IntervalIdT
   | ECannotInsertUnhandled
   | EIntervalBeginsBeforeUnhandled of IntervalIdT

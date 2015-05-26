@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-{-# OPTIONS_GHC -Wall -Werror -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 
 module LinearScan
     ( -- * Main entry point
@@ -425,6 +425,9 @@ allocate maxReg binfo oinfo blocks = do
           U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
+        LS.EIntersectsWithFixedInterval reg pos ->
+            "Current interval intersects with " ++
+            "fixed interval for register " ++ show reg ++ " at " ++ show pos
         LS.ESplitAssignedIntervalForReg reg ->
             "Splitting assigned interval for register " ++ show reg
         LS.ESplitActiveOrInactiveInterval b ->
@@ -446,11 +449,13 @@ allocate maxReg binfo oinfo blocks = do
         LS.ESpillCurrentInterval ->
             "Spilling current interval"
         LS.ESplitCurrentInterval pos ->
-            "Spilling current interval " ++ show pos
-        LS.ETryAllocateFreeReg xid ->
-            "Trying to allocate free registers for interval " ++ show xid
-        LS.EAllocateBlockedReg xid ->
-            "Trying to allocate a blocked register for interval " ++ show xid
+            "Splitting current interval " ++ show pos
+        LS.ETryAllocateFreeReg reg mpos xid ->
+            "Trying to allocate register " ++ show reg
+                ++ " at " ++ show mpos ++ " for interval " ++ show xid
+        LS.EAllocateBlockedReg reg mpos xid ->
+            "Allocating blocked register " ++ show reg
+                ++ " at " ++ show mpos ++ " for interval " ++ show xid
         LS.ERemoveUnhandledInterval xid ->
             "Removing unhandled interval " ++ show xid
 

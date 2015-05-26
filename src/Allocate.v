@@ -43,6 +43,29 @@ Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
                end))
   end.
 
+Definition convert_oddnum (x : option oddnum) : option nat :=
+  match x with
+    | Some x => Some x.1
+    | None => None
+  end.
+
+Definition findEligibleRegister (sd : ScanStateDesc maxReg)
+  `(current : Interval d) xs : PhysReg * option oddnum :=
+  (* Make sure that if there's a fixed interval that intersection with the
+     current interval, that we indicate that the register is only free up
+     until that point. *)
+  let: (xs, fixedAndIntersects) :=
+    vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
+      let: (fup, fai) := acc in
+      if mint is Some int
+      then
+        let ip := intervalIntersectionPoint int.2 current in
+        let intersects := if ip is Some _ then true else false in
+        (updateRegisterPos fup reg (intervalIntersectionPoint int.2 current),
+         vreplace fai reg intersects)
+      else acc) (xs, vconst false) (fixedIntervals sd) in
+  registerWithHighestPos registers_exist fixedAndIntersects xs.
+
 (** If [tryAllocateFreeReg] fails to allocate a register, the [ScanState] is
     left unchanged.  If it succeeds, or is forced to split [current], then a
     register will have been assigned. *)
@@ -68,19 +91,9 @@ Definition tryAllocateFreeReg {pre} :
         foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
           freeUntilPos' intersectingIntervals in
 
-    (* Make sure that if there's a fixed interval that intersection with the
-       current interval, that we indicate that the register is only free up
-       until that point. *)
-    let freeUntilPos :=
-        vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
-          if mint is Some int
-          then updateRegisterPos acc reg
-                 (intervalIntersectionPoint int.2 current)
-          else acc) freeUntilPos'' (fixedIntervals sd) in
-
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
-    let (reg, mres) := registerWithHighestPos registers_exist freeUntilPos in
+    let (reg, mres) := findEligibleRegister sd current freeUntilPos'' in
 
     (** [moveUnhandledToActive] not only moves an [IntervalId] from the
         [unhandled] list to the [active] list in the current [ScanStateDesc],
@@ -89,7 +102,7 @@ Definition tryAllocateFreeReg {pre} :
     let success := moveUnhandledToActive reg ;;; ipure reg in
 
     let cid := curId cur in
-    context (EAllocateBlockedReg (fst cid)) $
+    context (ETryAllocateFreeReg reg (convert_oddnum mres) (fst cid)) $
       ipure $
         match mres with
         | None => Some success
@@ -157,22 +170,12 @@ Definition allocateBlockedReg {pre} :
           else acc) [::] (fixedIntervals sd) in
     let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
 
-    (* Make sure that if there's a fixed interval that intersection with the
-       current interval, that we indicate that the register is only free up
-       until that point. *)
-    let nextUsePos :=
-        vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
-          if mint is Some int
-          then updateRegisterPos acc reg
-                 (intervalIntersectionPoint int.2 current)
-          else acc) nextUsePos'' (fixedIntervals sd) in
-
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
-    let (reg, mres) := registerWithHighestPos registers_exist nextUsePos in
+    let (reg, mres) := findEligibleRegister sd current nextUsePos'' in
 
     let cid := curId cur in
-    context (EAllocateBlockedReg (fst cid)) $
+    context (EAllocateBlockedReg reg (convert_oddnum mres) (fst cid)) $
       if (match mres with
           | None   => false
           | Some n =>
@@ -224,7 +227,8 @@ Definition allocateBlockedReg {pre} :
            position? *)
         mloc <<- intersectsWithFixedInterval reg ;;;
         match mloc with
-        | Some n => splitCurrentInterval (BeforePos n)
+        | Some n => context (EIntersectsWithFixedInterval n.1 reg) $
+                      splitCurrentInterval (BeforePos n)
         | None   => ipure tt
         end ;;;
 
