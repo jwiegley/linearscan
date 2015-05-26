@@ -362,8 +362,19 @@ showDetails err = do
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
 
-deriving instance Show LS.SpillConditionT
-deriving instance Show LS.SplitPositionT
+instance Show LS.SpillConditionT where
+    show (LS.NewToHandledT uid) = "new interval " ++ show uid
+    show (LS.UnhandledToHandledT uid) = "unhandled interval " ++ show uid
+    show (LS.ActiveToHandledT xid reg) =
+        "active interval "++ show xid ++ " for register " ++ show reg
+    show (LS.InactiveToHandledT xid reg) =
+        "inactive interval "++ show xid ++ " for register " ++ show reg
+
+instance Show LS.SplitPositionT where
+    show (LS.BeforePosT pos)         = "before " ++ show pos
+    show (LS.EndOfLifetimeHoleT pos) =
+        "at end of lifetime hole after " ++ show pos
+
 deriving instance Show LS.SSTrace
 
 toDetails :: LS.Details blk1 blk2
@@ -419,7 +430,7 @@ allocate maxReg binfo oinfo blocks = do
         LS.ESplitActiveOrInactiveInterval b ->
             "Splitting " ++ (if b then "active" else "inactive") ++ " interval"
         LS.ESpillInterval cond ->
-            "Spilling interval " ++ show cond
+            "Spilling " ++ show cond
         LS.ESplitUnhandledInterval ->
             "Splitting unhandled interval"
         LS.EIntervalHasUsePosReqReg pos ->
