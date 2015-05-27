@@ -7,6 +7,11 @@ Right now I just drop a single allocation.
 * TODO Fix performance issues
 * TODO Enter TODO items for all jww comments
 * TODO Write more edge-case tests
+* TODO Compute lifetime holes
+If a variable is last read at position 100, and written to at position 200,
+then 100-200 should become a lifetime hole (unless it's in a loop).
+
+There should be no save after 100 and restore before 200, as there is now.
 * DONE "Another resolution case" unit test fails
 There's an issue demonstrated by my unit tests that shows incorrect move
 resolution at loop header blocks.  I've written to Christian about this, since

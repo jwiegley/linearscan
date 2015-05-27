@@ -491,10 +491,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
            will also be there in [unhandled sd] when [go] is next
            evaluated. *)
         match strengthenHasLen (thisHolds ss') with
-        | None => if cnt is S _
-                  then inl ([:: EUnexpectedNoMoreUnhandled],
-                            packScanState (thisState ss'))
-                  else inr ss'
+        | None => inr ss'
         | Some holds' =>
             go cnt {| thisDesc  := thisDesc ss'
                     ; thisHolds := holds'
