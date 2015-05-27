@@ -161,13 +161,7 @@ Definition allocateBlockedReg {pre} :
     let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
     let intersectingIntervals : seq (IntervalSig * PhysReg) :=
         filter (fun x => intervalsIntersect current (fst x).2)
-               (resolve (inactive sd)) ++
-        vfoldl_with_index (fun reg acc mint =>
-          if mint is Some int
-          then if intervalsIntersect current int.2
-               then (int, reg) :: acc
-               else acc
-          else acc) [::] (fixedIntervals sd) in
+               (resolve (inactive sd)) in
     let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
 
     (* reg = register with highest nextUsePos *)
