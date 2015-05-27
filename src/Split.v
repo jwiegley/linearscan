@@ -68,6 +68,10 @@ Proof.
       case: H => [[?] ?].
       apply: inr (ss; _).
       exact: Build_SSMorphLen.
+    case: H => [?].
+    case E: (0 < size (unhandled ss.1)).
+      apply: inr (ss; _).
+      exact: Build_SSMorphLen.
     exact: inl (ENoValidSplitPosition uid :: e).
 
   case Hint: int => [d i] in Hmid *.
