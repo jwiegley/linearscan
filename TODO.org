@@ -1,4 +1,6 @@
-* TODO 21 Tempest cases are still failing
+* DONE 21 Tempest cases are still failing
+* TODO regBlocked test is failing
+* TODO Several generated tests fail
 * TODO Improve handling of register made available to calls
 Right now I just drop a single allocation.
 * TODO Implement a VM for verifying allocations
