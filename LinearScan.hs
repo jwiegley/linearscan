@@ -425,7 +425,7 @@ allocate maxReg binfo oinfo blocks = do
           U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
     reasonToStr r = case r of
-        LS.EIntersectsWithFixedInterval reg pos ->
+        LS.EIntersectsWithFixedInterval pos reg ->
             "Current interval intersects with " ++
             "fixed interval for register " ++ show reg ++ " at " ++ show pos
         LS.ESplitAssignedIntervalForReg reg ->
