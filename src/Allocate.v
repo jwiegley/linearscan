@@ -486,10 +486,7 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
            same position as [curPos], and so even though [unhandled sd] may
            have been changed by the call to [handleInterval], it will not
            have changed it with respect to subsequent intervals at the same
-           position.  Thus, we may safely make the assumption that if
-           another interval at the same position exists in [xs], then it
-           will also be there in [unhandled sd] when [go] is next
-           evaluated. *)
+           position. *)
         match strengthenHasLen (thisHolds ss') with
         | None => inr ss'
         | Some holds' =>
