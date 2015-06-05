@@ -1,4 +1,4 @@
--R Hask Hask -R src LinearScan
+-R Hask/src Hask -R src LinearScan
 src/Allocate.v
 src/Assign.v
 src/Blocks.v
