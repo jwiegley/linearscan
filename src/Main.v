@@ -110,6 +110,8 @@ Definition linearScan
 
 Require Import Hask.Haskell.
 
+(* Set Extraction Conservative Types. *)
+
 Extraction Implicit widen_id [ n ].
 Extraction Implicit widen_fst [ n ].
 

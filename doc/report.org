@@ -1,0 +1,81 @@
+#+TITLE: Experience Report: Building a register allocator in Coq
+
+* Setting the stage
+
+** Needed a new register allocator due to subtle bugs in the previous one
+** Chose Coq to provide verification and fidelity of results
+** No prior experience using Coq to build production software
+** Deployment was chosen to be extraction to Haskell as a library
+
+* Initial effort: Complex types
+
+** Primary types were records of both data and propositions
+** The resulting dependent types imposed many proof obligations
+
+* Next effort: External proofs
+
+** Propositions were moved from types into theorems
+** Proving required complex induction over large functions
+** Every change required proofs to be updated
+
+* Next effort: Data types + Propositional types
+
+** Propositions were moved to constructors of an inductive data type
+** This divided between data and constructive predicates on the data
+** Several fruits of this effort were kept, but imposed work
+
+* Next effort: Proof by reflection
+
+** Many propositions were exchanged for functions returning bool
+** Switched to the ssreflect library, which supports this type of reasoning
+** Allowed many proofs to avoid induction and use mainly rewriting
+
+* Finalization of library code
+
+** Abstracted library code lent itself well to reflection and proof
+** Subsystems once "completed" needed little attention thereafter
+** This where Coq shined, eliminating tests and creating confidence
+
+* Continued work on application code
+
+** Higher level code on top of libraries needed frequent change
+** As the design evolved, many functions needed to be rewritten
+** Owing to inductive predicates, proof obligations required constant work
+** As the code evolved, changes became more and more difficult to make
+** The last 20% of the work took an inordinate amount of time as a result
+
+* Pressure release: Error results to avoid proof obligation
+
+** To recover the pace of development, functions were permitted to "error out"
+** Reporting error, instead of proving correctness, brought back flexibility
+** When errors became common, it justified the proof work to eliminate them
+
+* Pressure release: Coq as a functional language
+
+** Most new functions abandoned proof restrictions and dependent types
+** In this sense, Coq was just being used as if it were a "stricter Haskell"
+** Core libraries carried high assurance, but the new code now requried testing
+
+* The Haskell bridge
+
+** Not all constructions could be made efficient on both sides
+** Proof requirements do not prefer complex implementations!
+** Monads were introduced to allow effect-producing callbacks
+** Much work was done to optimize extraction, but led to difficult bugs
+
+* Overall experience
+
+** Coq would have been ideal for core library development
+** Imposed a high engineering cost for application development
+** Since not everything was proved, testing was still necessary
+** Mounting time restrictions led to fewer and fewer proofs
+** The final product required testing as with any application
+** However, confidence levels at seeing all test pass was high
+
+* Take-aways
+
+** Coq is a powerful functional platform for crafting code of value
+** It is not the right tool for large, complex applications
+** Not unless one abandons most of what makes it so powerful
+** A combination of Haskell and Coq would be of great value
+** Getting this combination to work well requires some investment

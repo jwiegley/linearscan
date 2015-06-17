@@ -63,6 +63,8 @@ Inductive Interval : IntervalDesc -> Prop :=
                 ; rds  := NE_Cons r xs (* cons_range H *)
                 |}.
 
+Open Scope string_scope.
+
 Tactic Notation "Interval_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "I_Sing"
