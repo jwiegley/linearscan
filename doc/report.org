@@ -1,5 +1,20 @@
 #+TITLE: Experience Report: Building a register allocator in Coq
 
+* Abstract
+
+This experience report describes the development of a register allocation
+algorithm in Coq and its subsequent inclusion in a larger Haskell project. It
+documents the use of Coq from an engineering point of view (i.e., not solely
+for proof work), and by a team initially unfamiliar with using Coq for
+programming tasks. It presents multiple approaches to software design within a
+dependently typed language, the hurdles encountered and how they were
+overcome, and pitfalls others should consider when contemplating Coq for such
+a task. Its conclusion is that Coq is an excellent functional language, for
+which up-front knowledge of certain techniques is essential to reducing costs.
+It is hoped the reader may save some of the time spent learning these
+techniques, and thus facilitate the introduction of automated theorem proving
+into production environments.
+
 * Setting the stage
 
 ** Needed a new register allocator due to subtle bugs in the previous one
