@@ -98,7 +98,7 @@ Definition linearScan
       let sd     := finalizeScanState ssig'.2 opCount.*2 in
       let allocs := determineAllocations sd in
       mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-      blocks2  <-- assignRegNum binfo oinfo allocs mappings blocks1 ;;
+      blocks2  <-- assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
       pure $ k $ Build_Details _ _ maxReg None
         liveSets' blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))

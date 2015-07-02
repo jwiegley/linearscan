@@ -140,17 +140,26 @@ Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
 
   pure $ ops ++ transitions.
 
-Definition resolveMappings bid opsm mappings : mType (seq opType2) :=
+Definition resolveMappings {maxVar : nat} bid opsm mappings :
+  Verified maxVar (seq opType2) :=
   (* Check whether any boundary transitions require move resolution at the
      beginning or end of the block given by [bid]. *)
   if IntMap_lookup bid mappings isn't Some graphs then pure opsm else
   let: (gbeg, gend) := graphs in
-  bmoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gbeg)) ;;
-  emoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gend)) ;;
+
+  let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
+  verifyResolutions begMoves ;;
+  bmoves <-- lift $ generateMoves begMoves ;;
+
+  let endMoves := map (@moveFromGraph maxReg) (topsort gend) in
+  verifyResolutions endMoves ;;
+  emoves <-- lift $ generateMoves endMoves ;;
+
   pure $ bmoves ++ opsm ++ emoves.
 
 Definition considerOps (maxVar : nat)
-  (allocs : seq (Allocation maxReg))
+  (allocs   : seq (Allocation maxReg))
+  (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg)) :
   seq blockType1 -> Verified maxVar (seq blockType2) :=
   mapM $ fun blk =>
@@ -161,6 +170,14 @@ Definition considerOps (maxVar : nat)
       s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
+    bid <-- lift $ iso_to $ blockId binfo blk ;;
+    let: (liveIn, liveOut) :=
+       if IntMap_lookup bid liveSets is Some bls
+       then (blockLiveIn bls, blockLiveOut bls)
+       else (emptyIntSet, emptyIntSet) in
+
+    verifyBlockBegin liveIn ;;
+
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
     opsm' <-- concatMapM k opsm ;;
@@ -168,8 +185,9 @@ Definition considerOps (maxVar : nat)
 
     (* Insert resolving moves at the beginning or end of [opsm'] based on the
        mappings. *)
-    bid    <-- lift $ iso_to $ blockId binfo blk ;;
-    opsm'' <-- lift $ resolveMappings bid opsm' mappings ;;
+    opsm'' <-- resolveMappings bid opsm' mappings ;;
+
+    verifyBlockEnd liveOut ;;
 
     match opsb', opse' with
     | b :: bs, e :: es =>
@@ -192,11 +210,12 @@ Definition considerOps (maxVar : nat)
    in the instruction stream itself, returning a new list of blocks. *)
 Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
+  (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
   (blocks   : seq blockType1) : mType (seq blockType2) :=
   let maxVar := forFold 0 allocs $ fun acc x =>
     maxn acc (ivar (intVal x)) in
-  fst <$> considerOps allocs mappings blocks
+  fst <$> considerOps allocs liveSets mappings blocks
     (exist _ (newRegStateDesc maxReg maxVar, newAssnStateDesc)
              (StartState maxReg maxVar)).
 

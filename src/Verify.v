@@ -4,12 +4,7 @@ Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
-Require Import LinearScan.ScanState.
-Require Import LinearScan.Morph.
-Require Import LinearScan.Cursor.
-Require Import LinearScan.Spec.
-Require Import LinearScan.Spill.
-Require Import LinearScan.Split.
+Require Import LinearScan.Resolve.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -136,8 +131,15 @@ Variable A : Type.
 
 Definition Verified := StateT { d : RegStateDesc * A | RegState (fst d) } mType.
 
+Definition verifyBlockBegin (liveIn : IntSet) : Verified unit := pure tt.
+
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
   lift $ iso_to $ applyAllocs oinfo op allocs.
+
+Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
+  Verified unit := pure tt.
+
+Definition verifyBlockEnd (liveOut : IntSet) : Verified unit := pure tt.
 
 End Verify.
