@@ -55,10 +55,13 @@ library
     LinearScan.Blocks
     LinearScan.Build
     LinearScan.Choice
+    LinearScan.Class
     LinearScan.Context
     LinearScan.Const
     LinearScan.Cursor
     LinearScan.Datatypes
+    LinearScan.Either
+    LinearScan.Either0
     LinearScan.Eqtype
     LinearScan.Fintype
     LinearScan.Functor

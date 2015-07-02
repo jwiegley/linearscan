@@ -1,4 +1,6 @@
 Require Import LinearScan.Lib.
+Require Import Hask.Control.Monad.Trans.Class.
+Require Import Hask.Control.Monad.Trans.Either.
 Require Import Hask.Control.Monad.Trans.State.
 Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
@@ -129,7 +131,10 @@ Inductive RegState : RegStateDesc -> Prop :=
 
 Variable A : Type.
 
-Definition Verified := StateT { d : RegStateDesc * A | RegState (fst d) } mType.
+Definition AllocError := nat.
+
+Definition Verified :=
+  EitherT AllocError (StateT { d : RegStateDesc * A | RegState (fst d) } mType).
 
 Definition verifyBlockBegin (liveIn : IntSet) : Verified unit := pure tt.
 

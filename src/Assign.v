@@ -1,4 +1,5 @@
 Require Import LinearScan.Lib.
+Require Import Hask.Control.Monad.Trans.Class.
 Require Import Hask.Control.Monad.Trans.State.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Graph.
@@ -26,29 +27,6 @@ Context `{mDict : Monad mType}.
 
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg opType1 opType2.
-
-Record AllocState := {
-  (* Indicate which variables (not intervals) are currently allocated. *)
-  registers   : Vec (option nat) maxReg;
-
-  (* Indicate whether a variable is currently known to be in either a register
-     or a variable spill slot. If not present, the variable is not known at
-     this point and is not available in either register or memory. *)
-  allocations : IntMap (option PhysReg)
-}.
-
-Definition newAllocState : AllocState :=
-   {| registers   := vconst None
-    ; allocations := emptyIntMap |}.
-
-(* An allocation error occurs if the source and destination for a register are
-   different, because this should have been accounted for. *)
-Record AllocError := {
-  aeVarId     : nat;
-  aeVarSrcReg : option PhysReg;
-  aeVarDstReg : option PhysReg;
-  aeBlockId   : BlockId
-}.
 
 Record AssnStateDesc := {
   assnOpId     : OpId;
@@ -119,7 +97,7 @@ Definition Verified (maxVar : nat) :=
 
 Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
   Verified maxVar (seq opType2) :=
-  assn <-- use _aside ;;
+  assn <-- lift $ use _aside ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varAllocs opid allocs) vars in
@@ -127,12 +105,12 @@ Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
-     then lift $ generateMoves
-                   (determineMoves
-                      (resolvingMoves allocs opid opid.+2))
+     then lift $ lift $ generateMoves
+       (determineMoves
+          (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
+  lift $ modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
 
   pure $ ops ++ transitions.
 
@@ -145,11 +123,11 @@ Definition resolveMappings {maxVar : nat} bid opsm mappings :
 
   let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
   verifyResolutions begMoves ;;
-  bmoves <-- lift $ generateMoves begMoves ;;
+  bmoves <-- lift $ lift $ generateMoves begMoves ;;
 
   let endMoves := map (@moveFromGraph maxReg) (topsort gend) in
   verifyResolutions endMoves ;;
-  emoves <-- lift $ generateMoves endMoves ;;
+  emoves <-- lift $ lift $ generateMoves endMoves ;;
 
   pure $ bmoves ++ opsm ++ emoves.
 
@@ -161,12 +139,12 @@ Definition considerOps (maxVar : nat)
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
-    modifyT (fun s =>
+    lift $ modifyT (fun s =>
       let opid := s ^_ stepdown (_aside \o+ _assnOpId) in
       s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
-    bid <-- lift $ iso_to $ blockId binfo blk ;;
+    bid <-- lift $ lift $ blockId binfo blk ;;
     let: (liveIn, liveOut) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)
@@ -208,10 +186,10 @@ Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
-  (blocks   : seq blockType1) : mType (seq blockType2) :=
+  (blocks   : seq blockType1) : mType (AllocError + seq blockType2) :=
   let maxVar := forFold 0 allocs $ fun acc x =>
     maxn acc (ivar (intVal x)) in
-  fst <$> considerOps allocs liveSets mappings blocks
+  fmap fst <$> considerOps allocs liveSets mappings blocks
     (exist _ (newRegStateDesc maxReg maxVar, newAssnStateDesc)
              (StartState maxReg maxVar)).
 

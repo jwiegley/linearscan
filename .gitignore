@@ -81,3 +81,6 @@ html
 /LinearScan/Tuple.hs
 /LinearScan/Const.hs
 /LinearScan/Verify.hs
+/LinearScan/Class.hs
+/LinearScan/Either.hs
+/LinearScan/Either0.hs

@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import Hask.Control.Monad.State.
+Require Import Hask.Control.Monad.Trans.Class.
 Require Import Hask.Control.Monad.Trans.State.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.

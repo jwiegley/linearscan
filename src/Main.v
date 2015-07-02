@@ -17,6 +17,7 @@ Require Import LinearScan.Loops.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Morph.
+Require Import LinearScan.Verify.
 
 Generalizable All Variables.
 
@@ -64,7 +65,7 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
-  allocatedBlocks : seq blockType2;
+  allocatedBlocks : AllocError + seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
   loopState       : LoopState

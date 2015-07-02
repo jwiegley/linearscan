@@ -43,6 +43,7 @@ import qualified LinearScan.Range as LS
 import qualified LinearScan.Trace as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
+import qualified LinearScan.Verify as LS
 import           LinearScan.Applicative (Any)
 import qualified Unsafe.Coerce as U
 
@@ -325,7 +326,7 @@ data Details m blk1 blk2 op1 op2 = Details
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
-    , allocatedBlocks :: [blk2]
+    , allocatedBlocks :: Either LS.AllocError [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -410,7 +411,9 @@ allocate maxReg binfo oinfo blocks = do
     dets <- showDetails res'
     return $ case reason res' of
         Just (err, _) -> Left  $ tracer dets $ map reasonToStr err
-        Nothing       -> Right $ allocatedBlocks res'
+        Nothing       -> case allocatedBlocks res' of
+            Left e     -> Left [show e] -- jww (2015-07-02): NYI
+            Right blks -> Right blks
   where
     dict :: LS.Monad (m Any)
     dict = LS.Build_Monad
