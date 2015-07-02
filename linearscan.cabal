@@ -95,6 +95,7 @@ library
     LinearScan.State0
     LinearScan.String0
     LinearScan.Trace
+    LinearScan.Tuple
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
