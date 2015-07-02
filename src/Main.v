@@ -27,8 +27,8 @@ Inductive FinalStage : Set :=
 Record ScanStateDescSet (maxReg : nat) : Set := {
     s_nextInterval : nat;
 
-    s_intervals : Vec IntervalDesc s_nextInterval;
-    s_fixedIntervals : Vec (option IntervalDesc) maxReg;
+    s_intervals      : seq IntervalDesc;
+    s_fixedIntervals : seq (option IntervalDesc);
 
     (* The [nat] in this member indicates the beginning position of the
        interval. *)
@@ -41,13 +41,14 @@ Record ScanStateDescSet (maxReg : nat) : Set := {
 Definition toScanStateDescSet `(sd : ScanStateDesc maxReg) :
   ScanStateDescSet maxReg :=
   {| s_nextInterval   := nextInterval sd
-   ; s_intervals      := vmap (fun x => @getIntervalDesc x.1 x.2) (intervals sd)
-   ; s_fixedIntervals := vmap (fun mx =>
-                                 match mx with
-                                 | Some x => Some (@getIntervalDesc x.1 x.2)
-                                 | None => None
-                                 end)
-                              (fixedIntervals sd)
+   ; s_intervals      := map (fun x => @getIntervalDesc x.1 x.2)
+                             (vec_to_seq (intervals sd))
+   ; s_fixedIntervals := map (fun mx =>
+                                match mx with
+                                | Some x => Some (@getIntervalDesc x.1 x.2)
+                                | None => None
+                                end)
+                             (vec_to_seq (fixedIntervals sd))
    ; s_unhandled      := [seq (nat_of_ord (fst i), snd i) | i <- unhandled sd ]
    ; s_active         := [seq (nat_of_ord (fst i),
                                nat_of_ord (snd i)) | i <- active sd ]
@@ -96,12 +97,8 @@ Definition linearScan
   | inr ssig' =>
       let sd     := finalizeScanState ssig'.2 opCount.*2 in
       let allocs := determineAllocations sd in
-
       mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-
-      (* replace virtual registers with physical registers *)
-      blocks2 <--
-        assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
+      blocks2  <-- assignRegNum binfo oinfo allocs mappings blocks1 ;;
       pure $ k $ Build_Details _ _ maxReg None
         liveSets' blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))

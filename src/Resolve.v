@@ -110,7 +110,12 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
     (fun vid x y =>
        if intReg x == intReg y
        then None
-       else Some (intReg x, intReg y))
+       else if match intReg x, intReg y with
+               | None,   Some _ => true (* intervalBeginsWithInput (intVal y) *)
+               | _, _ => true
+               end
+            then Some (intReg x, intReg y)
+            else None)
     (fun _ => emptyIntMap)
     (fun _ => emptyIntMap)
     liveAtFrom liveAtTo.

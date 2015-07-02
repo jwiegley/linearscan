@@ -79,3 +79,5 @@ html
 /LinearScan/Identity.hs
 /LinearScan/Maybe.hs
 /LinearScan/Tuple.hs
+/LinearScan/Const.hs
+/LinearScan/Verify.hs

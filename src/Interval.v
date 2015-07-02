@@ -322,6 +322,11 @@ Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   go (rds d).
 Arguments firstUsePos d /.
 
+Definition intervalBeginsWithInput (d : IntervalDesc) : bool :=
+  if firstUsePos d is Some u
+  then uvar u == Input
+  else false.
+
 Definition lastUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with

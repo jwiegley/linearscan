@@ -20,3 +20,4 @@ src/Spill.v
 src/Split.v
 src/Trace.v
 src/UsePos.v
+src/Verify.v

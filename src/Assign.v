@@ -8,6 +8,7 @@ Require Import LinearScan.LiveSets.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Allocate.
+Require Import LinearScan.Verify.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -49,125 +50,38 @@ Record AllocError := {
   aeBlockId   : BlockId
 }.
 
-Record AssnStateInfo := {
-  assnOpId             : OpId;
-  assnBlockBeg         : OpId;
-  assnBlockEnd         : OpId;
-  assnAllocState       : AllocState;
-  assnBlockEntryAllocs : IntMap AllocState;
-  assnBlockExitAllocs  : IntMap AllocState;
-  assnErrors           : seq AllocError
+Record AssnStateDesc := {
+  assnOpId     : OpId;
+  assnBlockBeg : OpId;
+  assnBlockEnd : OpId
 }.
 
-Definition newAssnStateInfo :=
-  {| assnOpId             := 1
-   ; assnBlockBeg         := 1
-   ; assnBlockEnd         := 1
-   ; assnAllocState       := newAllocState
-   ; assnBlockEntryAllocs := emptyIntMap
-   ; assnBlockExitAllocs  := emptyIntMap
-   ; assnErrors           := [::]
+Definition newAssnStateDesc :=
+  {| assnOpId     := 1
+   ; assnBlockBeg := 1
+   ; assnBlockEnd := 1
    |}.
 
-Definition _assnOpId : Lens' AssnStateInfo OpId := fun _ _ f s =>
+Definition _assnOpId : Lens' AssnStateDesc OpId := fun _ _ f s =>
   fmap (fun x =>
-    {| assnOpId             := x
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := assnErrors s
+    {| assnOpId     := x
+     ; assnBlockBeg := assnBlockBeg s
+     ; assnBlockEnd := assnBlockEnd s
      |}) (f (assnOpId s)).
-Program Instance Lens__assnOpId : CorrectLens _assnOpId.
-Obligation 2. by case: x. Qed.
 
-Definition _assnBlockBeg : Lens' AssnStateInfo OpId := fun _ _ f s =>
+Definition _assnBlockBeg : Lens' AssnStateDesc OpId := fun _ _ f s =>
   fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := x
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := assnErrors s
+    {| assnOpId     := assnOpId s
+     ; assnBlockBeg := x
+     ; assnBlockEnd := assnBlockEnd s
      |}) (f (assnBlockBeg s)).
-Program Instance Lens__assnBlockBeg : CorrectLens _assnBlockBeg.
-Obligation 2. by case: x. Qed.
 
-Definition _assnBlockEnd : Lens' AssnStateInfo OpId := fun _ _ f s =>
+Definition _assnBlockEnd : Lens' AssnStateDesc OpId := fun _ _ f s =>
   fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := x
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := assnErrors s
+    {| assnOpId     := assnOpId s
+     ; assnBlockBeg := assnBlockBeg s
+     ; assnBlockEnd := x
      |}) (f (assnBlockEnd s)).
-Program Instance Lens__assnBlockEnd : CorrectLens _assnBlockEnd.
-Obligation 2. by case: x. Qed.
-
-Definition _assnAllocState : Lens' AssnStateInfo AllocState := fun _ _ f s =>
-  fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := x
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := assnErrors s
-     |}) (f (assnAllocState s)).
-Program Instance Lens__assnAllocState : CorrectLens _assnAllocState.
-Obligation 2. by case: x. Qed.
-
-Definition _assnBlockEntryAllocs : Lens' AssnStateInfo (IntMap AllocState) :=
-  fun _ _ f s => fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := x
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := assnErrors s
-     |}) (f (assnBlockEntryAllocs s)).
-Program Instance Lens__assnBlockEntryAllocs : CorrectLens _assnBlockEntryAllocs.
-Obligation 2. by case: x. Qed.
-
-Definition _assnBlockExitAllocs : Lens' AssnStateInfo (IntMap AllocState) :=
-  fun _ _ f s => fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := x
-     ; assnErrors           := assnErrors s
-     |}) (f (assnBlockExitAllocs s)).
-Program Instance Lens__assnBlockExitAllocs : CorrectLens _assnBlockExitAllocs.
-Obligation 2. by case: x. Qed.
-
-Definition _assnErrors : Lens' AssnStateInfo (seq AllocError) := fun _ _ f s =>
-  fmap (fun x =>
-    {| assnOpId             := assnOpId s
-     ; assnBlockBeg         := assnBlockBeg s
-     ; assnBlockEnd         := assnBlockEnd s
-     ; assnAllocState       := assnAllocState s
-     ; assnBlockEntryAllocs := assnBlockEntryAllocs s
-     ; assnBlockExitAllocs  := assnBlockExitAllocs s
-     ; assnErrors           := x
-     |}) (f (assnErrors s)).
-Program Instance Lens__assnErrors : CorrectLens _assnErrors.
-Obligation 2. by case: x. Qed.
-
-Definition AssnState := StateT AssnStateInfo mType.
-
-Definition use `(l : Lens' s a) `{Monad m} : StateT s m a := view l <$> getT.
-
-Definition plusStateT `(l : Lens' s nat) (n : nat) `{Monad m} :
-  StateT s m unit := modifyT (l %~ plus n).
-
-Notation "l += n" := (plusStateT l n) (at level 71).
 
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   mType (seq opType2) :=
@@ -198,13 +112,22 @@ Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
           then opid <= iend int
           else opid <  iend int]].
 
-Definition setAllocations (allocs : seq (Allocation maxReg)) op :
-  AssnState (seq opType2) :=
-  assn <-- getT ;;
+Definition _aside {a b : Type} {P : a -> Prop} :
+  Lens' { x : a * b | P (fst x) } b :=
+  fun _ _ f s =>
+    let: exist (x, y) H := s in
+    fmap (fun z => exist _ (x, z) H) (f y).
+
+Definition Verified (maxVar : nat) :=
+  Verified maxReg maxVar mType AssnStateDesc.
+
+Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
+  Verified maxVar (seq opType2) :=
+  assn <-- use _aside ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varAllocs opid allocs) vars in
-  ops <-- lift $ iso_to $ applyAllocs oinfo op regs ;;
+  ops <-- verifyApplyAllocs oinfo op regs ;;
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
@@ -213,7 +136,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
                       (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  modifyT (_assnOpId .~ opid.+2) ;;
+  modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
 
   pure $ ops ++ transitions.
 
@@ -226,18 +149,17 @@ Definition resolveMappings bid opsm mappings : mType (seq opType2) :=
   emoves <-- generateMoves (map (@moveFromGraph maxReg) (topsort gend)) ;;
   pure $ bmoves ++ opsm ++ emoves.
 
-Definition considerOps
+Definition considerOps (maxVar : nat)
   (allocs : seq (Allocation maxReg))
-  (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg)) :
-  seq blockType1 -> AssnState (seq blockType2) :=
+  seq blockType1 -> Verified maxVar (seq blockType2) :=
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
-    modifyT (fun assn =>
-      let opid := assn ^_ _assnOpId in
-      assn &+ _assnBlockBeg .~ opid + (size opsb).*2
-           &+ _assnBlockEnd .~ opid + (size opsb + size opsm).*2) ;;
+    modifyT (fun s =>
+      let opid := s ^_ stepdown (_aside \o+ _assnOpId) in
+      s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
+        &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
@@ -263,33 +185,6 @@ Definition considerOps
         pure $ setBlockOps binfo blk [::] opsm'' [::]
     end.
 
-Definition compatibleAllocStates (bb be : BlockId) (x y : AllocState) :
-  seq AllocError :=
-  let f errs varId reg :=
-      if IntMap_lookup varId (allocations y) is Some r
-      then if r != reg
-           then {| aeVarId     := varId
-                 ; aeVarSrcReg := reg
-                 ; aeVarDstReg := r
-                 ; aeBlockId   := bb
-                 |} :: errs
-           else errs
-      else {| aeVarId     := varId
-            ; aeVarSrcReg := reg
-            ; aeVarDstReg := None
-            ; aeBlockId   := bb
-            |} :: errs in
-  let errs := IntMap_foldlWithKey f [::] (allocations x) in
-  let g errs varId reg :=
-      if IntMap_lookup varId (allocations x) is None
-      then {| aeVarId     := varId
-            ; aeVarSrcReg := None
-            ; aeVarDstReg := reg
-            ; aeBlockId   := be
-            |} :: errs
-      else errs in
-  IntMap_foldlWithKey g errs (allocations y).
-
 (* Given a set of allocations, which associate intervals with optional
    register assignments; the set of live variables at the beginning and ending
    of each block; the set of resolving moves between each two connected
@@ -297,9 +192,25 @@ Definition compatibleAllocStates (bb be : BlockId) (x y : AllocState) :
    in the instruction stream itself, returning a new list of blocks. *)
 Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
-  (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
   (blocks   : seq blockType1) : mType (seq blockType2) :=
-  fst <$> considerOps allocs liveSets mappings blocks newAssnStateInfo.
+  let maxVar := forFold 0 allocs $ fun acc x =>
+    maxn acc (ivar (intVal x)) in
+  fst <$> considerOps allocs mappings blocks
+    (exist _ (newRegStateDesc maxReg maxVar, newAssnStateDesc)
+             (StartState maxReg maxVar)).
 
 End Assign.
+
+Module AssnLensLaws.
+
+Include LensLaws.
+
+Program Instance Lens__assnOpId : LensLaws _assnOpId.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__assnBlockBeg : LensLaws _assnBlockBeg.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__assnBlockEnd : LensLaws _assnBlockEnd.
+Obligation 2. by case: x. Qed.
+
+End AssnLensLaws.

@@ -56,6 +56,7 @@ library
     LinearScan.Build
     LinearScan.Choice
     LinearScan.Context
+    LinearScan.Const
     LinearScan.Cursor
     LinearScan.Datatypes
     LinearScan.Eqtype
@@ -97,6 +98,7 @@ library
     LinearScan.UsePos
     LinearScan.Utils
     LinearScan.Vector0
+    LinearScan.Verify
     LinearScan.Yoneda
   cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
   ghc-options:      -fno-warn-deprecated-flags
