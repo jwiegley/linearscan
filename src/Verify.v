@@ -79,13 +79,27 @@ Inductive RegState : RegStateDesc -> Prop :=
        |}
 
   | AllocReg st r v :
+    vnth (rsRegs   st) r == None ->
+    vnth (rsAllocs st) v == None ->
     RegState
-      {| rsRegs   := vreplace (rsRegs st) r (Some v)
-       ; rsAllocs := rsAllocs st
+      {| rsRegs   := vreplace (rsRegs   st) r (Some v)
+       ; rsAllocs := vreplace (rsAllocs st) v (Some r)
        ; rsStack  := rsStack st
        |}
 
-  | MoveReg st :
+  | FreeReg st r v :
+    vnth (rsRegs   st) r == Some v ->
+    vnth (rsAllocs st) v == Some r ->
+    RegState
+      {| rsRegs   := vreplace (rsRegs   st) r None
+       ; rsAllocs := vreplace (rsAllocs st) v None
+       ; rsStack  := rsStack st
+       |}
+
+(*
+  | MoveReg st r1 r2 v :
+    vnth (rsRegs st) r1 == Some v ->
+    vnth (rsRegs st) r2 == None ->
     RegState
       {| rsRegs   := rsRegs st
        ; rsAllocs := rsAllocs st
@@ -106,18 +120,30 @@ Inductive RegState : RegStateDesc -> Prop :=
        ; rsStack  := rsStack st
        |}
 
-  | RestoreReg st :
+  | LoadReg st :
     RegState
       {| rsRegs   := rsRegs st
        ; rsAllocs := rsAllocs st
        ; rsStack  := rsStack st
        |}
+*)
 
-  | FreeReg st :
+  | AllocStack st v :
+    vnth (rsAllocs st) v == None ->
+    vnth (rsStack  st) v == false ->
     RegState
       {| rsRegs   := rsRegs st
        ; rsAllocs := rsAllocs st
-       ; rsStack  := rsStack st
+       ; rsStack  := vreplace (rsStack st) v true
+       |}
+
+  | FreeStack st v :
+    vnth (rsAllocs st) v == None ->
+    vnth (rsStack  st) v == true ->
+    RegState
+      {| rsRegs   := rsRegs st
+       ; rsAllocs := rsAllocs st
+       ; rsStack  := vreplace (rsStack st) v false
        |}
 
   | UseReg st :
