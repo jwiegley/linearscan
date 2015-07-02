@@ -1,6 +1,8 @@
 COQFLAGS = ""
-MISSING  = \
-	find . -name '*.v' ! -name Notes.v ! -name CpdtTactics.v	\
+MISSING  =								\
+	find . -name '*.v' ! -name Notes.v				\
+		! -name Extract.v					\
+		! -name CpdtTactics.v					\
                 ! -name '*2.v'                                   |	\
 		xargs egrep -i -Hn '(abort|admit|undefined)'     |	\
 		      egrep -v 'Definition undefined'            |	\
