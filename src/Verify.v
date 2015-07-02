@@ -48,21 +48,28 @@ Defined.
 
 Definition RV := ('I_maxReg + 'I_maxVar)%type.
 
+Definition keepOnly {A : Type} `(xs : seq 'I_n) :
+  Vec (option A) n -> Vec (option A) n :=
+  vmap_with_index (fun i x => if i \in xs then x else None).
+
 Inductive RegState : RegStateDesc -> Prop :=
   | StartState : RegState newRegStateDesc
 
   (* Based on the code flow analysis, [ins] is the set of incoming registers.
      Anything other than these should not be presently active, all them should
      be active, and they should apply to the correct variables. *)
-  | BeginBlock st ins :
-    forall H : all (ltn ^~ maxVar) (IntSet_toList ins),
+  | BeginBlock st (liveIns : seq 'I_maxVar) :
     all (fun var =>
            if vnth (rsAllocs st) var isn't Some reg  then false else
            if vnth (rsRegs st)   reg isn't Some var' then false else
-           var == var') (IntSet_to_seq_fin H) ->
+           var == var') liveIns ->
+    let liveRegs := forFold [::] liveIns $ fun acc var =>
+      if vnth (rsAllocs st) var is Some reg
+      then reg :: acc
+      else acc in
     RegState
-      {| rsRegs   := rsRegs st
-       ; rsAllocs := rsAllocs st
+      {| rsRegs   := keepOnly liveRegs $ rsRegs st
+       ; rsAllocs := keepOnly liveIns $ rsAllocs st
        ; rsStack  := rsStack st
        |}
 
