@@ -145,12 +145,12 @@ Definition considerOps (maxVar : nat)
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
     bid <-- lift $ lift $ blockId binfo blk ;;
-    let: (liveIn, liveOut) :=
+    let: (liveIns, liveOuts) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)
        else (emptyIntSet, emptyIntSet) in
 
-    verifyBlockBegin liveIn ;;
+    verifyCheckBlock liveIns ;;
 
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
@@ -161,7 +161,7 @@ Definition considerOps (maxVar : nat)
        mappings. *)
     opsm'' <-- resolveMappings bid opsm' mappings ;;
 
-    verifyBlockEnd liveOut ;;
+    verifyCheckBlock liveOuts ;;
 
     match opsb', opse' with
     | b :: bs, e :: es =>

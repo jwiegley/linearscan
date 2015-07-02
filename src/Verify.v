@@ -52,31 +52,29 @@ Definition keepOnly {A : Type} `(xs : seq 'I_n) :
   Vec (option A) n -> Vec (option A) n :=
   vmap_with_index (fun i x => if i \in xs then x else None).
 
+Definition verifyLiveness (st : RegStateDesc) : seq 'I_maxVar -> bool :=
+  all (fun var =>
+    if vnth (rsAllocs st) var isn't Some reg  then false else
+    if vnth (rsRegs st)   reg isn't Some var' then false else
+    var == var').
+
+Definition liveRegisters (st : RegStateDesc) : seq 'I_maxVar -> seq 'I_maxReg :=
+  flip (forFold [::]) $ fun acc var =>
+    if vnth (rsAllocs st) var is Some reg
+    then reg :: acc
+    else acc.
+
 Inductive RegState : RegStateDesc -> Prop :=
   | StartState : RegState newRegStateDesc
 
   (* Based on the code flow analysis, [ins] is the set of incoming registers.
      Anything other than these should not be presently active, all them should
      be active, and they should apply to the correct variables. *)
-  | BeginBlock st (liveIns : seq 'I_maxVar) :
-    all (fun var =>
-           if vnth (rsAllocs st) var isn't Some reg  then false else
-           if vnth (rsRegs st)   reg isn't Some var' then false else
-           var == var') liveIns ->
-    let liveRegs := forFold [::] liveIns $ fun acc var =>
-      if vnth (rsAllocs st) var is Some reg
-      then reg :: acc
-      else acc in
+  | BlockCheck st (lives : seq 'I_maxVar) :
+    verifyLiveness st lives ->
     RegState
-      {| rsRegs   := keepOnly liveRegs $ rsRegs st
-       ; rsAllocs := keepOnly liveIns $ rsAllocs st
-       ; rsStack  := rsStack st
-       |}
-
-  | EndBlock st :
-    RegState
-      {| rsRegs   := rsRegs st
-       ; rsAllocs := rsAllocs st
+      {| rsRegs   := keepOnly (liveRegisters st lives) $ rsRegs st
+       ; rsAllocs := keepOnly lives $ rsAllocs st
        ; rsStack  := rsStack st
        |}
 
@@ -140,10 +138,13 @@ Variable A : Type.
 
 Definition AllocError := nat.
 
+(* The [Verified] transformer stack uses [EitherT] to allow sudden exit due to
+   error, otherwise it maintains the current [RegState] plus whatever
+   additional state the user desires. *)
 Definition Verified :=
   EitherT AllocError (StateT { d : RegStateDesc * A | RegState (fst d) } mType).
 
-Definition verifyBlockBegin (liveIn : IntSet) : Verified unit := pure tt.
+Definition verifyCheckBlock (liveIn : IntSet) : Verified unit := pure tt.
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
@@ -151,7 +152,5 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
 
 Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
   Verified unit := pure tt.
-
-Definition verifyBlockEnd (liveOut : IntSet) : Verified unit := pure tt.
 
 End Verify.
