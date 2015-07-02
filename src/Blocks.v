@@ -37,22 +37,22 @@ Definition OpId := nat.
 Record OpInfo `{Monad m} (opType1 opType2 : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq VarInfo;
-  moveOp      : PhysReg -> PhysReg -> Yoneda m (seq opType2);
-  swapOp      : PhysReg -> PhysReg -> Yoneda m (seq opType2);
-  saveOp      : PhysReg -> option VarId -> Yoneda m (seq opType2);
-  restoreOp   : option VarId -> PhysReg -> Yoneda m (seq opType2);
-  applyAllocs : opType1 -> seq (VarId * PhysReg) -> Yoneda m (seq opType2);
+  moveOp      : PhysReg -> PhysReg -> m (seq opType2);
+  swapOp      : PhysReg -> PhysReg -> m (seq opType2);
+  saveOp      : PhysReg -> option VarId -> m (seq opType2);
+  restoreOp   : option VarId -> PhysReg -> m (seq opType2);
+  applyAllocs : opType1 -> seq (VarId * PhysReg) -> m (seq opType2);
   showOp      : opType1 -> string
 }.
 
 Definition BlockId := nat.
 
 Record BlockInfo `{Monad m} (blockType1 blockType2 opType1 opType2 : Set) := {
-  blockId         : blockType1 -> Yoneda m BlockId;
-  blockSuccessors : blockType1 -> Yoneda m (seq BlockId);
+  blockId         : blockType1 -> m BlockId;
+  blockSuccessors : blockType1 -> m (seq BlockId);
 
   splitCriticalEdge : blockType1 -> blockType1
-                        -> Yoneda m (blockType1 * blockType1)%type;
+                        -> m (blockType1 * blockType1)%type;
 
   blockOps    : blockType1 -> (seq opType1 * seq opType1 * seq opType1);
   setBlockOps : blockType1 -> seq opType2 -> seq opType2 -> seq opType2

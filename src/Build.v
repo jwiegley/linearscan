@@ -593,7 +593,7 @@ Proof.
 
   have Hsz : pos < pos + sz by exact: ltn_plus.
   exact:
-    (bid <-- iso_to $ blockId binfo b ;;
+    (bid <-- blockId binfo b ;;
      let outs := if IntMap_lookup bid liveSets is Some ls
                  then blockLiveOut ls
                  else emptyIntSet in

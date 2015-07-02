@@ -43,7 +43,7 @@ import qualified LinearScan.Range as LS
 import qualified LinearScan.Trace as LS
 import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Utils as LS
-import           LinearScan.Yoneda (Any)
+import           LinearScan.Applicative (Any)
 import qualified Unsafe.Coerce as U
 
 -- | Each variable has associated allocation details, and a flag to indicate
@@ -114,11 +114,11 @@ fromOpInfo :: Monad m
            => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
     LS.Build_OpInfo a (map fromVarInfo . b)
-        (\r1 r2 _ k -> liftM k (c r1 r2))
-        (\r1 r2 _ k -> liftM k (d r1 r2))
-        (\r1 r2 _ k -> liftM k (e r1 r2))
-        (\r1 r2 _ k -> liftM k (f r1 r2))
-        (\r1 r2 _ k -> liftM k (g r1 r2)) h
+        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (d r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (e r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (f r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (g r1 r2)) h
 
 type IntervalId = Int
 
@@ -315,9 +315,9 @@ fromBlockInfo :: Monad m
               -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
     LS.Build_BlockInfo
-        (\r1 _ k -> liftM k (a r1))
-        (\r1 _ k -> liftM k (b r1))
-        (\r1 r2 _ k -> liftM k (c r1 r2))
+        (\r1 -> U.unsafeCoerce (a r1))
+        (\r1 -> U.unsafeCoerce (b r1))
+        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
@@ -404,10 +404,9 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
 allocate 0 _ _ _  = return $ Left ["Cannot allocate with no registers"]
 allocate _ _ _ [] = return $ Left ["No basic blocks were provided"]
 allocate maxReg binfo oinfo blocks = do
-    x <- LS.linearScan dict maxReg
-       (fromBlockInfo binfo) (fromOpInfo oinfo) blocks $ \res ->
-       toDetails res binfo oinfo
-    let res' = U.unsafeCoerce (x :: Any) :: Details m blk1 blk2 op1 op2
+    res <- LS.linearScan dict maxReg
+       (fromBlockInfo binfo) (fromOpInfo oinfo) blocks
+    let res' = toDetails (U.unsafeCoerce (res :: Any)) binfo oinfo
     dets <- showDetails res'
     return $ case reason res' of
         Just (err, _) -> Left  $ tracer dets $ map reasonToStr err

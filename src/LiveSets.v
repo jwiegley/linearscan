@@ -99,7 +99,7 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
          end for
        end for
      end for *)
-  iso_to $ @snd _ _ <$> forFoldM (1, emptyIntMap) blocks (fun acc b =>
+  @snd _ _ <$> forFoldM (1, emptyIntMap) blocks (fun acc b =>
     let: (idx, m) := acc in
     let: (opsb, opsm, opse) := blockOps binfo b in
     let liveSet :=
@@ -161,7 +161,7 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
          b.live_in = (b.live_out – b.live_kill) ∪ b.live_gen
        end for
      while change occurred in any live set *)
-  iso_to $ forFoldrM liveSets blocks $ fun b liveSets1 =>
+  forFoldrM liveSets blocks $ fun b liveSets1 =>
     bid <-- blockId binfo b ;;
     match IntMap_lookup bid liveSets1 with
     | None => pure liveSets1    (* jww (2015-02-14): should never happen *)

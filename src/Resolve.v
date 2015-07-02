@@ -173,7 +173,7 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
          resolver.resolve_mappings()
        end for
      end for *)
-  iso_to $ forFoldM emptyIntMap blocks $ fun mappings b =>
+  forFoldM emptyIntMap blocks $ fun mappings b =>
     bid <-- blockId binfo b ;;
     (* jww (2015-01-28): Failure here should be impossible *)
     if IntMap_lookup bid liveSets isn't Some from

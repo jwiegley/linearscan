@@ -75,7 +75,7 @@ Definition linearScan
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : @OpInfo maxReg m dict opType1 opType2)
-  (blocks : seq blockType1) : Yoneda m (Details maxReg) := fun _ k =>
+  (blocks : seq blockType1) : m (Details maxReg) :=
   (* order blocks and operations (including loop detection) *)
   z <-- computeBlockOrder binfo blocks ;;
   let: (loops, blocks1) := z in
@@ -89,9 +89,9 @@ Definition linearScan
   let opCount := (countOps binfo blocks1).+1 in
   match walkIntervals registers_exist ssig.2 opCount with
   | inl (err, ssig') =>
-    pure $ k $ Build_Details _ _ maxReg
+    pure $ Build_Details _ _ maxReg
       (Some (err, AllocatingRegistersFailed))
-      liveSets' blocks blocks1 [::]
+      liveSets' blocks blocks1 (inr [::])
       (Some (toScanStateDescSet ssig.1))
       (Some (toScanStateDescSet ssig'.1)) loops
   | inr ssig' =>
@@ -99,7 +99,7 @@ Definition linearScan
       let allocs := determineAllocations sd in
       mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
       blocks2  <-- assignRegNum binfo oinfo allocs liveSets' mappings blocks1 ;;
-      pure $ k $ Build_Details _ _ maxReg None
+      pure $ Build_Details _ _ maxReg None
         liveSets' blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet sd)) loops

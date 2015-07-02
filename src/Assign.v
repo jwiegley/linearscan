@@ -86,11 +86,7 @@ Definition _assnBlockEnd : Lens' AssnStateDesc OpId := fun _ _ f s =>
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   mType (seq opType2) :=
   forFoldrM [::] moves $ fun mv acc =>
-    (* The [iso_to] is due to the fact that swapOp returns [Yoneda m a],
-       rather than [m a]. This is necessary to work around a limitation with
-       type formers and extraction:
-       https://coq.inria.fr/bugs/show_bug.cgi?id=4227. *)
-    let k := fmap (@Some _) \o iso_to in
+    let k := fmap (@Some _) in
     mops <-- match mv with
       | Swap    sreg dreg => k $ swapOp oinfo sreg dreg
       | Move    sreg dreg => k $ moveOp oinfo sreg dreg

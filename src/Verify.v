@@ -135,7 +135,7 @@ Definition verifyBlockBegin (liveIn : IntSet) : Verified unit := pure tt.
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
-  lift $ iso_to $ applyAllocs oinfo op allocs.
+  lift $ lift $ applyAllocs oinfo op allocs.
 
 Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
   Verified unit := pure tt.
