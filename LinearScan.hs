@@ -131,11 +131,11 @@ fromOpInfo :: Monad m
            => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
     LS.Build_OpInfo a (map fromVarInfo . b)
-        (\r1 r2 -> unsafeCoerce (c r1 r2))
-        (\r1 r2 -> unsafeCoerce (d r1 r2))
-        (\r1 r2 -> unsafeCoerce (e r1 r2))
-        (\r1 r2 -> unsafeCoerce (f r1 r2))
-        (\r1 r2 -> unsafeCoerce (g r1 r2)) h
+        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (d r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (e r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (f r1 r2))
+        (\r1 r2 -> U.unsafeCoerce (g r1 r2)) h
 
 type IntervalId = Int
 
@@ -332,9 +332,9 @@ fromBlockInfo :: Monad m
               -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
     LS.Build_BlockInfo
-        (\r1 -> unsafeCoerce (a r1))
-        (\r1 -> unsafeCoerce (b r1))
-        (\r1 r2 -> unsafeCoerce (c r1 r2))
+        (\r1 -> U.unsafeCoerce (a r1))
+        (\r1 -> U.unsafeCoerce (b r1))
+        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
@@ -423,7 +423,7 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
 allocate 0 _ _ _  = return $ Left ["Cannot allocate with no registers"]
 allocate _ _ _ [] = return $ Left ["No basic blocks were provided"]
 allocate maxReg binfo oinfo blocks = do
-    res <- unsafeCoerce $ LS.linearScan coqMonad maxReg
+    res <- U.unsafeCoerce $ LS.linearScan coqMonad maxReg
         (fromBlockInfo binfo)
         (fromOpInfo oinfo) blocks
     let res' = toDetails res binfo oinfo

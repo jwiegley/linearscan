@@ -138,7 +138,7 @@ Definition considerOps (maxVar : nat)
       s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
-    bid <-- lift $ lift $ iso_to $ blockId binfo blk ;;
+    bid <-- lift $ lift $ blockId binfo blk ;;
     let: (liveIns, liveOuts) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)

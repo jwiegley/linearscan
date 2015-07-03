@@ -27,6 +27,7 @@ all: $(VOFILES) LinearScan/Main.hs		\
 	@$(MAKE) LinearScan/Main.hs
 
 LinearScan/Main.hs: src/Main.vo
+	@mkdir LinearScan
 	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
 	    while read file; do mv $$file LinearScan; done
 	@perl -i fixcode.pl LinearScan/*.hs
