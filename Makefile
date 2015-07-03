@@ -61,8 +61,6 @@ Makefile.coq: _CoqProject
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
-	ls -1 LinearScan/* | egrep -v '(Utils).hs' | \
-	    while read file; do rm -f $$file; done
-	rm -f Makefile.coq Setup
+	rm -f Makefile.coq Setup LinearScan/*
 	rm -fr dist .coq-native
 	rm -fr .hdevtools.sock *.glob *.d *.vo

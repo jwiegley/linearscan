@@ -58,6 +58,7 @@ library
     LinearScan.Class
     LinearScan.Context
     LinearScan.Const
+    LinearScan.Contravariant
     LinearScan.Cursor
     LinearScan.Datatypes
     LinearScan.Either
@@ -99,13 +100,14 @@ library
     LinearScan.Trace
     LinearScan.Tuple
     LinearScan.UsePos
-    LinearScan.Utils
     LinearScan.Vector0
     LinearScan.Verify
-  cpp-options:      -DMAX_REG=4 -DREG_SIZE=8
-  ghc-options:      -fno-warn-deprecated-flags
-  build-depends:    base >=4.7 && <5.0
-                  , containers
-                  , transformers
-                  , mtl
-                  , ghc-prim
+    Hask.Utils
+  cpp-options:    -DMAX_REG=4 -DREG_SIZE=8
+  ghc-options:    -fno-warn-deprecated-flags
+  hs-source-dirs: . Hask/haskell
+  build-depends:  base >=4.7 && <5.0
+    , containers
+    , transformers
+    , mtl
+    , ghc-prim

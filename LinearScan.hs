@@ -29,23 +29,38 @@ import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
 import           Debug.Trace
-import qualified LinearScan.Applicative as LS
+import qualified Hask.Utils as LS
+import qualified LinearScan.Applicative as Coq
+import           LinearScan.Blocks
 import qualified LinearScan.Blocks as LS
-import           LinearScan.Blocks as LS
+import qualified LinearScan.Functor as Coq
+import qualified LinearScan.Functor as Functor
 import qualified LinearScan.IntMap as LS
 import qualified LinearScan.IntSet as LS
 import qualified LinearScan.Interval as LS
 import qualified LinearScan.LiveSets as LS
 import qualified LinearScan.Loops as LS
 import qualified LinearScan.Main as LS
-import qualified LinearScan.Monad as LS
+import qualified LinearScan.Monad as Coq
 import qualified LinearScan.Range as LS
 import qualified LinearScan.Trace as LS
 import qualified LinearScan.UsePos as LS
-import qualified LinearScan.Utils as LS
 import qualified LinearScan.Verify as LS
-import           LinearScan.Applicative (Any)
-import qualified Unsafe.Coerce as U
+import           Unsafe.Coerce
+
+type Any = Functor.Any
+
+coqFunctor :: forall f. Functor f => Coq.Functor (f Any)
+coqFunctor _ _ g x =
+    unsafeCoerce (fmap g (unsafeCoerce x :: f Any))
+
+coqApplicative :: forall f. Applicative f => Coq.Applicative (f Any)
+coqApplicative = Coq.Build_Applicative coqFunctor (const pure)
+    (\_ _ g x -> unsafeCoerce (unsafeCoerce g <*> unsafeCoerce x :: f Any))
+
+coqMonad :: forall m. (Monad m, Applicative m) => Coq.Monad (m Any)
+coqMonad = Coq.Build_Monad coqApplicative
+    (\_ x -> unsafeCoerce (join (unsafeCoerce x :: m (m Any)) :: m Any))
 
 -- | Each variable has associated allocation details, and a flag to indicate
 --   whether it must be loaded into a register at its point of use.  Variables
@@ -95,15 +110,24 @@ showOp1' :: (op1 -> String)
          -> op1
          -> String
 showOp1' showop pos ins outs o =
+    trace "showOp1'..1" $
     let showerv (Left r)  = "r" ++ show r
         showerv (Right v) = "v" ++ show v in
+    trace "showOp1'..2" $
     let render Nothing = ""
         render (Just r) = "=r" ++ show r in
+    trace "showOp1'..3" $
     let marker label (i, erv, reg) =
             "<" ++ label ++ " " ++ showerv erv ++
             (if i == either id id erv
              then ""
              else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
+    trace "showOp1'..4" $
+    trace ("showOp1'..5: " ++ concatMap (marker "End") outs) $
+    trace ("showOp1'..6: " ++ concatMap (marker "Beg") ins) $
+    trace ("showOp1'..7: " ++ show pos) $
+    trace ("showOp1'..8: " ++ showop o) $
+    trace "showOp1'..9" $
     concatMap (marker "End") outs ++
     concatMap (marker "Beg") ins ++
     show pos ++ ": " ++ showop o ++ "\n"
@@ -115,11 +139,11 @@ fromOpInfo :: Monad m
            => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
 fromOpInfo (OpInfo a b c d e f g h) =
     LS.Build_OpInfo a (map fromVarInfo . b)
-        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (d r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (e r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (f r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (g r1 r2)) h
+        (\r1 r2 -> unsafeCoerce (c r1 r2))
+        (\r1 r2 -> unsafeCoerce (d r1 r2))
+        (\r1 r2 -> unsafeCoerce (e r1 r2))
+        (\r1 r2 -> unsafeCoerce (f r1 r2))
+        (\r1 r2 -> unsafeCoerce (g r1 r2)) h
 
 type IntervalId = Int
 
@@ -272,10 +296,15 @@ showOps1 oinfo sd pos (o:os) =
     --          then (idx, Left idx, mreg) : eacc
     --          else eacc) in
     let (begs, ends) =
-            LS.vfoldl'_with_index (0 :: Int) k ([], []) (intervals sd) in
+            LS.vfoldl'_with_index 0 k ([], []) (intervals sd) in
     -- let (begs', ends') =
     --         LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
     --                               (fixedIntervals sd) in
+    trace "showOps1..1" $
+    trace ("showOps1..1b: " ++ show (intervals sd)) $
+    trace "showOps1..1c" $
+    trace ("showOps1.." ++ showOp1' (showOp1 oinfo) (pos*2+1) begs ends o) $
+    trace "showOps1..2" $
     showOp1' (showOp1 oinfo) (pos*2+1) begs ends o
         ++ showOps1 oinfo sd (pos+1) os
 
@@ -300,14 +329,21 @@ showBlocks1 binfo oinfo sd ls = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
+        trace "showBlocks1 1.." $ return ()
         bid <- LinearScan.blockId binfo b
+        trace "showBlocks1 2.." $ return ()
+        trace ("showBlocks1 2.." ++ show bid) $ return ()
         let (liveIn, liveOut) =
                  case LS.coq_IntMap_lookup bid ls of
                      Nothing -> (LS.emptyIntSet, LS.emptyIntSet)
                      Just s  -> (LS.blockLiveIn s, LS.blockLiveOut s)
+        trace "showBlocks1 3.." $ return ()
         let allops blk =
                 let (x, y, z) = LinearScan.blockOps binfo blk in
                 x ++ y ++ z
+        trace "showBlocks1 4.." $ return ()
+        trace ("showBlocks1 4.." ++ showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b) $ return ()
+        trace "showBlocks1 5.." $ return ()
         (showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd) b ++)
             `liftM` go (pos + length (allops b)) bs
 
@@ -316,9 +352,9 @@ fromBlockInfo :: Monad m
               -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
     LS.Build_BlockInfo
-        (\r1 -> U.unsafeCoerce (a r1))
-        (\r1 -> U.unsafeCoerce (b r1))
-        (\r1 r2 -> U.unsafeCoerce (c r1 r2))
+        (\r1 -> unsafeCoerce (a r1))
+        (\r1 -> unsafeCoerce (b r1))
+        (\r1 r2 -> unsafeCoerce (c r1 r2))
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
 data Details m blk1 blk2 op1 op2 = Details
@@ -326,7 +362,7 @@ data Details m blk1 blk2 op1 op2 = Details
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
-    , allocatedBlocks :: Either LS.AllocError [blk2]
+    , allocatedBlocks :: Either [LS.AllocError] [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -334,10 +370,20 @@ data Details m blk1 blk2 op1 op2 = Details
     , loopState       :: LoopState
     }
 
+deriving instance Show LS.AllocError
+
 showDetails :: Monad m => Details m blk1 blk2 op1 op2 -> m String
 showDetails err = do
+    trace "showDetails 1.." $ return ()
     pre  <- showPreScanStateDesc (scanStatePre err)
+    trace "showDetails 2.." $ return ()
     post <- showPostScanStateDesc (scanStatePost err)
+    trace "showDetails 3.." $ return ()
+    trace ("showDetails 4: " ++ show (reason err)) $ return ()
+    trace ("showDetails 5: " ++ pre) $ return ()
+    trace ("showDetails 6: " ++ post) $ return ()
+    trace ("showDetails 7: " ++ show (loopState err)) $ return ()
+    trace "showDetails 8.." $ return ()
     return $ "Reason: " ++ show (reason err) ++ "\n\n"
           ++ ">>> ScanState before allocation:\n"
           ++ pre ++ "\n"
@@ -405,27 +451,25 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
 allocate 0 _ _ _  = return $ Left ["Cannot allocate with no registers"]
 allocate _ _ _ [] = return $ Left ["No basic blocks were provided"]
 allocate maxReg binfo oinfo blocks = do
-    res <- LS.linearScan dict maxReg
-       (fromBlockInfo binfo) (fromOpInfo oinfo) blocks
-    let res' = toDetails (U.unsafeCoerce (res :: Any)) binfo oinfo
-    dets <- showDetails res'
-    return $ case reason res' of
-        Just (err, _) -> Left  $ tracer dets $ map reasonToStr err
-        Nothing       -> case allocatedBlocks res' of
-            Left e     -> Left [show e] -- jww (2015-07-02): NYI
-            Right blks -> Right blks
+    trace "allocate 1.." $ return ()
+    res <- unsafeCoerce $ LS.linearScan coqMonad maxReg
+        (fromBlockInfo binfo)
+        (fromOpInfo oinfo) blocks
+    trace "allocate 2.." $ return ()
+    let res' = toDetails res binfo oinfo
+    trace "allocate 3.." $ return ()
+    case reason res' of
+        Just (err, _) -> do
+            trace "allocate 4.." $ return ()
+            dets <- showDetails res'
+            trace "allocate 5.." $ return ()
+            return $ Left $ tracer dets $ map reasonToStr err
+        Nothing -> do
+            trace "allocate 6.." $ return ()
+            return $ case allocatedBlocks res' of
+                Left es    -> Left (map show es) -- jww (2015-07-02): NYI
+                Right blks -> Right blks
   where
-    dict :: LS.Monad (m Any)
-    dict = LS.Build_Monad
-        (LS.Build_Applicative
-         (\(_ :: ()) (_ :: ()) (f :: Any -> Any) x ->
-           U.unsafeCoerce (fmap f (U.unsafeCoerce x :: m Any)))
-         (\(_ :: ()) -> pure)
-         (\(_ :: ()) (_ :: ()) f x ->
-           U.unsafeCoerce (U.unsafeCoerce f <*> U.unsafeCoerce x :: m Any)))
-        (\(_ :: ()) x ->
-          U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
-
     reasonToStr r = case r of
         LS.EIntersectsWithFixedInterval pos reg ->
             "Current interval intersects with " ++
@@ -460,7 +504,6 @@ allocate maxReg binfo oinfo blocks = do
                 ++ " at " ++ show mpos ++ " for interval " ++ show xid
         LS.ERemoveUnhandledInterval xid ->
             "Removing unhandled interval " ++ show xid
-
         LS.ECannotInsertUnhandled ->
             "Cannot insert interval onto unhandled list"
         LS.EIntervalBeginsBeforeUnhandled xid ->

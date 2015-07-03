@@ -11,12 +11,11 @@ import qualified Data.IntSet
 import qualified Data.List
 import qualified Data.Ord
 import qualified Data.Functor.Identity
-import qualified LinearScan.Utils
+import qualified Hask.Utils
 };
 
     s/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/;
     s/module (.+?) where/module LinearScan.\1 where/;
-    s/module LinearScan..+?.Utils where/module LinearScan.Utils where/;
 
     # Sometimes when generating type synonyms, the extraction mechanism will
     # inexplicably flip type arguments. We undo these bugs here.
