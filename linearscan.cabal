@@ -58,7 +58,6 @@ library
     LinearScan.Class
     LinearScan.Context
     LinearScan.Const
-    LinearScan.Contravariant
     LinearScan.Cursor
     LinearScan.Datatypes
     LinearScan.Either

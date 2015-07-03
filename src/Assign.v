@@ -91,7 +91,7 @@ Definition Verified (maxVar : nat) :=
 
 Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
   Verified maxVar (seq opType2) :=
-  assn <-- lift $ use _aside ;;
+  assn <-- use _aside ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varAllocs opid allocs) vars in
@@ -104,7 +104,7 @@ Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
           (resolvingMoves allocs opid opid.+2))
      else pure [::]) ;;
 
-  lift $ modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
+  modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
 
   pure $ ops ++ transitions.
 
@@ -133,12 +133,12 @@ Definition considerOps (maxVar : nat)
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
-    lift $ modifyT (fun s =>
+    modifyT (fun s =>
       let opid := s ^_ stepdownl' (_aside \o+ _assnOpId) in
       s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
-    bid <-- lift $ lift $ blockId binfo blk ;;
+    bid <-- lift $ lift $ iso_to $ blockId binfo blk ;;
     let: (liveIns, liveOuts) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)

@@ -135,7 +135,7 @@ Arguments packVerified [rd] st s /.
 (* The [Verified] transformer stack uses [EitherT] to allow sudden exit due to
    error, otherwise it maintains the current [RegState] plus whatever
    additional state the user desires. *)
-Definition Verified := EitherT (seq AllocError) (StateT VerifiedSig mType).
+Definition Verified := StateT VerifiedSig (EitherT (seq AllocError) mType).
 
 Definition _rs {a b : Type} {P : a -> Prop} :
   Getter { x : a * b | P (fst x) } a :=
@@ -148,7 +148,7 @@ Definition _aside {a b : Type} {P : a -> Prop} :
     fmap (fun z => exist _ (x, z) H) (f y).
 
 Definition runVerified `(m : Verified b) (i : A) : mType (seq AllocError + b) :=
-  fmap fst <$> m (exist _ (newRegStateDesc, i) StartState).
+  fmap fst $ m ((newRegStateDesc, i); StartState).
 
 Definition allocReg (r : 'I_maxReg) (v : 'I_maxVar) : Verified unit := pure tt.
 
