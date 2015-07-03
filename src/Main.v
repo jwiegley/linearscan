@@ -65,7 +65,7 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
-  allocatedBlocks : AllocError + seq blockType2;
+  allocatedBlocks : seq AllocError + seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
   loopState       : LoopState

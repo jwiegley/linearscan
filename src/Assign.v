@@ -86,12 +86,6 @@ Definition varAllocs opid (allocs : seq (Allocation maxReg)) v :
           then opid <= iend int
           else opid <  iend int]].
 
-Definition _aside {a b : Type} {P : a -> Prop} :
-  Lens' { x : a * b | P (fst x) } b :=
-  fun _ _ f s =>
-    let: exist (x, y) H := s in
-    fmap (fun z => exist _ (x, z) H) (f y).
-
 Definition Verified (maxVar : nat) :=
   Verified maxReg maxVar mType AssnStateDesc.
 
@@ -140,7 +134,7 @@ Definition considerOps (maxVar : nat)
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
     lift $ modifyT (fun s =>
-      let opid := s ^_ stepdown (_aside \o+ _assnOpId) in
+      let opid := s ^_ stepdownl' (_aside \o+ _assnOpId) in
       s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
         &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
 
@@ -186,12 +180,11 @@ Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
-  (blocks   : seq blockType1) : mType (AllocError + seq blockType2) :=
+  (blocks   : seq blockType1) : mType (seq AllocError + seq blockType2) :=
   let maxVar := forFold 0 allocs $ fun acc x =>
     maxn acc (ivar (intVal x)) in
-  fmap fst <$> considerOps allocs liveSets mappings blocks
-    (exist _ (newRegStateDesc maxReg maxVar, newAssnStateDesc)
-             (StartState maxReg maxVar)).
+  runVerified (maxVar:=maxVar)
+    (considerOps allocs liveSets mappings blocks) newAssnStateDesc.
 
 End Assign.
 
