@@ -163,11 +163,10 @@ Definition verifyCheckBlock' (st : RegStateDesc) (s : A) (lives : IntSet) :
 Proof.
   case L: (all (ltn ^~ maxVar) (IntSet_toList lives)).
     have l := IntSet_to_seq_fin L.
-    move=> {L lives}.
     case B: (checkLiveness st l) => [|e es].
-      have H : size (checkLiveness st l) == 0.
+      have H : size (checkLiveness st l) == 0
         by rewrite B.
-      exact (inr (packVerified (BlockCheck H) s)).
+      exact: inr (packVerified (BlockCheck H) s).
     exact: inl (e :: es).
   exact: inl [:: VarId_OutOfBounds].
 Defined.
