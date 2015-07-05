@@ -126,13 +126,27 @@ Inductive RegState : RegStateDesc -> Prop :=
 Definition getRegStateDesc `(st : RegState rd) := rd.
 Arguments getRegStateDesc [rd] st /.
 
+Definition packRegState `(st : RegState rd) := exist RegState rd st.
+Arguments packRegState [rd] st /.
+
 Variable A : Type.
 
+Definition BlockExitAllocations := IntMap (seq (VarId * PhysReg)).
+
 Record VerifiedSig := {
-  verDesc  : RegStateDesc;
-  verState : RegState verDesc;
-  verExt   : A
+  verDesc   : RegStateDesc;
+  verState  : RegState verDesc;
+  (* [verBlocks] gives the final allocation state for any blocks; it only
+     contains mappings for variables listed in a block's "live out" set. *)
+  verBlocks : BlockExitAllocations;
+  verExt    : A
 }.
+
+Definition newVerifiedSig (i : A) :=
+  {| verDesc   := newRegStateDesc
+   ; verState  := StartState
+   ; verBlocks := emptyIntMap
+   ; verExt    := i |}.
 
 Definition _verDesc : Getter VerifiedSig RegStateDesc := fun _ _ _ f s =>
   fmap (const s) (f (verDesc s)).
@@ -140,23 +154,27 @@ Definition _verDesc : Getter VerifiedSig RegStateDesc := fun _ _ _ f s =>
 Definition _verState :
   Lens' VerifiedSig { rd : RegStateDesc | RegState rd } := fun _ _ f s =>
   fmap (fun x =>
-    {| verDesc  := x.1
-     ; verState := x.2
-     ; verExt   := verExt s
+    {| verDesc   := x.1
+     ; verState  := x.2
+     ; verBlocks := verBlocks s
+     ; verExt    := verExt s
      |}) (f (verDesc s; verState s)).
+
+Definition _verBlocks : Lens' VerifiedSig BlockExitAllocations := fun _ _ f s =>
+  fmap (fun x =>
+    {| verDesc   := verDesc s
+     ; verState  := verState s
+     ; verBlocks := x
+     ; verExt    := verExt s
+     |}) (f (verBlocks s)).
 
 Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
   fmap (fun x =>
-    {| verDesc  := verDesc s
-     ; verState := verState s
-     ; verExt   := x
+    {| verDesc   := verDesc s
+     ; verState  := verState s
+     ; verBlocks := verBlocks s
+     ; verExt    := x
      |}) (f (verExt s)).
-
-Definition packVerified `(st : RegState rd) (s : A) : VerifiedSig :=
-  {| verDesc  := rd
-   ; verState := st
-   ; verExt   := s |}.
-Arguments packVerified [rd] st s /.
 
 (* The [Verified] transformer stack uses [EitherT] to allow sudden exit due to
    error, otherwise it maintains the current [RegState] plus whatever
@@ -172,13 +190,11 @@ Definition _aside {a b : Type} {P : a -> Prop} :
 
 Definition resetAllocState : Verified unit :=
   a <-- use _verExt ;;
-  putT $ packVerified StartState a.
+  putT $ newVerifiedSig a.
 
 Definition runVerified `(m : Verified b) (i : A) :
   mType ((OpId * seq AllocError) + b) :=
-  fst <$> m {| verDesc  := newRegStateDesc
-             ; verState := StartState
-             ; verExt   := i |}.
+  fst <$> m (newVerifiedSig i).
 
 Definition decide {T : Type} (H : bool)
   (kt : (H = true)  -> T)
@@ -214,7 +230,7 @@ Definition allocReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
   decide (vnth (rsRegs st) reg == None)
     (fun H1 =>
        decide (vnth (rsAllocs st) var == None)
-         (fun H2 => putT $ packVerified (AllocReg H1 H2) a)
+         (fun H2 => _verState .= packRegState (AllocReg H1 H2))
          (fun _  =>
             if vnth (rsAllocs st) var is Some r
             then errorT $ VarAllocatedToDifferentReg var reg r
@@ -232,7 +248,7 @@ Definition freeReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
   decide (vnth (rsRegs st) reg == Some var)
     (fun H1 =>
        decide (vnth (rsAllocs st) var == Some reg)
-         (fun H2 => putT $ packVerified (FreeReg H1 H2) a)
+         (fun H2 => _verState .= packRegState (FreeReg H1 H2))
          (fun _  =>
             if vnth (rsAllocs st) var is Some r
             then errorT $ FreeVarAllocatedToDifferentReg var reg r
@@ -374,6 +390,8 @@ Program Instance Lens__aside : LensLaws (@_aside a b P).
 
 (* Program Instance Lens__verDesc : GetterLaws (@_verDesc maxReg maxVar a). *)
 Program Instance Lens__verState : LensLaws (@_verState maxReg maxVar a).
+Obligation 2. by case: x. Qed.
+Program Instance Lens__verBlocks : LensLaws (@_verBlocks maxReg maxVar a).
 Obligation 2. by case: x. Qed.
 Program Instance Lens__verExt : LensLaws (@_verExt maxReg maxVar a).
 Obligation 2. by case: x. Qed.

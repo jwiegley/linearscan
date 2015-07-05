@@ -93,9 +93,11 @@ Definition varInfoAllocs opid (allocs : seq (Allocation maxReg)) v :
 Definition Verified (maxVar : nat) :=
   Verified maxReg maxVar mType AssnStateDesc.
 
+Definition _verExt {maxVar : nat} := @_verExt maxReg maxVar AssnStateDesc.
+
 Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
   Verified maxVar (seq opType2) :=
-  assn <-- use _aside ;;
+  assn <-- use _verExt ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varInfoAllocs opid allocs) vars in
@@ -109,7 +111,7 @@ Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
        lift $ lift $ generateMoves moves
      else pure [::]) ;;
 
-  modifyT ((_aside \o+ _assnOpId) .~ opid.+2) ;;
+  _verExt \o+ _assnOpId .= opid.+2 ;;
 
   pure $ ops ++ transitions.
 
@@ -121,19 +123,17 @@ Definition considerOps (maxVar : nat)
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
-    modifyT (fun s =>
-      let opid := s ^_ stepdownl' (_aside \o+ _assnOpId) in
-      s &+ (_aside \o+ _assnBlockBeg) .~ opid + (size opsb).*2
-        &+ (_aside \o+ _assnBlockEnd) .~ opid + (size opsb + size opsm).*2) ;;
+    opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    let opid_firstOp := opid + (size opsb).*2 in
+
+    _verExt \o+ _assnBlockBeg .= opid + (size opsb).*2 ;;
+    _verExt \o+ _assnBlockEnd .= opid + (size opsb + size opsm).*2 ;;
 
     bid <-- lift $ lift $ blockId binfo blk ;;
     let: (liveIns, liveOuts) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)
        else (emptyIntSet, emptyIntSet) in
-
-    opid <-- use (stepdownl' (_aside \o+ _assnOpId)) ;;
-    let opid_firstOp := opid + (size opsb).*2 in
 
     let startRegs :=
         concat $ map (varAllocs opid_firstOp allocs Input)
@@ -157,7 +157,7 @@ Definition considerOps (maxVar : nat)
     opsm' <-- concatMapM k opsm ;;
     opse' <-- concatMapM k opse ;;
 
-    opid <-- use (stepdownl' (_aside \o+ _assnOpId)) ;;
+    opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
 
     let endMoves := map (@moveFromGraph maxReg) (topsort gend) in
     verifyResolutions opid endMoves ;;
