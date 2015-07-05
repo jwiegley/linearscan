@@ -50,20 +50,33 @@ Definition keepOnly {A : Type} `(xs : seq 'I_n) :
   vmap_with_index (fun i x => if i \in xs then x else None).
 
 Inductive AllocError :=
+  | VarId_OutOfBounds of VarId & nat
   | VarNotAllocated of VarId
+  | FreeUnallocatedVar of VarId
+  | FreeVarAllocatedToDifferentReg of VarId & nat & nat
+  | FreeRegNotAllocatedToVar of nat & VarId
+  | VarWithoutAllocation of VarId
+  | VarAllocatedToDifferentReg of VarId & nat & nat
+  | RegNotAllocated of nat
   | RegNotAllocatedToVar of nat & VarId
   | RegAllocatedToDifferentVar of nat & VarId & VarId
-  | VarId_OutOfBounds.
+  | RegAlreadyAllocatedTo of nat & VarId
+  | SpillingToWrongSlot of nat & VarId & VarId.
+
+Definition checkAlloc' st (var : 'I_maxVar) : option AllocError :=
+  if vnth (rsAllocs st) var isn't Some reg
+  then Some (VarNotAllocated var)
+  else if vnth (rsRegs st) reg isn't Some var'
+       then Some (RegNotAllocatedToVar reg var)
+       else if var == var'
+            then None
+            else Some (RegAllocatedToDifferentVar reg var var').
 
 Definition checkLiveness st : seq 'I_maxVar -> seq AllocError :=
   flip (forFold [::]) $ fun acc var =>
-    if vnth (rsAllocs st) var isn't Some reg
-    then VarNotAllocated var :: acc
-    else if vnth (rsRegs st) reg isn't Some var'
-         then RegNotAllocatedToVar reg var :: acc
-         else if nat_of_ord var == var'
-              then acc
-              else RegAllocatedToDifferentVar reg var var' :: acc.
+    if checkAlloc' st var is Some err
+    then err :: acc
+    else acc.
 
 Definition liveRegisters st : seq 'I_maxVar -> seq 'I_maxReg :=
   flip (forFold [::]) $ fun acc var =>
@@ -73,17 +86,6 @@ Definition liveRegisters st : seq 'I_maxVar -> seq 'I_maxReg :=
 
 Inductive RegState : RegStateDesc -> Prop :=
   | StartState : RegState newRegStateDesc
-
-  (* Based on the code flow analysis, [ins] is the set of incoming registers.
-     Anything other than these should not be presently active, all them should
-     be active, and they should apply to the correct variables. *)
-  | BlockCheck st (lives : seq 'I_maxVar) :
-    size (checkLiveness st lives) == 0 ->
-    RegState
-      {| rsRegs   := keepOnly (liveRegisters st lives) $ rsRegs st
-       ; rsAllocs := keepOnly lives $ rsAllocs st
-       ; rsStack  := rsStack st
-       |}
 
   | AllocReg st r v :
     vnth (rsRegs   st) r == None ->
@@ -126,20 +128,41 @@ Arguments getRegStateDesc [rd] st /.
 
 Variable A : Type.
 
-Definition VerifiedSig := { d : RegStateDesc * A | RegState (fst d) }.
+Record VerifiedSig := {
+  verDesc  : RegStateDesc;
+  verState : RegState verDesc;
+  verExt   : A
+}.
 
-Definition packVerified `(st : RegState rd) (s : A) :=
-  exist (RegState \o fst) (rd, s) st.
+Definition _verDesc : Getter VerifiedSig RegStateDesc := fun _ _ _ f s =>
+  fmap (const s) (f (verDesc s)).
+
+Definition _verState :
+  Lens' VerifiedSig { rd : RegStateDesc | RegState rd } := fun _ _ f s =>
+  fmap (fun x =>
+    {| verDesc  := x.1
+     ; verState := x.2
+     ; verExt   := verExt s
+     |}) (f (verDesc s; verState s)).
+
+Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
+  fmap (fun x =>
+    {| verDesc  := verDesc s
+     ; verState := verState s
+     ; verExt   := x
+     |}) (f (verExt s)).
+
+Definition packVerified `(st : RegState rd) (s : A) : VerifiedSig :=
+  {| verDesc  := rd
+   ; verState := st
+   ; verExt   := s |}.
 Arguments packVerified [rd] st s /.
 
 (* The [Verified] transformer stack uses [EitherT] to allow sudden exit due to
    error, otherwise it maintains the current [RegState] plus whatever
    additional state the user desires. *)
-Definition Verified := StateT VerifiedSig (EitherT (seq AllocError) mType).
-
-Definition _rs {a b : Type} {P : a -> Prop} :
-  Getter { x : a * b | P (fst x) } a :=
-  fun _ _ _ f s => fmap (const s) (f (fst (proj1_sig s))).
+Definition Verified :=
+  StateT VerifiedSig (EitherT (OpId * seq AllocError) mType).
 
 Definition _aside {a b : Type} {P : a -> Prop} :
   Lens' { x : a * b | P (fst x) } b :=
@@ -147,58 +170,195 @@ Definition _aside {a b : Type} {P : a -> Prop} :
     let: exist (x, y) H := s in
     fmap (fun z => exist _ (x, z) H) (f y).
 
-Definition runVerified `(m : Verified b) (i : A) : mType (seq AllocError + b) :=
-  fmap fst $ m ((newRegStateDesc, i); StartState).
+Definition resetAllocState : Verified unit :=
+  a <-- use _verExt ;;
+  putT $ packVerified StartState a.
 
-Definition allocReg (r : 'I_maxReg) (v : 'I_maxVar) : Verified unit := pure tt.
+Definition runVerified `(m : Verified b) (i : A) :
+  mType ((OpId * seq AllocError) + b) :=
+  fst <$> m {| verDesc  := newRegStateDesc
+             ; verState := StartState
+             ; verExt   := i |}.
 
-Definition freeReg (r : 'I_maxReg) (v : 'I_maxVar) : Verified unit := pure tt.
+Definition decide {T : Type} (H : bool)
+  (kt : (H = true)  -> T)
+  (kf : (H = false) -> T) : T :=
+  (fun (if_true  : (fun b : bool => protect_term (H = b) -> T) true)
+       (if_false : (fun b : bool => protect_term (H = b) -> T) false) =>
+    if H as b return ((fun b0 : bool => protect_term (H = b0) -> T) b)
+    then if_true
+    else if_false)
+  (fun (E : H = true)  => kt E)
+  (fun (E : H = false) => kf E)
+  (erefl H).
 
-Definition allocStack (v : 'I_maxVar) : Verified unit := pure tt.
+Arguments decide {T} H kt kf.
 
-Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt.
+Variable pc : OpId.
 
-Definition verifyCheckBlock' (st : RegStateDesc) (s : A) (lives : IntSet) :
-  seq AllocError + VerifiedSig.
-Proof.
-  case L: (all (ltn ^~ maxVar) (IntSet_toList lives)).
-    have l := IntSet_to_seq_fin L.
-    case B: (checkLiveness st l) => [|e es].
-      have H : size (checkLiveness st l) == 0
-        by rewrite B.
-      exact: inr (packVerified (BlockCheck H) s).
-    exact: inl (e :: es).
-  exact: inl [:: VarId_OutOfBounds].
-Defined.
+Definition errorsT {a} (errs : seq AllocError) : Verified a :=
+  fun _ => pure $ inl (pc, errs).
 
-Definition verifyCheckBlock (lives : IntSet) : Verified unit :=
-  pure tt.
-  (* z <-- lift $ use _ex1 ;; *)
-  (* let: (st, a) := z in *)
-  (* match verifyCheckBlock' st a lives *)
-  (* return Verified unit with *)
-  (* | inl es => pure (inl es) *)
-  (* | inr x  => lift $ putT x *)
-  (* end. *)
+Definition errorT {a} (err : AllocError) : Verified a :=
+  errorsT [:: err].
+
+Definition checkAlloc (var : 'I_maxVar) : Verified unit :=
+  st <-- use _verDesc ;;
+  if checkAlloc' st var is Some err
+  then errorT err
+  else pure tt.
+
+Definition allocReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
+  st <-- use _verDesc ;;
+  a  <-- use _verExt ;;
+  decide (vnth (rsRegs st) reg == None)
+    (fun H1 =>
+       decide (vnth (rsAllocs st) var == None)
+         (fun H2 => putT $ packVerified (AllocReg H1 H2) a)
+         (fun _  =>
+            if vnth (rsAllocs st) var is Some r
+            then errorT $ VarAllocatedToDifferentReg var reg r
+            else pure tt))
+    (fun _  =>
+       if vnth (rsRegs st) reg is Some v
+       then
+         when (v != var) $
+           errorT $ RegAllocatedToDifferentVar reg var v
+       else pure tt).
+
+Definition freeReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
+  st <-- use _verDesc ;;
+  a  <-- use _verExt ;;
+  decide (vnth (rsRegs st) reg == Some var)
+    (fun H1 =>
+       decide (vnth (rsAllocs st) var == Some reg)
+         (fun H2 => putT $ packVerified (FreeReg H1 H2) a)
+         (fun _  =>
+            if vnth (rsAllocs st) var is Some r
+            then errorT $ FreeVarAllocatedToDifferentReg var reg r
+            else errorT $ FreeUnallocatedVar var))
+    (fun _  => errorT $ FreeRegNotAllocatedToVar reg var).
+
+(* Definition allocStack (v : 'I_maxVar) : Verified unit := pure tt. *)
+
+(* Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt. *)
+
+Lemma size_is0 : forall a (l : seq a), l = nil -> size l == 0.
+Proof. move=> a. by case. Qed.
+
+Definition checkVar (vid : VarId) : Verified 'I_maxVar :=
+  decide (vid < maxVar)
+    (fun H => pure $ Ordinal H)
+    (fun _ => errorT $ VarId_OutOfBounds vid maxVar).
+
+Definition verifyBlockBegin (liveIns : IntSet)
+  (allocs : seq (VarId * PhysReg)) : Verified unit :=
+  resetAllocState ;;
+  forM_ (IntSet_toList liveIns) $ fun vid =>
+    if maybeLookup allocs vid isn't Some reg
+    then errorT $ VarWithoutAllocation vid
+    else checkVar vid >>= allocReg reg.
+
+Definition verifyBlockEnd (liveOuts : IntSet) : Verified unit :=
+  decide (all (ltn ^~ maxVar) (IntSet_toList liveOuts))
+    (fun L =>
+       st <-- use _verDesc ;;
+       if checkLiveness st (IntSet_to_seq_fin L) is e :: es
+       then errorsT (e :: es)
+       else pure tt)
+    (fun _ =>
+       forM_ (IntSet_toList liveOuts) $ fun var =>
+         when (maxVar <= var) $
+           errorT $ VarId_OutOfBounds var maxVar).
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
+  forM_ (opRefs oinfo op) (fun ref =>
+    (* Get the current allocation state of all registers. *)
+    st <-- use _verDesc ;;
+
+    (* Determine which register this variable has been associated with by the
+       allocation for this operation. *)
+    match varId ref with
+    | inl reg =>
+      (* Direct register references are mostly left alone; we just check to
+         make sure that it's not overwriting a variable in a register. *)
+      if vnth (rsRegs st) reg is Some v
+      then errorT $ RegAlreadyAllocatedTo reg v
+      else pure tt
+
+    | inr vid =>
+      if maybeLookup allocs vid isn't Some reg
+      then errorT $ VarWithoutAllocation vid
+      else
+        var <-- checkVar vid ;;
+        match varKind ref with
+        | Input  => checkAlloc var
+        | Temp   => pure tt         (* jww (2015-07-04): What to do here? *)
+        | Output =>
+            (* Writing to a register undoes any previous allocation. *)
+            (if vnth (rsRegs st) reg is Some v
+             then freeReg reg v
+             else pure tt) ;;
+            allocReg reg var
+        end
+    end) ;;
+
   lift $ lift $ applyAllocs oinfo op allocs.
 
 Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
   Verified unit :=
   forM_ moves $ fun mv =>
+    st <-- use _verDesc ;;
     match mv with
-    | Move    x y =>
-        pure tt
-    | Swap    x y =>
-        pure tt
-    | Spill   x s =>
-        pure tt
-    | Restore s x =>
-        pure tt
-    | Nop         =>
-        pure tt
+    | Move fromReg toReg =>
+      if vnth (rsRegs st) fromReg isn't Some fromVar
+      then errorT $ RegNotAllocated fromReg
+      else
+        if vnth (rsRegs st) toReg is Some toVar
+        then errorT $ RegAlreadyAllocatedTo toReg toVar
+        else
+          freeReg fromReg fromVar ;;
+          allocReg toReg fromVar
+
+    | Swap fromReg toReg =>
+      if vnth (rsRegs st) fromReg isn't Some fromVar
+      then errorT $ RegNotAllocated fromReg
+      else
+        if vnth (rsRegs st) toReg isn't Some toVar
+        then errorT $ RegNotAllocated toReg
+        else
+          when (fromVar != toVar) $
+            freeReg toReg toVar ;;
+            freeReg fromReg fromVar ;;
+            allocReg toReg fromVar ;;
+            allocReg fromReg toVar
+
+    | Spill fromReg toSpillSlot =>
+      if vnth (rsRegs st) fromReg isn't Some fromVar
+      then errorT $ RegNotAllocated fromReg
+      else
+        stackVar <-- checkVar toSpillSlot ;;
+        if fromVar != stackVar
+        then errorT $ SpillingToWrongSlot fromReg toSpillSlot fromVar
+        else
+          freeReg fromReg fromVar ;;
+          (* checkStackFree *)
+          (* AllocStack *)
+          pure tt
+
+    | Restore fromSpillSlot toReg =>
+      stackVar <-- checkVar fromSpillSlot ;;
+      if vnth (rsRegs st) toReg is Some toVar
+      then
+        when (toVar != stackVar) $
+          freeReg toReg toVar ;;
+          allocReg toReg stackVar
+      else
+        (* checkStackAlloc ;; *)
+        allocReg toReg stackVar
+
+    | Nop => pure tt
     end.
 
 End Verify.
@@ -210,7 +370,12 @@ Include LensLaws.
 Variable a b : Type.
 Variable P : a -> Prop.
 
-(* Program Instance Lens__rs : LensLaws (@_rs a b P). *)
 Program Instance Lens__aside : LensLaws (@_aside a b P).
+
+(* Program Instance Lens__verDesc : GetterLaws (@_verDesc maxReg maxVar a). *)
+Program Instance Lens__verState : LensLaws (@_verState maxReg maxVar a).
+Obligation 2. by case: x. Qed.
+Program Instance Lens__verExt : LensLaws (@_verExt maxReg maxVar a).
+Obligation 2. by case: x. Qed.
 
 End VerifyLensLaws.

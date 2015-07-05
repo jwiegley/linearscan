@@ -342,7 +342,7 @@ data Details m blk1 blk2 op1 op2 = Details
     , liveSets        :: [(Int, LS.BlockLiveSets)]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
-    , allocatedBlocks :: Either [LS.AllocError] [blk2]
+    , allocatedBlocks :: Either (LS.OpId, [LS.AllocError]) [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -431,10 +431,13 @@ allocate maxReg binfo oinfo blocks = do
         Just (err, _) -> do
             dets <- showDetails res'
             return $ Left $ tracer dets $ map reasonToStr err
-        Nothing -> do
-            return $ case allocatedBlocks res' of
-                Left es    -> Left (map show es) -- jww (2015-07-02): NYI
-                Right blks -> Right blks
+        Nothing -> case allocatedBlocks res' of
+            Left (pos, es)    -> do
+                dets <- showDetails res'
+                return $ Left $ tracer dets $
+                    -- jww (2015-07-02): NYI
+                    ["At position " ++ show pos] ++ map show es
+            Right blks -> return $ Right blks
   where
     reasonToStr r = case r of
         LS.EIntersectsWithFixedInterval pos reg ->

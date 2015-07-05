@@ -7,6 +7,7 @@
     https://www.usenix.org/legacy/events/vee05/full_papers/p132-wimmer.pdf
 *)
 Require Import LinearScan.Lib.
+Require Export Hask.Haskell.
 Require Import LinearScan.Allocate.
 Require Import LinearScan.Assign.
 Require Import LinearScan.Blocks.
@@ -65,7 +66,7 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   liveSets        : IntMap BlockLiveSets;
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
-  allocatedBlocks : seq AllocError + seq blockType2;
+  allocatedBlocks : (OpId * seq AllocError) + seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
   loopState       : LoopState

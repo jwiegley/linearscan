@@ -1,6 +1,5 @@
 Require Export Hask.Prelude.
 Require Export Hask.Ltac.
-Require Export Hask.Haskell.
 Require Export Hask.Control.Lens.
 Require Export Hask.Control.Monad.
 Require Export Hask.Data.IntMap.
