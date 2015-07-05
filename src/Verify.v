@@ -7,6 +7,7 @@ Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Resolve.
+Require Import LinearScan.Loops.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -61,11 +62,17 @@ Inductive AllocError :=
   | RegNotAllocatedToVar of nat & VarId
   | RegAllocatedToDifferentVar of nat & VarId & VarId
   | RegAlreadyAllocatedTo of nat & VarId
-  | SpillingToWrongSlot of nat & VarId & VarId.
+  | SpillingToWrongSlot of nat & VarId & VarId
+  | BlockWithoutPredecessors of BlockId
+  | UnknownPredecessorBlock of BlockId & BlockId
+  | ErrorAtBlockEnd of BlockId.
 
-Definition checkAlloc' st (var : 'I_maxVar) : option AllocError :=
+Definition checkAlloc' st (var : 'I_maxVar) (strict : bool) :
+  option AllocError :=
   if vnth (rsAllocs st) var isn't Some reg
-  then Some (VarNotAllocated var)
+  then if strict
+       then Some (VarNotAllocated var)
+       else None
   else if vnth (rsRegs st) reg isn't Some var'
        then Some (RegNotAllocatedToVar reg var)
        else if var == var'
@@ -74,7 +81,7 @@ Definition checkAlloc' st (var : 'I_maxVar) : option AllocError :=
 
 Definition checkLiveness st : seq 'I_maxVar -> seq AllocError :=
   flip (forFold [::]) $ fun acc var =>
-    if checkAlloc' st var is Some err
+    if checkAlloc' st var false is Some err
     then err :: acc
     else acc.
 
@@ -131,7 +138,7 @@ Arguments packRegState [rd] st /.
 
 Variable A : Type.
 
-Definition BlockExitAllocations := IntMap (seq (VarId * PhysReg)).
+Definition BlockExitAllocations := IntMap (seq ('I_maxVar * 'I_maxReg)).
 
 Record VerifiedSig := {
   verDesc   : RegStateDesc;
@@ -188,10 +195,6 @@ Definition _aside {a b : Type} {P : a -> Prop} :
     let: exist (x, y) H := s in
     fmap (fun z => exist _ (x, z) H) (f y).
 
-Definition resetAllocState : Verified unit :=
-  a <-- use _verExt ;;
-  putT $ newVerifiedSig a.
-
 Definition runVerified `(m : Verified b) (i : A) :
   mType ((OpId * seq AllocError) + b) :=
   fst <$> m (newVerifiedSig i).
@@ -220,7 +223,7 @@ Definition errorT {a} (err : AllocError) : Verified a :=
 
 Definition checkAlloc (var : 'I_maxVar) : Verified unit :=
   st <-- use _verDesc ;;
-  if checkAlloc' st var is Some err
+  if checkAlloc' st var true is Some err
   then errorT err
   else pure tt.
 
@@ -267,25 +270,49 @@ Definition checkVar (vid : VarId) : Verified 'I_maxVar :=
     (fun H => pure $ Ordinal H)
     (fun _ => errorT $ VarId_OutOfBounds vid maxVar).
 
-Definition verifyBlockBegin (liveIns : IntSet)
-  (allocs : seq (VarId * PhysReg)) : Verified unit :=
-  resetAllocState ;;
-  forM_ (IntSet_toList liveIns) $ fun vid =>
-    if maybeLookup allocs vid isn't Some reg
-    then errorT $ VarWithoutAllocation vid
-    else checkVar vid >>= allocReg reg.
+Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
+  Verified unit :=
+  if IntMap_lookup bid (forwardBranches loops) is Some fwds
+  then forM_ (IntSet_toList fwds) $ fun pred =>
+    exits <-- use _verBlocks ;;
+    if IntMap_lookup pred exits isn't Some allocs
+    then errorT $ UnknownPredecessorBlock bid pred
+    else forM_ (IntSet_toList liveIns) $ fun vid =>
+      var <-- checkVar vid ;;
+      if maybeLookup allocs var isn't Some reg
+      then pure tt (* errorT $ VarWithoutAllocation vid *)
+      else allocReg reg var
+  else
+    if IntSet_size liveIns == 0
+    then pure tt
+    else errorT $ BlockWithoutPredecessors bid.
 
-Definition verifyBlockEnd (liveOuts : IntSet) : Verified unit :=
+Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
   decide (all (ltn ^~ maxVar) (IntSet_toList liveOuts))
     (fun L =>
        st <-- use _verDesc ;;
-       if checkLiveness st (IntSet_to_seq_fin L) is e :: es
-       then errorsT (e :: es)
-       else pure tt)
+       let vars := IntSet_to_seq_fin L in
+       if checkLiveness st vars is e :: es
+       then errorsT $ ErrorAtBlockEnd bid :: e :: es
+       else
+         _verBlocks %= IntMap_insert bid
+           (forFold [::] vars $ fun acc var =>
+             if vnth (rsAllocs st) var is Some reg
+             then (var, reg) :: acc
+             else acc) ;;
+         (* Clear out all known allocations *)
+         _verState .= packRegState StartState)
     (fun _ =>
        forM_ (IntSet_toList liveOuts) $ fun var =>
          when (maxVar <= var) $
            errorT $ VarId_OutOfBounds var maxVar).
+
+Definition replaceReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
+  st <-- use _verDesc ;;
+  (if vnth (rsRegs st) reg is Some v
+   then freeReg reg v
+   else pure tt) ;;
+  allocReg reg var.
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
@@ -311,12 +338,7 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
         match varKind ref with
         | Input  => checkAlloc var
         | Temp   => pure tt         (* jww (2015-07-04): What to do here? *)
-        | Output =>
-            (* Writing to a register undoes any previous allocation. *)
-            (if vnth (rsRegs st) reg is Some v
-             then freeReg reg v
-             else pure tt) ;;
-            allocReg reg var
+        | Output => replaceReg reg var
         end
     end) ;;
 
@@ -330,12 +352,7 @@ Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
     | Move fromReg toReg =>
       if vnth (rsRegs st) fromReg isn't Some fromVar
       then errorT $ RegNotAllocated fromReg
-      else
-        if vnth (rsRegs st) toReg is Some toVar
-        then errorT $ RegAlreadyAllocatedTo toReg toVar
-        else
-          freeReg fromReg fromVar ;;
-          allocReg toReg fromVar
+      else replaceReg toReg fromVar
 
     | Swap fromReg toReg =>
       if vnth (rsRegs st) fromReg isn't Some fromVar
@@ -355,24 +372,12 @@ Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
       then errorT $ RegNotAllocated fromReg
       else
         stackVar <-- checkVar toSpillSlot ;;
-        if fromVar != stackVar
-        then errorT $ SpillingToWrongSlot fromReg toSpillSlot fromVar
-        else
-          freeReg fromReg fromVar ;;
-          (* checkStackFree *)
-          (* AllocStack *)
-          pure tt
+        when (fromVar != stackVar) $
+          errorT $ SpillingToWrongSlot fromReg toSpillSlot fromVar
 
     | Restore fromSpillSlot toReg =>
       stackVar <-- checkVar fromSpillSlot ;;
-      if vnth (rsRegs st) toReg is Some toVar
-      then
-        when (toVar != stackVar) $
-          freeReg toReg toVar ;;
-          allocReg toReg stackVar
-      else
-        (* checkStackAlloc ;; *)
-        allocReg toReg stackVar
+      replaceReg toReg stackVar
 
     | Nop => pure tt
     end.

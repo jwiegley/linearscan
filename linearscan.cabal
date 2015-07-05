@@ -66,6 +66,7 @@ library
     LinearScan.Fintype
     LinearScan.Functor
     LinearScan.Graph
+    LinearScan.Identity
     LinearScan.IntMap
     LinearScan.IntSet
     LinearScan.Interval

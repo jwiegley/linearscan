@@ -6,6 +6,7 @@ Require Import LinearScan.Graph.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.LiveSets.
+Require Import LinearScan.Loops.
 Require Import LinearScan.Resolve.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Allocate.
@@ -118,14 +119,13 @@ Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
 Definition considerOps (maxVar : nat)
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
-  (mappings : IntMap (BlockMoves maxReg)) :
+  (mappings : IntMap (BlockMoves maxReg))
+  (loops    : LoopState) :
   seq blockType1 -> Verified maxVar (seq blockType2) :=
   mapM $ fun blk =>
     let: (opsb, opsm, opse) := blockOps binfo blk in
 
     opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
-    let opid_firstOp := opid + (size opsb).*2 in
-
     _verExt \o+ _assnBlockBeg .= opid + (size opsb).*2 ;;
     _verExt \o+ _assnBlockEnd .= opid + (size opsb + size opsm).*2 ;;
 
@@ -135,11 +135,7 @@ Definition considerOps (maxVar : nat)
        then (blockLiveIn bls, blockLiveOut bls)
        else (emptyIntSet, emptyIntSet) in
 
-    let startRegs :=
-        concat $ map (varAllocs opid_firstOp allocs Input)
-                     (IntSet_toList liveIns) in
-
-    verifyBlockBegin opid liveIns startRegs ;;
+    verifyBlockBegin opid bid liveIns loops ;;
 
     let: (gbeg, gend) :=
        if IntMap_lookup bid mappings is Some graphs
@@ -147,9 +143,7 @@ Definition considerOps (maxVar : nat)
        else (emptyGraph, emptyGraph) in
 
     let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
-    (* jww (2015-07-04): We don't currently have enough information to verify
-       the incoming resolutions at the beginning of each block. *)
-    (* verifyResolutions opid begMoves ;; *)
+    verifyResolutions opid begMoves ;;
     bmoves <-- lift $ lift $ generateMoves begMoves ;;
 
     let k := setAllocations allocs in
@@ -163,7 +157,7 @@ Definition considerOps (maxVar : nat)
     verifyResolutions opid endMoves ;;
     emoves <-- lift $ lift $ generateMoves endMoves ;;
 
-    verifyBlockEnd opid liveOuts ;;
+    verifyBlockEnd opid bid liveOuts ;;
 
     let opsm'' := bmoves ++ opsm' ++ emoves in
     match opsb', opse' with
@@ -189,12 +183,13 @@ Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
+  (loops : LoopState)
   (blocks   : seq blockType1) :
   mType ((OpId * seq AllocError) + seq blockType2) :=
   let maxVar := forFold 0 allocs $ fun acc x =>
     maxn acc (ivar (intVal x)) in
   runVerified (maxVar:=maxVar.+1)
-    (considerOps allocs liveSets mappings blocks) newAssnStateDesc.
+    (considerOps allocs liveSets mappings loops blocks) newAssnStateDesc.
 
 End Assign.
 
