@@ -11,6 +11,7 @@ module LinearScan
       allocate
       -- * Blocks
     , LinearScan.BlockInfo(..)
+    , LS.UseVerifier(..)
       -- * Operations
     , LinearScan.OpInfo(..)
     , OpKind(..)
@@ -419,13 +420,13 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
          => Int        -- ^ Maximum number of registers to use
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
+         -> LS.UseVerifier
          -> [blk1] -> m (Either [String] [blk2])
-allocate 0 _ _ _  = return $ Left ["Cannot allocate with no registers"]
-allocate _ _ _ [] = return $ Left ["No basic blocks were provided"]
-allocate maxReg binfo oinfo blocks = do
+allocate 0 _ _ _ _  = return $ Left ["Cannot allocate with no registers"]
+allocate _ _ _ _ [] = return $ Left ["No basic blocks were provided"]
+allocate maxReg binfo oinfo useVerifier blocks = do
     res <- U.unsafeCoerce $ LS.linearScan coqMonad maxReg
-        (fromBlockInfo binfo)
-        (fromOpInfo oinfo) blocks
+        (fromBlockInfo binfo) (fromOpInfo oinfo) useVerifier blocks
     let res' = toDetails res binfo oinfo
     case reason res' of
         Just (err, _) -> do

@@ -160,7 +160,7 @@ Definition allocateBlockedReg {pre} :
                       | i <- xs] in
     let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
     let intersectingIntervals : seq (IntervalSig * PhysReg) :=
-        filter (fun x => intervalsIntersect current (fst x).2)
+        filter (fun x => intervalsIntersect current (fst x).1)
                (resolve (inactive sd)) in
     let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
 

@@ -96,19 +96,21 @@ Definition Verified (maxVar : nat) :=
 
 Definition _verExt {maxVar : nat} := @_verExt maxReg maxVar AssnStateDesc.
 
+Variable useVerifier : UseVerifier.
+
 Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
   Verified maxVar (seq opType2) :=
   assn <-- use _verExt ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varInfoAllocs opid allocs) vars in
-  ops <-- verifyApplyAllocs oinfo opid op regs ;;
+  ops <-- verifyApplyAllocs oinfo opid useVerifier op regs ;;
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
      then
        let moves := determineMoves (resolvingMoves allocs opid opid.+2) in
-       verifyResolutions opid moves ;;
+       verifyResolutions opid useVerifier moves ;;
        lift $ lift $ generateMoves moves
      else pure [::]) ;;
 
@@ -135,29 +137,31 @@ Definition considerOps (maxVar : nat)
        then (blockLiveIn bls, blockLiveOut bls)
        else (emptyIntSet, emptyIntSet) in
 
-    verifyBlockBegin opid bid liveIns loops ;;
+    verifyBlockBegin opid useVerifier bid liveIns loops ;;
 
     let: (gbeg, gend) :=
        if IntMap_lookup bid mappings is Some graphs
        then graphs
        else (emptyGraph, emptyGraph) in
 
-    let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
-    verifyResolutions opid begMoves ;;
-    bmoves <-- lift $ lift $ generateMoves begMoves ;;
-
     let k := setAllocations allocs in
     opsb' <-- concatMapM k opsb ;;
-    opsm' <-- concatMapM k opsm ;;
-    opse' <-- concatMapM k opse ;;
 
+    let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
     opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    verifyResolutions opid useVerifier begMoves ;;
+    bmoves <-- lift $ lift $ generateMoves begMoves ;;
+
+    opsm' <-- concatMapM k opsm ;;
 
     let endMoves := map (@moveFromGraph maxReg) (topsort gend) in
-    verifyResolutions opid endMoves ;;
+    opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    verifyResolutions opid useVerifier endMoves ;;
     emoves <-- lift $ lift $ generateMoves endMoves ;;
 
-    verifyBlockEnd opid bid liveOuts ;;
+    opse' <-- concatMapM k opse ;;
+
+    verifyBlockEnd opid useVerifier bid liveOuts ;;
 
     let opsm'' := bmoves ++ opsm' ++ emoves in
     match opsb', opse' with

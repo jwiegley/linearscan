@@ -569,3 +569,42 @@ Proof.
   - Case "ScanState_moveInactiveToActive". exact: IHst.
   - Case "ScanState_moveInactiveToHandled". exact: IHst.
 Qed.
+
+(*
+Lemma register_allocations_disjoint `(st : @ScanState maxReg b sd) :
+  forall reg : PhysReg maxReg,
+  let descOf {a} (x : IntervalId sd * a) :=
+      getIntervalDesc (getInterval (fst x)) in
+  let intervalsForReg : seq IntervalDesc :=
+    (if vnth (fixedIntervals sd) reg is Some int
+     then [:: int.1]
+     else [::]) ++
+    [seq descOf x | x <-  handled sd & snd x == Some reg] ++
+    [seq descOf x | x <-   active sd & snd x == reg] ++
+    [seq descOf x | x <- inactive sd & snd x == reg] in
+  ~~ has (fun int1 : IntervalDesc =>
+            has (fun int2 : IntervalDesc =>
+                   (ivar int1 != ivar int2) &&
+                   intervalsIntersect int1 int2)
+                intervalsForReg)
+         intervalsForReg.
+Proof.
+  move=> reg.
+  ScanState_cases (induction st) Case; simpl in *.
+  - Case "ScanState_nil". by rewrite vnth_vconst.
+  - Case "ScanState_newUnhandled".
+    rewrite -map_comp.
+    apply IHst.
+    exact: IHst.
+  - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_newHandled". exact: IHst.
+  - Case "ScanState_setInterval". exact: IHst.
+  - Case "ScanState_setFixedIntervals". exact: IHst.
+  - Case "ScanState_moveUnhandledToActive". exact: IHst.
+  - Case "ScanState_moveUnhandledToHandled". exact: IHst.
+  - Case "ScanState_moveActiveToInactive". exact: IHst.
+  - Case "ScanState_moveActiveToHandled". exact: IHst.
+  - Case "ScanState_moveInactiveToActive". exact: IHst.
+  - Case "ScanState_moveInactiveToHandled". exact: IHst.
+Qed.
+*)

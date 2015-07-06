@@ -26,6 +26,11 @@ Context `{mDict : Monad mType}.
 
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
+Inductive UseVerifier :=
+  | VerifyDisabled
+  | VerifyEnabledUnitializedOK
+  | VerifyEnabled.
+
 Record RegStateDesc := {
   rsRegs   : Vec (option 'I_maxVar) maxReg;
   rsAllocs : Vec (option 'I_maxReg) maxVar;
@@ -221,9 +226,12 @@ Definition errorsT {a} (errs : seq AllocError) : Verified a :=
 Definition errorT {a} (err : AllocError) : Verified a :=
   errorsT [:: err].
 
+Variable useVerifier : UseVerifier.
+
 Definition checkAlloc (var : 'I_maxVar) : Verified unit :=
   st <-- use _verDesc ;;
-  if checkAlloc' st var true is Some err
+  if checkAlloc' st var (if useVerifier is VerifyEnabled
+                         then true else false) is Some err
   then errorT err
   else pure tt.
 
@@ -272,6 +280,7 @@ Definition checkVar (vid : VarId) : Verified 'I_maxVar :=
 
 Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   Verified unit :=
+  if useVerifier isn't VerifyEnabled then pure tt else
   if IntMap_lookup bid (forwardBranches loops) is Some fwds
   then forM_ (IntSet_toList fwds) $ fun pred =>
     exits <-- use _verBlocks ;;
@@ -288,6 +297,7 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
     else errorT $ BlockWithoutPredecessors bid.
 
 Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
+  if useVerifier isn't VerifyEnabled then pure tt else
   decide (all (ltn ^~ maxVar) (IntSet_toList liveOuts))
     (fun L =>
        st <-- use _verDesc ;;
@@ -316,43 +326,49 @@ Definition replaceReg (reg : 'I_maxReg) (var : 'I_maxVar) : Verified unit :=
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
-  forM_ (opRefs oinfo op) (fun ref =>
-    (* Get the current allocation state of all registers. *)
-    st <-- use _verDesc ;;
+  (if useVerifier isn't VerifyDisabled
+   then
+     forM_ (opRefs oinfo op) (fun ref =>
+       (* Get the current allocation state of all registers. *)
+       st <-- use _verDesc ;;
 
-    (* Determine which register this variable has been associated with by the
-       allocation for this operation. *)
-    match varId ref with
-    | inl reg =>
-      (* Direct register references are mostly left alone; we just check to
-         make sure that it's not overwriting a variable in a register. *)
-      if vnth (rsRegs st) reg is Some v
-      then errorT $ RegAlreadyAllocatedTo reg v
-      else pure tt
+       (* Determine which register this variable has been associated with by the
+          allocation for this operation. *)
+       match varId ref with
+       | inl reg =>
+         (* Direct register references are mostly left alone; we just check to
+            make sure that it's not overwriting a variable in a register. *)
+         if vnth (rsRegs st) reg is Some v
+         then errorT $ RegAlreadyAllocatedTo reg v
+         else pure tt
 
-    | inr vid =>
-      if maybeLookup allocs vid isn't Some reg
-      then errorT $ VarWithoutAllocation vid
-      else
-        var <-- checkVar vid ;;
-        match varKind ref with
-        | Input  => checkAlloc var
-        | Temp   => pure tt         (* jww (2015-07-04): What to do here? *)
-        | Output => replaceReg reg var
-        end
-    end) ;;
+       | inr vid =>
+         if maybeLookup allocs vid isn't Some reg
+         then errorT $ VarWithoutAllocation vid
+         else
+           var <-- checkVar vid ;;
+           match varKind ref with
+           | Input  => checkAlloc var
+           | Temp   => pure tt         (* jww (2015-07-04): What to do here? *)
+           | Output => replaceReg reg var
+           end
+       end)
+   else pure tt) ;;
 
   lift $ lift $ applyAllocs oinfo op allocs.
 
 Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
   Verified unit :=
+  if useVerifier isn't VerifyEnabled then pure tt else
   forM_ moves $ fun mv =>
     st <-- use _verDesc ;;
     match mv with
     | Move fromReg toReg =>
       if vnth (rsRegs st) fromReg isn't Some fromVar
       then errorT $ RegNotAllocated fromReg
-      else replaceReg toReg fromVar
+      else
+        freeReg fromReg fromVar ;;
+        allocReg toReg fromVar
 
     | Swap fromReg toReg =>
       if vnth (rsRegs st) fromReg isn't Some fromVar
@@ -371,6 +387,7 @@ Definition verifyResolutions (moves : seq (ResolvingMove maxReg)) :
       if vnth (rsRegs st) fromReg isn't Some fromVar
       then errorT $ RegNotAllocated fromReg
       else
+        freeReg fromReg fromVar ;;
         stackVar <-- checkVar toSpillSlot ;;
         when (fromVar != stackVar) $
           errorT $ SpillingToWrongSlot fromReg toSpillSlot fromVar

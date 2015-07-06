@@ -192,7 +192,7 @@ Proof.
   by ordered.
 Qed.
 
-Definition intervalsIntersect `(Interval i) `(Interval j) : bool :=
+Definition intervalsIntersect (i : IntervalDesc) (j : IntervalDesc) : bool :=
   let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
   has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
       (NE_to_list (rds i)).

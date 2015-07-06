@@ -77,7 +77,7 @@ Definition linearScan
   (maxReg : nat) (registers_exist : maxReg > 0)
   (binfo : BlockInfo blockType1 blockType2 opType1 opType2)
   (oinfo : @OpInfo maxReg m dict opType1 opType2)
-  (blocks : seq blockType1) : m (Details maxReg) :=
+  (useVerifier : UseVerifier) (blocks : seq blockType1) : m (Details maxReg) :=
   (* order blocks and operations (including loop detection) *)
   z <-- computeBlockOrder binfo blocks ;;
   let: (loops, blocks1) := z in
@@ -100,7 +100,7 @@ Definition linearScan
       let sd     := finalizeScanState ssig'.2 opCount.*2 in
       let allocs := determineAllocations sd in
       mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-      blocks2  <-- assignRegNum binfo oinfo allocs liveSets'
+      blocks2  <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
                                 mappings loops blocks1 ;;
       pure $ Build_Details _ _ maxReg None
         liveSets' blocks blocks1 blocks2
