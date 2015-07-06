@@ -204,20 +204,6 @@ Definition runVerified `(m : Verified b) (i : A) :
   mType ((OpId * seq AllocError) + b) :=
   fst <$> m (newVerifiedSig i).
 
-Definition decide {T : Type} (H : bool)
-  (kt : (H = true)  -> T)
-  (kf : (H = false) -> T) : T :=
-  (fun (if_true  : (fun b : bool => protect_term (H = b) -> T) true)
-       (if_false : (fun b : bool => protect_term (H = b) -> T) false) =>
-    if H as b return ((fun b0 : bool => protect_term (H = b0) -> T) b)
-    then if_true
-    else if_false)
-  (fun (E : H = true)  => kt E)
-  (fun (E : H = false) => kf E)
-  (erefl H).
-
-Arguments decide {T} H kt kf.
-
 Variable pc : OpId.
 
 Definition errorsT {a} (errs : seq AllocError) : Verified a :=
