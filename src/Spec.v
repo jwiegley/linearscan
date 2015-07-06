@@ -570,41 +570,159 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". exact: IHst.
 Qed.
 
-(*
-Lemma register_allocations_disjoint `(st : @ScanState maxReg b sd) :
-  forall reg : PhysReg maxReg,
+Lemma map_filter_fst_widen :
+  forall (b : eqType) c n (f : ('I_n.+1 * b) -> c)
+         (xs : seq ('I_n * b)) (x : b),
+    [seq f i | i <- [seq widen_fst p | p <- xs] & snd i == x] =
+    [seq f (widen_fst i) | i <- xs & snd i == x].
+Proof.
+  move=> b c n f.
+  elim=> //= [y ys IHys] x.
+  case E: (snd y == x) => /=.
+    by rewrite IHys.
+  exact: IHys.
+Qed.
+
+Lemma map_filter_vshiftin :
+  forall (b : eqType) n (xs : seq ('I_n * b)) (x : b)
+         (v : Vec IntervalSig n) (y : IntervalSig),
+  [seq (vnth (vshiftin v y) (fst i)).1
+     | i <- [seq widen_fst j | j <- xs] & snd i == x] =
+  [seq (vnth v (fst i)).1 | i <- xs & snd i == x].
+Proof.
+  move=> b n.
+  elim=> //= [z zs IHzs] x v y.
+  case E: (snd z == x) => /=.
+    by rewrite IHzs vnth_vshiftin.
+  exact: IHzs.
+Qed.
+
+Lemma map_filter_vreplace :
+  forall (b : eqType) n (xs : seq ('I_n * b)) (k : 'I_n) (x : b)
+         (v : Vec IntervalSig n) (y : IntervalSig),
+  [seq (vnth (vreplace v k y) (fst i)).1 | i <- xs & snd i == x] =
+  [seq (vnth v (fst i)).1 | i <- xs & snd i == x].
+Proof.
+  move=> b n.
+  elim=> //= [z zs IHzs] k x v y.
+  case: (snd z == x) => /=.
+    rewrite IHzs.
+    case E: (k == fst z).
+      move/eqP in E.
+      rewrite E.
+      rewrite vnth_vreplace.
+      admit.
+    move/negbT in E.
+    by rewrite vnth_vreplace_neq.
+  exact: IHzs.
+Admitted.
+
+Definition intervalsForReg `(sd : ScanStateDesc maxReg)
+  (reg : PhysReg maxReg) : seq IntervalDesc :=
   let descOf {a} (x : IntervalId sd * a) :=
       getIntervalDesc (getInterval (fst x)) in
-  let intervalsForReg : seq IntervalDesc :=
-    (if vnth (fixedIntervals sd) reg is Some int
-     then [:: int.1]
-     else [::]) ++
-    [seq descOf x | x <-  handled sd & snd x == Some reg] ++
-    [seq descOf x | x <-   active sd & snd x == reg] ++
-    [seq descOf x | x <- inactive sd & snd x == reg] in
-  ~~ has (fun int1 : IntervalDesc =>
-            has (fun int2 : IntervalDesc =>
-                   (ivar int1 != ivar int2) &&
-                   intervalsIntersect int1 int2)
-                intervalsForReg)
-         intervalsForReg.
+  (if vnth (fixedIntervals sd) reg is Some int then [:: int.1] else [::])
+  ++ [seq descOf x | x <-  handled sd & snd x == Some reg]
+  ++ [seq descOf x | x <-   active sd & snd x ==      reg]
+  ++ [seq descOf x | x <- inactive sd & snd x ==      reg].
+
+Definition regAvailForInterval `(sd : ScanStateDesc maxReg)
+  (d : IntervalDesc) (reg : PhysReg maxReg) : bool :=
+  ~~ has (intervalsIntersect d) (intervalsForReg sd reg).
+
+Fixpoint between_all `(R : rel a) (xs : seq a) : bool :=
+  match xs with
+  | nil => true
+  | cons y ys => has (R y) xs && between_all R ys
+  end.
+
+Lemma between_all_cat : forall a (R : rel a) (xs ys : seq a),
+  between_all R (xs ++ ys) = between_all R xs && between_all R ys.
+Proof.
+Admitted.
+
+Definition intersecting (int1 int2 : IntervalDesc) :=
+  (ivar int1 != ivar int2) && intervalsIntersect int1 int2.
+
+Notation "f .: g" := (fun x y => f (g x y)) (at level 100).
+
+Theorem no_allocations_overlap `(st : @ScanState maxReg InUse sd) :
+  forall reg : PhysReg maxReg,
+  between_all (negb .: intersecting) (intervalsForReg sd reg).
 Proof.
   move=> reg.
+  rewrite /intervalsForReg.
   ScanState_cases (induction st) Case; simpl in *.
   - Case "ScanState_nil". by rewrite vnth_vconst.
   - Case "ScanState_newUnhandled".
-    rewrite -map_comp.
-    apply IHst.
+    rewrite !map_filter_vshiftin.
     exact: IHst.
   - Case "ScanState_finalize". exact: IHst.
-  - Case "ScanState_newHandled". exact: IHst.
-  - Case "ScanState_setInterval". exact: IHst.
-  - Case "ScanState_setFixedIntervals". exact: IHst.
-  - Case "ScanState_moveUnhandledToActive". exact: IHst.
+  - Case "ScanState_newHandled".
+    rewrite !map_filter_vshiftin.
+    exact: IHst.
+  - Case "ScanState_setInterval".
+    (* jww (2015-07-05): We should be able to prove this based on the fact
+       that intervals may only contract. *)
+    admit.
+  - Case "ScanState_setFixedIntervals".
+    admit. (* evidence needed that each new interval is available *)
+  - Case "ScanState_moveUnhandledToActive".
+    rewrite !between_all_cat in IHst *.
+    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
+    apply/andP; split=> //.
+    apply/andP; split=> //.
+    apply/andP; split=> //.
+    case E: (reg0 == reg) => //.
+    rewrite map_cons /=.
+    apply/andP; split=> //.
+    apply/orP; left.
+    rewrite /intersecting.
+    apply/nandP; left.
+    by rewrite negb_eq.
   - Case "ScanState_moveUnhandledToHandled". exact: IHst.
-  - Case "ScanState_moveActiveToInactive". exact: IHst.
-  - Case "ScanState_moveActiveToHandled". exact: IHst.
-  - Case "ScanState_moveInactiveToActive". exact: IHst.
-  - Case "ScanState_moveInactiveToHandled". exact: IHst.
-Qed.
-*)
+  - Case "ScanState_moveActiveToInactive".
+    rewrite !between_all_cat in IHst *.
+    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
+    apply/andP; split=> //.
+    apply/andP; split=> //.
+    apply/andP; split.
+      admit.
+    case E: (snd x == reg) => //.
+    rewrite map_cons /=.
+    apply/andP; split=> //.
+    apply/orP; left.
+    rewrite /intersecting.
+    apply/nandP; left.
+    by rewrite negb_eq.
+  - Case "ScanState_moveActiveToHandled".
+    rewrite !between_all_cat in IHst *.
+    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
+    apply/andP; split=> //.
+    apply/andP; split.
+      admit.
+    apply/andP; split => //.
+    admit.
+  - Case "ScanState_moveInactiveToActive".
+    rewrite !between_all_cat in IHst *.
+    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
+    apply/andP; split=> //.
+    apply/andP; split=> //.
+    apply/andP; split.
+      case E: (snd x == reg) => //.
+      rewrite map_cons /=.
+      apply/andP; split=> //.
+      apply/orP; left.
+      rewrite /intersecting.
+      apply/nandP; left.
+      by rewrite negb_eq.
+    admit.
+  - Case "ScanState_moveInactiveToHandled".
+    rewrite !between_all_cat in IHst *.
+    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
+    apply/andP; split=> //.
+    apply/andP; split.
+      admit.
+    apply/andP; split => //.
+    admit.
+Admitted.
