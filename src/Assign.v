@@ -67,11 +67,11 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   forFoldrM [::] moves $ fun mv acc =>
     let k := fmap (@Some _) in
     mops <-- match mv with
-      | Swap    sreg dreg => k $ swapOp oinfo sreg dreg
-      | Move    sreg dreg => k $ moveOp oinfo sreg dreg
-      | Spill   sreg vid  => k $ saveOp oinfo sreg (Some vid)
-      | Restore vid  dreg => k $ restoreOp oinfo (Some vid) dreg
-      | Nop               => pure None
+      | Swap    sreg svid dreg dvid => k $ swapOp oinfo sreg svid dreg dvid
+      | Move    sreg svid dreg      => k $ moveOp oinfo sreg svid dreg
+      | Spill   sreg svid           => k $ saveOp oinfo sreg svid
+      | Restore dvid dreg           => k $ restoreOp oinfo dvid dreg
+      | _ => pure None
       end ;;
     pure $ if mops is Some ops then ops ++ acc else acc.
 
@@ -98,27 +98,28 @@ Definition _verExt {maxVar : nat} := @_verExt maxReg maxVar AssnStateDesc.
 
 Variable useVerifier : UseVerifier.
 
-Definition setAllocations (maxVar : nat) (allocs : seq (Allocation maxReg)) op :
+Definition setAllocations (maxVar : nat) (Hvar : 0 < maxVar)
+  (allocs : seq (Allocation maxReg)) op :
   Verified maxVar (seq opType2) :=
   assn <-- use _verExt ;;
   let opid  := assnOpId assn in
   let vars  := opRefs oinfo op in
   let regs  := concat $ map (varInfoAllocs opid allocs) vars in
-  ops <-- verifyApplyAllocs oinfo opid useVerifier op regs ;;
+  ops <-- verifyApplyAllocs Hvar oinfo opid useVerifier op regs ;;
 
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
      then
        let moves := determineMoves (resolvingMoves allocs opid opid.+2) in
-       verifyResolutions opid useVerifier moves ;;
-       lift $ lift $ generateMoves moves
+       moves' <-- verifyResolutions Hvar opid useVerifier moves ;;
+       lift $ generateMoves moves'
      else pure [::]) ;;
 
-  _verExt \o+ _assnOpId .= opid.+2 ;;
+  _verExt \o+ _assnOpId += 2 ;;
 
   pure $ ops ++ transitions.
 
-Definition considerOps (maxVar : nat)
+Definition considerOps (maxVar : nat) (Hvar : 0 < maxVar)
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
@@ -131,35 +132,36 @@ Definition considerOps (maxVar : nat)
     _verExt \o+ _assnBlockBeg .= opid + (size opsb).*2 ;;
     _verExt \o+ _assnBlockEnd .= opid + (size opsb + size opsm).*2 ;;
 
-    bid <-- lift $ lift $ blockId binfo blk ;;
+    bid <-- lift $ blockId binfo blk ;;
     let: (liveIns, liveOuts) :=
        if IntMap_lookup bid liveSets is Some bls
        then (blockLiveIn bls, blockLiveOut bls)
        else (emptyIntSet, emptyIntSet) in
 
-    verifyBlockBegin opid useVerifier bid liveIns loops ;;
+    verifyBlockBegin Hvar opid useVerifier bid liveIns loops ;;
 
+    let eg := emptyGraph (@determineEdge maxReg) in
     let: (gbeg, gend) :=
        if IntMap_lookup bid mappings is Some graphs
        then graphs
-       else (emptyGraph, emptyGraph) in
+       else (eg, eg) in
 
-    let k := setAllocations allocs in
-    opsb' <-- concatMapM k opsb ;;
+    let k := setAllocations Hvar allocs in
+    opsb'     <-- concatMapM k opsb ;;
 
-    let begMoves := map (@moveFromGraph maxReg) (topsort gbeg) in
-    opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
-    verifyResolutions opid useVerifier begMoves ;;
-    bmoves <-- lift $ lift $ generateMoves begMoves ;;
+    let begMoves := topsort gbeg (@splitEdge maxReg) in
+    opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    begMoves' <-- verifyResolutions Hvar opid.-2 useVerifier begMoves ;;
+    bmoves    <-- lift $ generateMoves begMoves' ;;
 
-    opsm' <-- concatMapM k opsm ;;
+    opsm'     <-- concatMapM k opsm ;;
 
-    let endMoves := map (@moveFromGraph maxReg) (topsort gend) in
-    opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
-    verifyResolutions opid useVerifier endMoves ;;
-    emoves <-- lift $ lift $ generateMoves endMoves ;;
+    let endMoves := topsort gend (@splitEdge maxReg) in
+    opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    endMoves' <-- verifyResolutions Hvar opid.-2 useVerifier endMoves ;;
+    emoves    <-- lift $ generateMoves endMoves' ;;
 
-    opse' <-- concatMapM k opse ;;
+    opse'     <-- concatMapM k opse ;;
 
     verifyBlockEnd opid useVerifier bid liveOuts ;;
 
@@ -187,13 +189,18 @@ Definition assignRegNum
   (allocs   : seq (Allocation maxReg))
   (liveSets : IntMap BlockLiveSets)
   (mappings : IntMap (BlockMoves maxReg))
-  (loops : LoopState)
+  (loops    : LoopState)
   (blocks   : seq blockType1) :
-  mType ((OpId * seq AllocError) + seq blockType2) :=
+  mType (IntMap (seq (@ResolvingMove maxReg)) *
+         (IntMap (seq AllocError) + seq blockType2)) :=
   let maxVar := forFold 0 allocs $ fun acc x =>
     maxn acc (ivar (intVal x)) in
-  runVerified (maxVar:=maxVar.+1)
-    (considerOps allocs liveSets mappings loops blocks) newAssnStateDesc.
+  res <-- considerOps (ltn0Sn maxVar) allocs liveSets mappings loops blocks
+                      (newVerifiedSig maxReg maxVar.+1 newAssnStateDesc) ;;
+  let: (bs, st) := res in
+  pure (verMoves st, if IntMap_toList (verErrors st) is [::]
+                     then inr bs
+                     else inl (verErrors st)).
 
 End Assign.
 

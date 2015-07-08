@@ -192,13 +192,62 @@ Proof.
   by ordered.
 Qed.
 
+(* This version allows overlap in lifetime holes. *)
+(*
 Definition intervalsIntersect (i : IntervalDesc) (j : IntervalDesc) : bool :=
   let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
   has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
       (NE_to_list (rds i)).
 
-Definition intervalIntersectionPoint `(Interval i) `(Interval j) :
+Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
+Proof.
+  move=> x y.
+  rewrite /intervalsIntersect.
+  case: x => [? ? ? rdsx] /=;
+  case: y => [? ? ? rdsy] /=.
+  elim: rdsx => /= [x|x xs IHxs].
+    rewrite Bool.orb_false_r.
+    elim: rdsy => /= [y|y ys IHys].
+      by rewrite !Bool.orb_false_r rangesIntersect_sym.
+    by rewrite rangesIntersect_sym IHys Bool.orb_false_r.
+  rewrite {}IHxs.
+  elim: rdsy => /= [y|y ys IHys].
+    by rewrite !Bool.orb_false_r rangesIntersect_sym.
+  rewrite rangesIntersect_sym.
+  rewrite -!orbA; f_equal.
+  rewrite orbC -!orbA; f_equal.
+  by rewrite -orbC IHys.
+Qed.
+*)
+
+Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
+  (iend x == iend y) || ((ibeg x < iend y) && (ibeg y < iend x)).
+
+Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
+Proof.
+  move=> x y.
+  rewrite /intervalsIntersect.
+  case: x => [xb xe ? ?] /=;
+  case: y => [yb ye ? ?] /=.
+  rewrite eq_sym; f_equal.
+  by intuition.
+Qed.
+
+Lemma Interval_beg_odd `(i : Interval d) : odd (ibeg d).
+Proof.
+  induction i; simpl in *.
+    exact: Range_beg_odd.
+  exact: Range_beg_odd r.2.
+Qed.
+
+Definition intervalIntersectionPoint `(xr : Interval x) `(yr : Interval y) :
   option oddnum :=
+  if intervalsIntersect xr yr
+  then Some (if ibeg x < ibeg y
+             then (ibeg y; Interval_beg_odd yr)
+             else (ibeg x; Interval_beg_odd xr))
+  else None.
+(*
   NE_foldl (fun mx rd =>
     option_choose mx
       (NE_foldl
@@ -207,6 +256,7 @@ Definition intervalIntersectionPoint `(Interval i) `(Interval j) :
               (rangeIntersectionPoint rd.2 rd'.2))
          None (rds j)))
     None (rds i).
+*)
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in

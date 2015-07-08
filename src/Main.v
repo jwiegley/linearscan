@@ -64,9 +64,10 @@ Definition toScanStateDescSet `(sd : ScanStateDesc maxReg) :
 Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   reason          : option (seq SSTrace * FinalStage);
   liveSets        : IntMap BlockLiveSets;
+  resolvingMoves  : IntMap (seq ResolvingMoveSet);
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
-  allocatedBlocks : (OpId * seq AllocError) + seq blockType2;
+  allocatedBlocks : IntMap (seq AllocError) + seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
   loopState       : LoopState
@@ -91,19 +92,20 @@ Definition linearScan
   let opCount := (countOps binfo blocks1).+1 in
   match walkIntervals registers_exist ssig.2 opCount with
   | inl (err, ssig') =>
-    pure $ Build_Details _ _ maxReg
-      (Some (err, AllocatingRegistersFailed))
-      liveSets' blocks blocks1 (inr [::])
+    pure $ Build_Details _ _ maxReg (Some (err, AllocatingRegistersFailed))
+      liveSets' emptyIntMap blocks blocks1 (inr [::])
       (Some (toScanStateDescSet ssig.1))
       (Some (toScanStateDescSet ssig'.1)) loops
   | inr ssig' =>
       let sd     := finalizeScanState ssig'.2 opCount.*2 in
       let allocs := determineAllocations sd in
       mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-      blocks2  <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
-                                mappings loops blocks1 ;;
+      res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
+                           mappings loops blocks1 ;;
+      let: (moves, blocks2) := res in
       pure $ Build_Details _ _ maxReg None
-        liveSets' blocks blocks1 blocks2
+        liveSets' (IntMap_map (map (@weakenResolvingMove maxReg)) moves)
+        blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet sd)) loops
   end.

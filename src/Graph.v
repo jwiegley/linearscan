@@ -8,20 +8,25 @@ Generalizable All Variables.
 Section Graph.
 
 Variable a : eqType.
+Variable b : eqType.
 
 Record Graph := {
   vertices : seq (option a);
-  edges    : seq (option a * option a)
+  edges    : seq b;
+  edge_f   : b -> (option a * option a)
 }.
 
-Definition emptyGraph :=
+Definition emptyGraph (f : b -> (option a * option a)) : Graph :=
   {| vertices := [::]
-   ; edges    := [::] |}.
+   ; edges    := [::]
+   ; edge_f   := f
+   |}.
 
 Definition addVertex v (g : Graph) : Graph :=
   (fun vg =>
     {| vertices := if v \in vg then vg else v :: vg
-     ; edges := edges g
+     ; edges    := edges g
+     ; edge_f   := edge_f g
      |})
   (vertices g).
 
@@ -29,22 +34,26 @@ Definition addEdge e (g : Graph) : Graph :=
   let g' :=
     (fun eg =>
       {| vertices := vertices g
-       ; edges := if e \in eg then eg else e :: eg
+       ; edges    := if e \in eg then eg else e :: eg
+       ; edge_f   := edge_f g
        |})
     (edges g) in
-  addVertex (fst e) (addVertex (snd e) g').
+  let: (a, z) := edge_f g' e in
+  addVertex a (addVertex z g').
 
-Definition removeEdge (x : option a * option a) g :=
+Definition removeEdge (x : b) g : Graph :=
   {| vertices := vertices g
-   ; edges    := filter (fun y => y != x) (edges g) |}.
+   ; edges    := filter (fun y => y != x) (edges g)
+   ; edge_f   := edge_f g
+   |}.
 
 Definition connections f (x : option a) g :=
-  filter ((fun y : option a => y == x) \o f) (edges g).
+  filter ((fun y : option a => y == x) \o f \o edge_f g) (edges g).
 
 Definition outbound := connections (@fst _ _).
 Definition inbound  := connections (@snd _ _).
 
-Fixpoint tsort' fuel l roots g :=
+Fixpoint tsort' fuel l (roots : seq (option a)) (k : b -> seq b) g : seq b :=
   (* The fuel represents the fact that we must only call tsort' once for
      each vertex in the graph.
 
@@ -52,7 +61,8 @@ Fixpoint tsort' fuel l roots g :=
      termination, since any error in choice of fuel is not propagated, making
      this function useless in the context of proof. *)
   if fuel isn't S fuel then rev l else
-  if edges g isn't (se, de) :: es then rev l else
+
+  if edges g isn't e :: es then rev l else
 
   let: next :=
     if roots is n :: s
@@ -65,36 +75,37 @@ Fixpoint tsort' fuel l roots g :=
 
          jww (2015-01-30): This means I need a way to indicate swaps here,
          since effectively what I am doing now is swapping through memory. *)
-      ([:: de], addEdge (se, None) (removeEdge (se, de) g)) in
-  if next isn't (n :: s, g') then [::] else
+      ([:: snd (edge_f g e)], foldr addEdge (removeEdge e g) (k e)) in
+  if next isn't (n :: s, g') then [::] else (* always matches *)
 
   let outEdges    := outbound n g' in
   let: (res, g'') := foldl (fun acc e =>
                               let: (res, g'') := acc in
                               (e :: res, removeEdge e g''))
                            ([::], g') outEdges in
-  let outNodes    := map (@snd _ _) outEdges in
+  let outNodes    := map (@snd _ _ \o edge_f g) outEdges in
   let s'          := s ++ filter (@nilp _ \o inbound ^~ g'') outNodes in
 
-  tsort' fuel (l ++ res) s' g''.
+  tsort' fuel (l ++ res) s' k g''.
 
-Definition topsort g :=
+(* The function [k] takes an edge, and must yield an edge whose target (as
+   given by [edge_f g]) is [None]. *)
+Definition topsort g (k : b -> seq b) : seq b :=
   let noInbound :=
       (fun xs => [seq x <- vertices g | x \notin xs])
-      (map (@snd _ _) (edges g)) in
+      (map (@snd _ _ \o edge_f g) (edges g)) in
   (* +1 is added to the fuel in case None is injected as a root *)
-  tsort' (size (vertices g)).+1 [::] noInbound g.
+  tsort' (size (vertices g)).+1 [::] noInbound k g.
 
 End Graph.
 
-Arguments emptyGraph [a].
-Arguments addVertex [a] v g.
-Arguments addEdge [a] e g.
-Arguments removeEdge [a] _ g.
-Arguments connections [a] _ _ g.
-Arguments outbound [a] _ g.
-Arguments inbound [a] _ g.
-Arguments topsort [a] g.
+Arguments emptyGraph {a b} f.
+Arguments addVertex {a b} v g.
+Arguments addEdge {a b} e g.
+Arguments removeEdge {a b} _ g.
+Arguments outbound {a b} _ g.
+Arguments inbound {a b} _ g.
+Arguments topsort {a b} g k.
 
 (* Compute *)
 (*   ( addEdge (Some  1, Some  3) *)

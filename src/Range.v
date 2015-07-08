@@ -28,7 +28,7 @@ Record RangeDesc : Set := {
 
 Section EqRange.
 
-Fixpoint eqrange s1 s2 {struct s2} :=
+Definition eqrange s1 s2 :=
   match s1, s2 with
   | {| rbeg := rb1; rend := re1; ups := rus1 |},
     {| rbeg := rb2; rend := re2; ups := rus2 |} =>
@@ -653,11 +653,58 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition rangesIntersect `(Range x) `(Range y) : bool :=
-  (rend x == rend y) ||
-  (if rbeg x < rbeg y
-   then rbeg y < rend x
-   else rbeg x < rend y).
+Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : bool :=
+  (rend x == rend y) || ((rbeg x < rend y) && (rbeg y < rend x)).
+
+Example rangesIntersect_ex1 :
+  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 4 ; rend := 8 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex2 :
+  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 5 ; rend := 8 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex3 :
+  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 6 ; rend := 8 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex4 :
+  true = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex5 :
+  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 3 ; rend := 5 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex6 :
+  true = rangesIntersect {| rbeg := 2 ; rend := 4 ; ups  := [::] |}
+                         {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex7 :
+  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex8 :
+  false = rangesIntersect {| rbeg := 2 ; rend := 2 ; ups  := [::] |}
+                          {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Lemma rangesIntersect_sym : symmetric rangesIntersect.
+Proof.
+  move=> x y.
+  rewrite /rangesIntersect.
+  case: x => [xb xe ?] /=;
+  case: y => [yb ye ?] /=.
+  rewrite eq_sym; f_equal.
+  by intuition.
+Qed.
 
 Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
   option oddnum :=

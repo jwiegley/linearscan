@@ -597,26 +597,6 @@ Proof.
   exact: IHzs.
 Qed.
 
-Lemma map_filter_vreplace :
-  forall (b : eqType) n (xs : seq ('I_n * b)) (k : 'I_n) (x : b)
-         (v : Vec IntervalSig n) (y : IntervalSig),
-  [seq (vnth (vreplace v k y) (fst i)).1 | i <- xs & snd i == x] =
-  [seq (vnth v (fst i)).1 | i <- xs & snd i == x].
-Proof.
-  move=> b n.
-  elim=> //= [z zs IHzs] k x v y.
-  case: (snd z == x) => /=.
-    rewrite IHzs.
-    case E: (k == fst z).
-      move/eqP in E.
-      rewrite E.
-      rewrite vnth_vreplace.
-      admit.
-    move/negbT in E.
-    by rewrite vnth_vreplace_neq.
-  exact: IHzs.
-Admitted.
-
 Definition intervalsForReg `(sd : ScanStateDesc maxReg)
   (reg : PhysReg maxReg) : seq IntervalDesc :=
   let descOf {a} (x : IntervalId sd * a) :=
@@ -631,33 +611,241 @@ Definition regAvailForInterval `(sd : ScanStateDesc maxReg)
   ~~ has (intervalsIntersect d) (intervalsForReg sd reg).
 
 Fixpoint between_all `(R : rel a) (xs : seq a) : bool :=
-  match xs with
-  | nil => true
-  | cons y ys => has (R y) xs && between_all R ys
-  end.
+  if xs is y :: ys
+  then all (R y) ys && between_all R ys
+  else true.
 
-Lemma between_all_cat : forall a (R : rel a) (xs ys : seq a),
-  between_all R (xs ++ ys) = between_all R xs && between_all R ys.
+Lemma all_xpredT_true : forall a (xs : seq a), all xpredT xs.
+Proof. by move=> a; elim. Qed.
+
+Lemma all_catC {a} (P : pred a) (xs ys : seq a) :
+  all P (xs ++ ys) = all P (ys ++ xs).
+Proof.
+  case: xs => /= [|x xs] in ys *.
+    by rewrite cats0.
+  case: ys => // [|y ys].
+    by rewrite cats0.
+  by rewrite !all_cat /= andbA andbC.
+Qed.
+
+Lemma all_all_cons : forall a (xs ys : seq a) (x : a) (R : rel a)
+  (Hsym : symmetric R),
+  all (fun y : a => all (R y) (x :: xs)) ys =
+  all (R x) ys && all (fun y : a => all (R y) xs) ys.
+Proof.
+  move=> a xs ys x R Hsym.
+  elim: ys => // [y ys IHys].
+  rewrite [all]lock -{1}lock /= -lock IHys /= -!andbA.
+  congr (_ && _).
+    by rewrite Hsym.
+  by rewrite and_swap.
+Qed.
+
+Lemma between_all_cat : forall a (xs ys : seq a) (R : rel a)
+  (Hsym : symmetric R),
+  between_all R (xs ++ ys) =
+  [&& between_all R xs
+  ,   between_all R ys
+  ,   all (fun x => all (R x) ys) xs
+  &   all (fun y => all (R y) xs) ys
+  ].
+Proof.
+  move=> a xs ys R Hsym.
+  elim: xs => [|x xs IHxs] in ys Hsym *.
+    by rewrite /= all_xpredT_true Bool.andb_true_r.
+  rewrite cat_cons all_all_cons;
+    last by exact: Hsym.
+  rewrite /= all_cat {}IHxs /=;
+    last by exact: Hsym.
+  rewrite !andbA; f_equal.
+  rewrite [X in _ = X]andbC.
+  rewrite !andbA; f_equal.
+  rewrite [X in _ = X]andbC.
+  rewrite !andbA; f_equal.
+  rewrite Bool.andb_diag.
+  by rewrite -!andbA and_swap.
+Qed.
+
+Lemma between_all_catC {a} (xs ys : seq a) (R : rel a) (Hsym : symmetric R) :
+  between_all R (xs ++ ys) = between_all R (ys ++ xs).
+Proof.
+  case: xs => /= [|x xs] in ys *.
+    by rewrite cats0.
+  case: ys => // [|y ys].
+    by rewrite cats0.
+  rewrite !between_all_cat; try exact: Hsym.
+  rewrite !all_cat /= andbA andbC -!andbA.
+  congr (_ && _).
+  congr (_ && _).
+  rewrite ![LHS]andbA and_swap !andbA andbC -!andbA.
+  congr (_ && _).
+  rewrite [R y x]Hsym.
+  rewrite [LHS]andbC -!andbA.
+  rewrite and_swap.
+  rewrite andbA.
+  rewrite and_swap -!andbA.
+  congr (_ && _).
+Admitted.
+
+Lemma all_rem_filter_f :
+  forall (a : eqType) (xs : seq a) (y : a)
+         b (Q : pred b) (f : a -> b) (P : pred a),
+   all Q [seq f i | i <- xs & P i] ->
+   all Q [seq f i | i <- rem y xs & P i].
+Proof.
+  move=> a xs y b Q f P.
+  elim: xs => //= [x xs IHxs].
+  case E: (x == y) => /=.
+    move/eqP in E.
+    rewrite {}E.
+    case: (P y) => //=.
+    by move/andP=> [*].
+  case: (P x) => //=.
+  move/andP=> [*].
+  apply/andP; split => //.
+  exact: IHxs.
+Qed.
+
+Lemma between_all_rem :
+  forall (a : eqType) (xs : seq a) (y : a)
+         b (R : rel b) (f : a -> b) (P : pred a),
+  between_all R [seq f i | i <- xs & P i]
+    -> between_all R [seq f i | i <- rem y xs & P i].
+Proof.
+  move=> a xs y b R f P.
+  elim: xs => //= [x xs IHxs].
+  case E: (x == y) => /=.
+    case: (P x) => //=.
+    by move/andP=> [H1 H2].
+  case: (P x) => //=.
+  move/andP=> [H1 H2].
+  apply/andP; split.
+    exact: all_rem_filter_f.
+  exact: IHxs.
+Qed.
+
+Arguments between_all_rem : default implicits.
+
+Lemma all_impl3of4 :
+  forall a (x y z w v : seq a) (P : pred a) (H : all P z -> all P v),
+    all P (x ++ y ++ z ++ w) ->
+    all P (x ++ y ++ v ++ w).
 Proof.
 Admitted.
 
-Definition intersecting (int1 int2 : IntervalDesc) :=
-  (ivar int1 != ivar int2) && intervalsIntersect int1 int2.
+Lemma all_impl4of4 :
+  forall a (x y z w v : seq a) (P : pred a) (H : all P w -> all P v),
+    all P (x ++ y ++ z ++ w) ->
+    all P (x ++ y ++ z ++ v).
+Proof.
+Admitted.
+
+Lemma between_all_impl3of4 :
+  forall a (x y z w v : seq a) (R : rel a)
+         (H : between_all R z -> between_all R v),
+    between_all R (x ++ y ++ z ++ w) ->
+    between_all R (x ++ y ++ v ++ w).
+Proof.
+Admitted.
+
+Lemma between_all_impl4of4 :
+  forall a (x y z w v : seq a) (R : rel a)
+         (H : between_all R w -> between_all R v),
+    between_all R (x ++ y ++ z ++ w) ->
+    between_all R (x ++ y ++ z ++ v).
+Proof.
+Admitted.
+
+Lemma between_all_impl3of3 :
+  forall a (x y z v : seq a) (R : rel a)
+         (H : between_all R z -> between_all R v),
+    between_all R (x ++ y ++ z) ->
+    between_all R (x ++ y ++ v).
+Proof.
+Admitted.
+
+Lemma between_all_inv3of4 :
+  forall (a : eqType) b (x y w : seq b) (z : seq a) (s : a) (P : pred a)
+         (f : a -> b) (R : rel b),
+    between_all R (x ++ y ++ [seq f i | i <- z & P i] ++ w)
+      -> s \in z
+      -> all (R (f s)) (x ++ y ++ [seq f i | i <- z & P i] ++ w).
+Proof.
+Admitted.
+
+Lemma between_all_inv4of4 :
+  forall (a : eqType) b (x y z : seq b) (w : seq a) (s : a) (P : pred a)
+         (f : a -> b) (R : rel b),
+    between_all R (x ++ y ++ z ++ [seq f i | i <- w & P i])
+      -> s \in w
+      -> all (R (f s)) (x ++ y ++ z ++ [seq f i | i <- w & P i]).
+Proof.
+Admitted.
 
 Notation "f .: g" := (fun x y => f (g x y)) (at level 100).
 
-Theorem no_allocations_overlap `(st : @ScanState maxReg InUse sd) :
+Ltac nao_setup IHst :=
+  rewrite !between_all_cat in IHst *;
+  move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]];
+  do !(apply/andP; split=> //).
+
+Ltac nao_resolve :=
+  rewrite map_cons /=;
+  apply/andP; split=> //;
+  apply/orP; left;
+  apply/nandP; left;
+  by rewrite negb_eq.
+
+Lemma sym_neg : forall a (R : rel a), symmetric R -> symmetric (negb .: R).
+Proof.
+  move=> a R H x y.
+  by rewrite H.
+Qed.
+
+Lemma between_all_map_rem_cons_f :
+  forall b (R : rel b) (a : eqType) (f : a -> b)
+         (xs ys : seq a) (x : a) (P : pred a),
+  between_all R [seq f i | i <- [seq j <- rem x xs | P j] ++
+                                x :: [seq j <- ys | P j]] =
+  between_all R [seq f i | i <- [seq j <- xs | P j] ++
+                                [seq j <- ys | P j]].
+Proof.
+Admitted.
+
+Lemma between_all_map_catC :
+  forall b (R : rel b) (a : eqType) (f : a -> b) (xs ys : seq a),
+  between_all R [seq f i | i <- xs ++ ys] =
+  between_all R [seq f i | i <- ys ++ xs].
+Proof.
+Admitted.
+
+Lemma all_transport : forall a (xs : seq a) (P Q : pred a),
+  (forall x : a, P x = Q x) -> all P xs = all Q xs.
+Admitted.
+
+Lemma contractions_disjoint :
+  forall x y z : IntervalDesc,
+    ~~ intervalsIntersect x y ->
+    ibeg z == ibeg y ->
+    iend z <= iend y ->
+    ~~ intervalsIntersect x z.
+Admitted.
+
+Theorem no_allocations_overlap `(st : @ScanState maxReg InUse sd)
+  (registers_exist : maxReg > 0) :
   forall reg : PhysReg maxReg,
-  between_all (negb .: intersecting) (intervalsForReg sd reg).
+  between_all (negb .: intervalsIntersect) (intervalsForReg sd reg).
 Proof.
   move=> reg.
   rewrite /intervalsForReg.
   ScanState_cases (induction st) Case; simpl in *.
-  - Case "ScanState_nil". by rewrite vnth_vconst.
+  - Case "ScanState_nil".
+    by rewrite vnth_vconst.
   - Case "ScanState_newUnhandled".
     rewrite !map_filter_vshiftin.
     exact: IHst.
-  - Case "ScanState_finalize". exact: IHst.
+  - Case "ScanState_finalize".
+    exact: IHst.
   - Case "ScanState_newHandled".
     rewrite !map_filter_vshiftin.
     exact: IHst.
@@ -666,63 +854,121 @@ Proof.
        that intervals may only contract. *)
     admit.
   - Case "ScanState_setFixedIntervals".
-    admit. (* evidence needed that each new interval is available *)
+    have Hneeded :
+      forall reg,
+        if vnth regs reg is Some int
+        then all (negb \o intervalsIntersect int.1)
+                 (intervalsForReg sd reg)
+        else true
+          by admit.
+    specialize (Hneeded reg).
+    rewrite /intervalsForReg in Hneeded.
+    have Hsym := sym_neg intervalsIntersect_sym.
+    rewrite between_all_cat; last exact: Hsym.
+    rewrite between_all_cat in IHst; last exact: Hsym.
+    case: (vnth regs reg) => [int|] in Hneeded *.
+      move: Hneeded.
+      rewrite all_cat.
+      move/andP => [H1 H2].
+      do !(move/andP: IHst => [? IHst]).
+      rewrite !andbA.
+      do !(apply/andP; split => //=).
+      clear -H2.
+      rewrite /funcomp /getInterval in H2.
+      have H0 :
+        (fun y : IntervalDesc => ~~ intervalsIntersect y int.1 && true) =1
+        (fun x : IntervalDesc => ~~ intervalsIntersect int.1 x).
+        move=> x.
+        by rewrite Bool.andb_true_r intervalsIntersect_sym.
+      rewrite (all_transport _ H0).
+      exact: H2.
+    rewrite /=.
+    rewrite all_xpredT_true Bool.andb_true_r.
+    move: IHst.
+    by move/andP=> [_ /andP [? _]].
   - Case "ScanState_moveUnhandledToActive".
-    rewrite !between_all_cat in IHst *.
-    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
-    apply/andP; split=> //.
-    apply/andP; split=> //.
-    apply/andP; split=> //.
+    have Hsym := sym_neg intervalsIntersect_sym.
     case E: (reg0 == reg) => //.
-    rewrite map_cons /=.
-    apply/andP; split=> //.
-    apply/orP; left.
-    rewrite /intersecting.
-    apply/nandP; left.
-    by rewrite negb_eq.
+    rewrite catA between_all_catC; last exact: Hsym.
+    rewrite cat_cons /=.
+    rewrite all_catC between_all_catC; last exact: Hsym.
+    rewrite -!catA.
+    apply/andP; split => //.
+    move: st.
+    set sd := (X in ScanState _ X).
+    move=> st.
+    have Hneeded :
+      all (negb \o intervalsIntersect (vnth ints (fst x)).1)
+          (intervalsForReg sd reg)
+        by admit.
+    exact: Hneeded.
   - Case "ScanState_moveUnhandledToHandled". exact: IHst.
   - Case "ScanState_moveActiveToInactive".
-    rewrite !between_all_cat in IHst *.
-    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
-    apply/andP; split=> //.
-    apply/andP; split=> //.
-    apply/andP; split.
-      admit.
-    case E: (snd x == reg) => //.
-    rewrite map_cons /=.
-    apply/andP; split=> //.
-    apply/orP; left.
-    rewrite /intersecting.
-    apply/nandP; left.
-    by rewrite negb_eq.
+    case E: (snd x == reg).
+      rewrite -!map_cat.
+      apply: between_all_impl3of3.
+        move=> H0.
+        rewrite between_all_map_rem_cons_f.
+        exact: H0.
+      rewrite !map_cat.
+      by [].
+    apply: between_all_impl3of4.
+      exact: between_all_rem.
+    by [].
   - Case "ScanState_moveActiveToHandled".
-    rewrite !between_all_cat in IHst *.
-    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
-    apply/andP; split=> //.
-    apply/andP; split.
-      admit.
-    apply/andP; split => //.
-    admit.
+    case S: spilled in H0 *.
+      case R: (Nothing == Just reg) => //.
+      apply: between_all_impl3of4.
+        exact: between_all_rem.
+      by [].
+    have Hsym := sym_neg intervalsIntersect_sym.
+    case E: (Just (snd x) == Just reg).
+      rewrite /= between_all_catC /=; last exact: Hsym.
+      apply/andP; split => //.
+        rewrite all_catC.
+        apply: all_impl3of4.
+          exact: all_rem_filter_f.
+        exact: between_all_inv3of4 _ _ _ _ _ (active sd) x _ _ _ IHst H.
+      rewrite between_all_catC; last exact: Hsym.
+      apply: between_all_impl3of4.
+        exact: between_all_rem.
+      by [].
+    apply: between_all_impl3of4.
+      exact: between_all_rem.
+    by [].
   - Case "ScanState_moveInactiveToActive".
-    rewrite !between_all_cat in IHst *.
-    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
-    apply/andP; split=> //.
-    apply/andP; split=> //.
-    apply/andP; split.
-      case E: (snd x == reg) => //.
-      rewrite map_cons /=.
-      apply/andP; split=> //.
-      apply/orP; left.
-      rewrite /intersecting.
-      apply/nandP; left.
-      by rewrite negb_eq.
-    admit.
+    case E: (snd x == reg).
+      rewrite -!map_cat.
+      apply: between_all_impl3of3.
+        move=> H1.
+        rewrite -between_all_map_catC.
+        rewrite between_all_map_rem_cons_f.
+        rewrite between_all_map_catC.
+        exact: H1.
+      rewrite !map_cat.
+      by [].
+    apply: between_all_impl4of4.
+      exact: between_all_rem.
+    by [].
   - Case "ScanState_moveInactiveToHandled".
-    rewrite !between_all_cat in IHst *.
-    move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]].
-    apply/andP; split=> //.
-    apply/andP; split.
-      admit.
-    apply/andP; split => //.
-    admit.
+    case S: spilled.
+      case R: (Nothing == Just reg) => //.
+      apply: between_all_impl4of4.
+        exact: between_all_rem.
+      by [].
+    have Hsym := sym_neg intervalsIntersect_sym.
+    case E: (Just (snd x) == Just reg).
+      rewrite /= between_all_catC /=; last exact: Hsym.
+      apply/andP; split => //.
+        rewrite all_catC.
+        apply: all_impl4of4.
+          exact: all_rem_filter_f.
+        exact: between_all_inv4of4 _ _ _ _ _ (inactive sd) x _ _ _ IHst H.
+      rewrite between_all_catC; last exact: Hsym.
+      apply: between_all_impl4of4.
+        exact: between_all_rem.
+      by [].
+    apply: between_all_impl4of4.
+      exact: between_all_rem.
+    by [].
 Admitted.

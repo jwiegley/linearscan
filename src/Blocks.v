@@ -37,10 +37,10 @@ Definition OpId := nat.
 Record OpInfo `{Monad m} (opType1 opType2 : Set) := {
   opKind      : opType1 -> OpKind;
   opRefs      : opType1 -> seq VarInfo;
-  moveOp      : PhysReg -> PhysReg -> m (seq opType2);
-  swapOp      : PhysReg -> PhysReg -> m (seq opType2);
-  saveOp      : PhysReg -> option VarId -> m (seq opType2);
-  restoreOp   : option VarId -> PhysReg -> m (seq opType2);
+  moveOp      : PhysReg -> VarId -> PhysReg -> m (seq opType2);
+  swapOp      : PhysReg -> VarId -> PhysReg -> VarId -> m (seq opType2);
+  saveOp      : PhysReg -> VarId -> m (seq opType2);
+  restoreOp   : VarId   -> PhysReg -> m (seq opType2);
   applyAllocs : opType1 -> seq (VarId * PhysReg) -> m (seq opType2);
   showOp      : opType1 -> string
 }.

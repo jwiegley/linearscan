@@ -228,8 +228,8 @@ Proof.
                                    (i1_0.1; i1_0.2)) (fst u')).2 == None.
       case F: (lebf snd (widen_fst (uid, beg)) (ord_max, ibeg i1_1.1)) in U;
       inversion U.
-        have ->: widen_ord _ uid = widen_ord Hle uid.
-          move=> i.
+        have ->: widen_id uid = widen_ord Hle uid.
+          rewrite /widen_id.
           f_equal.
           exact: eq_irrelevance.
         rewrite -lock in Hreq.
@@ -288,8 +288,8 @@ Proof.
       rewrite /elem /widen_fst in Helem.
       inversion Helem.
       rewrite -lock in Hreq.
-      have ->: widen_ord _ xid = widen_ord Hle xid.
-        move=> i.
+      have ->: widen_id xid = widen_ord Hle xid.
+        rewrite /widen_id.
         f_equal.
         exact: eq_irrelevance.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
@@ -349,8 +349,8 @@ Proof.
       rewrite /elem /widen_fst in Helem.
       inversion Helem.
       rewrite -lock in Hreq.
-      have ->: widen_ord _ xid = widen_ord Hle xid.
-        move=> i.
+      have ->: widen_id xid = widen_ord Hle xid.
+        rewrite /widen_id.
         f_equal.
         exact: eq_irrelevance.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
