@@ -281,7 +281,7 @@ Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
 
 Definition Verified := StateT VerifiedSig mType.
 
-Variable pc : OpId.(varReg dst)
+Variable pc : OpId.
 
 Definition errorsT (errs : seq AllocError) : Verified unit :=
   _verErrors %= IntMap_insert pc errs.
@@ -419,8 +419,8 @@ Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
 
   decide (all (ltn ^~ maxVar) (IntSet_toList liveOuts))
     (fun L =>
-       st <-- use _verDesc ;;
        let vars := IntSet_to_seq_fin L in
+       st <-- use _verDesc ;;
        if checkLiveness st vars is e :: es
        then errorsT $ ErrorAtBlockEnd bid :: e :: es
        else pure tt)
@@ -446,15 +446,13 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   (if useVerifier isn't VerifyDisabled
    then
      forM_ (opRefs oinfo op) (fun ref =>
-       (* Get the current allocation state of all registers. *)
-       st <-- use _verDesc ;;
-
        (* Determine which register this variable has been associated with by the
           allocation for this operation. *)
        match varId ref with
        | inl reg =>
          (* Direct register references are mostly left alone; we just check to
             make sure that it's not overwriting a variable in a register. *)
+         st <-- use _verDesc ;;
          if vnth (rsRegs st) reg is Some v
          then errorT $ RegAlreadyAllocatedTo reg v
          else pure tt
@@ -471,9 +469,6 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
            end
        end)
    else pure tt) ;;
-
-  (* st <-- use _verDesc ;; *)
-  (* _verState .= packRegState (ClearGhostsS st) ;; *)
 
   lift $ applyAllocs oinfo op allocs.
 
