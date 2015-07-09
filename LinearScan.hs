@@ -122,10 +122,13 @@ showOp1' showop pos ins outs rms o =
             (if i == either id id erv
              then ""
              else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
+    let leader = show pos ++ ": " in
+    let width = length leader in
     concatMap (marker "End") outs ++
     concatMap (marker "Beg") ins ++
-    show pos ++ ": " ++ showop o ++ "\n" ++
-    concatMap (\x -> show x ++ "\n") rms
+    leader ++ showop o ++ "\n" ++
+    concatMap (\x -> replicate width ' ' ++
+                     replicate 8 ' ' ++ show x ++ "\n") rms
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
@@ -364,19 +367,19 @@ deriving instance Show LS.AllocError
 
 instance Show LS.ResolvingMoveSet where
   show (LS.RSMove fr fv tr) =
-      "<Move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
-           "(r" ++ show tr ++ " v" ++ show fv ++ ")>"
+      "move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
+           "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSSwap fr fv tr tv) =
-      "<Swap (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
-           "(r" ++ show tr ++ " v" ++ show tv ++ ")>"
+      "swap (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
+           "(r" ++ show tr ++ " v" ++ show tv ++ ")"
   show (LS.RSSpill fr tv)    =
-      "<Spill (r" ++ show fr ++ " v" ++ show tv ++ ")>"
+      "spill (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSRestore fv tr)  =
-      "<Restore (r" ++ show tr ++ " v" ++ show fv ++ ")>"
+      "restore (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSAllocReg fv tr) =
-      "<AllocReg (r" ++ show tr ++ " v" ++ show fv ++ ")>"
+      "reserve (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSFreeReg fr tv)  =
-      "<FreeReg (r" ++ show fr ++ " v" ++ show tv ++ ")>"
+      "release (r" ++ show fr ++ " v" ++ show tv ++ ")"
   -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
   -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
 
