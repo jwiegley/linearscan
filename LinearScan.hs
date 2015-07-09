@@ -30,7 +30,6 @@ import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
 import           Data.Maybe (fromMaybe)
-import           Debug.Trace
 import qualified Hask.Utils as LS
 import qualified LinearScan.Applicative as Coq
 import           LinearScan.Blocks
@@ -253,9 +252,6 @@ toLoopState (LS.Build_LoopState a b c d e f g h) =
         (M.fromList (map (fmap S.fromList) g))
         (M.fromList h)
 
-tracer :: String -> a -> a
-tracer x = Debug.Trace.trace ("====================\n" ++ x)
-
 showBlock1 :: (blk1 -> [op1])
            -> LS.BlockId
            -> LS.OpId
@@ -457,9 +453,9 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
          -> LS.UseVerifier
-         -> [blk1] -> m (Either [String] [blk2])
-allocate 0 _ _ _ _  = return $ Left ["Cannot allocate with no registers"]
-allocate _ _ _ _ [] = return $ Left ["No basic blocks were provided"]
+         -> [blk1] -> m (Either (String, [String]) [blk2])
+allocate 0 _ _ _ _  = return $ Left ("", ["Cannot allocate with no registers"])
+allocate _ _ _ _ [] = return $ Left ("", ["No basic blocks were provided"])
 allocate maxReg binfo oinfo useVerifier blocks = do
     res <- U.unsafeCoerce $ LS.linearScan coqMonad maxReg
         (fromBlockInfo binfo) (fromOpInfo oinfo) useVerifier blocks
@@ -467,15 +463,15 @@ allocate maxReg binfo oinfo useVerifier blocks = do
     case reason res' of
         Just (err, _) -> do
             dets <- showDetails res'
-            return $ Left $ tracer dets $ map reasonToStr err
+            return $ Left (dets, map reasonToStr err)
         Nothing -> case allocatedBlocks res' of
             Left m -> do
                 dets <- showDetails res'
-                return $ Left $ tracer dets $
+                return $ Left (dets,
                     -- jww (2015-07-02): NYI
                     concatMap (\(pos, es) ->
                                 ("At position " ++ show pos) : map show es)
-                              (M.toList m)
+                              (M.toList m))
             Right blks -> return $ Right blks
   where
     reasonToStr r = case r of
