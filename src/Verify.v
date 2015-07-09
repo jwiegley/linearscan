@@ -117,7 +117,7 @@ Record VerifiedSig := {
   verState  : RegState verDesc;
   (* [verBlocks] gives the final allocation state for every handled block *)
   verBlocks : IntMap RegStateSig;
-  verMoves  : IntMap (seq (@ResolvingMove maxReg));
+  verMoves  : IntMap (seq ResolvingMoveSet);
   verErrors : IntMap (seq AllocError);
   verExt    : A
 }.
@@ -156,7 +156,7 @@ Definition _verBlocks : Lens' VerifiedSig (IntMap RegStateSig) :=
      |}) (f (verBlocks s)).
 
 Definition _verMoves :
-  Lens' VerifiedSig (IntMap (seq (@ResolvingMove maxReg))) := fun _ _ f s =>
+  Lens' VerifiedSig (IntMap (seq ResolvingMoveSet)) := fun _ _ f s =>
   fmap (fun x =>
     {| verDesc   := verDesc s
      ; verState  := verState s
@@ -199,14 +199,14 @@ Definition errorT (err : AllocError) : Verified unit :=
 
 Variable useVerifier : UseVerifier.
 
-Definition addMove (mv : @ResolvingMove maxReg) : Verified unit :=
+Definition addMove (mv : ResolvingMoveSet) : Verified unit :=
   _verMoves %= IntMap_alter
     (fun mxs => @Some _ $ if mxs is Some xs
                           then rcons xs mv
                           else [:: mv]) pc.
 
 Definition reserveReg (reg : PhysReg) (var : VarId) : Verified unit :=
-  addMove $ AllocReg var reg ;;
+  addMove $ RSAllocReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == None) is Some H
   then _verState .= packRegState (ReserveRegS var H)
@@ -227,13 +227,14 @@ Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
   else errorT $ VarNotReservedForReg var reg.
 
 Definition releaseReg (reg : PhysReg) (var : VarId) : Verified unit :=
-  addMove $ FreeReg reg var ;;
+  addMove $ RSFreeReg reg var ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
   else errorT $ VarNotReservedForReg var reg.
 
 Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
+  addMove $ RSAssignReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (AssignRegS H)
@@ -251,6 +252,7 @@ Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
   else errorT $ VarNotResidentForReg var reg.
 
 Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
+  addMove $ RSClearReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
   then _verState .= packRegState (ClearRegS H)
@@ -344,7 +346,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
       unless (fromReg == toReg) $
         releaseReg fromReg fromVar ;;
         reserveReg toReg fromVar ;;
-        addMove (resMove mv) ;;
+        addMove (weakenResolvingMove (resMove mv)) ;;
         assignReg toReg fromVar ;;
         when (resGhost mv) (releaseReg toReg fromVar) ;;
         pure $ resMove mv :: acc
@@ -354,7 +356,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
       checkResidency toReg toVar ;;
       releaseReg fromReg fromVar ;;
       releaseReg toReg toVar ;;
-      addMove (resMove mv) ;;
+      addMove (weakenResolvingMove (resMove mv)) ;;
       reserveReg fromReg toVar ;;
       reserveReg toReg fromVar ;;
       assignReg fromReg toVar ;;
@@ -365,13 +367,13 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
       releaseReg fromReg toSpillSlot ;;
       check <-- isResident fromReg toSpillSlot ;;
       if check
-      then addMove (resMove mv) ;;
+      then addMove (weakenResolvingMove (resMove mv)) ;;
            pure $ resMove mv :: acc
       else pure acc
 
     | Restore fromSpillSlot toReg =>
       reserveReg toReg fromSpillSlot ;;
-      addMove (resMove mv) ;;
+      addMove (weakenResolvingMove (resMove mv)) ;;
       assignReg toReg fromSpillSlot ;;
       when (resGhost mv)
         (releaseReg toReg fromSpillSlot) ;;

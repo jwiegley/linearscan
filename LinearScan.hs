@@ -380,6 +380,10 @@ instance Show LS.ResolvingMoveSet where
       "reserve (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSFreeReg fr tv)  =
       "release (r" ++ show fr ++ " v" ++ show tv ++ ")"
+  show (LS.RSAssignReg fv tr) =
+      "assign (r" ++ show tr ++ " v" ++ show fv ++ ")"
+  show (LS.RSClearReg fr tv)  =
+      "clear (r" ++ show fr ++ " v" ++ show tv ++ ")"
   -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
   -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
 

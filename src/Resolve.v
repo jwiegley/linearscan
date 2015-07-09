@@ -43,6 +43,8 @@ Inductive ResolvingMoveSet : Set :=
   | RSRestore    of VarId & nat
   | RSAllocReg   of VarId & nat
   | RSFreeReg    of nat & VarId
+  | RSAssignReg  of nat & VarId
+  | RSClearReg   of nat & VarId
   (* | RSAllocStack of VarId *)
   (* | RSFreeStack  of VarId *)
 .

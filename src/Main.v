@@ -104,8 +104,7 @@ Definition linearScan
                            mappings loops blocks1 ;;
       let: (moves, blocks2) := res in
       pure $ Build_Details _ _ maxReg None
-        liveSets' (IntMap_map (map (@weakenResolvingMove maxReg)) moves)
-        blocks blocks1 blocks2
+        liveSets' moves blocks blocks1 blocks2
         (Some (toScanStateDescSet ssig.1))
         (Some (toScanStateDescSet sd)) loops
   end.

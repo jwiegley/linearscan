@@ -189,7 +189,7 @@ Definition assignRegNum
   (mappings : IntMap (BlockMoves maxReg))
   (loops    : LoopState)
   (blocks   : seq blockType1) :
-  mType (IntMap (seq (@ResolvingMove maxReg)) *
+  mType (IntMap (seq ResolvingMoveSet) *
          (IntMap (seq AllocError) + seq blockType2)) :=
   res <-- considerOps allocs liveSets mappings loops blocks
                       (newVerifiedSig maxReg newAssnStateDesc) ;;
