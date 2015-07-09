@@ -48,8 +48,8 @@ Definition newRegStateDesc : RegStateDesc :=
 Inductive AllocError :=
   | VarNotAllocated of VarId
   | VarNotResident of VarId
-  | VarNotResidentForReg of VarId & nat
-  | VarNotReservedForReg of VarId & nat
+  | VarNotResidentForReg of VarId & nat & option VarId
+  | VarNotReservedForReg of VarId & nat & option VarId
   | PhysRegAlreadyResidentForVar of nat & VarId
   | PhysRegAlreadyReservedForVar of nat & VarId
   | RegAlreadyReservedToVar of nat & VarId & VarId
@@ -220,43 +220,46 @@ Definition isReserved (reg : PhysReg) (var : VarId) : Verified bool :=
   pure (vnth (rsAllocs st) reg ^_ reservation == Some var).
 
 Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
-  st <-- use _verDesc ;;
   b  <-- isReserved reg var ;;
-  if b
-  then pure tt
-  else errorT $ VarNotReservedForReg var reg.
+  unless b
+    (st <-- use _verDesc ;;
+     errorT $ VarNotReservedForReg var reg
+       (vnth (rsAllocs st) reg ^_ reservation)).
 
 Definition releaseReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSFreeReg reg var ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
-  else errorT $ VarNotReservedForReg var reg.
+  else errorT $ VarNotReservedForReg var reg
+         (vnth (rsAllocs st) reg ^_ reservation).
 
 Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSAssignReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (AssignRegS H)
-  else errorT $ VarNotReservedForReg reg var.
+  else errorT $ VarNotReservedForReg reg var
+    (vnth (rsAllocs st) reg ^_ reservation).
 
 Definition isResident (reg : PhysReg) (var : VarId) : Verified bool :=
   st <-- use _verDesc ;;
   pure (vnth (rsAllocs st) reg ^_ residency == Some var).
 
 Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
-  st <-- use _verDesc ;;
   b  <-- isResident reg var ;;
-  if b
-  then pure tt
-  else errorT $ VarNotResidentForReg var reg.
+  unless b
+    (st <-- use _verDesc ;;
+     errorT $ VarNotResidentForReg var reg
+       (vnth (rsAllocs st) reg ^_ residency)).
 
 Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSClearReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
   then _verState .= packRegState (ClearRegS H)
-  else errorT $ VarNotResidentForReg var reg.
+  else errorT $ VarNotResidentForReg var reg
+    (vnth (rsAllocs st) reg ^_ residency).
 
 (* Definition allocStack (v : 'I_maxVar) : Verified unit := pure tt. *)
 
