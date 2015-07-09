@@ -304,7 +304,8 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
   (if useVerifier isn't VerifyDisabled
    then
-     forM_ (opRefs oinfo op) (fun ref =>
+     forM_ (sortBy (fun x y => VarKind_leq (varKind x) (varKind y))
+                   (opRefs oinfo op)) (fun ref =>
        (* Determine which register this variable has been associated with by the
           allocation for this operation. *)
        match varId ref with

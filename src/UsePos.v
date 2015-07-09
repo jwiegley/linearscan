@@ -7,6 +7,32 @@ Generalizable All Variables.
 
 Inductive VarKind : Set := Input | Temp | Output.
 
+Definition VarKind_leq (x y : VarKind) : bool :=
+  match x with
+    | Input => true
+    | Temp => if y is Input then false else true
+    | Output => if y is Output then true else false
+  end.
+
+Example VarKind_leq_ex1 : VarKind_leq Input Input.
+Proof. by []. Qed.
+Example VarKind_leq_ex2 : VarKind_leq Input Temp.
+Proof. by []. Qed.
+Example VarKind_leq_ex3 : VarKind_leq Input Output.
+Proof. by []. Qed.
+Example VarKind_leq_ex4 : ~~ VarKind_leq Temp Input.
+Proof. by []. Qed.
+Example VarKind_leq_ex5 : VarKind_leq Temp Temp.
+Proof. by []. Qed.
+Example VarKind_leq_ex6 : VarKind_leq Temp Output.
+Proof. by []. Qed.
+Example VarKind_leq_ex7 : ~~ VarKind_leq Output Input.
+Proof. by []. Qed.
+Example VarKind_leq_ex8 : ~~ VarKind_leq Output Temp.
+Proof. by []. Qed.
+Example VarKind_leq_ex9 : VarKind_leq Output Output.
+Proof. by []. Qed.
+
 Section EqVarKind.
 
 Implicit Type s : VarKind.
