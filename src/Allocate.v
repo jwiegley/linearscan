@@ -28,7 +28,7 @@ Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let int := curIntDetails cur in
     ipure $ if vnth (fixedIntervals sd) reg is Some i
-            then intervalIntersectionPoint int.2 i.2
+            then intervalOverlapPoint int.2 i.2
             else None.
 
 Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
@@ -156,12 +156,12 @@ Definition allocateBlockedReg {pre} :
             end in
         updateRegisterPos v r pos' in
 
-    let resolve xs := [seq (packInterval (getInterval (fst i)), snd i)
-                      | i <- xs] in
+    let resolve xs :=
+        [seq (packInterval (getInterval (fst i)), snd i) | i <- xs] in
     let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
     let intersectingIntervals : seq (IntervalSig * PhysReg) :=
-        filter (fun x => intervalsIntersect current (fst x).1)
-               (resolve (inactive sd)) in
+        [seq x <- resolve (inactive sd)
+        | intervalsIntersect current (fst x).1] in
     let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
 
     (* reg = register with highest nextUsePos *)

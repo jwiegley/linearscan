@@ -193,32 +193,20 @@ Proof.
 Qed.
 
 (* This version allows overlap in lifetime holes. *)
-(*
-Definition intervalsIntersect (i : IntervalDesc) (j : IntervalDesc) : bool :=
+Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) : bool :=
   let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
   has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
       (NE_to_list (rds i)).
 
-Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
-Proof.
-  move=> x y.
-  rewrite /intervalsIntersect.
-  case: x => [? ? ? rdsx] /=;
-  case: y => [? ? ? rdsy] /=.
-  elim: rdsx => /= [x|x xs IHxs].
-    rewrite Bool.orb_false_r.
-    elim: rdsy => /= [y|y ys IHys].
-      by rewrite !Bool.orb_false_r rangesIntersect_sym.
-    by rewrite rangesIntersect_sym IHys Bool.orb_false_r.
-  rewrite {}IHxs.
-  elim: rdsy => /= [y|y ys IHys].
-    by rewrite !Bool.orb_false_r rangesIntersect_sym.
-  rewrite rangesIntersect_sym.
-  rewrite -!orbA; f_equal.
-  rewrite orbC -!orbA; f_equal.
-  by rewrite -orbC IHys.
-Qed.
-*)
+Definition intervalOverlapPoint `(xr : Interval x) `(yr : Interval y) :=
+  NE_foldl (fun mx rd =>
+    option_choose mx
+      (NE_foldl
+         (fun mx' rd' =>
+            option_choose mx
+              (rangeIntersectionPoint rd.2 rd'.2))
+         None (rds y)))
+    None (rds x).
 
 Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
   (iend x == iend y) || ((ibeg x < iend y) && (ibeg y < iend x)).
