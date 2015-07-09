@@ -503,8 +503,8 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
                           | inl _ => false
                           | inr _ => true
                           end) refs in
-      [seq x <- drop regsNeeded
-                     [seq {| varId       := inl n
+      drop regsNeeded
+           [seq x <- [seq {| varId       := inl n
                            ; varKind     := Temp
                            ; regRequired := true
                            |} | n in ord_enum maxReg]
