@@ -1,9 +1,9 @@
 * DONE 21 Tempest cases are still failing
-* TODO regBlocked test is failing
+* DONE regBlocked test is failing
 * TODO Several generated tests fail
 * TODO Improve handling of register made available to calls
 Right now I just drop a single allocation.
-* TODO Implement a VM for verifying allocations
+* DONE Implement a VM for verifying allocations
 * TODO Fix performance issues
 * TODO Enter TODO items for all jww comments
 * TODO Write more edge-case tests
