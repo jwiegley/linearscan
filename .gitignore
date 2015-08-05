@@ -5,6 +5,11 @@
 .coq-native/
 /LinearScan/
 /Makefile.coq
+/doc/cpp/linearscan.aux
+/doc/cpp/linearscan.bbl
+/doc/cpp/linearscan.blg
+/doc/cpp/linearscan.log
+/doc/cpp/linearscan.pdf
 /doc/linearscan.v.aux
 /doc/linearscan.v.bbl
 /doc/linearscan.v.blg

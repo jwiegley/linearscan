@@ -1,0 +1,209 @@
+\documentclass[preprint]{sigplanconf}
+
+% The following \documentclass options may be useful:
+
+% preprint      Remove this option only once the paper is in final form.
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+\usepackage{amsmath}
+
+\begin{document}
+
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+\conferenceinfo{CPP 2016}{January 20--22, 2016, Saint Petersburg, Florida, USA} 
+\copyrightyear{2016} 
+\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
+\doi{nnnnnnn.nnnnnnn}
+
+% Uncomment one of the following two, if you are not going for the 
+% traditional copyright transfer agreement.
+
+\exclusivelicense                % ACM gets exclusive license to publish, 
+                                 % you retain copyright
+
+%\permissiontopublish             % ACM gets nonexclusive license to publish
+                                  % (paid open-access papers, 
+                                  % short abstracts)
+
+\titlebanner{banner above paper title}        % These are ignored unless
+\preprintfooter{short description of paper}   % 'preprint' option specified.
+
+\title{Formalizing a Register Allocator in Coq}
+\subtitle{Experience Report}
+
+\authorinfo{John Wiegley}
+           {BAE Systems}
+           {john.wiegley@baesystems.com}
+\authorinfo{Howard Reubenstein}
+           {BAE Systems}
+           {howard.reubenstein@baesystems.com}
+
+\maketitle
+
+\begin{abstract}
+  This experience report describes the development of a register allocation
+  algorithm in Coq and its subsequent inclusion in a larger Haskell project.
+  It documents the use of Coq from an engineering point of view (i.e., not
+  solely for proof work), and by a team initially unfamiliar with using Coq
+  for programming tasks. It presents multiple approaches to software design
+  within a dependently typed language, the hurdles encountered and how they
+  were overcome, and pitfalls others should consider if contemplating Coq for
+  such a task. Its conclusion is that Coq is an excellent functional language,
+  for which up-front knowledge of certain techniques is essential to reducing
+  costs. It is hoped the reader may save some of the time spent discovering
+  these techniques, for though most of them are documented, it can be
+  difficult to know what is important before experiencing the need.
+\end{abstract}
+
+\category{CR-number}{subcategory}{third-level}
+
+% general terms are not compulsory anymore, 
+% you may leave them out
+\terms
+term1, term2
+
+\keywords
+formal methods, verification, register allocator, Coq, Haskell
+
+\section{Introduction}
+\label{sec:intro}
+
+Coq is a dependently-typed language, combined with a theorem proving
+environment, that is well-known for its ability to prove properties of
+algorithms. This suggested it would be ideal for an algorithm like a register
+allocator, which is easily expressed as a function from inputs to outputs.
+What was unknown about Coq is that it requires certain ways of approaching
+classes of problems, or else the time obligations of proof soon become
+prohibitive. This report intends to present these pitfalls so that others may
+more readily avoid them.
+
+Prior to this development, the authors had no experience using Coq to build
+verified software, outside of simple proofs carried out for the Software
+Foundations course. Available literature was read, but not everything becomes
+clear until the context is intimately understood.
+
+Lastly, since the desired goal was to integrate the result within a compiler
+written in Haskell, Coq was chosen for its ability to extract code directly to
+Haskell, despite reports that the extraction mechanism may be a weak point. It
+was decided to rely on unit tests to verify expectations of the extracted
+code.
+
+\section{First approach: Complex types}
+
+Since the desired goal was to prove properties, it was believed that encoding
+these properties into each type would be most beneficial, as it prevents
+values from being constructed that violate them.
+
+\section{Second approach: Simple types}
+
+\section{Third approach: Hybrid types}
+
+% * Setting the stage
+% 
+% ** Needed a new register allocator due to subtle bugs in the previous one
+% ** Chose Coq to provide verification and fidelity of results
+% ** No prior experience using Coq to build production software
+% ** Deployment was chosen to be extraction to Haskell as a library
+% 
+% * Initial effort: Complex types
+% 
+% ** Primary types were records of both data and propositions
+% ** The resulting dependent types imposed many proof obligations
+% 
+% * Next effort: External proofs
+% 
+% ** Propositions were moved from types into theorems
+% ** Proving required complex induction over large functions
+% ** Every change required proofs to be updated
+% 
+% * Next effort: Data types + Propositional types
+% 
+% ** Propositions were moved to constructors of an inductive data type
+% ** This divided between data and constructive predicates on the data
+% ** Several fruits of this effort were kept, but imposed work
+% 
+% * Next effort: Proof by reflection
+% 
+% ** Many propositions were exchanged for functions returning bool
+% ** Switched to the ssreflect library, which supports this type of reasoning
+% ** Allowed many proofs to avoid induction and use mainly rewriting
+% 
+% * Finalization of library code
+% 
+% ** Abstracted library code lent itself well to reflection and proof
+% ** Subsystems once "completed" needed little attention thereafter
+% ** This where Coq shined, eliminating tests and creating confidence
+% 
+% * Continued work on application code
+% 
+% ** Higher level code on top of libraries needed frequent change
+% ** As the design evolved, many functions needed to be rewritten
+% ** Owing to inductive predicates, proof obligations required constant work
+% ** As the code evolved, changes became more and more difficult to make
+% ** The last 20% of the work took an inordinate amount of time as a result
+% 
+% * Pressure release: Error results to avoid proof obligation
+% 
+% ** To recover the pace of development, functions were permitted to "error out"
+% ** Reporting error, instead of proving correctness, brought back flexibility
+% ** When errors became common, it justified the proof work to eliminate them
+% 
+% * Pressure release: Coq as a functional language
+% 
+% ** Most new functions abandoned proof restrictions and dependent types
+% ** In this sense, Coq was just being used as if it were a "stricter Haskell"
+% ** Core libraries carried high assurance, but the new code now requried testing
+% 
+% * The Haskell bridge
+% 
+% ** Not all constructions could be made efficient on both sides
+% ** Proof requirements do not prefer complex implementations!
+% ** Monads were introduced to allow effect-producing callbacks
+% ** Much work was done to optimize extraction, but led to difficult bugs
+% 
+% * Overall experience
+% 
+% ** Coq would have been ideal for core library development
+% ** Imposed a high engineering cost for application development
+% ** Since not everything was proved, testing was still necessary
+% ** Mounting time restrictions led to fewer and fewer proofs
+% ** The final product required testing as with any application
+% ** However, confidence levels at seeing all test pass was high
+% 
+% * Take-aways
+% 
+% ** Coq is a powerful functional platform for crafting code of value
+% ** It is not the right tool for large, complex applications
+% ** Not unless one abandons most of what makes it so powerful
+% ** A combination of Haskell and Coq would be of great value
+% ** Getting this combination to work well requires some investment
+
+\appendix
+\section{Appendix Title}
+
+This is the text of the appendix, if you need one.
+
+\acks
+
+Acknowledgments, \cite{FreeChurch} if needed.
+
+% We recommend abbrvnat bibliography style.
+\bibliographystyle{abbrvnat}
+
+% The bibliography should be embedded for final submission.
+\bibliography{linearscan}
+
+\end{document}
+
+%  LocalWords:  ssenb Wimmer ScanState SSMorph Generalizable MyMachine maxReg
+%  LocalWords:  ltn Qed MScanState MSSMorph sd ScanStateDesc IntervalId pos
+%  LocalWords:  moveActiveToHandled moveActiveToInactive transportId ints xs
+%  LocalWords:  nextInterval checkActiveIntervals getInterval intervalEnd fst
+%  LocalWords:  intervalStart forall gtb ScanStateV OldScanState unhandled nd
+%  LocalWords:  StronglySorted lebf uniq sortedness Datatypes unhandledIds
+%  LocalWords:  handleInterval SState SSMorphHasLen SSMorphSt PhysReg
