@@ -1,13 +1,8 @@
+% jww (2015-08-05): Remove preprint option once paper is in final form.
 \documentclass[preprint]{sigplanconf}
 
-% The following \documentclass options may be useful:
-
-% preprint      Remove this option only once the paper is in final form.
-% 10pt          To set in 10-point type instead of 9-point.
-% 11pt          To set in 11-point type instead of 9-point.
-% authoryear    To obtain author/year citation style instead of numeric.
-
-\usepackage{amsmath}
+\usepackage{amsmath}            % equations and math symbols
+\usepackage{enumitem}           % \setitemize, [noitemsep]
 
 \begin{document}
 
@@ -15,23 +10,24 @@
 \setlength{\pdfpageheight}{\paperheight}
 \setlength{\pdfpagewidth}{\paperwidth}
 
+%\setitemize{noitemsep,topsep=2pt,partopsep=2pt}
+
 \conferenceinfo{CPP 2016}{January 20--22, 2016, Saint Petersburg, Florida, USA} 
 \copyrightyear{2016} 
-\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
-\doi{nnnnnnn.nnnnnnn}
+%\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
+%\doi{nnnnnnn.nnnnnnn}
 
 % Uncomment one of the following two, if you are not going for the 
 % traditional copyright transfer agreement.
-
 \exclusivelicense                % ACM gets exclusive license to publish, 
                                  % you retain copyright
-
 %\permissiontopublish             % ACM gets nonexclusive license to publish
                                   % (paid open-access papers, 
                                   % short abstracts)
 
-\titlebanner{banner above paper title}        % These are ignored unless
-\preprintfooter{short description of paper}   % 'preprint' option specified.
+% These are ignored unless 'preprint' option specified.
+\titlebanner{Initial draft v1.0}
+\preprintfooter{Experience report building a register allocator in Coq}
 
 \title{Formalizing a Register Allocator in Coq}
 \subtitle{Experience Report}
@@ -60,12 +56,13 @@
   difficult to know what is important before experiencing the need.
 \end{abstract}
 
-\category{CR-number}{subcategory}{third-level}
+\category{D.2.4}{Software Verification}
+                {Formal methods and validation}
+                [Programming in Coq]
 
-% general terms are not compulsory anymore, 
-% you may leave them out
-\terms
-term1, term2
+% % general terms are not compulsory anymore, you may leave them out
+% \terms
+% term1, term2
 
 \keywords
 formal methods, verification, register allocator, Coq, Haskell
@@ -73,31 +70,69 @@ formal methods, verification, register allocator, Coq, Haskell
 \section{Introduction}
 \label{sec:intro}
 
-Coq is a dependently-typed language, combined with a theorem proving
-environment, that is well-known for its ability to prove properties of
-algorithms. This suggested it would be ideal for an algorithm like a register
-allocator, which is easily expressed as a function from inputs to outputs.
-What was unknown about Coq is that it requires certain ways of approaching
-classes of problems, or else the time obligations of proof soon become
-prohibitive. This report intends to present these pitfalls so that others may
-more readily avoid them.
+Coq is a dependently-typed language and theorem proving environment well-known
+for its ability to prove properties of algorithms. This suggested it would be
+ideal for a register allocator implementation, which is easily expressed as a
+function from inputs to outputs. Since the authors had not used Coq for
+engineering previously, what was unknown is that Coq requires certain ways of
+approaching different problems, or else the time obligations of proof can
+become prohibitive. This report presents some of these pitfalls, so that
+others may avoid them.
 
-Prior to this development, the authors had no experience using Coq to build
-verified software, outside of simple proofs carried out for the Software
-Foundations course. Available literature was read, but not everything becomes
-clear until the context is intimately understood.
-
-Lastly, since the desired goal was to integrate the result within a compiler
-written in Haskell, Coq was chosen for its ability to extract code directly to
-Haskell, despite reports that the extraction mechanism may be a weak point. It
-was decided to rely on unit tests to verify expectations of the extracted
-code.
+Further, since the desired goal was to integrate the resulting functions
+within a compiler written in Haskell, Coq was also chosen for its ability to
+extract code directly to Haskell, despite reports that the extraction
+mechanism may be weak in this area. It was decided to rely on unit tests to
+verify expectations of the extracted code.
 
 \section{First approach: Complex types}
 
-Since the desired goal was to prove properties, it was believed that encoding
-these properties into each type would be most beneficial, as it prevents
-values from being constructed that violate them.
+In order to prove properties about functions operating on types, the first
+approach was to encode certain properties in the types themselves, to prevent
+invalid values from being constructed or consumed. This does not guarantee
+every behavior of the functions involved, but does restrict what values may
+flow through the program.
+
+For example, a central type in the allocator is \verb|ScanState|, which
+governs the state of four related lists that evolve as the algorithm iterates
+through the submitted program graph:
+
+\begin{description}[noitemsep]
+\item[Unhandled intervals] Code spans where a variable use exists but no
+  register has been allocated;
+\item[Active intervals] Where an allocation has been made and that cover the
+  current position;
+\item[Inactive intervals] Which have an allocation but do \emph{not} cover the
+  current position---thus they may be easily split and their register spilled
+  to relieve pressure;
+\item[Handled intervals] Which have been finally allocated: no further
+  changes are made.
+\end{description}
+
+Several relationships exist among these lists (this list is not exhaustive):
+
+\begin{itemize}
+\item Every interval must appear in exactly one list;
+\item An interval may be split and/or moved to another list, but cannot be
+  removed;
+\item New intervals may be added to any list, but for the unhandled list must
+  be inserted after the current position (this is how termination is proved);
+\item A register cannot be allocated to more than one active interval;
+\item No two intervals allocated to the same register may overlap.
+\end{itemize}
+
+By maintaining these properties, it is guaranteed that registers are available
+when allocations are made. However, it still does not ensure that every
+variable use is covered by an interval, as intervals alone are used to decide
+allocations. Such a requirement occurs prior to allocation, in the phase that
+builds up the unhandled interval list.
+
+In this brief example, a simple collection of four lists involves a fairly
+complex web of relationships that each require verification. The initial
+attempt to achieve this was to enrich \verb|ScanState| with theorems stating
+each requirement, so no invalid \verb|ScanState|'s could be created. This
+drives the code manipulating \verb|ScanState|'s to demonstrate the correctness
+of each and every modification made to the allocation state.
 
 \section{Second approach: Simple types}
 
@@ -190,12 +225,9 @@ This is the text of the appendix, if you need one.
 
 \acks
 
-Acknowledgments, \cite{FreeChurch} if needed.
+Acknowledgments, \cite{TotallyFree} if needed.
 
-% We recommend abbrvnat bibliography style.
 \bibliographystyle{abbrvnat}
-
-% The bibliography should be embedded for final submission.
 \bibliography{linearscan}
 
 \end{document}
