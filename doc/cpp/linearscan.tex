@@ -128,13 +128,31 @@ allocations. Such a requirement occurs prior to allocation, in the phase that
 builds up the unhandled interval list.
 
 In this brief example, a simple collection of four lists involves a fairly
-complex web of relationships that each require verification. The initial
-attempt to achieve this was to enrich \verb|ScanState| with theorems stating
-each requirement, so no invalid \verb|ScanState|'s could be created. This
-drives the code manipulating \verb|ScanState|'s to demonstrate the correctness
-of each and every modification made to the allocation state.
+complex web of relationships. The initial attempt at verification was to
+enrich \verb|ScanState| with theorems stating each requirement, so no invalid
+states could exist. This drives the code manipulating \verb|ScanState|'s to
+demonstrate correctness of every modification made to the allocation state.
+
+This approach fails exactly where it succeeds: \emph{every modification
+  requires proof of validity}. Sometimes, it is convenient to allow
+intermediate states within a function to be invalid, so long as the result is
+valid. By embedding theorems within the type, it is never possible to extract
+an interval from a list, manipulate it separately, and then re-insert it. It
+can only be moved in one atomic step, to preserve the invariant that the total
+interval count is never reduced.
+
+It did not take long before complex algorithms became unwieldy to write in
+this style. Proof requirements seemed to multiply with each new function,
+resulting in byzantine chains of evidence to justify each new transformation.
 
 \section{Second approach: Simple types}
+
+In reaction to the Gordian knot created by involving theorems with types, the
+next attempt was to deal with simple, non-dependent types only, and to prove
+theorems about how related functions affected those types.
+
+<This was bad because it caused combinatorial expansion, necessary evidence
+was missing, etc.>
 
 \section{Third approach: Hybrid types}
 
