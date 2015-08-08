@@ -25,7 +25,7 @@ Context `{mDict : Monad mType}.
 
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
-Inductive UseVerifier := VerifyDisabled | VerifyEnabled.
+Inductive UseVerifier := VerifyDisabled | VerifyEnabled | VerifyEnabledStrict.
 
 Definition RegAllocations := Vec (option VarId * option VarId) maxReg.
 
@@ -194,16 +194,14 @@ Variable pc : OpId.
 Definition errorsT (errs : seq AllocError) : Verified unit :=
   _verErrors %= IntMap_insert pc errs.
 
-Definition errorT (err : AllocError) : Verified unit :=
-  errorsT [:: err].
+Definition errorT (err : AllocError) : Verified unit := errorsT [:: err].
 
 Variable useVerifier : UseVerifier.
 
 Definition addMove (mv : ResolvingMoveSet) : Verified unit :=
-  _verMoves %= IntMap_alter
-    (fun mxs => @Some _ $ if mxs is Some xs
-                          then rcons xs mv
-                          else [:: mv]) pc.
+  _verMoves %= IntMap_alter (fun mxs => @Some _ $ if mxs is Some xs
+                                                  then rcons xs mv
+                                                  else [:: mv]) pc.
 
 Definition reserveReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSAllocReg var reg ;;
@@ -220,52 +218,74 @@ Definition isReserved (reg : PhysReg) (var : VarId) : Verified bool :=
   pure (vnth (rsAllocs st) reg ^_ reservation == Some var).
 
 Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
-  b  <-- isReserved reg var ;;
-  unless b
-    (st <-- use _verDesc ;;
-     errorT $ VarNotReservedForReg var reg
-       (vnth (rsAllocs st) reg ^_ reservation)).
+  st <-- use _verDesc ;;
+  let err := errorT $ VarNotReservedForReg var reg
+                    (vnth (rsAllocs st) reg ^_ reservation) in
+  if vnth (rsAllocs st) reg ^_ reservation is Some var'
+  then unless (var == var') err
+  else if useVerifier is VerifyEnabledStrict
+       then err
+       else pure tt.
 
 Definition releaseReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSFreeReg reg var ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
-  else errorT $ VarNotReservedForReg var reg
-         (vnth (rsAllocs st) reg ^_ reservation).
+  else let err := errorT $ VarNotReservedForReg var reg
+                         (vnth (rsAllocs st) reg ^_ reservation) in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else if vnth (rsAllocs st) reg ^_ reservation is None
+            then pure tt
+            else err.
 
 Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSAssignReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (AssignRegS H)
-  else errorT $ VarNotReservedForReg reg var
-    (vnth (rsAllocs st) reg ^_ reservation).
+  else let err := errorT $ VarNotReservedForReg var reg
+                         (vnth (rsAllocs st) reg ^_ reservation) in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else if vnth (rsAllocs st) reg ^_ reservation is None
+            then pure tt
+            else err.
 
 Definition isResident (reg : PhysReg) (var : VarId) : Verified bool :=
   st <-- use _verDesc ;;
   pure (vnth (rsAllocs st) reg ^_ residency == Some var).
 
 Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
-  b  <-- isResident reg var ;;
-  unless b
-    (st <-- use _verDesc ;;
-     errorT $ VarNotResidentForReg var reg
-       (vnth (rsAllocs st) reg ^_ residency)).
+  st <-- use _verDesc ;;
+  let err := errorT $ VarNotResidentForReg var reg
+                    (vnth (rsAllocs st) reg ^_ residency) in
+  if vnth (rsAllocs st) reg ^_ residency is Some var'
+  then unless (var == var') err
+  else if useVerifier is VerifyEnabledStrict
+       then err
+       else pure tt.
 
 Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSClearReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
   then _verState .= packRegState (ClearRegS H)
-  else errorT $ VarNotResidentForReg var reg
-    (vnth (rsAllocs st) reg ^_ residency).
+  else let err := errorT $ VarNotResidentForReg var reg
+                         (vnth (rsAllocs st) reg ^_ residency) in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else if vnth (rsAllocs st) reg ^_ residency is None
+            then pure tt
+            else err.
 
 (* Definition allocStack (v : 'I_maxVar) : Verified unit := pure tt. *)
 
 (* Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt. *)
 
 Definition checkLiveness (vars : IntSet) : Verified unit :=
+  if useVerifier isn't VerifyEnabledStrict then pure tt else
   st <-- use _verDesc ;;
   forM_ (IntSet_toList vars) $ fun var =>
     unless (vfoldl_with_index (fun reg b p =>
@@ -284,8 +304,11 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
        then errorT $ UnknownPredecessorBlock bid pred
        else _verState .= allocs)
    else
-     when (IntSet_size liveIns > 0) $
-       errorT $ BlockWithoutPredecessors bid) ;;
+    (if useVerifier is VerifyEnabledStrict
+     then
+        when (IntSet_size liveIns > 0) $
+          errorT $ BlockWithoutPredecessors bid
+     else pure tt)) ;;
   checkLiveness liveIns.
 
 Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
