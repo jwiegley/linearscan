@@ -383,22 +383,45 @@ Proof.
 
   (* If [pos] fits within the current range, use it; otherwise, shift the
      beginning of the current range down to [pos] so that our use position may
-     fit within it. *)
-  have res : { r1 : RangeSig | (b.*2.+1 <= rbeg r1.1 <= upos) &&
-                               (rend r1.1 <= e.*2.+1) }.
+     fit within it. The boolean value is true if we are to replace the
+     beginning of the range list with the new range, and false if we are to
+     prepend it only. *)
+  have res : (bool * { r1 : RangeSig | (b.*2.+1 <= rbeg r1.1 <= upos) &&
+                                       (rend r1.1 <= e.*2.+1) })%type.
     move: (NE_head range) => [r /andP [Hbeg Hend]].
     case E: (upos < head_or_end r.1).
+      case: (ups r.1) => /= [|[loc req kind] us].
+        split. exact true.
+        pose r1 := Range_shift r.2 Hodd E.
+        have Hr1: r1 = Range_shift r.2 Hodd E by [].
+        exists r1.
+        move: (Range_shift_spec Hr1) => [-> -> _].
+        move/eqP: Heqe => ->.
+        by undoubled.
+      (* Is the use position at the beginning of the range output only? If so,
+         then we can allow a lifetime hole between the current position and
+         the beginning of that range. *)
+      case: (kind == Output).
+        split. exact false.
+        have H0 : b <= pos < pos.+1 by ordered.
+        pose NR := makeNewRange H0 Hodd Heqe.
+        exists NR.1.
+        rewrite /= {NR}.
+        move/eqP: Heqe => ->.
+        by case: (uvar upos); undoubled.
+      split. exact true.
       pose r1 := Range_shift r.2 Hodd E.
       have Hr1: r1 = Range_shift r.2 Hodd E by [].
       exists r1.
       move: (Range_shift_spec Hr1) => [-> -> _].
       move/eqP: Heqe => ->.
       by undoubled.
+    split. exact true.
     move/negbT in E; rewrite -ltnNge /= in E.
     exists r.
     move: (Range_proper r.2) => /=.
     by case: (ups r.1) => [|? ?] /= in E *; ordered.
-  move: res => [r1 /andP [/andP [? Hbeg2] ?]].
+  move: res => [replaceFirst [r1 /andP [/andP [? Hbeg2] ?]]].
 
   (* Check whether our use position actually fits within the end of the
      current range, after shifting.  If not, ignore the current range and just
@@ -415,9 +438,11 @@ Proof.
     exists (Range_cons r1.2 Hloc Hsorted Hodd).
     by rewrite /=; ordered.
 
-  case: range => [_|_ rs].
-    exact: Some [::: br].
-  exact: Some [::: br & rs].
+  case: replaceFirst.
+    case: range => [_|_ rs].
+      exact: Some [::: br].
+    exact: Some [::: br & rs].
+  exact: Some [::: br & range].
 Defined.
 
 Definition handleVar {b pos e} (H : b <= pos < e)
