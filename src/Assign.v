@@ -147,14 +147,14 @@ Definition considerOps
     let k := setAllocations allocs in
     opsb'     <-- concatMapM k opsb ;;
 
-    let begMoves := topsort gbeg (@splitEdge maxReg) in
+    let begMoves := sortMoves gbeg in
     opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
     begMoves' <-- verifyResolutions opid.-2 useVerifier begMoves ;;
     bmoves    <-- lift $ generateMoves begMoves' ;;
 
     opsm'     <-- concatMapM k opsm ;;
 
-    let endMoves := topsort gend (@splitEdge maxReg) in
+    let endMoves := sortMoves gend in
     opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
     endMoves' <-- verifyResolutions opid.-2 useVerifier endMoves ;;
     emoves    <-- lift $ generateMoves endMoves' ;;

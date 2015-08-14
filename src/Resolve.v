@@ -67,22 +67,16 @@ Implicit Type s : ResolvingMove.
 
 Definition eqResolvingMove s1 s2 :=
   match s1, s2 with
-  | Move fr1 fv1 tr1,     Move fr2 fv2 tr2     =>
-    [&& fr1 == fr2, fv1 == fv2 & tr1 == tr2]
-  | Swap fr1 fv1 tr1 tv1, Swap fr2 fv2 tr2 tv2 =>
-    [&& fr1 == fr2, fv1 == fv2, tr1 == tr2 & tv1 == tv2]
-  | Spill fr1 fv1,        Spill fr2 fv2        =>
-    [&& fr1 == fr2 & fv1 == fv2]
-  | Restore tv1 tr1,      Restore tv2 tr2      =>
-    [&& tv1 == tv2 & tr1 == tr2]
-  | AllocReg fv1 tr1,     AllocReg fv2 tr2     =>
-    [&& fv1 == fv2 & tr1 == tr2]
-  | FreeReg fr1 tv1,      FreeReg fr2 tv2      =>
-    [&& fr1 == fr2 & tv1 == tv2]
-  (* | AllocStack tv1,       AllocStack tv2       => *)
-  (*   tv1 == tv2 *)
-  (* | FreeStack fv1,        FreeStack fv2        => *)
-  (*   fv1 == fv2 *)
+  | Move fr1 fv1 tr1,     Move fr2 fv2 tr2     => [&& fr1 == fr2
+                                                  ,   fv1 == fv2 & tr1 == tr2]
+  | Swap fr1 fv1 tr1 tv1, Swap fr2 fv2 tr2 tv2 => [&& fr1 == fr2, fv1 == fv2
+                                                  ,   tr1 == tr2 & tv1 == tv2]
+  | Spill fr1 fv1,        Spill fr2 fv2        => [&& fr1 == fr2 & fv1 == fv2]
+  | Restore tv1 tr1,      Restore tv2 tr2      => [&& tv1 == tv2 & tr1 == tr2]
+  | AllocReg fv1 tr1,     AllocReg fv2 tr2     => [&& fv1 == fv2 & tr1 == tr2]
+  | FreeReg fr1 tv1,      FreeReg fr2 tv2      => [&& fr1 == fr2 & tv1 == tv2]
+  (* | AllocStack tv1,       AllocStack tv2       => tv1 == tv2 *)
+  (* | FreeStack fv1,        FreeStack fv2        => fv1 == fv2 *)
   | _, _ => false
   end.
 
@@ -126,6 +120,17 @@ Canonical ResolvingMove_eqType :=
   Eval hnf in EqType ResolvingMove ResolvingMove_eqMixin.
 
 End EqResolvingMove.
+
+Definition eqResolvingMoveKind (x y : ResolvingMove) : bool :=
+  match x, y with
+  | Move       _ _ _,   Move       _ _ _   => true
+  | Swap       _ _ _ _, Swap       _ _ _ _ => true
+  | Spill      _ _,     Spill      _ _     => true
+  | Restore    _ _,     Restore    _ _     => true
+  | AllocReg   _ _,     AllocReg   _ _     => true
+  | FreeReg    _ _,     FreeReg    _ _     => true
+  | _,                  _                  => false
+  end.
 
 Definition ResGraphNode := sum_eqType (ordinal_eqType maxReg) nat_eqType.
 
@@ -176,25 +181,27 @@ End EqResGraphEdge.
 Definition determineEdge (x : ResGraphEdge) :
   option ResGraphNode * option ResGraphNode := (resBeg x, resEnd x).
 
+Definition compareNodes (x y : option ResGraphNode) : bool := x < y.
+
+Definition compareEdges (x y : ResGraphEdge) : bool :=
+  ~~ (resGhost x && ~~ resGhost y).
+
 Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   match resMove x with
   | Move       fr fv tr    =>
     [:: {| resMove  := Spill fr fv
          ; resGhost := false
          ; resBeg   := resBeg x
-         ; resEnd   := None
-         |}
+         ; resEnd   := None |}
      ;  {| resMove  := Restore fv tr
          ; resGhost := resGhost x
          ; resBeg   := None
-         ; resEnd   := resEnd x
-         |} ]
+         ; resEnd   := resEnd x |} ]
   | Swap       fr fv tr tv =>
     [:: {| resMove  := Swap tr tv fr fv
          ; resGhost := resGhost x
          ; resBeg   := resEnd x
-         ; resEnd   := resBeg x
-         |} ]
+         ; resEnd   := resBeg x |} ]
   | Spill      fr fv       => [::] (* jww (2015-07-07): Need to use temp slot *)
   | Restore    tv tr       => [::]
   | AllocReg   tv tr       => [::]
@@ -203,9 +210,11 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   (* | FreeStack  fv          => [::] *)
   end.
 
+Definition sortMoves (x : Graph ResGraphNode ResGraphEdge_eqType) :
+  seq ResGraphEdge := topsort x splitEdge compareEdges.
+
 Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
-  topsort (IntMap_foldl (flip addEdge) (emptyGraph determineEdge) moves)
-          splitEdge.
+  sortMoves (IntMap_foldl (flip addEdge) (emptyGraph determineEdge) moves).
 
 (* Assuming a transition [from] one point in the procedure [to] another --
    where these two positions may be contiguous, or connected via a branch --
@@ -271,8 +280,7 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
                  else None
             else None
        else
-         let mmv :=
-            match intReg x, intReg y with
+         let mmv := match intReg x, intReg y with
             | Some xr, Some yr => Some (Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
             | None,    Some xr => Some (Restore vid xr)

@@ -1,4 +1,5 @@
 Require Import Hask.Ssr.
+Require Import Hask.Data.List.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -47,11 +48,11 @@ Definition removeEdge (x : b) g : Graph :=
    ; edge_f   := edge_f g
    |}.
 
-Definition connections f (x : option a) g :=
+Definition connections f (x : option a) g : seq b :=
   filter ((fun y : option a => y == x) \o f \o edge_f g) (edges g).
 
-Definition outbound := connections (@fst _ _).
-Definition inbound  := connections (@snd _ _).
+Definition outbound : option a -> Graph -> seq b := connections fst.
+Definition inbound  : option a -> Graph -> seq b := connections snd.
 
 Fixpoint tsort' fuel l (roots : seq (option a)) (k : b -> seq b) g : seq b :=
   (* The fuel represents the fact that we must only call tsort' once for
@@ -62,7 +63,7 @@ Fixpoint tsort' fuel l (roots : seq (option a)) (k : b -> seq b) g : seq b :=
      this function useless in the context of proof. *)
   if fuel isn't S fuel then rev l else
 
-  if edges g isn't e :: es then rev l else
+  if edges g isn't e :: _ then rev l else
 
   let: next :=
     if roots is n :: s
@@ -78,22 +79,26 @@ Fixpoint tsort' fuel l (roots : seq (option a)) (k : b -> seq b) g : seq b :=
       ([:: snd (edge_f g e)], foldr addEdge (removeEdge e g) (k e)) in
   if next isn't (n :: s, g') then [::] else (* always matches *)
 
-  let outEdges    := outbound n g' in
-  let: (res, g'') := foldl (fun acc e =>
-                              let: (res, g'') := acc in
-                              (e :: res, removeEdge e g''))
-                           ([::], g') outEdges in
-  let outNodes    := map (@snd _ _ \o edge_f g) outEdges in
-  let s'          := s ++ filter (@nilp _ \o inbound ^~ g'') outNodes in
+  let outEdges := outbound n g' in
+  let: (res, g'') :=
+    foldl (fun acc e => let: (res, g'') := acc in
+                          (e :: res, removeEdge e g''))
+          ([::], g') outEdges in
+  let outNodes := map (@snd _ _ \o edge_f g) outEdges in
+  let s' := s ++ filter (@nilp _ \o inbound ^~ g'') outNodes in
 
   tsort' fuel (l ++ res) s' k g''.
 
 (* The function [k] takes an edge, and must yield an edge whose target (as
    given by [edge_f g]) is [None]. *)
-Definition topsort g (k : b -> seq b) : seq b :=
-  let noInbound :=
-      (fun xs => [seq x <- vertices g | x \notin xs])
-      (map (@snd _ _ \o edge_f g) (edges g)) in
+Definition topsort g (k : b -> seq b) (p : rel b) : seq b :=
+  (* Identify vertices that have no incoming edge (i.e., the "in-degree" of
+     these vertices is zero, meaning that no edge has such a vertex for its
+     destination). *)
+  let verts := undup [seq fst (edge_f g x)
+                     | x <- sortBy p (edges g)] in
+  let noInbound := (fun xs => [seq x <- verts | x \notin xs])
+                     (map (@snd _ _ \o edge_f g) (edges g)) in
   (* +1 is added to the fuel in case None is injected as a root *)
   tsort' (size (vertices g)).+1 [::] noInbound k g.
 
@@ -105,7 +110,7 @@ Arguments addEdge {a b} e g.
 Arguments removeEdge {a b} _ g.
 Arguments outbound {a b} _ g.
 Arguments inbound {a b} _ g.
-Arguments topsort {a b} g k.
+Arguments topsort {a b} g k p.
 
 (* Compute *)
 (*   ( addEdge (Some  1, Some  3) *)
