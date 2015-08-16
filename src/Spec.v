@@ -824,12 +824,120 @@ Lemma all_transport : forall a (xs : seq a) (P Q : pred a),
 Admitted.
 
 Lemma contractions_disjoint :
-  forall x y z : IntervalDesc,
-    ~~ intervalsIntersect x y ->
-    ibeg z == ibeg y ->
-    iend z <= iend y ->
-    ~~ intervalsIntersect x z.
+  forall a d b c : IntervalDesc,
+    ~~ intervalsIntersect a d ->
+    ibeg b >= ibeg a ->
+    iend b <= iend a ->
+    ibeg c >= ibeg d ->
+    iend c <= iend d ->
+    ~~ intervalsIntersect b c.
 Admitted.
+
+Lemma all_all_contract
+  (a : Type) (P : a -> bool)
+  (b : Type) (Q : b -> bool)
+  (maxReg : nat)
+  (sd : ScanStateDesc maxReg)
+  (xid : 'I_(nextInterval sd))
+  (i : IntervalSig)
+  (xs : seq (IntervalId sd * a))
+  (ys : seq (IntervalId sd * b)) :
+  all (fun y : IntervalDesc =>
+         all (fun y0 : IntervalDesc => ~~ intervalsIntersect y y0)
+             [seq (vnth (intervals sd) (fst x)).1
+             | x <- xs
+             & P (snd x)])
+      [seq (vnth (intervals sd) (fst x)).1
+      | x <- ys
+      & Q (snd x)]
+  -> all (fun x : IntervalDesc =>
+            all (fun y0 : IntervalDesc => ~~ intervalsIntersect x y0)
+                [seq (vnth (vreplace (intervals sd) xid i) (fst x0)).1
+                | x0 <- ys
+                & Q (snd x0)])
+         [seq (vnth (vreplace (intervals sd) xid i) (fst x)).1
+         | x <- xs
+         & P (snd x)].
+Proof.
+Admitted.
+
+Lemma between_all_contract
+  (a : Type)
+  (P : a -> bool)
+  (maxReg : nat)
+  (sd : ScanStateDesc maxReg)
+  (xid : 'I_(nextInterval sd))
+  (i : IntervalSig)
+  (xs : seq (IntervalId sd * a)) :
+  between_all (negb .: intervalsIntersect)
+    ([seq (vnth (intervals sd) (fst x)).1 | x <- xs & P (snd x)])
+  -> between_all (negb .: intervalsIntersect)
+       ([seq (vnth (vreplace (intervals sd) xid i) (fst x)).1
+        | x <- xs & P (snd x)]).
+Proof.
+  move=> H.
+  elim: xs => //= [x xs IHxs] in H *.
+  case E: (P (snd x)) in IHxs H *.
+    move/andP: H => [H0 H1].
+    apply/andP; split.
+      rewrite {IHxs H1}.
+      elim: xs => //= [y ys IHys] in H0 *.
+      case F: (P (snd y)) in IHys H0 *.
+        move/andP: H0 => [H1 H2].
+        apply/andP; split.
+          rewrite {IHys H2}.
+          apply (@contractions_disjoint
+            (vnth (intervals sd) (fst x)).1
+            (vnth (intervals sd) (fst y)).1
+            (vnth (vreplace (intervals sd) xid i) (fst x)).1
+            (vnth (vreplace (intervals sd) xid i) (fst y)).1) => //.
+          - admit.
+          - admit.
+          - admit.
+          - admit.
+        exact: (IHys H2).
+      exact: (IHys H0).
+    exact: IHxs H1.
+  exact: IHxs H.
+Admitted.
+
+Tactic Notation "breakdown" tactic(T) :=
+    repeat match goal with
+    | [ H : is_true (@between_all _ _ (@cat _ _ _)) |- _ ] =>
+      move: H;
+      try rewrite -!map_cat;
+      try rewrite -!flatten_cat;
+      try rewrite -!filter_cat;
+      rewrite between_all_cat; last assumption;
+      try rewrite -!map_cat;
+      try rewrite -!flatten_cat;
+      try rewrite -!filter_cat;
+      try rewrite !all_cat;
+      move=> H;
+      repeat match goal with
+      | [ H: is_true (_ && _) |- _ ] => move/andP: H => [? ?]
+      | [ H: is_true [&& _, _, _, _ & _ ] |- _ ] => move: H => [*]
+      | [ H: is_true [&& _, _, _ & _ ] |- _ ] => move: H => [*]
+      | [ H: is_true [&& _, _ & _ ] |- _ ] => move: H => [*]
+      | [ H: is_true [&& _ & _ ] |- _ ] => move: H => [*]
+      end
+    | [ |- is_true (@between_all _ _ (@cat _ _ _)) ] =>
+      try rewrite -!map_cat;
+      try rewrite -!flatten_cat;
+      try rewrite -!filter_cat;
+      rewrite between_all_cat; last assumption;
+      try rewrite -!map_cat;
+      try rewrite -!flatten_cat;
+      try rewrite -!filter_cat;
+      try rewrite !all_cat;
+      repeat match goal with
+      | [ |- is_true (_ && _) ] => apply/andP; split
+      | [ |- is_true [&& _, _, _, _ & _ ] ] => split
+      | [ |- is_true [&& _, _, _ & _ ] ] => split
+      | [ |- is_true [&& _, _ & _ ] ] => split
+      | [ |- is_true [&& _ & _ ] ] => split
+      end
+    end; move=> //; try T.
 
 Theorem no_allocations_overlap `(st : @ScanState maxReg InUse sd)
   (registers_exist : maxReg > 0) :
@@ -852,6 +960,48 @@ Proof.
   - Case "ScanState_setInterval".
     (* jww (2015-07-05): We should be able to prove this based on the fact
        that intervals may only contract. *)
+    have Hsym := sym_neg intervalsIntersect_sym.
+    pose f x := x == Just reg.
+    pose g x := x == reg.
+    rewrite between_all_cat; last exact: Hsym.
+    rewrite between_all_cat in IHst; last exact: Hsym.
+    move/andP: IHst => [IHst0 /andP [IHst1 /andP [IHst2 IHst3]]].
+    apply/andP; split => //.
+    apply/andP; split => //.
+      rewrite between_all_cat; last exact: Hsym.
+      rewrite between_all_cat in IHst1; last exact: Hsym.
+      move/andP: IHst1 => [IHst10 /andP [IHst11 /andP [IHst12 IHst13]]].
+      apply/andP; split => //.
+        exact: (@between_all_contract _ f maxReg sd).
+      apply/andP; split => //.
+        rewrite between_all_cat; last exact: Hsym.
+        rewrite between_all_cat in IHst11; last exact: Hsym.
+        move/andP: IHst11 => [IHst110 /andP [IHst111 /andP [IHst112 IHst113]]].
+        do 2 (apply/andP; split => //;
+          first exact: (@between_all_contract _ g maxReg sd)).
+        apply/andP; split => //;
+        exact: (@all_all_contract _ g _ g maxReg sd).
+      rewrite -map_cat -filter_cat in IHst12.
+      rewrite -map_cat -filter_cat in IHst13.
+      rewrite -map_cat -filter_cat.
+      apply/andP; split => //.
+        exact: (@all_all_contract _ f _ g maxReg sd).
+      exact: (@all_all_contract _ g _ f maxReg sd).
+    apply/andP; split => //.
+      rewrite {IHst0 IHst1 IHst3}.
+      case: (vnth (fixedIntervals sd) reg) => //= [int] in IHst2 *.
+      move: IHst2.
+      rewrite -!map_cat -!filter_cat Bool.andb_true_r all_cat.
+      move/andP=> [IHst21 IHst22].
+      apply/andP; split.
+        admit.
+      admit.
+    rewrite {IHst0 IHst1 IHst2}.
+    move: IHst3.
+    rewrite -!map_cat -!filter_cat !all_cat.
+    move/andP=> [IHst31 IHst32].
+    apply/andP; split.
+      admit.
     admit.
   - Case "ScanState_setFixedIntervals".
     have Hneeded :
