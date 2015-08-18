@@ -40,14 +40,6 @@ Definition curPosition `(cur : ScanStateCursor sd) : nat :=
   intervalStart (curInterval cur).
 Arguments curPosition [sd] cur /.
 
-Lemma curPosition_odd `(cur : ScanStateCursor sd) :
-  odd (curPosition cur).
-Proof.
-  rewrite /curPosition.
-  case: (curInterval cur) => [? ? r|? ? ? [? r] ?] /=;
-  exact: (Range_beg_odd r).
-Qed.
-
 Definition withCursor {Q a pre}
   (f : forall sd : ScanStateDesc maxReg, ScanStateCursor sd
          -> SState pre (@SSMorphHasLen maxReg) Q a) :
