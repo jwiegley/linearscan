@@ -87,7 +87,7 @@ Proof.
       have Hreq : (firstUseReqReg (getInterval xid) == None)
         by rewrite /getInterval Heqe.
       move: (moveActiveToHandled st Hin (spilled:=true) Hreq)
-        => [sd' st' [[[? ?] H] _]].
+        => [sd' st' [[[?] H] _]].
       apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
@@ -98,7 +98,7 @@ Proof.
       have Hreq : (firstUseReqReg (getInterval xid) == None)
         by rewrite /getInterval Heqe.
       move: (moveInactiveToHandled st Hin (spilled:=true) Hreq)
-        => [sd' st' [[[? ?] H] _]].
+        => [sd' st' [[[?] H] _]].
       apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
@@ -309,7 +309,7 @@ Proof.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
 
     move: (moveActiveToHandled st Hin' (spilled:=true) Hreq')
-      => [sd3 st3 [[[? ?] H] _]].
+      => [sd3 st3 [[[?] H] _]].
     apply: inr _.
     exists (sd3; st3).
     apply Build_SSMorphHasLen => //=;
@@ -377,7 +377,7 @@ Proof.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
 
     move: (moveInactiveToHandled st Hin' (spilled:=true) Hreq')
-      => [sd3 st3 [[[? ?] H] _]].
+      => [sd3 st3 [[[?] H] _]].
     apply: inr _.
     exists (sd3; st3).
     apply Build_SSMorphHasLen => //=;
@@ -400,7 +400,7 @@ Proof.
   case: ssi => sd.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled sd) => //= [[uid beg] us].
-  move=> H1 H2 H3 H4.
+  move=> H1 H2 H3.
   have := getInterval uid.
   set d := (X in Interval X).
   move=> i st.
@@ -412,12 +412,10 @@ Proof.
   apply: inr (tt, _).
   apply: (Build_SSInfo _ st').
   case: (firstUseReqReg (vnth (intervals sd) uid).2) => [[pos /= ?]|] in H.
-  case: H => [[/= ? ?] _].
-  apply Build_SSMorph => //=; try ordered.
-    by (transitivity (fixedIntervals sd)).
-  case: H => [/= ? ?].
-  apply Build_SSMorph => //=; try ordered.
-    by (transitivity (fixedIntervals sd)).
+  case: H => [[/= ?] _].
+  apply Build_SSMorph => //=; by ordered.
+  case: H => [/= ?].
+  apply Build_SSMorph => //=; by ordered.
 Defined.
 
 End Spill.

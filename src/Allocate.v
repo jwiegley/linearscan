@@ -60,7 +60,7 @@ Definition findEligibleRegister (sd : ScanStateDesc maxReg)
       if mint is Some int
       then
         let ip := intervalIntersectionPoint int.2 current in
-        let intersects := if ip is Some _ then true else false in
+        let intersects := isJust ip in
         (updateRegisterPos fup reg (intervalIntersectionPoint int.2 current),
          vreplace fai reg intersects)
       else acc) (xs, vconst false) (fixedIntervals sd) in
@@ -232,7 +232,7 @@ Definition allocateBlockedReg {pre} :
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
 Proof.
-  case. case=> ? ? ?.
+  case. case=> ? ?.
   exact: (widen_ord _).
 Defined.
 
@@ -288,7 +288,7 @@ Next Obligation.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [[? ?] _].
+    case=> [[?] _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
@@ -298,14 +298,14 @@ Next Obligation.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [[? ?] _].
+    case=> [[?] _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [[? ?] _].
+  case=> [[?] _].
   rewrite map_widen_ord_refl.
   apply: subseq_impl_cons.
   exact Hsub.
@@ -351,7 +351,7 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   end.
 Next Obligation.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [[? ?] _].
+  case: sslen'; case=> [[?] _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -371,8 +371,7 @@ Program Definition goInactive (pos : nat) (sd : ScanStateDesc maxReg)
   match getInterval (fst x)
   return seq SSTrace + intermediate_result sd xs (@inactive maxReg) with
   | i =>
-    let Hin : x \in inactive z :=
-        @in_subseq_sing _ _ _ x xs _ Hsub in
+    let Hin : x \in inactive z := @in_subseq_sing _ _ _ x xs _ Hsub in
     let f (sd'    : ScanStateDesc maxReg)
           (st'    : ScanState InUse sd')
           (sslen' : SSMorphLen z sd')
@@ -401,7 +400,7 @@ Program Definition goInactive (pos : nat) (sd : ScanStateDesc maxReg)
 Next Obligation.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [[? ?] _].
+  case=> [[?] _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.

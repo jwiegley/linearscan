@@ -204,10 +204,18 @@ showUsePositions :: [LS.UsePos] -> String
 showUsePositions [] = ""
 showUsePositions [u] = go u
   where
-    go (LS.Build_UsePos n req _v) = show n ++ (if req then "" else "?")
+    go (LS.Build_UsePos n req v) =
+        (case v of LS.Input  -> "i"
+                   LS.Output -> "o"
+                   LS.Temp   -> "T")
+            ++ show n ++ (if req then "" else "?")
 showUsePositions (u:us) = go u ++ " " ++ showUsePositions us
   where
-    go (LS.Build_UsePos n req _v) = show n ++ (if req then "" else "?")
+    go (LS.Build_UsePos n req v) =
+        (case v of LS.Input  -> "i"
+                   LS.Output -> "o"
+                   LS.Temp   -> "T")
+            ++ show n ++ (if req then "" else "?")
 
 toScanStateDesc :: LS.ScanStateDescSet -> ScanStateDesc
 toScanStateDesc (LS.Build_ScanStateDescSet a b c d e f g) =

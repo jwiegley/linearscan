@@ -65,10 +65,10 @@ Proof.
       => [err|[ss H]].
       exact: inl err.
     case: (firstUseReqReg int.2) => [[? ?]|] in H.
-      case: H => [[? ?] ?].
+      case: H => [[?] ?].
       apply: inr (ss; _).
       exact: Build_SSMorphLen.
-    case: H => [? ?].
+    case: H => [?].
     case E: (0 < size (unhandled ss.1)).
       apply: inr (ss; _).
       exact: Build_SSMorphLen.
@@ -145,11 +145,11 @@ Proof.
   case: ssi => desc.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
-  move=> H1 H2 H3 H4.
+  move=> H1 H2 H3.
   move/splitUnhandledInterval/(_ uid beg us Hunh pos e2).
   case: desc => /= ? intervals0 fints unhandled0 ? ? ?
-    in uid us Hunh H1 H2 H3 H4 *.
-  case=> [err|[[sd st] [[/= [? ?] H]]]].
+    in uid us Hunh H1 H2 H3 *.
+  case=> [err|[[sd st] [[/= [?] H]]]].
     exact: inl err.
   apply: (inr (tt, _)).
   apply: (Build_SSInfo _ st).
@@ -160,8 +160,7 @@ Proof.
   try apply Build_SSMorph;
   rewrite ?insert_size ?size_map //;
   try move=> Hpre;
-  try exact: (leq_trans H1 _).
-  by (transitivity fints).
+  exact: (leq_trans H1 _).
 Defined.
 
 Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
@@ -195,11 +194,11 @@ Proof.
 
     case: Hin => [Hin|Hin].
       case: (spillInterval st Hunh Hbeg2 (ActiveToHandled uid Heqe Hin) e2)
-        => [err|[ss [[[/= ? ?] ?] ?]]].
+        => [err|[ss [[[/= ?] ?] ?]]].
         exact: inl err.
       exact: inr (ss; _).
     case: (spillInterval st Hunh Hbeg2 (InactiveToHandled uid Heqe Hin) e2)
-      => [err|[ss [[[/= ? ?] ?] ?]]].
+      => [err|[ss [[[/= ?] ?] ?]]].
       exact: inl err.
     exact: inr (ss; _).
 
@@ -249,7 +248,7 @@ Proof.
      register, in which case we spill the first place and add the second part
      back onto the unhandled list for processing later. *)
   case: (spillInterval st Hunh Hbeg2 (NewToHandled _ i1) e2)
-    => [err|[ss [[[/= ? ?] ?] ?]]].
+    => [err|[ss [[[/= ?] ?] ?]]].
     exact: inl err.
   exact: inr (ss; _).
 Defined.
@@ -277,7 +276,7 @@ Proof.
 
   case Hunh: (unhandled desc) => //= [[uid beg] us].
   case: desc => /= ? intervals0 fints ? active0 inactive0 ? in uid us Hunh *.
-  move=> intlist Hintlist intids Hin H1 H2 H3 H4 st.
+  move=> intlist Hintlist intids Hin H1 H2 H3 st.
 
   elim Hintids: intids => /= [|aid aids IHaids] in Hin *.
     apply: (inr (tt, (Build_SSInfo _ st))).
@@ -302,7 +301,7 @@ Proof.
     exact: inr _.
   move=> /(_ Hin' e2) {Hin'}.
 
-  case=> [err|[[sd st] [[/= [Hincr ?] H ?]]]].
+  case=> [err|[[sd st] [[/= [Hincr] H ?]]]].
     exact: inl err.
   apply: (inr (tt, _)).
 

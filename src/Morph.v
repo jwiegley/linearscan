@@ -22,8 +22,7 @@ Open Scope nat_scope.
     states.  It is a [PreOrder] relation. *)
 
 Record SSMorph (sd1 sd2 : ScanStateDesc maxReg) : Prop := {
-    next_interval_increases : nextInterval sd1 <= nextInterval sd2;
-    fixed_intervals_unchanged : fixedIntervals sd1 = fixedIntervals sd2
+    next_interval_increases : nextInterval sd1 <= nextInterval sd2
 }.
 
 Arguments next_interval_increases [sd1 sd2] _.
@@ -33,7 +32,6 @@ Obligation 1. constructor; auto. Qed.
 Obligation 2.
   constructor; destruct H; destruct H0.
   - exact: (leq_trans next_interval_increases0).
-  - by transitivity (fixedIntervals y).
 Qed.
 
 Record SSMorphLen (sd1 sd2 : ScanStateDesc maxReg) : Prop := {
