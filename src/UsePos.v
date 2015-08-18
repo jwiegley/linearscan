@@ -237,6 +237,29 @@ Proof.
   by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
 Qed.
 
+Lemma Forall_last_ltn : forall (y : UsePos) (ys : seq UsePos) (n : nat),
+  last (uloc y) [seq uloc u | u <- ys] < n
+    -> List.Forall (fun x : UsePos => y < x) ys -> y < n.
+Proof.
+  move=> y.
+  elim=> //= [z zs IHzs] n Hlast.
+  invert; subst.
+  apply: IHzs => //.
+  move/ltnW in H1.
+  exact (last_ltn Hlast H1).
+Qed.
+
+Lemma Forall_last_leq : forall (y : UsePos) (ys : seq UsePos) (n : nat),
+  last (uloc y) [seq uloc u | u <- ys] <= n
+    -> List.Forall (fun x : UsePos => y <= x) ys -> y <= n.
+Proof.
+  move=> y.
+  elim=> //= [z zs IHzs] n Hlast.
+  invert; subst.
+  apply: IHzs => //.
+  exact (last_leq Hlast H1).
+Qed.
+
 Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_le l
     -> (l1, l2) = span (fun u => uloc u < x) l
@@ -264,51 +287,4 @@ Proof.
   move/allP: H2 => /(_ x0 Hin).
   rewrite /funcomp.
   by ordered.
-Qed.
-
-Lemma last_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
-  last z xs < n -> y <= z -> last y xs < n.
-Proof.
-  move=> z y.
-  elim=> //= [x xs IHxs].
-  exact: leq_ltn_trans IHxs _.
-Qed.
-
-Lemma Forall_last_ltn : forall (y : UsePos) (ys : seq UsePos) (n : nat),
-  last (uloc y) [seq uloc u | u <- ys] < n
-    -> List.Forall (fun x : UsePos => y < x) ys -> y < n.
-Proof.
-  move=> y.
-  elim=> //= [z zs IHzs] n Hlast.
-  invert; subst.
-  apply: IHzs => //.
-  move/ltnW in H1.
-  exact (last_ltn Hlast H1).
-Qed.
-
-Lemma last_leq : forall (z y : nat) (xs : seq nat) (n : nat),
-  last z xs <= n -> y <= z -> last y xs <= n.
-Proof.
-  move=> z y.
-  elim=> //= [x xs IHxs].
-  exact: leq_trans IHxs _.
-Qed.
-
-Lemma last_leq_ltn : forall (z y : nat) (xs : seq nat) (n : nat),
-  last z xs < n -> y <= z -> last y xs < n.
-Proof.
-  move=> z y.
-  elim=> //= [x xs IHxs].
-  exact: leq_ltn_trans IHxs _.
-Qed.
-
-Lemma Forall_last_leq : forall (y : UsePos) (ys : seq UsePos) (n : nat),
-  last (uloc y) [seq uloc u | u <- ys] <= n
-    -> List.Forall (fun x : UsePos => y <= x) ys -> y <= n.
-Proof.
-  move=> y.
-  elim=> //= [z zs IHzs] n Hlast.
-  invert; subst.
-  apply: IHzs => //.
-  exact (last_leq Hlast H1).
 Qed.
