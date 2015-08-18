@@ -87,34 +87,9 @@ Definition intervalEnd   `(Interval i) : nat := iend i.
 Arguments intervalStart [i] _ /.
 Arguments intervalEnd [i] _ /.
 
-Definition isWithin (int : IntervalDesc) (vid : nat) (knd : VarKind)
-  (opid : nat) : bool :=
-  [&& ivar int == vid
-  ,   ibeg int <= opid
-  &   if knd is Input
-      then opid <= iend int
-      else opid < iend int
-  ].
-
 Definition posWithinInterval `(i : Interval d) (pos : nat) : bool :=
   intervalStart i <= pos < intervalEnd i.
 Arguments posWithinInterval [d] i pos /.
-
-Definition intervalCoversPos `(i : Interval d) (pos : nat) : bool :=
-  let within r :=
-      (* If the [Range] has input variables at its end, then the end position
-         is considered covered by the range, since a split there will result
-         in the need to save and restore those inputs. *)
-      if [seq u <- ups r.1
-         | (uloc u == rend r.1) && (uvar u == Input)] isn't nil
-      then rbeg r.1 < pos <= rend r.1
-      else rbeg r.1 < pos <  rend r.1 in
-  let fix go rs := match rs with
-      | NE_Sing r     => within r
-      | NE_Cons r rs' => within r || go rs'
-      end in
-  go (rds d).
-Arguments intervalCoversPos [d] i pos /.
 
 (* This lemma proves that if an [Interval] is formed from the list of ranges,
    where that list is at least a cons cell, then the end of the first element
@@ -204,25 +179,6 @@ Lemma has_rangesIntersect_sym (y : RangeSig) (xs : seq RangeSig) :
 Proof.
   elim: xs => //= [x xs IHxs].
   by rewrite rangesIntersect_sym IHxs.
-Qed.
-
-Lemma has_over_false A (f : A -> bool) (xs : seq A) :
-   has (fun x => f x || false) xs = has f xs.
-Proof.
-  elim: xs => //= [x xs IHxs].
-  by rewrite !Bool.orb_false_r IHxs.
-Qed.
-
-Lemma has_flip A (R : rel A) (_ : symmetric R) (xs ys : seq A) :
-  has (fun x => has (fun y => R x y) ys) xs
-    = has (fun y => has (fun x => R y x) xs) ys.
-Proof.
-  elim: xs => /= [|x xs IHxs].
-    by elim: ys.
-  rewrite has_predU {}IHxs.
-  f_equal.
-  elim: ys => //= [y ys IHys].
-  by rewrite IHys H.
 Qed.
 
 Lemma intervalsOverlap_sym : symmetric intervalsOverlap.
@@ -449,24 +405,6 @@ Arguments afterLifetimeHole d pos /.
 Definition firstUseReqReg `(i : Interval d) :
   option { u : oddnum | ibeg d <= u.1 <= iend d } := lookupUsePos i regReq.
 Arguments firstUseReqReg [d] i /.
-
-Program Definition firstUseReqRegOrEnd `(i : Interval d) : oddnum :=
-  if firstUseReqReg i is Some n
-  then n
-  else if odd (iend d)
-       then iend d
-       else (iend d).-1.
-Obligation 1.
-  case E: (odd (iend d)) => //.
-  move: (Interval_exact_beg i) => Hbeg.
-  move: (Interval_bounded i) => Hbound.
-  move: (Range_beg_odd (NE_head (rds d)).2) => Hodd.
-  rewrite -{}Hbeg in Hodd.
-  case: (iend d) => [|n] /= in E Hbound *.
-    move/odd_gt1 in Hodd.
-    by ordered.
-  by move/negbT/negbNE in E.
-Qed.
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
