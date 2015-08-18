@@ -60,14 +60,6 @@ Canonical VarKind_eqType :=
 
 End EqVarKind.
 
-Lemma at_least_one_var (kinds : seq VarKind) (Hkinds : 0 < size kinds) :
-  (Input \notin kinds) && (Output \notin kinds) && (Temp \notin kinds) -> False.
-Proof.
-  elim: kinds => // [k ks IHks] in Hkinds *.
-  move/andP=> [/andP [H1 H2] H3].
-  case: k => // in Hkinds H1 H2 H3 *.
-Qed.
-
 (** ** UsePos *)
 
 (** A "use position", or [UsePos], identifies an exact point in the
