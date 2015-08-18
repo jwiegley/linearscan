@@ -111,15 +111,6 @@ Proof.
   by reduce_last_use; ordered.
 Qed.
 
-Lemma Range_ends_after_use `(r : Range rd) : forall n,
-  n <= head_or_end rd -> n <= rend rd.
-Proof.
-  rewrite /head_or_end /head_or.
-  move: (Range_proper r) => /=.
-  rewrite /useWithinRange /=.
-  case: (ups rd) => //= [u us].
-  by reduce_last_use; ordered.
-Qed.
 
 Definition Range_shift `(r : Range rd) `(Hodd : odd b)
   (H : b < head_or_end rd) : RangeSig.
