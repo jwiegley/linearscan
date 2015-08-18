@@ -759,21 +759,3 @@ Proof.
     exact: H.
   by rewrite uniq_catC.
 Qed.
-
-(* Theorem non_handled_never_overlap `(st : @ScanState maxReg InUse sd) *)
-(*   (xid : @IntervalId maxReg sd) (reg : PhysReg maxReg) *)
-(*   (registers_exist : maxReg > 0): *)
-(*   xid \notin [seq fst i | i <- handled sd] *)
-(*     -> all (fun y : IntervalDesc => *)
-(*               ~~ intervalsIntersect (vnth (intervals sd) xid).1 y) *)
-(*            (handledIntervalDescsForReg sd reg). *)
-(* Proof. *)
-(*   rewrite /handledIntervalDescsForReg. *)
-(*   elim: (handled sd) => //= [x xs IHxs]. *)
-(*   rewrite in_cons. *)
-(*   move/norP=> [H1 H2]. *)
-(*   specialize (IHxs H2). *)
-(*   case: (snd x == Just reg) => //=. *)
-(*   apply/andP; split => //. *)
-(*   move: (no_allocations_overlap st registers_exist reg). *)
-(* Admitted. *)
