@@ -23,7 +23,7 @@ Definition PhysReg := 'I_maxReg.
 
 Open Scope program_scope.
 
-Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
+Definition overlapsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option oddnum) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let int := curIntDetails cur in
@@ -191,7 +191,7 @@ Definition allocateBlockedReg {pre} :
            // the fixed interval for reg
            if current intersects with the fixed interval for reg then
              split current before this intersection *)
-        (* mloc <<- intersectsWithFixedInterval reg ;; *)
+        (* mloc <<- overlapsWithFixedInterval reg ;; *)
         (* match mloc with *)
         (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
         (* | None   => ipure tt *)
@@ -219,9 +219,9 @@ Definition allocateBlockedReg {pre} :
              split current before this intersection *)
         (* jww (2015-01-30): What if the fixed interval begins at the current
            position? *)
-        mloc <<- intersectsWithFixedInterval reg ;;;
+        mloc <<- overlapsWithFixedInterval reg ;;;
         match mloc with
-        | Some n => context (EIntersectsWithFixedInterval n.1 reg) $
+        | Some n => context (EOverlapsWithFixedInterval n.1 reg) $
                       splitCurrentInterval (BeforePos n)
         | None   => ipure tt
         end ;;;
@@ -232,7 +232,7 @@ Definition allocateBlockedReg {pre} :
 Definition morphlen_transport {b b'} :
   @SSMorphLen maxReg b b' -> IntervalId b -> IntervalId b'.
 Proof.
-  case. case=> ? ?.
+  case. case=> ? ? ?.
   exact: (widen_ord _).
 Defined.
 
@@ -250,58 +250,85 @@ Definition intermediate_result (sd z : ScanStateDesc maxReg)
   | (ScanState InUse res.1 /\ SSMorphLen sd res.1)
   & subseq [seq mt_fst res.2 i | i <- xs] (f res.1) }.
 
-Program Definition goActive (pos : nat) (sd z : ScanStateDesc maxReg)
+Program Definition goActive (pos : nat) (sd : ScanStateDesc maxReg)
+  (e : seq SSTrace) (z : ScanStateDesc maxReg)
   (Pz : ScanState InUse z /\ SSMorphLen sd z)
   (x : int_reg z) (xs : int_reg_seq z)
   (Hsub : subseq (x :: xs) (active z)) :
-  intermediate_result sd xs (@active maxReg) :=
+  seq SSTrace + intermediate_result sd xs (@active maxReg) :=
   (* for each interval it in active do
        if it ends before position then
          move it from active to handled
        else if it does not cover position then
          move it from active to inactive *)
   let: conj st sslen := Pz in
-  let go i : intermediate_result sd xs (@active maxReg) :=
-    let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
-    let ss := if intervalEnd i < pos
-              then let: exist2 x H1 H2 :=
-                      moveActiveToHandled st Hin (spilled:=false)
-                                          is_true_true in
-                   exist2 _ _ x H1 (proj1 H2)
-              else if ~~ posWithinInterval i pos
-                   then moveActiveToInactive st Hin
-                   else exist2 _ _ z st (newSSMorphLen z) in
+  let i := getInterval (fst x) in
+  let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
+  if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
+  then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 1 :: e)
+  else
+    let ss :=
+      if intervalEnd i < pos
+      then let: exist2 x H1 H2 :=
+             moveActiveToHandled st Hin Hreq (spilled:=false) in
+           exist2 _ _ x H1 (proj1 H2)
+      else if ~~ posWithinInterval i pos
+           then moveActiveToInactive st Hin
+           else exist2 _ _ z st (newSSMorphLen z) in
     match ss with
     | exist2 sd' st' sslen' =>
-        exist2 _ _ (sd'; sslen') (conj st' (transitivity sslen sslen')) _
-    end in
-  go (getInterval (fst x)).
-Obligation 2.
+        inr (exist2 _ _ (sd'; sslen')
+                    (conj st' (transitivity sslen sslen')) _)
+    end.
+(* Next Obligation. *)
+(*   clear Heq_anonymous. *)
+(*   move: Hreq. *)
+(*   rewrite /verifyNewHandled. *)
+(*   move/andP=> [H1 H2]. *)
+(*   inv Heq_Pz. *)
+(*   destruct sslen. *)
+(*   destruct len_is_SSMorph. *)
+(*   f_equal. *)
+(*     rewrite {}H1 {H2}. *)
+(*     set v := (i, p) :: xs. *)
+(*     move/in_subseq_sing => /= in Hsub. *)
+(*     specialize (Hsub (i, p) xs refl_equal). *)
+(*     move/mem_map_fst in Hsub. *)
+(*     have H: i \notin [seq fst i | i <- handled z]. *)
+(*       move: (lists_are_unique st). *)
+(*       rewrite /all_state_lists catA uniq_catCA -catA catA cat_uniq. *)
+(*       move/andP=> [_ /andP [_ H]]. *)
+(*       rewrite /activeIds /handledIds in H. *)
+(*       exact: uniq_cat_in_notin Hsub H. *)
+(*     by move: (non_handled_never_overlap st p registers_exist H) => ->. *)
+(*   by rewrite -fixed_intervals_unchanged H2. *)
+(* Qed. *)
+Next Obligation.
   move: Heq_ss.
 
-  case: (iend (vnth (intervals z) i0).1 < pos).
+  case: (iend (vnth (intervals z) i).1 < pos).
     rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [? _].
+    case=> [[? ?] _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
-  case: (~~ (ibeg (vnth (intervals z) i0).1 <=
-             pos < iend (vnth (intervals z) i0).1)).
+  case: (~~ (ibeg (vnth (intervals z) i).1 <=
+             pos < iend (vnth (intervals z) i).1)).
     rewrite /moveActiveToInactive /=.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
-    case=> [? _].
+    case=> [[? ?] _].
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
   invert as [H1]; subst; simpl.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [? _].
+  case=> [[? ?] _].
   rewrite map_widen_ord_refl.
   apply: subseq_impl_cons.
   exact Hsub.
@@ -310,18 +337,22 @@ Qed.
 Definition checkActiveIntervals {pre} (pos : nat) :
   SState pre (@SSMorphLen maxReg) (@SSMorphLen maxReg) unit :=
   withScanStatePO (maxReg:=maxReg) $ fun sd (st : ScanState InUse sd) =>
+    e <<- Context.iask ;;;
     let unchanged := exist2 _ _ sd st (newSSMorphLen sd) in
-    let res : { sd' : ScanStateDesc maxReg
-              | ScanState InUse sd' /\ SSMorphLen sd sd' } :=
-        @dep_foldl_inv (ScanStateDesc maxReg)
+    let eres : seq SSTrace + { sd' : ScanStateDesc maxReg
+                             | ScanState InUse sd' /\ SSMorphLen sd sd' } :=
+        @dep_foldl_invE (seq SSTrace) (ScanStateDesc maxReg)
           (fun sd' => ScanState InUse sd' /\ SSMorphLen sd sd')
           (@SSMorphLen maxReg) _ sd (conj st (newSSMorphLen sd))
           (active sd) (size (active sd)) (eq_refl _)
-          (@active maxReg) (subseq_refl _) mt_fst (@goActive pos sd) in
-    let: exist sd' (conj st' H) := res in
-    Context.iput {| thisDesc  := sd'
-                  ; thisHolds := H
-                  ; thisState := st' |}.
+          (@active maxReg) (subseq_refl _) mt_fst (@goActive pos sd e) in
+    match eres with
+    | inl err => error_ err
+    | inr (exist sd' (conj st' H)) =>
+        Context.iput {| thisDesc  := sd'
+                      ; thisHolds := H
+                      ; thisState := st' |}
+    end.
 
 Program Definition moveInactiveToActive' `(st : ScanState InUse z)
   (x : int_reg z) (xs : int_reg_seq z)
@@ -339,11 +370,11 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
       | exist2 sd' st' sslen' =>
           inr (exist2 _ _ sd' st' (sslen'; _))
       end
-  | false => inl (ERegisterAssignmentsOverlap (snd x : PhysReg) :: e)
+  | false => inl (ERegisterAssignmentsOverlap (snd x) (fst x) 2 :: e)
   end.
-Obligation 2.
+Next Obligation.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
-  case: sslen'; case=> [? _].
+  case: sslen'; case=> [[? ?] _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
@@ -373,26 +404,54 @@ Program Definition goInactive (pos : nat) (sd : ScanStateDesc maxReg)
         inr (exist2 _ _ (sd'; sslen')
                     (conj st' (transitivity sslen sslen')) Hsub') in
     if intervalEnd i < pos
-    then match moveInactiveToHandled st Hin (spilled:=false) is_true_true with
-         | exist2 sd' st' (conj sslen' _) =>
-             f sd' st' sslen' _
-         end
-    else if posWithinInterval i pos
-         then match moveInactiveToActive' st Hsub Hin e with
-              | inl err => inl err
-              | inr (exist2 sd' st' (exist sslen' Hsub')) =>
-                  f sd' st' sslen' Hsub'
-              end
-         else f z st (newSSMorphLen z) _
+    then
+      if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
+      then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 3 :: e)
+      else
+        match moveInactiveToHandled st Hin Hreq (spilled:=false) with
+        | exist2 sd' st' (conj sslen' _) =>
+            f sd' st' sslen' _
+        end
+    else
+      if posWithinInterval i pos
+      then match moveInactiveToActive' st Hsub Hin e with
+           | inl err => inl err
+           | inr (exist2 sd' st' (exist sslen' Hsub')) =>
+               f sd' st' sslen' Hsub'
+           end
+      else f z st (newSSMorphLen z) _
   end.
-Obligation 2.
+(* Next Obligation. *)
+(*   clear Heq_anonymous. *)
+(*   move: Hreq. *)
+(*   rewrite /verifyNewHandled. *)
+(*   move/andP=> [H1 H2]. *)
+(*   inv Heq_Pz. *)
+(*   destruct sslen. *)
+(*   destruct len_is_SSMorph. *)
+(*   f_equal. *)
+(*     rewrite {}H1 {H2}. *)
+(*     set v := (i, p) :: xs. *)
+(*     move/in_subseq_sing => /= in Hsub. *)
+(*     specialize (Hsub (i, p) xs refl_equal). *)
+(*     move/mem_map_fst in Hsub. *)
+(*     have H: i \notin [seq fst i | i <- handled z]. *)
+(*       move: (lists_are_unique st). *)
+(*       rewrite /all_state_lists catA cat_uniq. *)
+(*       move/andP=> [_ /andP [_ H]]. *)
+(*       rewrite /activeIds /handledIds in H. *)
+(*       exact: uniq_cat_in_notin Hsub H. *)
+(*     by move: (non_handled_never_overlap st p registers_exist H) => ->. *)
+(*   by rewrite -fixed_intervals_unchanged H2. *)
+(* Qed. *)
+Next Obligation.
   rewrite /mt_fst /morphlen_transport /=.
   case: sslen'.
-  case=> [? _].
+  case=> [[? ?] _].
   rewrite map_widen_ord_refl.
   exact: subseq_cons_rem.
 Defined.
-Obligation 3.
+Next Obligation.
   rewrite /mt_fst /morphlen_transport /=.
   rewrite map_widen_ord_refl.
   apply: subseq_impl_cons.
@@ -448,16 +507,34 @@ Definition handleInterval {pre} :
       | None   => allocateBlockedReg
       end.
 
-Definition finalizeScanState `(st : ScanState InUse sd) (finalPos : nat) :
-  ScanStateDesc maxReg :=
+Program Definition finalizeScanState
+  `(st : ScanState InUse sd) (finalPos : nat) :
+  seq SSTrace +
+  { sd' : ScanStateDesc maxReg
+  | [&& size (unhandled sd') == 0
+    ,   size (active sd') == 0
+    &   size (inactive sd') == 0 ] } :=
   match (checkActiveIntervals   finalPos ;;;
          checkInactiveIntervals finalPos) [::]
           {| thisDesc  := sd
            ; thisHolds := newSSMorphLen sd
            ; thisState := st |} with
-  | inl _ => sd
-  | inr (tt, ss) => thisDesc ss
+  | inl errs => inl errs
+  | inr (tt, ss) => _
   end.
+Next Obligation.
+  destruct ss.
+  case H1: (size (unhandled thisDesc) == 0).
+    case H2: (size (active thisDesc) == 0).
+      case H3: (size (inactive thisDesc) == 0).
+        apply: Right _.
+        exists thisDesc.
+        apply/andP; split => //.
+        apply/andP; split => //.
+      exact: inl [:: EInactiveIntervalsRemain].
+    exact: inl [:: EActiveIntervalsRemain].
+  exact: inl [:: EUnhandledIntervalsRemain].
+Qed.
 
 Require Import Coq.Program.Wf.
 (* Include Trace. *)

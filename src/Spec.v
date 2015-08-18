@@ -569,328 +569,6 @@ Proof.
   - Case "ScanState_moveInactiveToHandled". exact: IHst.
 Qed.
 
-Lemma map_filter_fst_widen :
-  forall (b : eqType) c n (f : ('I_n.+1 * b) -> c)
-         (xs : seq ('I_n * b)) (x : b),
-    [seq f i | i <- [seq widen_fst p | p <- xs] & snd i == x] =
-    [seq f (widen_fst i) | i <- xs & snd i == x].
-Proof.
-  move=> b c n f.
-  elim=> //= [y ys IHys] x.
-  case E: (snd y == x) => /=.
-    by rewrite IHys.
-  exact: IHys.
-Qed.
-
-Lemma map_filter_vshiftin :
-  forall (b : eqType) n (xs : seq ('I_n * b)) (x : b)
-         (v : Vec IntervalSig n) (y : IntervalSig),
-  [seq (vnth (vshiftin v y) (fst i)).1
-     | i <- [seq widen_fst j | j <- xs] & snd i == x] =
-  [seq (vnth v (fst i)).1 | i <- xs & snd i == x].
-Proof.
-  move=> b n.
-  elim=> //= [z zs IHzs] x v y.
-  case E: (snd z == x) => /=.
-    by rewrite IHzs vnth_vshiftin.
-  exact: IHzs.
-Qed.
-
-Fixpoint between_all `(R : rel a) (xs : seq a) : bool :=
-  if xs is y :: ys
-  then all (R y) ys && between_all R ys
-  else true.
-
-Lemma eq_between_all A (P Q : rel A) : P =1 Q -> between_all P =1 between_all Q.
-Proof.
-  move=> H xs.
-  elim: xs => //= [x xs IHxs].
-  rewrite IHxs; f_equal.
-  by rewrite H.
-Qed.
-
-Lemma all_xpredT_true : forall a (xs : seq a), all xpredT xs.
-Proof. by move=> ?; elim. Qed.
-
-Lemma all_catC {a} (P : pred a) (xs ys : seq a) :
-  all P (xs ++ ys) = all P (ys ++ xs).
-Proof.
-  case: xs => /= [|x xs] in ys *.
-    by rewrite cats0.
-  case: ys => // [|y ys].
-    by rewrite cats0.
-  by rewrite !all_cat /= andbA andbC.
-Qed.
-
-Lemma all_all_cons : forall a (xs ys : seq a) (x : a) (R : rel a),
-  all (fun y : a => all (R y) (x :: xs)) ys =
-  all (R ^~ x) ys && all (fun y : a => all (R y) xs) ys.
-Proof.
-  move=> a xs ys x R.
-  elim: ys => // [y ys IHys].
-  rewrite [all]lock -{1}lock /= -lock IHys /= -!andbA.
-  congr (_ && _).
-  by rewrite and_swap.
-Qed.
-
-Lemma all_all_cat : forall A (P : rel A) (xs ys zs : seq A),
-  all (fun x => all (P x) (xs ++ ys)) zs
-    = all (fun x => all (P x) xs) zs && all (fun x => all (P x) ys) zs.
-Proof.
-  move=> A P xs ys.
-  elim=> //= [z zs IHzs].
-  rewrite IHzs all_cat.
-  rewrite !andbA.
-  congr (_ && _).
-  rewrite -!andbA.
-  congr (_ && _).
-  by rewrite andbC.
-Qed.
-
-Lemma between_all_cat : forall a (xs ys : seq a) (R : rel a),
-  between_all R (xs ++ ys) =
-  [&& between_all R xs
-  ,   between_all R ys
-  ,   all (fun x => all (R x) ys) xs
-  &   all (fun y => all (R ^~ y) xs) ys
-  ].
-Proof.
-  move=> a xs ys R.
-  elim: xs => [|x xs IHxs] in ys *.
-    by rewrite /= all_xpredT_true Bool.andb_true_r.
-  rewrite cat_cons all_all_cons.
-  rewrite /= all_cat {}IHxs /=.
-  rewrite !andbA; f_equal.
-  rewrite [X in _ = X]andbC.
-  rewrite !andbA; f_equal.
-  rewrite [X in _ = X]andbC.
-  rewrite !andbA; f_equal.
-  rewrite Bool.andb_diag.
-  by rewrite -!andbA and_swap.
-Qed.
-
-Lemma all_flip : forall A (P : rel A) (_ : symmetric P) x (xs : seq A),
-  all (P x) xs = all (P ^~ x) xs.
-Proof.
-  move=> A P H x.
-  elim=> //= [y ys IHys].
-  by rewrite -IHys H.
-Qed.
-
-Lemma all_all_flip : forall A (P : rel A) (_ : symmetric P) (xs ys : seq A),
-  all (fun x => all (P x) ys) xs = all (fun x => all (P ^~ x) ys) xs.
-Proof.
-  move=> A P H.
-  elim=> //= [z zs IHzs] ys.
-  by rewrite -IHzs all_flip.
-Qed.
-
-Lemma between_all_catC {a} (xs ys : seq a) (R : rel a) (_ : symmetric R) :
-  between_all R (xs ++ ys) = between_all R (ys ++ xs).
-Proof.
-  elim: xs => /= [|x xs IHxs] in ys *.
-    by rewrite cats0.
-  rewrite IHxs.
-  elim: ys => /= [|y ys IHys].
-    by rewrite cats0.
-  rewrite -IHys !andbA.
-  congr (_ && _).
-  rewrite !all_cat -!andbA 2!andbA and_swap.
-  congr (_ && _).
-  rewrite andbC -!andbA [RHS]and_swap.
-  congr (_ && _).
-  rewrite [RHS]and_swap.
-  congr (_ && _).
-  by rewrite H.
-Qed.
-
-Lemma all_rem_filter_f :
-  forall (a : eqType) (xs : seq a) (y : a)
-         b (Q : pred b) (f : a -> b) (P : pred a),
-   all Q [seq f i | i <- xs & P i] ->
-   all Q [seq f i | i <- rem y xs & P i].
-Proof.
-  move=> a xs y b Q f P.
-  elim: xs => //= [x xs IHxs].
-  case E: (x == y) => /=.
-    move/eqP in E.
-    rewrite {}E.
-    case: (P y) => //=.
-    by move/andP=> [*].
-  case: (P x) => //=.
-  move/andP=> [*].
-  apply/andP; split => //.
-  exact: IHxs.
-Qed.
-
-Lemma between_all_rem :
-  forall (a : eqType) (xs : seq a) (y : a)
-         b (R : rel b) (f : a -> b) (P : pred a),
-  between_all R [seq f i | i <- xs & P i]
-    -> between_all R [seq f i | i <- rem y xs & P i].
-Proof.
-  move=> a xs y b R f P.
-  elim: xs => //= [x xs IHxs].
-  case E: (x == y) => /=.
-    case: (P x) => //=.
-    by move/andP=> [H1 H2].
-  case: (P x) => //=.
-  move/andP=> [H1 H2].
-  apply/andP; split.
-    exact: all_rem_filter_f.
-  exact: IHxs.
-Qed.
-
-Arguments between_all_rem : default implicits.
-
-Lemma all_impl3of4 :
-  forall a (x y z w v : seq a) (P : pred a) (H : all P z -> all P v),
-    all P (x ++ y ++ z ++ w) ->
-    all P (x ++ y ++ v ++ w).
-Proof.
-  move=> a x y z w v P H.
-  rewrite !all_cat.
-  move/andP=> [? /andP [? /andP [H0 ?]]].
-  apply H in H0.
-  by do 3 (apply/andP; split => //).
-Qed.
-
-Lemma all_impl4of4 :
-  forall a (x y z w v : seq a) (P : pred a) (H : all P w -> all P v),
-    all P (x ++ y ++ z ++ w) ->
-    all P (x ++ y ++ z ++ v).
-Proof.
-  move=> a x y z w v P H.
-  rewrite !all_cat.
-  move/andP=> [? /andP [? /andP [? H0]]].
-  apply H in H0.
-  by do 3 (apply/andP; split => //).
-Qed.
-
-Lemma split_impl_and : forall P Q R,
-  P -> (Q && R) -> (P -> Q /\ (P -> R)).
-Proof.
-  intuition;
-  by move/andP: H => [*].
-Qed.
-
-Notation "f .: g" := (fun x y => f (g x y)) (at level 100).
-
-Lemma sym_neg : forall a (R : rel a), symmetric R -> symmetric (negb .: R).
-Proof.
-  move=> a R H x y.
-  by rewrite H.
-Qed.
-
-Lemma sym_neg_flip : forall a (R : rel a),
-  symmetric R -> symmetric (fun x y => negb (R y x)).
-Proof.
-  move=> a R H x y.
-  by rewrite H.
-Qed.
-
-Ltac nao_setup IHst :=
-  rewrite !between_all_cat in IHst *;
-  move/andP: IHst => [H1 /andP [H2 /andP [H3 H4]]];
-  do !(apply/andP; split=> //).
-
-Ltac nao_resolve :=
-  rewrite map_cons /=;
-  apply/andP; split=> //;
-  apply/orP; left;
-  apply/nandP; left;
-  by rewrite negb_eq.
-
-Lemma perm_eq_nil : forall (a : eqType) (xs : seq a),
-  perm_eq [::] xs -> xs = [::].
-Proof.
-  move=> a.
-  elim=> //= [x xs IHxs].
-  rewrite /perm_eq /=.
-  move/andP => [H1 H2].
-  rewrite eq_refl /= in H1.
-  discriminate H1.
-Qed.
-
-Lemma all_perm : forall (a : eqType) (P : pred a) (xs ys : seq a),
-  perm_eq xs ys -> all P xs = all P ys.
-Proof.
-  move=> a P xs ys H.
-  move/perm_eq_mem in H.
-  by rewrite (eq_all_r H).
-Qed.
-
-Lemma perm_filter : forall (a : eqType) (P : pred a) (xs ys : seq a),
-  perm_eq xs ys -> perm_eq [seq j <- xs | P j] [seq j <- ys | P j].
-Proof.
-  move=> a P xs ys.
-  move/perm_eqP=> H.
-  apply/perm_eqP=> Q.
-  by rewrite !count_filter H.
-Qed.
-
-Lemma between_all_map_catC :
-  forall b (R : rel b) (_ : symmetric R)
-         (a : eqType) (f : a -> b) (xs ys : seq a),
-  between_all R [seq f i | i <- xs ++ ys] =
-  between_all R [seq f i | i <- ys ++ xs].
-Proof.
-  move=> b R H a f xs ys.
-  rewrite !map_cat !between_all_cat.
-  rewrite and_swap.
-  congr (_ && _).
-  congr (_ && _).
-  rewrite andbC.
-  rewrite all_all_flip //.
-  congr (_ && _).
-  by rewrite all_all_flip.
-Qed.
-
-Lemma all_transport : forall a (P Q : pred a) (xs : seq a),
-  P =1 Q -> all P xs -> all Q xs.
-Proof.
-  move=> a P Q.
-  elim=> //= [x xs IHxs] H /andP [H1 H2].
-  rewrite H in H1.
-  apply/andP; split => //.
-  exact: IHxs.
-Qed.
-
-Lemma all_contract
-  (a : Type) (P : a -> bool) (R : IntervalDesc -> bool)
-  (maxReg : nat)
-  (sd : ScanStateDesc maxReg)
-  (xid : 'I_(nextInterval sd))
-  (i : IntervalSig)
-  (xs : seq (IntervalId sd * a)) :
-  all R [seq (vnth (intervals sd) (fst x)).1 | x <- xs & P (snd x)]
-    -> R i.1
-    -> all R [seq (vnth (vreplace (intervals sd) xid i) (fst x)).1
-             | x <- xs & P (snd x)].
-Proof.
-  elim: xs => //= [x xs IHxs].
-  case: (P (snd x)) => //=.
-  move=> /andP [H1 H2] H3.
-  case B: (xid == fst x) => //=.
-    move/eqP in B; rewrite B in IHxs *.
-    rewrite vnth_vreplace.
-    apply/andP; split => //.
-    exact: IHxs.
-  move/negbT in B.
-  rewrite vnth_vreplace_neq //.
-  apply/andP; split => //.
-  exact: IHxs.
-Qed.
-
-Lemma all_all_invert : forall A (P : rel A) (xs ys : seq A),
-  all (fun x => all (P x) ys) xs = all (fun y => all (P ^~ y) xs) ys.
-Proof.
-  move=> A P.
-  elim=> /= [|x xs IHxs] ys.
-    by rewrite all_xpredT_true.
-  by rewrite IHxs all_all_cons.
-Qed.
-
 Theorem no_pending_handled `(st : @ScanState maxReg phase sd) :
   if phase is Pending
   then size (handled sd) == 0
@@ -902,13 +580,27 @@ Proof.
     by rewrite size_map.
 Qed.
 
+Lemma map_filter_vshiftin :
+  forall (b : eqType) n (xs : seq ('I_n * b)) (x : b)
+         (v : Vec IntervalSig n) (y : IntervalSig),
+  [seq (vnth (vshiftin v y) (fst i)).1
+  | i <- [seq widen_fst j | j <- xs] & snd i == x]
+    = [seq (vnth v (fst i)).1 | i <- xs & snd i == x].
+Proof.
+  move=> b n.
+  elim=> //= [z zs IHzs] x v y.
+  case E: (snd z == x) => /=.
+    by rewrite IHzs vnth_vshiftin.
+  exact: IHzs.
+Qed.
+
 Theorem no_allocations_overlap `(st : @ScanState maxReg InUse sd)
   (registers_exist : maxReg > 0) :
   forall reg : PhysReg maxReg,
   between_all (negb .: intervalsIntersect)
               (handledIntervalDescsForReg sd reg) &&
   if vnth (fixedIntervals sd) reg is Some int
-  then all (fun x => ~~ intervalsIntersect int.1 x)
+  then all (fun x => ~~ intervalsOverlap int.1 x)
            (handledIntervalDescsForReg sd reg)
   else true.
 Proof.
@@ -1000,7 +692,7 @@ Proof.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
     move=> IHst /andP [H2 H3].
     apply/andP; split => //.
-    by rewrite (sym_neg intervalsIntersect_sym).
+    by rewrite (sym_neg intervalsOverlap_sym).
   - Case "ScanState_moveInactiveToHandled".
     move: IHst H0.
     case: spilled.
@@ -1012,5 +704,76 @@ Proof.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
     move=> IHst /andP [H2 H3].
     apply/andP; split => //.
-    by rewrite (sym_neg intervalsIntersect_sym).
+    by rewrite (sym_neg intervalsOverlap_sym).
 Qed.
+
+Theorem mem_map_fst (A B : eqType) (x : A) (y : B) (xs : seq (A * B)) :
+  (x, y) \in xs -> x \in [seq fst i | i <- xs].
+Proof.
+  elim: xs => //= [[w z] zs IHzs].
+  rewrite !in_cons.
+  move/orP=> [H|H] /=;
+  apply/orP.
+    move/eqP in H; inv H.
+    by left.
+  right.
+  exact: IHzs.
+Qed.
+
+Theorem cat_in_notin (A : eqType) x y (xs ys : seq A) :
+  x \in xs -> y \notin ys ++ xs -> x != y.
+Proof.
+  elim: xs => //= [z zs IHzs].
+  rewrite in_cons.
+  move/orP=> [H|H].
+    move/eqP in H; rewrite {}H {IHzs}.
+    rewrite mem_cat.
+    move/norP=> [H1 H2].
+    move: H2.
+    rewrite in_cons.
+    move/norP.
+    rewrite eq_sym.
+    by intuition.
+  move=> H1.
+  apply: IHzs => //.
+  move: H1.
+  rewrite !mem_cat.
+  move/norP=> [H2 H3].
+  apply/norP; split => //.
+  rewrite in_cons in H3.
+  by move/norP: H3 => [H3 H4].
+Qed.
+
+Theorem uniq_cat_in_notin (A : eqType) i (xs ys : seq A) :
+  i \in xs -> uniq (xs ++ ys) -> i \notin ys.
+Proof.
+  elim: ys => //= [y ys IHys].
+  rewrite uniq_catC cat_cons /=.
+  move=> H /andP [H1 H2].
+  rewrite in_cons.
+  apply/norP; split.
+    apply: cat_in_notin.
+      exact: H.
+    exact: H1.
+  apply: IHys.
+    exact: H.
+  by rewrite uniq_catC.
+Qed.
+
+(* Theorem non_handled_never_overlap `(st : @ScanState maxReg InUse sd) *)
+(*   (xid : @IntervalId maxReg sd) (reg : PhysReg maxReg) *)
+(*   (registers_exist : maxReg > 0): *)
+(*   xid \notin [seq fst i | i <- handled sd] *)
+(*     -> all (fun y : IntervalDesc => *)
+(*               ~~ intervalsIntersect (vnth (intervals sd) xid).1 y) *)
+(*            (handledIntervalDescsForReg sd reg). *)
+(* Proof. *)
+(*   rewrite /handledIntervalDescsForReg. *)
+(*   elim: (handled sd) => //= [x xs IHxs]. *)
+(*   rewrite in_cons. *)
+(*   move/norP=> [H1 H2]. *)
+(*   specialize (IHxs H2). *)
+(*   case: (snd x == Just reg) => //=. *)
+(*   apply/andP; split => //. *)
+(*   move: (no_allocations_overlap st registers_exist reg). *)
+(* Admitted. *)

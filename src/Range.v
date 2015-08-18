@@ -653,8 +653,17 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
+Definition rangeComputedBeg (r : RangeDesc) : nat :=
+  (* If the range starts with an input, extend the range to one before, so
+     that we catch any overlaps with other inputs. *)
+  if [seq u <- ups r | (uloc u == rbeg r) && (uvar u == Input)] is u :: us
+  then (rbeg r).-1
+  else rbeg r.
+
 Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : bool :=
-  (rend x == rend y) || ((rbeg x < rend y) && (rbeg y < rend x)).
+  let xb := rangeComputedBeg x in
+  let yb := rangeComputedBeg y in
+  (xb < rend y) && (yb < rend x).
 
 Example rangesIntersect_ex1 :
   true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
@@ -672,8 +681,8 @@ Example rangesIntersect_ex3 :
 Proof. by []. Qed.
 
 Example rangesIntersect_ex4 :
-  true = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+  false = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex5 :
@@ -687,8 +696,8 @@ Example rangesIntersect_ex6 :
 Proof. by []. Qed.
 
 Example rangesIntersect_ex7 :
-  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex8 :
@@ -696,13 +705,28 @@ Example rangesIntersect_ex8 :
                           {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
+Example rangesIntersect_ex9 :
+  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 5 ; rend := 5
+                           ; ups  := [:: {| uloc   := 5
+                                          ; regReq := false
+                                          ; uvar   := Output |}] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex10 :
+  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5
+                          ; ups  := [:: {| uloc   := 5
+                                         ; regReq := false
+                                         ; uvar   := Input |}] |}.
+Proof. by []. Qed.
+
 Lemma rangesIntersect_sym : symmetric rangesIntersect.
 Proof.
   move=> x y.
-  rewrite /rangesIntersect.
-  case: x => [xb xe ?] /=;
-  case: y => [yb ye ?] /=.
-  rewrite eq_sym; f_equal.
+  rewrite /rangesIntersect /rangeComputedBeg.
+  case: x => [xb xe [|xu xus]] /=;
+  case: y => [yb ye [|yu yus]] /=;
   by intuition.
 Qed.
 

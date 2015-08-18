@@ -82,6 +82,19 @@ Definition registerWithHighestPos (fixedAndIntersects : Vec bool maxReg) :
   head (Ordinal registers_exist, Some odd1)
     \o sortRegisterVector fixedAndIntersects.
 
+Definition handledIntervalDescsForReg (sd : ScanStateDesc) (reg : PhysReg)
+  : seq IntervalDesc :=
+  [seq getIntervalDesc (getInterval (fst x))
+  | x <- handled sd & snd x == Some reg].
+
+Definition verifyNewHandled (sd : ScanStateDesc) (int : IntervalDesc)
+  (reg : PhysReg) : bool :=
+  let check y := ~~ intervalsIntersect int y in
+  all check (handledIntervalDescsForReg sd reg) &&
+  if vnth (fixedIntervals sd) reg is Some i
+  then ~~ intervalsOverlap int i.1
+  else true.
+
 (** ** ScanState *)
 
 (** The [ScanState] inductive data type describes the allowable state
@@ -164,6 +177,7 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
     let xi := (vnth (intervals sd) xid).2 in
     intervalStart i == intervalStart xi ->
     intervalEnd i   <= intervalEnd   xi ->
+    xid \notin handledIds sd ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -244,9 +258,10 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
 
   | ScanState_moveActiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in active sd ->
-    (if spilled
-     then firstUseReqReg (getInterval (fst x)) == None
-     else true) ->
+    (let int := vnth (intervals sd) (fst x) in
+     if spilled
+     then firstUseReqReg int.2 == None
+     else verifyNewHandled sd int.1 (snd x)) ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd
@@ -274,9 +289,10 @@ Inductive ScanState : ScanStateStatus -> ScanStateDesc -> Prop :=
 
   | ScanState_moveInactiveToHandled sd spilled :
     ScanState InUse sd -> forall x, x \in inactive sd ->
-    (if spilled
-     then firstUseReqReg (getInterval (fst x)) == None
-     else true) ->
+    (let int := vnth (intervals sd) (fst x) in
+     if spilled
+     then firstUseReqReg int.2 == None
+     else verifyNewHandled sd int.1 (snd x)) ->
     ScanState InUse
       {| nextInterval     := nextInterval sd
        ; unhandled        := unhandled sd

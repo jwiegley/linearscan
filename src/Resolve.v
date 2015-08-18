@@ -2,6 +2,7 @@ Require Import LinearScan.Lib.
 Require Import Hask.Data.Maybe.
 Require Import LinearScan.Graph.
 Require Import LinearScan.UsePos.
+Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
 Require Import LinearScan.Blocks.
@@ -260,16 +261,25 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
           else (to < iend int, false))
     else (false, false) in
 
+  let outputBegin int pos :=
+      if ups (NE_head (rds int)).1 is u :: us
+      then let starting := [seq x <- u :: us | [&& ibeg int == pos
+                                                &   pos == uloc x ]] in
+           [&& size starting > 0
+           &   size [seq x <- starting | uvar x == Output] == size starting]
+      else false in
+
   let liveAtTo :=
-      IntMap_fromList [seq (ivar (intVal i),
-                            (i, snd (shouldKeep (intVal i) to)))
+      IntMap_fromList [seq let int := intVal i in
+                           (ivar int,
+                            (i, snd (shouldKeep int to), outputBegin int to))
                       | i <- allocs & fst (shouldKeep (intVal i) to)] in
 
   (* We use an [IntMap] here to easily detect via merge which variables are
      coming into being, and which are being dropped. *)
   IntMap_mergeWithKey
     (fun vid x yp =>
-       let: (y, ghost) := yp in
+       let: (y, ghost, outb) := yp in
        if intReg x == intReg y
        then if intReg y is Some reg
             then if ghost
@@ -283,7 +293,9 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
          let mmv := match intReg x, intReg y with
             | Some xr, Some yr => Some (Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some xr => Some (Restore vid xr)
+            | None,    Some xr => if outb
+                                  then None
+                                  else Some (Restore vid xr)
             | None,    None    => None
             end in
          let anchor x := (inl <$> intReg x) <|> Some (inr vid) in
@@ -306,7 +318,7 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
 
     (IntMap_foldlWithKey
        (fun acc vid yp =>
-          let: (y, ghost) := yp in
+          let: (y, ghost, outb) := yp in
           if intReg y is Some r
           then IntMap_insert vid
              {| resMove  := AllocReg vid r

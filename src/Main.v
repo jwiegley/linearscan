@@ -97,16 +97,23 @@ Definition linearScan
       (Some (toScanStateDescSet ssig.1))
       (Some (toScanStateDescSet ssig'.1)) loops
   | inr ssig' =>
-      let sd     := finalizeScanState ssig'.2 opCount.*2 in
-      let allocs := determineAllocations sd in
-      mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
-      res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
-                           mappings loops blocks1 ;;
-      let: (moves, blocks2) := res in
-      pure $ Build_Details _ _ maxReg None
-        liveSets' moves blocks blocks1 blocks2
-        (Some (toScanStateDescSet ssig.1))
-        (Some (toScanStateDescSet sd)) loops
+      match finalizeScanState ssig'.2 opCount.*2 with
+      | inl err =>
+        pure $ Build_Details _ _ maxReg (Some (err, AllocatingRegistersFailed))
+          liveSets' emptyIntMap blocks blocks1 (inr [::])
+          (Some (toScanStateDescSet ssig.1))
+          (Some (toScanStateDescSet ssig'.1)) loops
+      | inr (exist sd _) =>
+        let allocs := determineAllocations sd in
+        mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
+        res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
+                             mappings loops blocks1 ;;
+        let: (moves, blocks2) := res in
+        pure $ Build_Details _ _ maxReg None
+          liveSets' moves blocks blocks1 blocks2
+          (Some (toScanStateDescSet ssig.1))
+          (Some (toScanStateDescSet sd)) loops
+      end
   end.
 
 Require Import Hask.Haskell.

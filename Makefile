@@ -1,4 +1,4 @@
-COQFLAGS = ""
+COQFLAGS = "-no-native-compiler"
 MISSING  =								\
 	find . -name '*.v' ! -name Notes.v				\
 		! -name Extract.v					\

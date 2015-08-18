@@ -65,10 +65,10 @@ Proof.
       => [err|[ss H]].
       exact: inl err.
     case: (firstUseReqReg int.2) => [[? ?]|] in H.
-      case: H => [[?] ?].
+      case: H => [[? ?] ?].
       apply: inr (ss; _).
       exact: Build_SSMorphLen.
-    case: H => [?].
+    case: H => [? ?].
     case E: (0 < size (unhandled ss.1)).
       apply: inr (ss; _).
       exact: Build_SSMorphLen.
@@ -90,12 +90,23 @@ Proof.
   move: (ScanState_setInterval st) => /= /(_ uid i0.1 i0.2).
   move: Hint; rewrite /int => ->.
   move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+
   have Hend : iend i0.1 <= ie.
     rewrite H3.
     move: (Interval_bounded i1.2).
     by ordered.
-  move/(_ Hend).
-  rewrite /= => {st} st.
+
+  move: st.
+  set sd' := (X in ScanState _ X).
+  rewrite /= in sd' *.
+  move=> st.
+
+  case Hnot: (uid \notin handledIds sd'); last first.
+    move=> *.
+    exact: inl (ECannotModifyHandledInterval uid :: e2).
+
+  move/(_ Hend is_true_true).
+  rewrite /= => {st Hend Hnot} st.
 
   (* Establish that beg == ibeg i0.1. *)
   clear int.
@@ -134,10 +145,11 @@ Proof.
   case: ssi => desc.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
-  move=> H1 H2 H3.
+  move=> H1 H2 H3 H4.
   move/splitUnhandledInterval/(_ uid beg us Hunh pos e2).
-  case: desc => /= ? intervals0 ? unhandled0 ? ? ? in uid us Hunh H1 H2 H3 *.
-  case=> [err|[[sd st] [[/= ? H]]]].
+  case: desc => /= ? intervals0 fints unhandled0 ? ? ?
+    in uid us Hunh H1 H2 H3 H4 *.
+  case=> [err|[[sd st] [[/= [? ?] H]]]].
     exact: inl err.
   apply: (inr (tt, _)).
   apply: (Build_SSInfo _ st).
@@ -148,7 +160,8 @@ Proof.
   try apply Build_SSMorph;
   rewrite ?insert_size ?size_map //;
   try move=> Hpre;
-  exact: (leq_trans H1 _).
+  try exact: (leq_trans H1 _).
+  by (transitivity fints).
 Defined.
 
 Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
@@ -182,11 +195,11 @@ Proof.
 
     case: Hin => [Hin|Hin].
       case: (spillInterval st Hunh Hbeg2 (ActiveToHandled uid Heqe Hin) e2)
-        => [err|[ss [[[/= ?] ?] ?]]].
+        => [err|[ss [[[/= ? ?] ?] ?]]].
         exact: inl err.
       exact: inr (ss; _).
     case: (spillInterval st Hunh Hbeg2 (InactiveToHandled uid Heqe Hin) e2)
-      => [err|[ss [[[/= ?] ?] ?]]].
+      => [err|[ss [[[/= ? ?] ?] ?]]].
       exact: inl err.
     exact: inr (ss; _).
 
@@ -206,12 +219,18 @@ Proof.
   move: (ScanState_setInterval st) => /= /(_ xid i0.1 i0.2).
   move: Hint; rewrite /int => ->.
   move/eqP in H2; rewrite eq_sym in H2; move/(_ H2).
+
   have Hend : iend i0.1 <= ie.
     rewrite H3.
     move: (Interval_bounded i1.2).
     by ordered.
-  move/(_ Hend).
-  rewrite /= => {Heqe sd st} st.
+
+  case Hnot: (xid \notin handledIds sd); last first.
+    move=> *.
+    exact: inl (ECannotModifyHandledInterval xid :: e2).
+
+  move/(_ Hend is_true_true).
+  rewrite /= => {Heqe sd st Hend Hnot} st.
 
   move: st.
   set sd := (X in ScanState _ X).
@@ -230,7 +249,7 @@ Proof.
      register, in which case we spill the first place and add the second part
      back onto the unhandled list for processing later. *)
   case: (spillInterval st Hunh Hbeg2 (NewToHandled _ i1) e2)
-    => [err|[ss [[[/= ?] ?] ?]]].
+    => [err|[ss [[[/= ? ?] ?] ?]]].
     exact: inl err.
   exact: inr (ss; _).
 Defined.
@@ -257,8 +276,8 @@ Proof.
   move: intlist Hintlist intids Hin.
 
   case Hunh: (unhandled desc) => //= [[uid beg] us].
-  case: desc => /= ? intervals0 ? ? active0 inactive0 ? in uid us Hunh *.
-  move=> intlist Hintlist intids Hin H1 H2 H3 st.
+  case: desc => /= ? intervals0 fints ? active0 inactive0 ? in uid us Hunh *.
+  move=> intlist Hintlist intids Hin H1 H2 H3 H4 st.
 
   elim Hintids: intids => /= [|aid aids IHaids] in Hin *.
     apply: (inr (tt, (Build_SSInfo _ st))).
@@ -283,7 +302,7 @@ Proof.
     exact: inr _.
   move=> /(_ Hin' e2) {Hin'}.
 
-  case=> [err|[[sd st] [[/= [Hincr] H ?]]]].
+  case=> [err|[[sd st] [[/= [Hincr ?] H ?]]]].
     exact: inl err.
   apply: (inr (tt, _)).
 
@@ -310,7 +329,8 @@ Proof.
   try apply Build_SSMorph;
   rewrite ?insert_size ?size_map //;
   try move=> Hpre;
-  exact: (leq_trans H1 _).
+  try exact: (leq_trans H1 _);
+  by (transitivity fints).
 Defined.
 
 Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :

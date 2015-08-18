@@ -475,7 +475,7 @@ allocate maxReg binfo oinfo useVerifier blocks = do
             Right blks -> return $ Right blks
   where
     reasonToStr r = case r of
-        LS.EIntersectsWithFixedInterval pos reg ->
+        LS.EOverlapsWithFixedInterval pos reg ->
             "Current interval intersects with " ++
             "fixed interval for register " ++ show reg ++ " at " ++ show pos
         LS.ESplitAssignedIntervalForReg reg ->
@@ -519,12 +519,19 @@ allocate maxReg binfo oinfo useVerifier blocks = do
             "Interval " ++ show xid ++ " is a singleton"
         LS.ERegisterAlreadyAssigned reg ->
             "Register " ++ show reg ++ " already assigned"
-        LS.ERegisterAssignmentsOverlap reg ->
+        LS.ERegisterAssignmentsOverlap reg i idx ->
             "Register assignments overlap at " ++ show reg
+                ++ " for interval " ++ show i ++ " (index " ++ show idx ++ ")"
         LS.EUnexpectedNoMoreUnhandled ->
             "The unexpected happened: no more unhandled intervals"
         LS.ECannotSpillIfRegisterRequired i ->
             "Cannot spill interval " ++ show i
                 ++ " with use positions requiring registers"
+        LS.ECannotModifyHandledInterval i ->
+            "Attempt to modify handled interval " ++ show i
         LS.EFuelExhausted -> "Fuel was exhausted"
+        LS.EUnhandledIntervalsRemain ->
+            "There are unhandled intervals remaining"
+        LS.EActiveIntervalsRemain -> "There are active intervals remaining"
+        LS.EInactiveIntervalsRemain -> "There are inactive intervals remaining"
         LS.ENotYetImplemented n -> "Not Yet Implemented (#" ++ show n ++ ")"

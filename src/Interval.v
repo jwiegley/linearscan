@@ -198,6 +198,55 @@ Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) : bool :=
   has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
       (NE_to_list (rds i)).
 
+Lemma has_rangesIntersect_sym (y : RangeSig) (xs : seq RangeSig) :
+   has (fun x => rangesIntersect y.1 x.1) xs
+     = has (fun x => rangesIntersect x.1 y.1) xs.
+Proof.
+  elim: xs => //= [x xs IHxs].
+  by rewrite rangesIntersect_sym IHxs.
+Qed.
+
+Lemma has_over_false A (f : A -> bool) (xs : seq A) :
+   has (fun x => f x || false) xs = has f xs.
+Proof.
+  elim: xs => //= [x xs IHxs].
+  by rewrite !Bool.orb_false_r IHxs.
+Qed.
+
+Lemma has_flip A (R : rel A) (_ : symmetric R) (xs ys : seq A) :
+  has (fun x => has (fun y => R x y) ys) xs
+    = has (fun y => has (fun x => R y x) xs) ys.
+Proof.
+  elim: xs => /= [|x xs IHxs].
+    by elim: ys.
+  rewrite has_predU {}IHxs.
+  f_equal.
+  elim: ys => //= [y ys IHys].
+  by rewrite IHys H.
+Qed.
+
+Lemma intervalsOverlap_sym : symmetric intervalsOverlap.
+Proof.
+  move=> x y.
+  rewrite /intervalsOverlap.
+  case: x => [? xb xe [xr|xr xrs]] /=;
+  case: y => [? yb ye [yr|yr yrs]] /=.
+  - by rewrite rangesIntersect_sym.
+  - by rewrite has_over_false !Bool.orb_false_r
+               rangesIntersect_sym
+               has_rangesIntersect_sym.
+  - by rewrite has_over_false !Bool.orb_false_r
+               rangesIntersect_sym
+               has_rangesIntersect_sym.
+  - rewrite !has_predU -!orbA rangesIntersect_sym; f_equal.
+      rewrite !orbA; f_equal.
+      by rewrite orbC 2!has_rangesIntersect_sym.
+    have Hsym : symmetric (fun x y => rangesIntersect x.1 y.1).
+      move=> P [xd' xr'] [yd' yr'] /=.
+      by rewrite rangesIntersect_sym.
+    by rewrite has_flip.
+Qed.
+
 Definition intervalOverlapPoint `(xr : Interval x) `(yr : Interval y) :=
   NE_foldl (fun mx rd =>
     option_choose mx
@@ -208,16 +257,23 @@ Definition intervalOverlapPoint `(xr : Interval x) `(yr : Interval y) :=
          None (rds y)))
     None (rds x).
 
+Definition intervalComputedBeg (i : IntervalDesc) : nat :=
+  let rd := NE_head (rds i) in
+  if rbeg rd.1 == ibeg i
+  then rangeComputedBeg rd.1
+  else ibeg i.
+
 Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
-  (iend x == iend y) || ((ibeg x < iend y) && (ibeg y < iend x)).
+  let xb := intervalComputedBeg x in
+  let yb := intervalComputedBeg y in
+  (xb < iend y) && (yb < iend x).
 
 Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
 Proof.
   move=> x y.
-  rewrite /intervalsIntersect.
-  case: x => [xb xe ? ?] /=;
-  case: y => [yb ye ? ?] /=.
-  rewrite eq_sym; f_equal.
+  rewrite /intervalsIntersect /intervalComputedBeg.
+  case: x => [? xb xe [xr|xr xrs]] /=;
+  case: y => [? yb ye [yr|yr yrs]] /=;
   by intuition.
 Qed.
 

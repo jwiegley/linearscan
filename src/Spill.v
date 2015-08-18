@@ -61,7 +61,7 @@ Proof.
   case S: (firstUseReqReg i1.2) => [[[splitPos2 Hodd2] /= Hmid2] |]; last first.
     move/eqP in S.
     SpillCondition_cases
-      (case: spill => [|Heqe|xid ? Heqe Hin|xid ? Heqe Hin]) Case.
+      (case: spill => [|Heqe|xid reg Heqe Hin|xid reg Heqe Hin]) Case.
     - Case "NewToHandled".
       move: (ScanState_newHandled st S) => st'.
       apply: inr _.
@@ -87,7 +87,7 @@ Proof.
       have Hreq : (firstUseReqReg (getInterval xid) == None)
         by rewrite /getInterval Heqe.
       move: (moveActiveToHandled st Hin (spilled:=true) Hreq)
-        => [sd' st' [[[?] H] _]].
+        => [sd' st' [[[? ?] H] _]].
       apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
@@ -98,7 +98,7 @@ Proof.
       have Hreq : (firstUseReqReg (getInterval xid) == None)
         by rewrite /getInterval Heqe.
       move: (moveInactiveToHandled st Hin (spilled:=true) Hreq)
-        => [sd' st' [[[?] H] _]].
+        => [sd' st' [[[? ?] H] _]].
       apply: inr _.
       exists (sd'; st').
       apply Build_SSMorphHasLen => //=.
@@ -192,6 +192,7 @@ Proof.
     (* Update the state with the new dimensions of the first interval. *)
     move: (ScanState_setInterval st)
       => /= /(_ (widen_ord Hle uid) i1_0.1 i1_0.2).
+
     have Hint : ibeg i1_0.1 ==
                 ibeg (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle uid)).1.
@@ -200,6 +201,7 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
+
     have Hend : iend i1_0.1 <=
                 iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle uid)).1.
@@ -209,8 +211,13 @@ Proof.
         exact: eq_irrelevance.
       rewrite vnth_vshiftin Heqe.
       by ordered.
-    move/(_ Hint Hend).
-    rewrite /= => {Hint Hend st} st.
+
+    case Hnot: (widen_ord Hle uid \notin handledIds sd'); last first.
+      move=> *.
+      exact: inl (ECannotModifyHandledInterval uid :: e3).
+
+    move/(_ Hint Hend is_true_true).
+    rewrite /= => {Hint Hend Hnot st} st.
 
     rewrite /sd' in st.
     case U: unh' => [|u' us'] in sd' Hle st.
@@ -251,6 +258,7 @@ Proof.
   - Case "ActiveToHandled".
     move: (ScanState_setInterval st)
       => /= /(_ (widen_ord Hle xid) i1_0.1 i1_0.2).
+
     have Hint : ibeg i1_0.1 ==
                 ibeg (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle xid)).1.
@@ -259,6 +267,7 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
+
     have Hend : iend i1_0.1 <=
                 iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle xid)).1.
@@ -268,8 +277,13 @@ Proof.
         exact: eq_irrelevance.
       rewrite vnth_vshiftin Heqe.
       by ordered.
-    move/(_ Hint Hend).
-    rewrite /= => {Hint Hend st} st.
+
+    case Hnot: (widen_ord Hle xid \notin handledIds sd'); last first.
+      move=> *.
+      exact: inl (ECannotModifyHandledInterval xid :: e3).
+
+    move/(_ Hint Hend is_true_true).
+    rewrite /= => {Hint Hend Hnot st} st.
 
     move: st.
     set sd'' := (X in ScanState _ X).
@@ -295,7 +309,7 @@ Proof.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
 
     move: (moveActiveToHandled st Hin' (spilled:=true) Hreq')
-      => [sd3 st3 [[[?] H] _]].
+      => [sd3 st3 [[[? ?] H] _]].
     apply: inr _.
     exists (sd3; st3).
     apply Build_SSMorphHasLen => //=;
@@ -312,6 +326,7 @@ Proof.
   - Case "InactiveToHandled".
     move: (ScanState_setInterval st)
       => /= /(_ (widen_ord Hle xid) i1_0.1 i1_0.2).
+
     have Hint : ibeg i1_0.1 ==
                 ibeg (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle xid)).1.
@@ -320,6 +335,7 @@ Proof.
         f_equal.
         exact: eq_irrelevance.
       by rewrite vnth_vshiftin Heqe -H2_1.
+
     have Hend : iend i1_0.1 <=
                 iend (vnth (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                            (widen_ord Hle xid)).1.
@@ -329,8 +345,13 @@ Proof.
         exact: eq_irrelevance.
       rewrite vnth_vshiftin Heqe.
       by ordered.
-    move/(_ Hint Hend).
-    rewrite /= => {Hint Hend st} st.
+
+    case Hnot: (widen_ord Hle xid \notin handledIds sd'); last first.
+      move=> *.
+      exact: inl (ECannotModifyHandledInterval xid :: e3).
+
+    move/(_ Hint Hend is_true_true).
+    rewrite /= => {Hint Hend Hnot st} st.
 
     move: st.
     set sd'' := (X in ScanState _ X).
@@ -356,7 +377,7 @@ Proof.
       by rewrite /sd'' [vnth _]/= vnth_vreplace.
 
     move: (moveInactiveToHandled st Hin' (spilled:=true) Hreq')
-      => [sd3 st3 [[[?] H] _]].
+      => [sd3 st3 [[[? ?] H] _]].
     apply: inr _.
     exists (sd3; st3).
     apply Build_SSMorphHasLen => //=;
@@ -379,7 +400,7 @@ Proof.
   case: ssi => sd.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled sd) => //= [[uid beg] us].
-  move=> H1 H2 H3.
+  move=> H1 H2 H3 H4.
   have := getInterval uid.
   set d := (X in Interval X).
   move=> i st.
@@ -391,10 +412,12 @@ Proof.
   apply: inr (tt, _).
   apply: (Build_SSInfo _ st').
   case: (firstUseReqReg (vnth (intervals sd) uid).2) => [[pos /= ?]|] in H.
-  case: H => [[/= ?] _].
-  apply Build_SSMorph => //=; by ordered.
-  case: H => [/= ?].
-  apply Build_SSMorph => //=; by ordered.
+  case: H => [[/= ? ?] _].
+  apply Build_SSMorph => //=; try ordered.
+    by (transitivity (fixedIntervals sd)).
+  case: H => [/= ? ?].
+  apply Build_SSMorph => //=; try ordered.
+    by (transitivity (fixedIntervals sd)).
 Defined.
 
 End Spill.
