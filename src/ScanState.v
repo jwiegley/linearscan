@@ -52,7 +52,7 @@ Definition getInterval `(i : IntervalId sd) := (vnth (intervals sd) i).2.
 Arguments getInterval [sd] i /.
 
 Definition sortRegisterVector (fixedAndIntersects : Vec bool maxReg) :
-  Vec (option oddnum) maxReg -> seq (PhysReg * option oddnum) :=
+  Vec (option nat) maxReg -> seq (PhysReg * option nat) :=
   vfoldl_with_index
     (fun reg acc mpos =>
        let f x y :=
@@ -66,7 +66,7 @@ Definition sortRegisterVector (fixedAndIntersects : Vec bool maxReg) :
              if xmpos is Some xn
              then
                if ympos is Some yn
-               then xn.1 > yn.1
+               then xn > yn
                else false
              else true in
        insert f (reg, mpos) acc) [::].
@@ -78,8 +78,8 @@ Definition sortRegisterVector (fixedAndIntersects : Vec bool maxReg) :
     The worst case scenario is that every register has [Some n] with the same
     n, in which case register 0 is selected. *)
 Definition registerWithHighestPos (fixedAndIntersects : Vec bool maxReg) :
-  Vec (option oddnum) maxReg -> PhysReg * option oddnum :=
-  head (Ordinal registers_exist, Some odd1)
+  Vec (option nat) maxReg -> PhysReg * option nat :=
+  head (Ordinal registers_exist, Some 0)
     \o sortRegisterVector fixedAndIntersects.
 
 Definition handledIntervalDescsForReg (sd : ScanStateDesc) (reg : PhysReg)

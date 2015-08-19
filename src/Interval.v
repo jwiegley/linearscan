@@ -233,30 +233,11 @@ Proof.
   by intuition.
 Qed.
 
-Lemma Interval_beg_odd `(i : Interval d) : odd (ibeg d).
-Proof.
-  induction i; simpl in *.
-    exact: Range_beg_odd.
-  exact: Range_beg_odd r.2.
-Qed.
-
 Definition intervalIntersectionPoint `(xr : Interval x) `(yr : Interval y) :
-  option oddnum :=
+  option nat :=
   if intervalsIntersect xr yr
-  then Some (if ibeg x < ibeg y
-             then (ibeg y; Interval_beg_odd yr)
-             else (ibeg x; Interval_beg_odd xr))
+  then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
   else None.
-(*
-  NE_foldl (fun mx rd =>
-    option_choose mx
-      (NE_foldl
-         (fun mx' rd' =>
-            option_choose mx
-              (rangeIntersectionPoint rd.2 rd'.2))
-         None (rds j)))
-    None (rds i).
-*)
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in
@@ -389,10 +370,10 @@ Definition lastUsePos (d : IntervalDesc) : option UsePos :=
   go (rds d).
 Arguments lastUsePos d /.
 
-Definition afterLifetimeHole (d : IntervalDesc) (pos : oddnum) : oddnum :=
+Definition afterLifetimeHole (d : IntervalDesc) (pos : nat) : nat :=
   let f x k :=
-      if rbeg x.1 > pos.1
-      then (rbeg x.1; Range_beg_odd x.2)
+      if rbeg x.1 > pos
+      then rbeg x.1
       else k in
   let fix go xs :=
       match xs with
@@ -436,8 +417,8 @@ Defined.
    before the split position (and thus, the split could never occur there),
    and the second set are either after the split position, or the split
    position falls within the first of those ranges. *)
-Definition divideIntervalRanges `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg d < before <= iend d) :
+Definition divideIntervalRanges `(i : Interval d)
+  `(Hwithin : ibeg d < before <= iend d) :
   { p : SortedRanges (ibeg d) * SortedRanges (ibeg d)
   | match p with
     | (exist2 [::] _ _,
@@ -521,8 +502,8 @@ Defined.
    needed in first range of the second set, split it two.  Return the two sets
    of Ranges corresponding to the ranges of the two new Intervals after
    splitting is done. *)
-Definition splitIntervalRanges `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg d < before <= iend d) :
+Definition splitIntervalRanges `(i : Interval d)
+  `(Hwithin : ibeg d < before <= iend d) :
   { p : SortedRanges (ibeg d) * SortedRanges before
   | match p with
     | (exist2 (r1 :: rs1) _ _,
@@ -535,7 +516,7 @@ Definition splitIntervalRanges `(i : Interval d) `(Hodd : odd before)
 Proof.
   move: (Interval_exact_beg i) => Hbeg.
   move: (Interval_exact_end i) => Hend.
-  case: (divideIntervalRanges i Hodd Hwithin)
+  case: (divideIntervalRanges i Hwithin)
     => [[[rs1 HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // H;
     first by clear -H; case: rs1 => [|? ?] in H *.
 
@@ -565,7 +546,7 @@ Proof.
     move: H => [? ? ?].
     by rewrite /=; ordered.
 
-  move: (@rangeSpan _ r2.2 _ Hodd Hinr) => [[r2a r2b] [H1 H2 H3 H4 H5]] //.
+  move: (@rangeSpan _ r2.2 _ Hinr) => [[r2a r2b] [H1 H2 H3 H4 H5]] //.
   apply: ((exist2 _ _ (rcons rs1 r2a) _ _,
            exist2 _ _ (r2b :: rs2) _ _); _) => //=.
   - clear Hbrs1.
@@ -628,13 +609,13 @@ Definition SubIntervalsOf (d : IntervalDesc) (before : nat) :=
     succeed, which means there must be use positions within the interval prior
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
-Definition splitInterval `(i : Interval d) `(Hodd : odd before)
-  (Hwithin : ibeg d < before <= iend d) : SubIntervalsOf d before.
+Definition splitInterval `(i : Interval d)
+  `(Hwithin : ibeg d < before <= iend d) : SubIntervalsOf d before.
 Proof.
   (* If before falls within a lifetime hole for the interval, then splitting
      at that position results in two intervals that are not connected by any
      need ato save and restore variables. *)
-  case: (splitIntervalRanges i Hodd Hwithin)
+  case: (splitIntervalRanges i Hwithin)
     => [[[[|r1 rs1] HSrs1 Hbrs1] [[|r2 rs2] HSrs2 Hbrs2]]] // [? ? ?].
   have i1 :=
     @Interval_fromRanges (ivar i) _ (exist2 _ _ (r1 :: rs1) HSrs1 Hbrs1)

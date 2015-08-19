@@ -35,7 +35,7 @@ Definition emptyPendingRanges (b e : nat) (H : b < e) (liveOuts : IntSet) :
   IntMap (PendingRanges b e).
 Proof.
   have Hsz : b.*2.+1 < e.*2.+1 by undoubled.
-  have empty  := emptyBoundedRange Hsz (odd_double_plus _).
+  have empty  := emptyBoundedRange Hsz.
   have f xs vid := IntMap_insert (vid + maxReg) [::: empty] xs.
   exact (IntSet_foldl f emptyIntMap liveOuts).
 Defined.
@@ -207,11 +207,11 @@ Program Fixpoint rangesToBoundedRanges {b e} (y : RangeSig) (ys : seq RangeSig)
   | cons z zs =>
       NE_Cons y (@rangesToBoundedRanges b e z zs _ _ _)
   end.
-Obligation 2.
+Next Obligation.
   rewrite /= in Hbound.
   by ordered.
 Qed.
-Obligation 4.
+Next Obligation.
   apply/andP; split=> //.
   apply StronglySorted_impl_cons in H1;
     last exact: range_ltn_trans.
@@ -221,10 +221,10 @@ Obligation 4.
   move: (Range_bounded (last (z; H) zs).2).
   by ordered.
 Qed.
-Obligation 5.
+Next Obligation.
   by inv H1.
 Qed.
-Obligation 6.
+Next Obligation.
   inv H1; inv H6.
   rewrite /range_ltn /= in H4.
   move: (Range_bounded H0).
@@ -344,7 +344,6 @@ Proof.
      case: (uvar upos) in rd *;
      by undoubled.
    + by constructor; constructor.
-   + by case: (uvar upos); exact: odd_double_plus.
    + by apply/andP; split.
 
   rewrite /= => r.
@@ -392,8 +391,8 @@ Proof.
     case E: (upos < head_or_end r.1).
       case: (ups r.1) => /= [|[loc req kind] us].
         split. exact true.
-        pose r1 := Range_shift r.2 Hodd E.
-        have Hr1: r1 = Range_shift r.2 Hodd E by [].
+        pose r1 := Range_shift r.2 E.
+        have Hr1: r1 = Range_shift r.2 E by [].
         exists r1.
         move: (Range_shift_spec Hr1) => [-> -> _].
         move/eqP: Heqe => ->.
@@ -410,8 +409,8 @@ Proof.
         move/eqP: Heqe => ->.
         by case: (uvar upos); undoubled.
       split. exact true.
-      pose r1 := Range_shift r.2 Hodd E.
-      have Hr1: r1 = Range_shift r.2 Hodd E by [].
+      pose r1 := Range_shift r.2 E.
+      have Hr1: r1 = Range_shift r.2 E by [].
       exists r1.
       move: (Range_shift_spec Hr1) => [-> -> _].
       move/eqP: Heqe => ->.
@@ -617,7 +616,7 @@ Proof.
     last exact: IHbs pos.
 
   have Hsz : pos < pos + sz by exact: ltn_plus.
-  exact:
+  exact
     (bid <-- blockId binfo b ;;
      let outs := if IntMap_lookup bid liveSets is Some ls
                  then blockLiveOut ls

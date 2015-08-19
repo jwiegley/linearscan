@@ -18,20 +18,20 @@ Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
 Inductive SplitPosition : Set :=
-  | BeforePos of oddnum
-  | EndOfLifetimeHole of oddnum.
+  | BeforePos of nat
+  | EndOfLifetimeHole of nat.
 
 Definition SplitPositionToT (x : SplitPosition) :=
   match x with
-  | BeforePos n         => BeforePosT n.1
-  | EndOfLifetimeHole n => EndOfLifetimeHoleT n.1
+  | BeforePos n         => BeforePosT n
+  | EndOfLifetimeHole n => EndOfLifetimeHoleT n
   end.
 
 (* Given an interval, determine its optimal split position.  If no split
    position can be found, it means the interval may be safely spilled, and all
    further variable references should be accessed directly from memory. *)
-Program Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
-  oddnum :=
+Definition splitPosition `(i : Interval d) (pos : SplitPosition) :
+  nat :=
   match pos with
   | BeforePos n => n
   | EndOfLifetimeHole n => afterLifetimeHole i n
@@ -46,7 +46,7 @@ Proof.
   case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
 
-  case: (splitPosition int.2 pos) => [splitPos Hodd].
+  move: (splitPosition int.2 pos) => splitPos.
 
   (* Ensure that the [splitPos] falls within the interval, otherwise our
      action can have no effect.
@@ -77,7 +77,7 @@ Proof.
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
 
-  case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
+  case: (splitInterval i Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
 
   (* The interval was split into two parts.  The first part will be dealt with
      by the caller (either moved to the active list to represent a register
@@ -166,7 +166,7 @@ Defined.
 Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
   `(Hunh : unhandled sd = (uid, beg) :: us)
   (xid : IntervalId sd) (pos : SplitPosition) (reg : PhysReg)
-  (Hbeg : beg <= (splitPosition (getInterval xid) pos).1)
+  (Hbeg : beg <= splitPosition (getInterval xid) pos)
   (Hin : ((xid, reg) \in active sd) + ((xid, reg) \in inactive sd))
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
@@ -176,7 +176,7 @@ Proof.
   case: sd => /= [ni ints ? unh ? ? ?] in st uid us xid Hunh Hbeg Hin *.
   set int := vnth ints xid.
 
-  case: (splitPosition int.2 pos) => [splitPos Hodd] in Hbeg *.
+  move: (splitPosition int.2 pos) => splitPos in Hbeg *.
 
   move: st.
   set sd := (X in ScanState _ X).
@@ -205,7 +205,7 @@ Proof.
   case Hint: int => [d i] in Hmid *.
   case: d => [iv ib ie rds] /= in i Hint Hmid *.
 
-  case: (splitInterval i Hodd Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
+  case: (splitInterval i Hmid) => [[i0 i1] [/= H1 H2 H3]] //.
 
   (* The interval was split into two parts.  The first part is left where it
      was (it is simply shorter now, but it's beginning has not changed), while
@@ -286,7 +286,7 @@ Proof.
     try apply Build_SSMorph => //=;
     by rewrite Hunh.
 
-  case Hbeg: (beg <= (splitPosition (getInterval aid) pos).1); last first.
+  case Hbeg: (beg <= splitPosition (getInterval aid) pos); last first.
     exact: inl (ECannotSplitSingleton aid :: e2).
 
   move/splitActiveOrInactiveInterval: st
@@ -332,12 +332,12 @@ Proof.
   by (transitivity fints).
 Defined.
 
-Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
+Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
   context (ESplitActiveIntervalForReg reg) $
     splitAssignedIntervalForReg reg (BeforePos pos) true.
 
-Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : oddnum) :
+Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ss.

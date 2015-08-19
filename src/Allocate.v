@@ -24,33 +24,27 @@ Definition PhysReg := 'I_maxReg.
 Open Scope program_scope.
 
 Definition overlapsWithFixedInterval {pre} (reg : PhysReg) :
-  SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option oddnum) :=
+  SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option nat) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let int := curIntDetails cur in
     ipure $ if vnth (fixedIntervals sd) reg is Some i
             then intervalOverlapPoint int.2 i.2
             else None.
 
-Definition updateRegisterPos {n : nat} (v : Vec (option oddnum) n)
-  (r : 'I_n) (p : option oddnum) : Vec (option oddnum) n :=
+Definition updateRegisterPos {n : nat} (v : Vec (option nat) n)
+  (r : 'I_n) (p : option nat) : Vec (option nat) n :=
   match p with
   | None => v
   | Some x =>
       vreplace v r
         (Some (match vnth v r with
-               | Some n => if n.1 < x.1 then n else x
+               | Some n => if n < x then n else x
                | None   => x
                end))
   end.
 
-Definition convert_oddnum (x : option oddnum) : option nat :=
-  match x with
-    | Some x => Some x.1
-    | None => None
-  end.
-
 Definition findEligibleRegister (sd : ScanStateDesc maxReg)
-  `(current : Interval d) xs : PhysReg * option oddnum :=
+  `(current : Interval d) xs : PhysReg * option nat :=
   (* Make sure that if there's a fixed interval that intersection with the
      current interval, that we indicate that the register is only free up
      until that point. *)
@@ -83,7 +77,7 @@ Definition tryAllocateFreeReg {pre} :
          freeUntilPos[it.reg] = next intersection of it with current *)
     let go f v p := let: (i, r) := p in updateRegisterPos v r (f i) in
     let freeUntilPos' :=
-        foldl (go (fun _ => Some odd1)) (vconst None) (active sd) in
+        foldl (go (fun _ => Some 0)) (vconst None) (active sd) in
     let intersectingIntervals :=
         filter (fun x => intervalsIntersect current (getInterval (fst x)))
                (inactive sd) in
@@ -102,7 +96,7 @@ Definition tryAllocateFreeReg {pre} :
     let success := moveUnhandledToActive reg ;;; ipure reg in
 
     let cid := curId cur in
-    context (ETryAllocateFreeReg reg (convert_oddnum mres) (fst cid)) $
+    context (ETryAllocateFreeReg reg mres (fst cid)) $
       ipure $
         match mres with
         | None => Some success
@@ -117,10 +111,10 @@ Definition tryAllocateFreeReg {pre} :
                // register available for the first part of the interval
                current.reg = reg
                split current before freeUntilPos[reg] *)
-          if n.1 <= pos
+          if n <= pos
           then None
           else @Some _ $
-            if intervalEnd current < n.1
+            if intervalEnd current < n
             then success
             else splitCurrentInterval (BeforePos n) ;;;
                  success
@@ -135,14 +129,13 @@ Definition allocateBlockedReg {pre} :
     let current := curInterval cur in
     let start   := intervalStart current in
     let pos     := curPosition cur in
-    let posOdd  := curPosition_odd cur in
 
     (* set nextUsePos of all physical registers to maxInt
        for each interval it in active do
          nextUsePos[it.reg] = next use of it after start of current
        for each interval it in inactive intersecting with current do
          nextUsePos[it.reg] = next use of it after start of current *)
-    let go {n : nat} (v : Vec (option oddnum) n) (p : IntervalSig * 'I_n) :=
+    let go {n : nat} (v : Vec (option nat) n) (p : IntervalSig * 'I_n) :=
         let: (int, r) := p in
         let atPos u := (pos == uloc u) && regReq u in
         let pos' :=
@@ -154,7 +147,7 @@ Definition allocateBlockedReg {pre} :
             | Some _ => Some odd1
             | None   => nextUseAfter int.2 start
             end in
-        updateRegisterPos v r pos' in
+        updateRegisterPos v r (fmap (fun x => x.1) pos') in
 
     let resolve xs :=
         [seq (packInterval (getInterval (fst i)), snd i) | i <- xs] in
@@ -169,14 +162,14 @@ Definition allocateBlockedReg {pre} :
     let (reg, mres) := findEligibleRegister sd current nextUsePos'' in
 
     let cid := curId cur in
-    context (EAllocateBlockedReg reg (convert_oddnum mres) (fst cid)) $
+    context (EAllocateBlockedReg reg mres (fst cid)) $
       if (match mres with
           | None   => false
           | Some n =>
-              n.1 < if lookupUsePos current (fun u => pos <= uloc u)
-                      is Some (nextUse; _)
-                    then nextUse.1
-                    else intervalEnd current
+              n < if lookupUsePos current (fun u => pos <= uloc u)
+                    is Some (nextUse; _)
+                  then nextUse.1
+                  else intervalEnd current
           end)
       then
         (* if first usage of current is after nextUsePos[reg] then
@@ -206,9 +199,8 @@ Definition allocateBlockedReg {pre} :
            split active interval for reg at position
            split any inactive interval for reg at the end of its lifetime
              hole *)
-        let oddpos := (pos; posOdd) in
-        splitAnyInactiveIntervalForReg reg oddpos ;;;
-        splitActiveIntervalForReg reg oddpos ;;;
+        splitAnyInactiveIntervalForReg reg pos ;;;
+        splitActiveIntervalForReg reg pos ;;;
 
         (* The remaining part of these active and inactive intervals go back
            onto the unhandled list; the former part goes onto the inact list. *)
@@ -221,7 +213,7 @@ Definition allocateBlockedReg {pre} :
            position? *)
         mloc <<- overlapsWithFixedInterval reg ;;;
         match mloc with
-        | Some n => context (EOverlapsWithFixedInterval n.1 reg) $
+        | Some n => context (EOverlapsWithFixedInterval n reg) $
                       splitCurrentInterval (BeforePos n)
         | None   => ipure tt
         end ;;;

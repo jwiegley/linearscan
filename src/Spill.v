@@ -58,7 +58,7 @@ Proof.
 
   (* Is there a use position requiring a register in the interval?  If yes,
      then split it again; otherwise, spill it. *)
-  case S: (firstUseReqReg i1.2) => [[[splitPos2 Hodd2] /= Hmid2] |]; last first.
+  case S: (firstUseReqReg i1.2) => [[splitPos2 /= Hmid2] |]; last first.
     move/eqP in S.
     SpillCondition_cases
       (case: spill => [|Heqe|xid reg Heqe Hin|xid reg Heqe Hin]) Case.
@@ -105,9 +105,9 @@ Proof.
       apply H.
       by rewrite Hunh.
 
-  have e3 := EIntervalHasUsePosReqReg splitPos2 :: e2.
+  have e3 := EIntervalHasUsePosReqReg splitPos2.1 :: e2.
 
-  case E: (ibeg i1.1 == splitPos2).
+  case E: (ibeg i1.1 == splitPos2.1).
     (* This interval goes back on the unhandled list, to be processed in a
        later iteration. Note: this cannot change the head of the unhandled
        list. *)
@@ -128,7 +128,7 @@ Proof.
     try apply Build_SSMorph => //=;
     by rewrite /= insert_size /=.
 
-  have Hmid3 : ibeg i1.1 < splitPos2 <= iend i1.1.
+  have Hmid3 : ibeg i1.1 < splitPos2.1 <= iend i1.1.
     clear S.
     move/andP: Hmid2 => [Hmid2 ?].
     move/(leq_eqF E) in Hmid2.
@@ -143,7 +143,7 @@ Proof.
      use positions, and the second split children are sorted into the
      unhandled list.  They get a register assigned when the allocator advances
      to the start position of these intervals." *)
-  case: (splitInterval i1.2 Hodd2 Hmid3)
+  case: (splitInterval i1.2 Hmid3)
     => [[i1_0 i1_1] [/= H1_1 H2_1 H3_1]] //.
 
   (* jww (2015-05-21): This should be [None] by definition, but I lack the
