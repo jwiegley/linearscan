@@ -36,10 +36,6 @@ Arguments curIntDetails {sd} _.
 Definition curInterval `(cur : ScanStateCursor sd) := (curIntDetails cur).2.
 Arguments curInterval [sd] cur /.
 
-Definition curPosition `(cur : ScanStateCursor sd) : nat :=
-  intervalStart (curInterval cur).
-Arguments curPosition [sd] cur /.
-
 Definition withCursor {Q a pre}
   (f : forall sd : ScanStateDesc maxReg, ScanStateCursor sd
          -> SState pre (@SSMorphHasLen maxReg) Q a) :

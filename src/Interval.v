@@ -81,6 +81,12 @@ Coercion getIntervalDesc : Interval >-> IntervalDesc.
 Definition packInterval `(i : Interval d) := exist Interval d i.
 Arguments packInterval [d] i /.
 
+Definition intervalComputedStart (i : IntervalDesc) : nat :=
+  let rd := NE_head (rds i) in
+  if rbeg rd.1 == ibeg i
+  then rangeComputedBeg rd.1
+  else ibeg i.
+
 Definition intervalStart `(Interval i) : nat := ibeg i.
 Definition intervalEnd   `(Interval i) : nat := iend i.
 
@@ -213,21 +219,15 @@ Definition intervalOverlapPoint `(xr : Interval x) `(yr : Interval y) :=
          None (rds y)))
     None (rds x).
 
-Definition intervalComputedBeg (i : IntervalDesc) : nat :=
-  let rd := NE_head (rds i) in
-  if rbeg rd.1 == ibeg i
-  then rangeComputedBeg rd.1
-  else ibeg i.
-
 Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
-  let xb := intervalComputedBeg x in
-  let yb := intervalComputedBeg y in
+  let xb := intervalComputedStart x in
+  let yb := intervalComputedStart y in
   (xb < iend y) && (yb < iend x).
 
 Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
 Proof.
   move=> x y.
-  rewrite /intervalsIntersect /intervalComputedBeg.
+  rewrite /intervalsIntersect /intervalComputedStart.
   case: x => [? xb xe [xr|xr xrs]] /=;
   case: y => [? yb ye [yr|yr yrs]] /=;
   by intuition.
@@ -235,8 +235,10 @@ Qed.
 
 Definition intervalIntersectionPoint `(xr : Interval x) `(yr : Interval y) :
   option nat :=
+  let xb := intervalComputedStart x in
+  let yb := intervalComputedStart y in
   if intervalsIntersect xr yr
-  then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
+  then Some (if xb < ibeg y then yb else ibeg x)
   else None.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=

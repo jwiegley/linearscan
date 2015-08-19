@@ -68,7 +68,6 @@ Definition tryAllocateFreeReg {pre} :
     (option (SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) PhysReg)) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let current := curInterval cur in
-    let pos     := curPosition cur in
 
     (* set freeUntilPos of all physical registers to maxInt
        for each interval it in active do
@@ -111,7 +110,7 @@ Definition tryAllocateFreeReg {pre} :
                // register available for the first part of the interval
                current.reg = reg
                split current before freeUntilPos[reg] *)
-          if n <= pos
+          if n <= intervalComputedStart current
           then None
           else @Some _ $
             if intervalEnd current < n
@@ -127,8 +126,7 @@ Definition allocateBlockedReg {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) (option PhysReg) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let current := curInterval cur in
-    let start   := intervalStart current in
-    let pos     := curPosition cur in
+    let pos     := intervalComputedStart current in
 
     (* set nextUsePos of all physical registers to maxInt
        for each interval it in active do
@@ -145,7 +143,7 @@ Definition allocateBlockedReg {pre} :
                running by returning one. *)
             match findIntervalUsePos int.2 atPos with
             | Some _ => Some odd1
-            | None   => nextUseAfter int.2 start
+            | None   => nextUseAfter int.2 pos
             end in
         updateRegisterPos v r (fmap (fun x => x.1) pos') in
 
@@ -427,18 +425,18 @@ Definition handleInterval {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) (option PhysReg) :=
   (* position = start position of current *)
   withCursor (maxReg:=maxReg) $ fun _ cur =>
-    let current  := curInterval cur in
-    let position := curPosition cur in
-    let cid      := curId cur in
+    let current := curInterval cur in
+    let pos     := intervalComputedStart current in
+    let cid     := curId cur in
 
     (* Remove any empty intervals from the unhandled list *)
     if firstUsePos current is None
     then @moveUnhandledToHandled maxReg pre ;;; ipure None
     else
       (* // check for intervals in active that are handled or inactive *)
-      liftLen (fun sd => @checkActiveIntervals sd position) ;;;
+      liftLen (fun sd => @checkActiveIntervals sd pos) ;;;
       (* // check for intervals in inactive that are handled or active *)
-      liftLen (fun sd => @checkInactiveIntervals sd position) ;;;
+      liftLen (fun sd => @checkInactiveIntervals sd pos) ;;;
 
       (* // find a register for current
          tryAllocateFreeReg
