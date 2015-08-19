@@ -687,17 +687,8 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition rangeComputedBeg (r : RangeDesc) : nat :=
-  (* If the range starts with an input, extend the range to one before, so
-     that we catch any overlaps with other inputs. *)
-  if [seq u <- ups r | (uloc u == rbeg r) && (uvar u == Input)] isn't [::]
-  then (rbeg r).-1
-  else rbeg r.
-
 Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : bool :=
-  let xb := rangeComputedBeg x in
-  let yb := rangeComputedBeg y in
-  (xb < rend y) && (yb < rend x).
+  (rbeg x < rend y) && (rbeg y < rend x).
 
 Example rangesIntersect_ex1 :
   true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
@@ -748,17 +739,17 @@ Example rangesIntersect_ex9 :
 Proof. by []. Qed.
 
 Example rangesIntersect_ex10 :
-  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5
-                          ; ups  := [:: {| uloc   := 5
-                                         ; regReq := false
-                                         ; uvar   := Input |}] |}.
+  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                          {| rbeg := 5 ; rend := 5
+                           ; ups  := [:: {| uloc   := 5
+                                          ; regReq := false
+                                          ; uvar   := Input |}] |}.
 Proof. by []. Qed.
 
 Lemma rangesIntersect_sym : symmetric rangesIntersect.
 Proof.
   move=> x y.
-  rewrite /rangesIntersect /rangeComputedBeg.
+  rewrite /rangesIntersect.
   case: x => [xb xe [|xu xus]] /=;
   case: y => [yb ye [|yu yus]] /=;
   by intuition.
@@ -813,7 +804,7 @@ Record SplitRange (rd r1 r2 : RangeDesc) (before : nat) : Prop := {
    just those input variables, for the purposes of restoring it from the
    stack. *)
 Definition splittable_range_pos (pos : nat) (rd : RangeDesc) :=
-  rbeg rd < pos <= rend rd.
+  rbeg rd < pos < rend rd.
 Arguments splittable_range_pos pos rd /.
 
 (* Legal split positions:

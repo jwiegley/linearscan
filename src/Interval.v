@@ -81,12 +81,6 @@ Coercion getIntervalDesc : Interval >-> IntervalDesc.
 Definition packInterval `(i : Interval d) := exist Interval d i.
 Arguments packInterval [d] i /.
 
-Definition intervalComputedStart (i : IntervalDesc) : nat :=
-  let rd := NE_head (rds i) in
-  if rbeg rd.1 == ibeg i
-  then rangeComputedBeg rd.1
-  else ibeg i.
-
 Definition intervalStart `(Interval i) : nat := ibeg i.
 Definition intervalEnd   `(Interval i) : nat := iend i.
 
@@ -209,25 +203,21 @@ Proof.
     by rewrite has_flip.
 Qed.
 
-Definition intervalOverlapPoint `(xr : Interval x) `(yr : Interval y) :=
-  NE_foldl (fun mx rd =>
-    option_choose mx
-      (NE_foldl
-         (fun mx' rd' =>
-            option_choose mx
-              (rangeIntersectionPoint rd.2 rd'.2))
-         None (rds y)))
-    None (rds x).
+Definition intervalOverlapPoint `(xi : Interval xd) `(yi : Interval yd) :=
+  NE_foldl (fun acc xr =>
+    (NE_foldl
+       (fun acc' yr =>
+          option_choose acc' (rangeIntersectionPoint xr.2 yr.2))
+       acc (rds yd)))
+    None (rds xd).
 
 Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
-  let xb := intervalComputedStart x in
-  let yb := intervalComputedStart y in
-  (xb < iend y) && (yb < iend x).
+  (ibeg x < iend y) && (ibeg y < iend x).
 
 Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
 Proof.
   move=> x y.
-  rewrite /intervalsIntersect /intervalComputedStart.
+  rewrite /intervalsIntersect.
   case: x => [? xb xe [xr|xr xrs]] /=;
   case: y => [? yb ye [yr|yr yrs]] /=;
   by intuition.
@@ -235,10 +225,8 @@ Qed.
 
 Definition intervalIntersectionPoint `(xr : Interval x) `(yr : Interval y) :
   option nat :=
-  let xb := intervalComputedStart x in
-  let yb := intervalComputedStart y in
   if intervalsIntersect xr yr
-  then Some (if xb < ibeg y then yb else ibeg x)
+  then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
   else None.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
@@ -347,6 +335,31 @@ Definition rangeFirstUsePos (rd : RangeDesc) : option UsePos :=
   if ups rd is u :: _ then Some u else None.
 Arguments rangeFirstUsePos rd /.
 
+Definition posAtRangeEnd `(i : Interval d) (pos : nat) : bool :=
+  let fix go xs :=
+      match xs with
+        | NE_Sing x => rend x.1 == pos
+        | NE_Cons x xs => (rend x.1 == pos) || go xs
+      end in
+  go (rds d).
+Arguments posAtRangeEnd [d] i pos /.
+
+Lemma posAtRangeEnd_spec `(i : Interval d) (pos : nat) :
+  ~~ posAtRangeEnd i pos -> pos != iend d.
+Proof.
+  rewrite /posAtRangeEnd.
+  move: (Interval_exact_end i) => Hint.
+  elim: (rds d) => /= [r|r rs IHrs] in Hint *.
+    by ordered.
+  specialize (IHrs Hint).
+  move/norP=> [H1 H2].
+  by ordered.
+Qed.
+
+Definition singletonIntervalReqRes `(i : Interval d) : bool :=
+  [&& iend d - ibeg d == 1
+  &   isJust (lookupUsePos i regReq)].
+
 Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with
@@ -420,7 +433,7 @@ Defined.
    and the second set are either after the split position, or the split
    position falls within the first of those ranges. *)
 Definition divideIntervalRanges `(i : Interval d)
-  `(Hwithin : ibeg d < before <= iend d) :
+  `(Hwithin : ibeg d < before < iend d) :
   { p : SortedRanges (ibeg d) * SortedRanges (ibeg d)
   | match p with
     | (exist2 [::] _ _,
@@ -431,13 +444,13 @@ Definition divideIntervalRanges `(i : Interval d)
     | (exist2 (r1 :: rs1) _ _,
        exist2 (r2 :: rs2) _ _) =>
         [/\ rend (last r1 rs1).1 < rbeg r2.1
-        ,   rend (last r1 rs1).1 <= before <= rend r2.1
+        ,   rend (last r1 rs1).1 <= before < rend r2.1
         &   rds d = NE_append (NE_from_list r1 rs1) (NE_from_list r2 rs2) ]
 
     | _ => False  (* no other splitting scenario is possible *)
     end }.
 Proof.
-  case E: (span (fun rd => rend rd.1 < before) (rds d))
+  case E: (span (fun rd => rend rd.1 <= before) (rds d))
     => [[|r1 rs1] [|r2 rs2]];
 
   symmetry in E;
@@ -505,7 +518,7 @@ Defined.
    of Ranges corresponding to the ranges of the two new Intervals after
    splitting is done. *)
 Definition splitIntervalRanges `(i : Interval d)
-  `(Hwithin : ibeg d < before <= iend d) :
+  `(Hwithin : ibeg d < before < iend d) :
   { p : SortedRanges (ibeg d) * SortedRanges before
   | match p with
     | (exist2 (r1 :: rs1) _ _,
@@ -612,7 +625,7 @@ Definition SubIntervalsOf (d : IntervalDesc) (before : nat) :=
     to [before].  If [before] is [None], splitting is done before the first
     use position that does not require a register. *)
 Definition splitInterval `(i : Interval d)
-  `(Hwithin : ibeg d < before <= iend d) : SubIntervalsOf d before.
+  `(Hwithin : ibeg d < before < iend d) : SubIntervalsOf d before.
 Proof.
   (* If before falls within a lifetime hole for the interval, then splitting
      at that position results in two intervals that are not connected by any

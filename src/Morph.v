@@ -204,8 +204,8 @@ Proof.
   destruct len_is_SSMorph0.
   destruct unhandled; first by [].
   destruct p.
-  case E: (firstUseReqReg (vnth intervals i).2 == None);
-    last exact: inl (ECannotSpillIfRegisterRequired i :: e).
+  case E: (firstUseReqReg (vnth intervals i).2 == None); last first.
+    exact: inl (ECannotSpillIfRegisterRequired i :: e).
   apply inr.
   split. apply tt.
   pose (ScanState_moveUnhandledToHandled thisState0 E).

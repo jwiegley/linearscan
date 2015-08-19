@@ -5,6 +5,7 @@ Require Import LinearScan.ScanState.
 Require Import LinearScan.Spec.
 Require Import LinearScan.Morph.
 Require Import LinearScan.Context.
+Require Import LinearScan.Cursor.
 Require Import LinearScan.Spill.
 
 Set Implicit Arguments.
@@ -42,7 +43,7 @@ Definition splitUnhandledInterval `(st : ScanState InUse sd)
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphLen sd ss.1 }.
 Proof.
-  have e2 := ESplitUnhandledInterval :: e.
+  have e2 := ESplitUnhandledInterval uid (SplitPositionToT pos) :: e.
   case: sd => /= [? ints ? unh ? ? ?] in st uid us Hunh *.
   set int := vnth ints uid.
 
@@ -53,7 +54,7 @@ Proof.
 
      jww (2015-03-05): Evidence should be given so we do not need this
      check. *)
-  case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
+  case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
     case Hbeg2: (beg <= ibeg int.1); last first.
       exact: inl (ENoValidSplitPosition uid :: e).
 
@@ -141,10 +142,10 @@ Definition splitCurrentInterval {pre} (pos : SplitPosition) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ssi.
-  have e2 := ESplitCurrentInterval (SplitPositionToT pos) :: e.
   case: ssi => desc.
   case=> H. case: H => /=; case.
   case Hunh: (unhandled desc) => //= [[uid beg] us].
+  have e2 := ESplitCurrentInterval uid (SplitPositionToT pos) :: e.
   move=> H1 H2 H3.
   move/splitUnhandledInterval/(_ uid beg us Hunh pos e2).
   case: desc => /= ? intervals0 fints unhandled0 ? ? ?
@@ -171,8 +172,9 @@ Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
   (e : seq SSTrace) :
   seq SSTrace + { ss : ScanStateSig maxReg InUse | SSMorphHasLen sd ss.1 }.
 Proof.
-  have e2 := ESplitActiveOrInactiveInterval
-               (match Hin with inl _ => true | inr _ => false end) :: e.
+  have e2 := ESplitActiveOrInactiveInterval xid
+               (match Hin with inl _ => true | inr _ => false end)
+               (SplitPositionToT pos) :: e.
   case: sd => /= [ni ints ? unh ? ? ?] in st uid us xid Hunh Hbeg Hin *.
   set int := vnth ints xid.
 
@@ -184,7 +186,7 @@ Proof.
   have Heqe: (vnth (intervals sd) xid = int) by reflexivity.
 
   (* Ensure that the [splitPos] falls within the interval. *)
-  case Hmid: (ibeg int.1 < splitPos <= iend int.1); last first.
+  case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
     (* If the [splitPos] is before the beginning, there's really nothing we
        can do except fail.  But if our interval begins at or after [beg], then
        we can try to spill the first part of the interval (or all of it, if
@@ -259,7 +261,6 @@ Definition splitAssignedIntervalForReg {pre}
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ssi.
-  have e2 := ESplitAssignedIntervalForReg reg :: e.
   case: ssi => desc.
   case=> H. case: H => /=; case.
 
@@ -286,6 +287,7 @@ Proof.
     try apply Build_SSMorph => //=;
     by rewrite Hunh.
 
+  have e2 := ESplitAssignedIntervalForReg aid reg (SplitPositionToT pos) :: e.
   case Hbeg: (beg <= splitPosition (getInterval aid) pos); last first.
     exact: inl (ECannotSplitSingleton aid :: e2).
 
@@ -334,14 +336,15 @@ Defined.
 
 Definition splitActiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit :=
-  context (ESplitActiveIntervalForReg reg) $
+  context (ESplitActiveIntervalForReg reg (SplitPositionToT (BeforePos pos))) $
     splitAssignedIntervalForReg reg (BeforePos pos) true.
 
 Definition splitAnyInactiveIntervalForReg {pre} (reg : PhysReg) (pos : nat) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) unit.
 Proof.
   move=> e ss.
-  have e2 := ESplitAnyInactiveIntervalForReg reg :: e.
+  have e2 := ESplitAnyInactiveIntervalForReg reg
+               (SplitPositionToT (EndOfLifetimeHole pos)) :: e.
   have := splitAssignedIntervalForReg reg (EndOfLifetimeHole pos) false.
   move=> /(_ pre e2 ss).
   case=> [err|[_ ss']]; right; split; try constructor.

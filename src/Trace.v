@@ -30,21 +30,22 @@ Definition TrueIfActiveT : Set := bool.
 
 Inductive SSTrace : Set :=
   | EOverlapsWithFixedInterval of nat & PhysRegT
-  | ESplitAssignedIntervalForReg of PhysRegT
-  | ESplitActiveOrInactiveInterval of TrueIfActiveT
-  | EIntervalHasUsePosReqReg of IntervalIdT
+  | ESplitAssignedIntervalForReg of IntervalIdT & PhysRegT & SplitPositionT
+  | ESplitActiveOrInactiveInterval
+      of IntervalIdT & TrueIfActiveT & SplitPositionT
+  | EIntervalHasUsePosReqReg of nat
   | EIntervalBeginsAtSplitPosition
-  | EMoveUnhandledToActive of PhysRegT
-  | ESplitActiveIntervalForReg of PhysRegT
-  | ESplitAnyInactiveIntervalForReg of PhysRegT
+  | EMoveUnhandledToActive of IntervalIdT & PhysRegT
+  | ESplitActiveIntervalForReg of PhysRegT & SplitPositionT
+  | ESplitAnyInactiveIntervalForReg of PhysRegT & SplitPositionT
   | ESpillInterval of SpillConditionT
   | ESpillCurrentInterval
-  | ESplitUnhandledInterval
-  | ESplitCurrentInterval of SplitPositionT
+  | ESplitUnhandledInterval of IntervalIdT & SplitPositionT
+  | ESplitCurrentInterval of IntervalIdT & SplitPositionT
   | ETryAllocateFreeReg of PhysRegT & option nat & IntervalIdT
   | EAllocateBlockedReg of PhysRegT & option nat & IntervalIdT
   | ERemoveUnhandledInterval of IntervalIdT
-  | ECannotInsertUnhandled
+  | ECannotInsertUnhandled of nat & nat & nat & nat
   | EIntervalBeginsBeforeUnhandled of IntervalIdT
   | ENoValidSplitPosition of IntervalIdT
   | ECannotSplitSingleton of IntervalIdT
@@ -52,7 +53,8 @@ Inductive SSTrace : Set :=
   | ERegisterAssignmentsOverlap of PhysRegT & IntervalIdT & nat
   | ECannotModifyHandledInterval of IntervalIdT
   | EUnexpectedNoMoreUnhandled
-  | ECannotSpillIfRegisterRequired of PhysRegT
+  | ECannotSpillIfRegisterRequired of IntervalIdT
+  | ECannotSpillIfRegisterRequiredBefore of IntervalIdT & nat
   | EFuelExhausted
   | EUnhandledIntervalsRemain
   | EActiveIntervalsRemain

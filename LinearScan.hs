@@ -178,18 +178,21 @@ instance Show ScanStateDesc where
             ++ concatMap (\(reg, mi) ->
                            case mi of
                            Nothing -> ""
-                           Just i -> "  " ++ showIntervalDesc reg i ++ "\n")
+                           Just i ->
+                               "  " ++ showIntervalDesc reg i True ++ "\n")
                          (zip [0..] (fixedIntervals sd))
       where
-        showInterval i = showIntervalDesc i (intervals sd !! i)
+        showInterval i = showIntervalDesc i (intervals sd !! i) False
 
         showReg Nothing = "<stack>"
         showReg (Just r) = "r" ++ show r
 
-showIntervalDesc :: Int -> LS.IntervalDesc -> String
-showIntervalDesc i (LS.Build_IntervalDesc iv ib ie rs) =
-    "[" ++ show i ++ "]: " ++ " v" ++ show iv ++ " "
-          ++ show ib ++ "-" ++ show ie ++ " =>" ++ showRanges rs
+showIntervalDesc :: Int -> LS.IntervalDesc -> Bool -> String
+showIntervalDesc i (LS.Build_IntervalDesc iv ib ie rs) isReg =
+    (if isReg
+     then "r" ++ show i ++ ": "
+     else "[" ++ show i ++ "]: " ) ++ " v" ++ show iv ++ " "
+        ++ show ib ++ "-" ++ show ie ++ " =>" ++ showRanges rs
 
 showRanges :: [LS.RangeDesc] -> String
 showRanges [] = ""
@@ -486,28 +489,35 @@ allocate maxReg binfo oinfo useVerifier blocks = do
         LS.EOverlapsWithFixedInterval pos reg ->
             "Current interval intersects with " ++
             "fixed interval for register " ++ show reg ++ " at " ++ show pos
-        LS.ESplitAssignedIntervalForReg reg ->
-            "Splitting assigned interval for register " ++ show reg
-        LS.ESplitActiveOrInactiveInterval b ->
-            "Splitting " ++ (if b then "active" else "inactive") ++ " interval"
+        LS.ESplitAssignedIntervalForReg xid reg pos ->
+            "Splitting assigned interval " ++ show xid
+                ++ " for register " ++ show reg ++ " at position "++ show pos
+        LS.ESplitActiveOrInactiveInterval xid b pos ->
+            "Splitting " ++ (if b then "active" else "inactive") ++ " interval "
+                ++ show xid ++ " at position "++ show pos
         LS.ESpillInterval cond ->
-            "Spilling " ++ show cond
-        LS.ESplitUnhandledInterval ->
-            "Splitting unhandled interval"
+            "Spilling due to " ++ show cond
+        LS.ESplitUnhandledInterval uid pos ->
+            "Splitting unhandled interval " ++ show uid
+                ++ " at position" ++ show pos
         LS.EIntervalHasUsePosReqReg pos ->
             "Interval has use position requiring register at " ++ show pos
         LS.EIntervalBeginsAtSplitPosition ->
             "Interval begins at split position"
-        LS.EMoveUnhandledToActive reg ->
-            "Allocating unhandled interval at register " ++ show reg
-        LS.ESplitActiveIntervalForReg reg ->
+        LS.EMoveUnhandledToActive uid reg ->
+            "Allocating unhandled interval " ++ show uid
+                ++ " at register " ++ show reg
+        LS.ESplitActiveIntervalForReg reg pos ->
             "Splitting active interval for register " ++ show reg
-        LS.ESplitAnyInactiveIntervalForReg reg ->
+                ++ " at position "++ show pos
+        LS.ESplitAnyInactiveIntervalForReg reg pos ->
             "Splitting any inactive interval for register " ++ show reg
+                ++ " at position "++ show pos
         LS.ESpillCurrentInterval ->
             "Spilling current interval"
-        LS.ESplitCurrentInterval pos ->
-            "Splitting current interval " ++ show pos
+        LS.ESplitCurrentInterval uid pos ->
+            "Splitting current interval " ++ show uid
+                ++ " at position " ++ show pos
         LS.ETryAllocateFreeReg reg mpos xid ->
             "Trying to allocate register " ++ show reg
                 ++ " at " ++ show mpos ++ " for interval " ++ show xid
@@ -516,8 +526,10 @@ allocate maxReg binfo oinfo useVerifier blocks = do
                 ++ " at " ++ show mpos ++ " for interval " ++ show xid
         LS.ERemoveUnhandledInterval xid ->
             "Removing unhandled interval " ++ show xid
-        LS.ECannotInsertUnhandled ->
-            "Cannot insert interval onto unhandled list"
+        LS.ECannotInsertUnhandled beg ibeg splitPos iend ->
+            "Cannot insert onto unhandled: beg " ++ show beg ++ " >= ibeg "
+                ++ show ibeg ++ " && (ibeg == splitPos || iend " ++ show iend
+                ++ " == splitPos " ++ show splitPos ++ ")"
         LS.EIntervalBeginsBeforeUnhandled xid ->
             "Cannot spill interval " ++ show xid
                 ++ " (begins before current position)"
@@ -532,9 +544,12 @@ allocate maxReg binfo oinfo useVerifier blocks = do
                 ++ " for interval " ++ show i ++ " (index " ++ show idx ++ ")"
         LS.EUnexpectedNoMoreUnhandled ->
             "The unexpected happened: no more unhandled intervals"
-        LS.ECannotSpillIfRegisterRequired i ->
-            "Cannot spill interval " ++ show i
-                ++ " with use positions requiring registers"
+        LS.ECannotSpillIfRegisterRequired xid ->
+            "Cannot spill interval " ++ show xid
+                ++ " at position requiring register"
+        LS.ECannotSpillIfRegisterRequiredBefore splitPos pos ->
+            "Cannot spill interval split at " ++ show splitPos
+                ++ " requiring register at  position " ++ show pos
         LS.ECannotModifyHandledInterval i ->
             "Attempt to modify handled interval " ++ show i
         LS.EFuelExhausted -> "Fuel was exhausted"

@@ -107,13 +107,18 @@ Proof.
 
   have e3 := EIntervalHasUsePosReqReg splitPos2.1 :: e2.
 
-  case E: (ibeg i1.1 == splitPos2.1).
+  pose adjustedSplitPos2 := if posAtRangeEnd i1.2 splitPos2.1
+                            then (splitPos2.1).-1
+                            else splitPos2.1.
+
+  case E: (ibeg i1.1 >= adjustedSplitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
        later iteration. Note: this cannot change the head of the unhandled
        list. *)
     case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
-      exact: inl (ECannotInsertUnhandled ::
+      exact: inl (ECannotInsertUnhandled
+                    beg (ibeg i1.1) adjustedSplitPos2 (iend i1.1) ::
                   EIntervalBeginsAtSplitPosition :: e3).
 
     have := ScanState_newUnhandled st i1.2.
@@ -128,10 +133,13 @@ Proof.
     try apply Build_SSMorph => //=;
     by rewrite /= insert_size /=.
 
-  have Hmid3 : ibeg i1.1 < splitPos2.1 <= iend i1.1.
+  have Hmid3 : ibeg i1.1 < adjustedSplitPos2 < iend i1.1.
+    rewrite /adjustedSplitPos2 in E *.
     clear S.
-    move/andP: Hmid2 => [Hmid2 ?].
-    move/(leq_eqF E) in Hmid2.
+    move/andP: Hmid2 => [H1 H2].
+    case B: (posAtRangeEnd i1.2 splitPos2.1) in E *.
+      by ordered.
+    move: (posAtRangeEnd_spec (negbT B)).
     by ordered.
 
   (* Wimmer: "All active and inactive intervals for this register intersecting
@@ -150,7 +158,8 @@ Proof.
      evidence for now, from the first use of [firstUseReqReg] and then
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
-    exact: inl (ECannotSpillIfRegisterRequired pos.1 :: e3).
+    exact: inl (ECannotSpillIfRegisterRequiredBefore
+                  adjustedSplitPos2 pos.1 :: e3).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 

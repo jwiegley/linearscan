@@ -26,21 +26,18 @@ Open Scope program_scope.
 Definition overlapsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option nat) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
-    let int := curIntDetails cur in
     ipure $ if vnth (fixedIntervals sd) reg is Some i
-            then intervalOverlapPoint int.2 i.2
+            then intervalOverlapPoint (curIntDetails cur).2 i.2
             else None.
 
 Definition updateRegisterPos {n : nat} (v : Vec (option nat) n)
   (r : 'I_n) (p : option nat) : Vec (option nat) n :=
   match p with
   | None => v
-  | Some x =>
-      vreplace v r
-        (Some (match vnth v r with
-               | Some n => if n < x then n else x
-               | None   => x
-               end))
+  | Some x => vreplace v r (Some (match vnth v r with
+                                  | Some n => if n < x then n else x
+                                  | None   => x
+                                  end))
   end.
 
 Definition findEligibleRegister (sd : ScanStateDesc maxReg)
@@ -52,11 +49,8 @@ Definition findEligibleRegister (sd : ScanStateDesc maxReg)
     vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
       let: (fup, fai) := acc in
       if mint is Some int
-      then
-        let ip := intervalIntersectionPoint int.2 current in
-        let intersects := isJust ip in
-        (updateRegisterPos fup reg (intervalIntersectionPoint int.2 current),
-         vreplace fai reg intersects)
+      then let op := intervalOverlapPoint int.2 current in
+           (updateRegisterPos fup reg op, vreplace fai reg (isJust op))
       else acc) (xs, vconst false) (fixedIntervals sd) in
   registerWithHighestPos registers_exist fixedAndIntersects xs.
 
@@ -110,7 +104,7 @@ Definition tryAllocateFreeReg {pre} :
                // register available for the first part of the interval
                current.reg = reg
                split current before freeUntilPos[reg] *)
-          if n <= intervalComputedStart current
+          if n <= intervalStart current
           then None
           else @Some _ $
             if intervalEnd current < n
@@ -126,7 +120,7 @@ Definition allocateBlockedReg {pre} :
   SState pre (@SSMorphHasLen maxReg) (@SSMorph maxReg) (option PhysReg) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     let current := curInterval cur in
-    let pos     := intervalComputedStart current in
+    let pos     := intervalStart current in
 
     (* set nextUsePos of all physical registers to maxInt
        for each interval it in active do
@@ -135,7 +129,8 @@ Definition allocateBlockedReg {pre} :
          nextUsePos[it.reg] = next use of it after start of current *)
     let go {n : nat} (v : Vec (option nat) n) (p : IntervalSig * 'I_n) :=
         let: (int, r) := p in
-        let atPos u := (pos == uloc u) && regReq u in
+        let atPos u := ((pos    == uloc u) ||
+                        (pos.+1 == uloc u)) && regReq u in
         let pos' :=
             (* In calculating the highest use position of this register, if we
                know that it is being used at the current position, then it
@@ -165,7 +160,7 @@ Definition allocateBlockedReg {pre} :
           | None   => false
           | Some n =>
               n < if lookupUsePos current (fun u => pos <= uloc u)
-                    is Some (nextUse; _)
+                       is Some (nextUse; _)
                   then nextUse.1
                   else intervalEnd current
           end)
@@ -254,27 +249,32 @@ Program Definition goActive (pos : nat) (sd : ScanStateDesc maxReg)
   let: conj st sslen := Pz in
   let i := getInterval (fst x) in
   let Hin : x \in active z := @in_subseq_sing _ _ _ x xs _ Hsub in
-  if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
-  then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 1 :: e)
-  else
-    let ss :=
-      if intervalEnd i < pos
-      then let: exist2 x H1 H2 :=
-             moveActiveToHandled st Hin Hreq (spilled:=false) in
-           exist2 _ _ x H1 (proj1 H2)
-      else if ~~ posWithinInterval i pos
-           then moveActiveToInactive st Hin
-           else exist2 _ _ z st (newSSMorphLen z) in
-    match ss with
-    | exist2 sd' st' sslen' =>
-        inr (exist2 _ _ (sd'; sslen')
-                    (conj st' (transitivity sslen sslen')) _)
-    end.
+  let eres :=
+    if intervalEnd i < pos
+    then
+      if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
+      then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 1 :: e)
+      else
+      let: exist2 x H1 H2 :=
+           moveActiveToHandled st Hin Hreq (spilled:=false) in
+         inr (exist2 _ _ x H1 (proj1 H2))
+    else inr $ if ~~ posWithinInterval i pos
+               then moveActiveToInactive st Hin
+               else exist2 _ _ z st (newSSMorphLen z) in
+  match eres with
+  | inl err => inl err
+  | inr (exist2 sd' st' sslen') =>
+      inr (exist2 _ _ (sd'; sslen')
+                  (conj st' (transitivity sslen sslen')) _)
+  end.
 Next Obligation.
-  move: Heq_ss.
+  move: Heq_eres.
 
-  case: (iend (vnth (intervals z) i).1 < pos).
-    rewrite /moveActiveToHandled /=.
+  case: (iend (vnth (intervals z) i).1 < pos);
+  case: (prop (verifyNewHandled z (vnth (intervals z) i).1 p)) => a;
+  try discriminate.
+
+  - rewrite /moveActiveToHandled /=.
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
@@ -282,23 +282,39 @@ Next Obligation.
     rewrite map_widen_ord_refl.
     exact: subseq_cons_rem.
 
-  case: (~~ (ibeg (vnth (intervals z) i).1 <=
-             pos < iend (vnth (intervals z) i).1)).
-    rewrite /moveActiveToInactive /=.
+  - case: (~~ (ibeg (vnth (intervals z) i).1
+             <= pos < iend (vnth (intervals z) i).1)).
+      rewrite /moveActiveToInactive /=.
+      invert as [H1]; subst; simpl.
+      rewrite /mt_fst /morphlen_transport /=.
+      case: sslen'.
+      case=> [[?] _].
+      rewrite map_widen_ord_refl.
+      exact: subseq_cons_rem.
+
     invert as [H1]; subst; simpl.
     rewrite /mt_fst /morphlen_transport /=.
     case: sslen'.
     case=> [[?] _].
     rewrite map_widen_ord_refl.
-    exact: subseq_cons_rem.
+    apply: subseq_impl_cons.
+    exact Hsub.
 
-  invert as [H1]; subst; simpl.
-  rewrite /mt_fst /morphlen_transport /=.
-  case: sslen'.
-  case=> [[?] _].
-  rewrite map_widen_ord_refl.
-  apply: subseq_impl_cons.
-  exact Hsub.
+  - case: (~~ (ibeg (vnth (intervals z) i).1
+             <= pos < iend (vnth (intervals z) i).1)) in a *.
+      inv a.
+      rewrite /mt_fst /morphlen_transport /=.
+      case: sslen'.
+      case=> [[?] _].
+      rewrite map_widen_ord_refl.
+      exact: subseq_cons_rem.
+    inv a.
+    rewrite /mt_fst /morphlen_transport /=.
+    case: sslen'.
+    case=> [[?] _].
+    rewrite map_widen_ord_refl.
+    apply: subseq_impl_cons.
+    exact Hsub.
 Qed.
 
 Definition checkActiveIntervals {pre} (pos : nat) :
@@ -426,7 +442,7 @@ Definition handleInterval {pre} :
   (* position = start position of current *)
   withCursor (maxReg:=maxReg) $ fun _ cur =>
     let current := curInterval cur in
-    let pos     := intervalComputedStart current in
+    let pos     := intervalStart current in
     let cid     := curId cur in
 
     (* Remove any empty intervals from the unhandled list *)
