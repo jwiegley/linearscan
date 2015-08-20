@@ -1,4 +1,5 @@
 Require Import LinearScan.Lib.
+Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
@@ -42,6 +43,21 @@ Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
   | Case_aux c "ActiveToHandled"
   | Case_aux c "InactiveToHandled"
   ].
+
+(* Determine the optimal split position between an absolute lower bound
+   (anything lower and we cannot insert the split interval onto the unhandled
+   list for reprocessing) and an absolute upper bound (anything higher is not
+   valid according to the algorithm). Anything in between is fair game. *)
+Definition optimalSplitPosition `(i : Interval d)
+  (lowerBound upperBound : nat) : nat :=
+  if [|| (* Avoid leaving empty ranges (beg == end) *)
+         posAtRangeEnd i upperBound
+         (* Avoid input variable at the split location *)
+     |   lookupUsePos i (fun u => [&& uloc u == upperBound
+                                  &   uvar u == Input])
+     ]
+  then upperBound.-1
+  else upperBound.
 
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
@@ -107,9 +123,7 @@ Proof.
 
   have e3 := EIntervalHasUsePosReqReg splitPos2.1 :: e2.
 
-  pose adjustedSplitPos2 := if posAtRangeEnd i1.2 splitPos2.1
-                            then (splitPos2.1).-1
-                            else splitPos2.1.
+  pose adjustedSplitPos2 := optimalSplitPosition i1.2 beg splitPos2.1.
 
   case E: (ibeg i1.1 >= adjustedSplitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
@@ -134,12 +148,18 @@ Proof.
     by rewrite /= insert_size /=.
 
   have Hmid3 : ibeg i1.1 < adjustedSplitPos2 < iend i1.1.
-    rewrite /adjustedSplitPos2 in E *.
-    clear S.
-    move/andP: Hmid2 => [H1 H2].
-    case B: (posAtRangeEnd i1.2 splitPos2.1) in E *.
-      by ordered.
-    move: (posAtRangeEnd_spec (negbT B)).
+    clear -Hmid2 E.
+    move: E.
+    rewrite /adjustedSplitPos2 /optimalSplitPosition.
+    set b1 := posAtRangeEnd _ _.
+    set b2 := lookupUsePos _ _.
+    case B1: b1; case B2: b2 => [pos|];
+    try destruct pos;
+    rewrite /b1 in B1;
+    try (move/negbT in B1;
+         move: (posAtRangeEnd_spec B1));
+    rewrite /b2 in B2;
+    rewrite ?orTb ?Bool.orb_false_l /=;
     by ordered.
 
   (* Wimmer: "All active and inactive intervals for this register intersecting

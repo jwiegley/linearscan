@@ -335,12 +335,14 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
        | inl reg =>
          (* Direct register references are mostly left alone; we just check to
             make sure that it's not overwriting a variable in a register. *)
-         st <-- use _verDesc ;;
-         if varKind ref is Input
-         then pure tt
-         else if vnth (rsAllocs st) reg is (_, Some v)
-              then errorT $ PhysRegAlreadyReservedForVar reg v
-              else pure tt
+         (* st <-- use _verDesc ;; *)
+         (* if varKind ref is Input *)
+         (* then pure tt *)
+         (* else if vnth (rsAllocs st) reg is (_, Some v) *)
+         (*      then errorT $ PhysRegAlreadyReservedForVar reg v *)
+         (*      else pure tt *)
+         (* jww (2015-08-19): The above check doesn't fully work yet *)
+         pure tt
 
        | inr var =>
          if maybeLookup allocs var isn't Some reg
