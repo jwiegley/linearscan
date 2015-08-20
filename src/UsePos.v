@@ -80,14 +80,8 @@ Notation " (| x |) " := {| uloc := x; regReq := false |}.
 Notation " (! x !) " := {| uloc := x; regReq := true |}.
 End UsePosNotations.
 
-Definition upos_lt (x y : UsePos) : bool := uloc x < uloc y.
-Arguments upos_lt x y /.
-
 Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
 Arguments upos_le x y /.
-
-Definition upos_ge (x y : UsePos) : bool := ~~ upos_lt x y.
-Arguments upos_ge x y /.
 
 (* A [UsePos] is within bound of a range position if, be it an input-only use
    position, it fall on or before that position; or, be it not input-only, it
@@ -129,14 +123,8 @@ Definition upos_within_bound (before : nat) (u : UsePos) :=
   else uloc u < before.
 Arguments upos_within_bound before u /.
 
-Program Instance upos_lt_trans : Transitive upos_lt.
-Obligation 1. exact: (ltn_trans H). Qed.
-
 Program Instance upos_le_trans : Transitive upos_le.
 Obligation 1. by ordered. Qed.
-
-Lemma upos_le_antisym : forall x y : UsePos, ~~ (y <= x) -> x <= y.
-Proof. by ordered. Qed.
 
 Definition head_or x xs := head x [seq uloc u | u <- xs].
 Arguments head_or x xs /.
