@@ -261,13 +261,7 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
           else (to < iend int, false))
     else (false, false) in
 
-  let outputBegin int pos :=
-      if ups (NE_head (rds int)).1 is u :: us
-      then let starting := [seq x <- u :: us | [&& ibeg int == pos
-                                                &   pos == uloc x ]] in
-           [&& size starting > 0
-           &   size [seq x <- starting | uvar x == Output] == size starting]
-      else false in
+  let outputBegin int pos := hasOnlyOutputsAt (NE_head (rds int)).1 pos in
 
   let liveAtTo :=
       IntMap_fromList [seq let int := intVal i in
@@ -293,9 +287,9 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
          let mmv := match intReg x, intReg y with
             | Some xr, Some yr => Some (Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some xr => if outb
-                                  then None
-                                  else Some (Restore vid xr)
+            | None,    Some xr => Some (if outb
+                                        then AllocReg vid xr
+                                        else Restore vid xr)
             | None,    None    => None
             end in
          let anchor x := (inl <$> intReg x) <|> Some (inr vid) in
