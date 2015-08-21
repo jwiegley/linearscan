@@ -111,20 +111,20 @@ showOp1' :: (op1 -> String)
          -> [LS.ResolvingMoveSet]
          -> op1
          -> String
-showOp1' showop pos ins outs rms o =
-    let showerv (Left r)  = "r" ++ show r
-        showerv (Right v) = "v" ++ show v in
-    let render Nothing = ""
-        render (Just r) = "=r" ++ show r in
-    let marker label (i, erv, reg) =
-            "<" ++ label ++ " " ++ showerv erv ++
-            (if i == either id id erv
-             then ""
-             else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
+showOp1' showop pos _ins _outs rms o =
+    -- let showerv (Left r)  = "r" ++ show r
+    --     showerv (Right v) = "v" ++ show v in
+    -- let render Nothing = ""
+    --     render (Just r) = "=r" ++ show r in
+    -- let marker label (i, erv, reg) =
+    --         "<" ++ label ++ " " ++ showerv erv ++
+    --         (if i == either id id erv
+    --          then ""
+    --          else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
     let leader = show pos ++ ": " in
     let width = length leader in
-    concatMap (marker "End") outs ++
-    concatMap (marker "Beg") ins ++
+    -- concatMap (marker "End") outs ++
+    -- concatMap (marker "Beg") ins ++
     leader ++ showop o ++ "\n" ++
     concatMap (\x -> replicate width ' ' ++
                      replicate 8 ' ' ++ show x ++ "\n") rms

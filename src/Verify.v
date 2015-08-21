@@ -287,11 +287,21 @@ Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
 Definition checkLiveness (vars : IntSet) : Verified unit :=
   if useVerifier isn't VerifyEnabledStrict then pure tt else
   st <-- use _verDesc ;;
-  forM_ (IntSet_toList vars) $ fun var =>
-    unless (vfoldl_with_index (fun reg b p =>
-      b || if p ^_ residency is Some var then true else false)
-                              false (rsAllocs st)) $
-      errorT $ VarNotResident var.
+  (forM_ (IntSet_toList vars) $ fun var =>
+     unless (vfoldl_with_index (fun reg b p =>
+       b || if p ^_ residency is Some var then true else false)
+                               false (rsAllocs st)) $
+       errorT $ VarNotResident var) ;;
+
+  (* Clear out any resident registers which liveness tells us are not set.
+     That is, even though there may be contents "left over", we don't want to
+     rely on that, but only on the liveness information. *)
+  vfoldl_with_index (fun reg act p =>
+                       if p ^_ residency is Some v
+                       then unless (IntSet_member v vars) $
+                              clearReg reg v
+                       else pure tt)
+                    (pure tt) (rsAllocs st).
 
 Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   Verified unit :=

@@ -167,7 +167,15 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
     | None => pure liveSets1    (* jww (2015-02-14): should never happen *)
     | Some liveSet =>
       suxs <-- blockSuccessors binfo b ;;
-      let liveSet2 := forFold liveSet suxs $ fun liveSet2 s_bid =>
+      let liveSet1' :=
+          {| blockLiveGen   := blockLiveGen liveSet
+           ; blockLiveKill  := blockLiveKill liveSet
+           ; blockLiveIn    := blockLiveIn liveSet
+           ; blockLiveOut   := emptyIntSet
+           ; blockFirstOpId := blockFirstOpId liveSet
+           ; blockLastOpId  := blockLastOpId liveSet
+           |} in
+      let liveSet2 := forFold liveSet1' suxs $ fun liveSet2 s_bid =>
           match IntMap_lookup s_bid liveSets1 with
           | None => liveSet2  (* jww (2015-02-14): should never happen *)
           | Some sux =>
