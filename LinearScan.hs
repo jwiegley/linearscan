@@ -191,7 +191,7 @@ showIntervalDesc :: Int -> LS.IntervalDesc -> Bool -> String
 showIntervalDesc i (LS.Build_IntervalDesc iv ib ie rs) isReg =
     (if isReg
      then "r" ++ show i ++ ": "
-     else "[" ++ show i ++ "]: " ) ++ " v" ++ show iv ++ " "
+     else "[" ++ show i ++ "]: " ++ " v" ++ show iv) ++ " "
         ++ show ib ++ "-" ++ show ie ++ " =>" ++ showRanges rs
 
 showRanges :: [LS.RangeDesc] -> String
