@@ -59,6 +59,38 @@ Definition optimalSplitPosition `(i : Interval d)
   then upperBound.-1
   else upperBound.
 
+Lemma optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
+  optimalSplitPosition i lb ub <= ub.
+Proof.
+  rewrite /optimalSplitPosition.
+  set b1 := posAtRangeEnd _ _.
+  set b2 := lookupUsePos _ _.
+  case B1: b1; case B2: b2 => [pos|];
+  try destruct pos;
+  rewrite /b1 in B1;
+  try (move/negbT in B1;
+       move: (posAtRangeEnd_spec B1));
+  rewrite /b2 in B2;
+  rewrite ?orTb ?Bool.orb_false_l /=;
+  by ordered.
+Qed.
+
+Lemma optimalSplitPosition_beg_spec `(i : Interval d) (lb ub : nat) :
+  lb < ub <= iend d -> optimalSplitPosition i lb ub < iend d.
+Proof.
+  rewrite /optimalSplitPosition.
+  set b1 := posAtRangeEnd _ _.
+  set b2 := lookupUsePos _ _.
+  case B1: b1; case B2: b2 => [pos|];
+  try destruct pos;
+  rewrite /b1 in B1;
+  try (move/negbT in B1;
+       move: (posAtRangeEnd_spec B1));
+  rewrite /b2 in B2;
+  rewrite ?orTb ?Bool.orb_false_l /=;
+  by ordered.
+Qed.
+
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
   (Hbeg : beg <= ibeg i1.1) (spill : SpillCondition uid i1) (e : seq SSTrace) :
@@ -123,16 +155,16 @@ Proof.
 
   have e3 := EIntervalHasUsePosReqReg splitPos2.1 :: e2.
 
-  pose adjustedSplitPos2 := optimalSplitPosition i1.2 beg splitPos2.1.
+  pose optSplitPos2 := optimalSplitPosition i1.2 beg splitPos2.1.
 
-  case E: (ibeg i1.1 >= adjustedSplitPos2).
+  case E: (ibeg i1.1 >= optSplitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
        later iteration. Note: this cannot change the head of the unhandled
        list. *)
     case Hincr: (beg < ibeg i1.1); last first.
       move=> *.
       exact: inl (ECannotInsertUnhandled
-                    beg (ibeg i1.1) adjustedSplitPos2 (iend i1.1) ::
+                    beg (ibeg i1.1) optSplitPos2 (iend i1.1) ::
                   EIntervalBeginsAtSplitPosition :: e3).
 
     have := ScanState_newUnhandled st i1.2.
@@ -147,19 +179,14 @@ Proof.
     try apply Build_SSMorph => //=;
     by rewrite /= insert_size /=.
 
-  have Hmid3 : ibeg i1.1 < adjustedSplitPos2 < iend i1.1.
-    clear -Hmid2 E.
-    move: E.
-    rewrite /adjustedSplitPos2 /optimalSplitPosition.
-    set b1 := posAtRangeEnd _ _.
-    set b2 := lookupUsePos _ _.
-    case B1: b1; case B2: b2 => [pos|];
-    try destruct pos;
-    rewrite /b1 in B1;
-    try (move/negbT in B1;
-         move: (posAtRangeEnd_spec B1));
-    rewrite /b2 in B2;
-    rewrite ?orTb ?Bool.orb_false_l /=;
+  have Hmid3 : ibeg i1.1 < optSplitPos2 < iend i1.1.
+    clear -Hbeg Hmid2 E.
+    move/negbT in E.
+    rewrite -ltnNge in E.
+    have H : beg < splitPos2.1 <= iend i1.1.
+      move: (optimalSplitPosition_spec i1.2 beg splitPos2.1).
+      by ordered.
+    move: (optimalSplitPosition_beg_spec i1.2 H).
     by ordered.
 
   (* Wimmer: "All active and inactive intervals for this register intersecting
@@ -171,15 +198,14 @@ Proof.
      use positions, and the second split children are sorted into the
      unhandled list.  They get a register assigned when the allocator advances
      to the start position of these intervals." *)
-  case: (splitInterval i1.2 Hmid3)
-    => [[i1_0 i1_1] [/= H1_1 H2_1 H3_1]] //.
+  case: (splitInterval i1.2 Hmid3) => [[i1_0 i1_1] [/= H1_1 H2_1 H3_1]] //.
 
   (* jww (2015-05-21): This should be [None] by definition, but I lack the
      evidence for now, from the first use of [firstUseReqReg] and then
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
     exact: inl (ECannotSpillIfRegisterRequiredBefore
-                  adjustedSplitPos2 pos.1 :: e3).
+                  optSplitPos2 pos.1 :: e3).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 
