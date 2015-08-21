@@ -687,81 +687,128 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : bool :=
-  (rbeg x < rend y) && (rbeg y < rend x).
+Definition hasInputsAt (rd : RangeDesc) (pos : nat) : bool :=
+  foldl (fun b u =>
+           if b || ((uloc u == pos) && (uvar u == Input))
+           then true
+           else b) false (ups rd).
+
+Definition hasOnlyOutputsAt (rd : RangeDesc) (pos : nat) : bool :=
+  let xs := foldl (fun acc u =>
+                     if uloc u == pos
+                     then u :: acc
+                     else acc) [::] (ups rd) in
+  (size xs > 0) && ~~ has (fun u => uvar u != Output) xs.
+
+Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : option nat :=
+  if (rbeg x < rend y) && (rbeg y < rend x)
+  then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
+  else if [&& rend x == rbeg y
+          ,   hasInputsAt x (rend x)
+          &   ~~ hasOnlyOutputsAt y (rbeg y) ]
+       then Some (rend x)
+       else if [&& rend y == rbeg x
+                ,   hasInputsAt y (rend y)
+                &   ~~ hasOnlyOutputsAt x (rbeg x) ]
+            then Some (rend y)
+            else None.
 
 Example rangesIntersect_ex1 :
-  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 4 ; rend := 8 ; ups  := [::] |}.
+  Some 4 = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                           {| rbeg := 4 ; rend := 8 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex2 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 5 ; rend := 8 ; ups  := [::] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 8 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex3 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 6 ; rend := 8 ; ups  := [::] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 6 ; rend := 8 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex4 :
-  false = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+  None = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex5 :
-  true = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 3 ; rend := 5 ; ups  := [::] |}.
+  Some 3 = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                           {| rbeg := 3 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex6 :
-  true = rangesIntersect {| rbeg := 2 ; rend := 4 ; ups  := [::] |}
-                         {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
+  Some 2 = rangesIntersect {| rbeg := 2 ; rend := 4 ; ups  := [::] |}
+                           {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex7 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex8 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 2 ; ups  := [::] |}
-                          {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 2 ; ups  := [::] |}
+                         {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex9 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 5 ; rend := 5
-                           ; ups  := [:: {| uloc   := 5
-                                          ; regReq := false
-                                          ; uvar   := Output |}] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5
+                          ; ups  := [:: {| uloc   := 5
+                                         ; regReq := false
+                                         ; uvar   := Output |}] |}.
 Proof. by []. Qed.
 
 Example rangesIntersect_ex10 :
-  false = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                          {| rbeg := 5 ; rend := 5
-                           ; ups  := [:: {| uloc   := 5
-                                          ; regReq := false
-                                          ; uvar   := Input |}] |}.
+  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
+                         {| rbeg := 5 ; rend := 5
+                          ; ups  := [:: {| uloc   := 5
+                                         ; regReq := false
+                                         ; uvar   := Input |}] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex11 :
+  Some 5 = rangesIntersect {| rbeg := 2 ; rend := 5
+                            ; ups  := [:: {| uloc   := 5
+                                           ; regReq := false
+                                           ; uvar   := Input |}] |}
+                           {| rbeg := 5 ; rend := 5
+                            ; ups  := [:: {| uloc   := 5
+                                           ; regReq := false
+                                           ; uvar   := Input |}] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex12 :
+  Some 5 = rangesIntersect {| rbeg := 2 ; rend := 5
+                            ; ups  := [:: {| uloc   := 5
+                                           ; regReq := false
+                                           ; uvar   := Input |}] |}
+                           {| rbeg := 5 ; rend := 5
+                            ; ups  := [::] |}.
+Proof. by []. Qed.
+
+Example rangesIntersect_ex13 :
+  None = rangesIntersect {| rbeg := 2 ; rend := 5
+                          ; ups  := [:: {| uloc   := 5
+                                         ; regReq := false
+                                         ; uvar   := Input |}] |}
+                         {| rbeg := 5 ; rend := 5
+                          ; ups  := [:: {| uloc   := 5
+                                         ; regReq := false
+                                         ; uvar   := Output |}] |}.
 Proof. by []. Qed.
 
 Lemma rangesIntersect_sym : symmetric rangesIntersect.
-Proof.
-  move=> x y.
-  rewrite /rangesIntersect.
-  case: x => [xb xe [|xu xus]] /=;
-  case: y => [yb ye [|yu yus]] /=;
-  by intuition.
-Qed.
-
-Definition rangeIntersectionPoint `(xr : Range x) `(yr : Range y) :
-  option nat :=
-  if rangesIntersect xr yr
-  then Some (if rbeg x < rbeg y
-             then rbeg y
-             else rbeg x)
-  else None.
+Admitted.
+(* Proof. *)
+(*   move=> x y. *)
+(*   rewrite /rangesIntersect. *)
+(*   case: x => [xb xe [|xu xus]] /=; *)
+(*   case: y => [yb ye [|yu yus]] /=; *)
+(*   by intuition. *)
+(* Qed. *)
 
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
   option { u : UsePos | u \in ups rd }.
@@ -780,11 +827,6 @@ Proof.
   apply/orP.
   by right.
 Defined.
-
-Definition endsWithInputOnly `(r : Range rd) : bool :=
-  if olast (ups rd) is Some u
-  then (uloc u == rend rd) && (uvar u == Input)
-  else false.
 
 (* When a [Range] is split into two ranges, we preserve a great deal of
    information about how these (possibly) two sub-ranges are related.  If only

@@ -27,7 +27,7 @@ Definition overlapsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option nat) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     ipure $ if vnth (fixedIntervals sd) reg is Some i
-            then intervalOverlapPoint (curIntDetails cur).2 i.2
+            then intervalsOverlap (curIntDetails cur).2 i.2
             else None.
 
 Definition updateRegisterPos {n : nat} (v : Vec (option nat) n)
@@ -49,7 +49,7 @@ Definition findEligibleRegister (sd : ScanStateDesc maxReg)
     vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
       let: (fup, fai) := acc in
       if mint is Some int
-      then let op := intervalOverlapPoint int.2 current in
+      then let op := intervalsOverlap int.2 current in
            (updateRegisterPos fup reg op, vreplace fai reg (isJust op))
       else acc) (xs, vconst false) (fixedIntervals sd) in
   registerWithHighestPos registers_exist fixedAndIntersects xs.
@@ -69,18 +69,14 @@ Definition tryAllocateFreeReg {pre} :
        for each interval it in inactive intersecting with current do
          freeUntilPos[it.reg] = next intersection of it with current *)
     let go f v p := let: (i, r) := p in updateRegisterPos v r (f i) in
-    let freeUntilPos' :=
-        foldl (go (fun _ => Some 0)) (vconst None) (active sd) in
-    let intersectingIntervals :=
-        filter (fun x => intervalsIntersect current (getInterval (fst x)))
-               (inactive sd) in
-    let freeUntilPos'' :=
-        foldl (go (fun i => intervalIntersectionPoint (getInterval i) current))
-          freeUntilPos' intersectingIntervals in
+    let actives := foldl (go (fun _ => Some 0)) (vconst None) (active sd) in
+    let freeUntilPos :=
+        foldl (go (fun i => intervalsIntersect current (getInterval i)))
+          actives (inactive sd) in
 
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
-    let (reg, mres) := findEligibleRegister sd current freeUntilPos'' in
+    let (reg, mres) := findEligibleRegister sd current freeUntilPos in
 
     (** [moveUnhandledToActive] not only moves an [IntervalId] from the
         [unhandled] list to the [active] list in the current [ScanStateDesc],
@@ -144,11 +140,10 @@ Definition allocateBlockedReg {pre} :
 
     let resolve xs :=
         [seq (packInterval (getInterval (fst i)), snd i) | i <- xs] in
-    let nextUsePos' := foldl go (vconst None) (resolve (active sd)) in
-    let intersectingIntervals : seq (IntervalSig * PhysReg) :=
-        [seq x <- resolve (inactive sd)
-        | intervalsIntersect current (fst x).1] in
-    let nextUsePos'' := foldl go nextUsePos' intersectingIntervals in
+    let actives := foldl go (vconst None) (resolve (active sd)) in
+    let nextUsePos'' :=
+        foldl go actives [seq x <- resolve (inactive sd)
+                         | intervalsIntersect current (fst x).1] in
 
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
@@ -254,10 +249,9 @@ Program Definition goActive (pos : nat) (sd : ScanStateDesc maxReg)
     then
       if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
       then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 1 :: e)
-      else
-      let: exist2 x H1 H2 :=
-           moveActiveToHandled st Hin Hreq (spilled:=false) in
-         inr (exist2 _ _ x H1 (proj1 H2))
+      else let: exist2 x H1 H2 :=
+             moveActiveToHandled st Hin Hreq (spilled:=false) in
+           inr (exist2 _ _ x H1 (proj1 H2))
     else inr $ if ~~ posWithinInterval i pos
                then moveActiveToInactive st Hin
                else exist2 _ _ z st (newSSMorphLen z) in

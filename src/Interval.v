@@ -168,10 +168,12 @@ Proof.
 Qed.
 
 (* This version allows overlap in lifetime holes. *)
-Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) : bool :=
-  let f (x y : RangeSig) : bool := rangesIntersect x.2 y.2 in
-  has (fun (x : RangeSig) => has (f x) (NE_to_list (rds j)))
-      (NE_to_list (rds i)).
+Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) :
+  option nat :=
+  NE_foldl (fun (acc : option nat) (xr : RangeSig) =>
+              NE_foldl (fun (acc' : option nat) (yr : RangeSig) =>
+                          option_choose acc' (rangesIntersect xr.2 yr.2))
+                       acc (rds j)) None (rds i).
 
 Lemma has_rangesIntersect_sym (y : RangeSig) (xs : seq RangeSig) :
    has (fun x => rangesIntersect y.1 x.1) xs
@@ -188,46 +190,10 @@ Proof.
   case: x => [? xb xe [xr|xr xrs]] /=;
   case: y => [? yb ye [yr|yr yrs]] /=.
   - by rewrite rangesIntersect_sym.
-  - by rewrite has_over_false !Bool.orb_false_r
-               rangesIntersect_sym
-               has_rangesIntersect_sym.
-  - by rewrite has_over_false !Bool.orb_false_r
-               rangesIntersect_sym
-               has_rangesIntersect_sym.
-  - rewrite !has_predU -!orbA rangesIntersect_sym; f_equal.
-      rewrite !orbA; f_equal.
-      by rewrite orbC 2!has_rangesIntersect_sym.
-    have Hsym : symmetric (fun x y => rangesIntersect x.1 y.1).
-      move=> P [xd' xr'] [yd' yr'] /=.
-      by rewrite rangesIntersect_sym.
-    by rewrite has_flip.
-Qed.
-
-Definition intervalOverlapPoint `(xi : Interval xd) `(yi : Interval yd) :=
-  NE_foldl (fun acc xr =>
-    (NE_foldl
-       (fun acc' yr =>
-          option_choose acc' (rangeIntersectionPoint xr.2 yr.2))
-       acc (rds yd)))
-    None (rds xd).
-
-Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) : bool :=
-  (ibeg x < iend y) && (ibeg y < iend x).
-
-Lemma intervalsIntersect_sym : symmetric intervalsIntersect.
-Proof.
-  move=> x y.
-  rewrite /intervalsIntersect.
-  case: x => [? xb xe [xr|xr xrs]] /=;
-  case: y => [? yb ye [yr|yr yrs]] /=;
-  by intuition.
-Qed.
-
-Definition intervalIntersectionPoint `(xr : Interval x) `(yr : Interval y) :
-  option nat :=
-  if intervalsIntersect xr yr
-  then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
-  else None.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in
@@ -325,6 +291,9 @@ Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
 Defined.
 Arguments lookupUsePos [d] i f /.
 
+Definition intervalHasInputsAt (d : IntervalDesc) (pos : nat) : bool :=
+  NE_foldl (fun b (r : RangeSig) => b || hasInputsAt r.1 pos) false (rds d).
+
 Definition nextUseAfter `(i : Interval d) (pos : nat) : option oddnum :=
   if lookupUsePos i (fun u => pos < uloc u) is Some (n; _)
   then Some n
@@ -401,6 +370,12 @@ Arguments afterLifetimeHole d pos /.
 Definition firstUseReqReg `(i : Interval d) :
   option { u : oddnum | ibeg d <= u.1 <= iend d } := lookupUsePos i regReq.
 Arguments firstUseReqReg [d] i /.
+
+Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) :
+  option nat :=
+  if (ibeg x < iend y) && (ibeg y < iend x)
+  then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
+  else rangesIntersect (NE_last (rds x)).1 (NE_head (rds y)).1.
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 

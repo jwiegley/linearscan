@@ -48,46 +48,48 @@ Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
    (anything lower and we cannot insert the split interval onto the unhandled
    list for reprocessing) and an absolute upper bound (anything higher is not
    valid according to the algorithm). Anything in between is fair game. *)
-Definition optimalSplitPosition `(i : Interval d)
-  (lowerBound upperBound : nat) : nat :=
-  if [|| (* Avoid leaving empty ranges (beg == end) *)
-         posAtRangeEnd i upperBound
-         (* Avoid input variable at the split location *)
-     |   lookupUsePos i (fun u => [&& uloc u == upperBound
-                                  &   uvar u == Input])
-     ]
-  then upperBound.-1
-  else upperBound.
+Program Definition optimalSplitPosition `(i : Interval d) (lb ub : nat) : nat :=
+  if [|| posAtRangeEnd i ub        (* Avoid empty ranges *)
+     |   intervalHasInputsAt i ub  (* Avoid input at split pos *)
+     ] && (lb < ub)
+  then ub.-1
+  else ub.
 
 Lemma optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
   optimalSplitPosition i lb ub <= ub.
 Proof.
+  have Hord := ltn0ltn.
+  have Hlt := ltn_subn.
   rewrite /optimalSplitPosition.
-  set b1 := posAtRangeEnd _ _.
-  set b2 := lookupUsePos _ _.
-  case B1: b1; case B2: b2 => [pos|];
-  try destruct pos;
+  set b1 := (X in if X && _ then _ else _).
+  set b2 := lb < ub.
+  case B1: b1; case B2: b2;
   rewrite /b1 in B1;
   try (move/negbT in B1;
        move: (posAtRangeEnd_spec B1));
   rewrite /b2 in B2;
   rewrite ?orTb ?Bool.orb_false_l /=;
+  try specialize (Hord lb ub B2);
+  try specialize (Hlt lb ub B2 Hord);
   by ordered.
 Qed.
 
 Lemma optimalSplitPosition_beg_spec `(i : Interval d) (lb ub : nat) :
   lb < ub <= iend d -> optimalSplitPosition i lb ub < iend d.
 Proof.
+  have Hord := ltn0ltn.
+  have Hlt := ltn_subn.
   rewrite /optimalSplitPosition.
-  set b1 := posAtRangeEnd _ _.
-  set b2 := lookupUsePos _ _.
-  case B1: b1; case B2: b2 => [pos|];
-  try destruct pos;
+  set b1 := (X in if X && _ then _ else _).
+  set b2 := lb < ub.
+  case B1: b1; case B2: b2;
   rewrite /b1 in B1;
-  try (move/negbT in B1;
+  try (move/negbT/norP: B1 => [B1 ?];
        move: (posAtRangeEnd_spec B1));
   rewrite /b2 in B2;
   rewrite ?orTb ?Bool.orb_false_l /=;
+  try specialize (Hord lb ub B2);
+  try specialize (Hlt lb ub B2 Hord);
   by ordered.
 Qed.
 

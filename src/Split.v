@@ -49,12 +49,14 @@ Proof.
 
   move: (splitPosition int.2 pos) => splitPos.
 
+  pose optSplitPos := optimalSplitPosition int.2 beg splitPos.
+
   (* Ensure that the [splitPos] falls within the interval, otherwise our
      action can have no effect.
 
      jww (2015-03-05): Evidence should be given so we do not need this
      check. *)
-  case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
+  case Hmid: (ibeg int.1 < optSplitPos < iend int.1); last first.
     case Hbeg2: (beg <= ibeg int.1); last first.
       exact: inl (ENoValidSplitPosition uid :: e).
 
@@ -82,10 +84,9 @@ Proof.
 
   (* The interval was split into two parts.  The first part will be dealt with
      by the caller (either moved to the active list to represent a register
-     assignment, or move to the handled list to indicate a spill to the
+     assignment, or moved to the handled list to indicate a spill to the
      stack); the second goes back onto the unhandled list for processing
-     later, unless it is empty (i.e., ibeg i == iend i, *and* there are no use
-     positions). *)
+     later. *)
 
   (* Update the state with the new dimensions of the first interval. *)
   move: (ScanState_setInterval st) => /= /(_ uid i0.1 i0.2).
@@ -110,8 +111,9 @@ Proof.
   rewrite /= => {st Hend Hnot} st.
 
   (* Establish that beg == ibeg i0.1. *)
-  clear int.
-  case U: unh => // [x xs] in uid st us Hunh *.
+  rewrite /optSplitPos /int in Hmid H1.
+  clear optSplitPos int.
+  case U: unh => // [x xs] in uid st us Hunh Hmid H1 *.
   have Hin : (uid, beg) \in unh.
     rewrite U Hunh.
     exact: mem_head.
@@ -180,13 +182,15 @@ Proof.
 
   move: (splitPosition int.2 pos) => splitPos in Hbeg *.
 
+  pose optSplitPos := optimalSplitPosition int.2 beg splitPos.
+
   move: st.
   set sd := (X in ScanState _ X).
   move=> st.
   have Heqe: (vnth (intervals sd) xid = int) by reflexivity.
 
   (* Ensure that the [splitPos] falls within the interval. *)
-  case Hmid: (ibeg int.1 < splitPos < iend int.1); last first.
+  case Hmid: (ibeg int.1 < optSplitPos < iend int.1); last first.
     (* If the [splitPos] is before the beginning, there's really nothing we
        can do except fail.  But if our interval begins at or after [beg], then
        we can try to spill the first part of the interval (or all of it, if
@@ -237,8 +241,24 @@ Proof.
   set sd := (X in ScanState _ X).
   move=> st.
 
-  have Hbeg2 : beg <= ibeg i1.1
-    by clear -H1 Hbeg; rewrite /= in Hbeg; ordered.
+  have Hbeg2 : beg <= ibeg i1.1.
+    clear -H1 H2 H3 Hbeg Hmid.
+    move: H1.
+    have Hord := ltn0ltn.
+    have Hlt := ltn_subn.
+    move: Hmid.
+    rewrite /optSplitPos /optimalSplitPosition.
+    set b1 := (X in if X && _ then _ else _).
+    set b2 := (X in if _ && X then _ else _).
+    case B1: b1; case B2: b2;
+    rewrite /b1 in B1;
+    try (move/negbT/norP: B1 => [B1 ?];
+         move: (posAtRangeEnd_spec B1));
+    rewrite /b2 in B2;
+    rewrite ?orTb ?Bool.orb_false_l /=;
+    try specialize (Hord _ _ B2);
+    try specialize (Hlt _ _ B2 Hord);
+    by ordered.
 
   have Hsize2 : 0 < size (unhandled sd).
     rewrite /= in sd st *.
