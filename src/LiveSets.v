@@ -16,6 +16,15 @@ Record BlockLiveSets := {
   blockLastOpId  : OpId
 }.
 
+Definition emptyBlockLiveSets : BlockLiveSets :=
+  {| blockLiveGen   := emptyIntSet
+   ; blockLiveKill  := emptyIntSet
+   ; blockLiveIn    := emptyIntSet
+   ; blockLiveOut   := emptyIntSet
+   ; blockFirstOpId := 1
+   ; blockLastOpId  := 1
+   |}.
+
 Section EqBlockLiveSets.
 
 Variable a : eqType.
@@ -66,6 +75,72 @@ End EqBlockLiveSets.
 
 Section LiveSets.
 
+Definition _blockLiveGen :
+  Lens' BlockLiveSets IntSet := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := x
+     ; blockLiveKill  := blockLiveKill  s
+     ; blockLiveIn    := blockLiveIn    s
+     ; blockLiveOut   := blockLiveOut   s
+     ; blockFirstOpId := blockFirstOpId s
+     ; blockLastOpId  := blockLastOpId  s
+     |}) (f (blockLiveGen s)).
+
+Definition _blockLiveKill :
+  Lens' BlockLiveSets IntSet := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := blockLiveGen   s
+     ; blockLiveKill  := x
+     ; blockLiveIn    := blockLiveIn    s
+     ; blockLiveOut   := blockLiveOut   s
+     ; blockFirstOpId := blockFirstOpId s
+     ; blockLastOpId  := blockLastOpId  s
+     |}) (f (blockLiveKill s)).
+
+Definition _blockLiveIn :
+  Lens' BlockLiveSets IntSet := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := blockLiveGen   s
+     ; blockLiveKill  := blockLiveKill  s
+     ; blockLiveIn    := x
+     ; blockLiveOut   := blockLiveOut   s
+     ; blockFirstOpId := blockFirstOpId s
+     ; blockLastOpId  := blockLastOpId  s
+     |}) (f (blockLiveIn s)).
+
+Definition _blockLiveOut :
+  Lens' BlockLiveSets IntSet := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := blockLiveGen   s
+     ; blockLiveKill  := blockLiveKill  s
+     ; blockLiveIn    := blockLiveIn    s
+     ; blockLiveOut   := x
+     ; blockFirstOpId := blockFirstOpId s
+     ; blockLastOpId  := blockLastOpId  s
+     |}) (f (blockLiveOut s)).
+
+Definition _blockFirstOpId :
+  Lens' BlockLiveSets OpId := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := blockLiveGen   s
+     ; blockLiveKill  := blockLiveKill  s
+     ; blockLiveIn    := blockLiveIn    s
+     ; blockLiveOut   := blockLiveOut   s
+     ; blockFirstOpId := x
+     ; blockLastOpId  := blockLastOpId  s
+     |}) (f (blockFirstOpId s)).
+
+Definition _blockLastOpId :
+  Lens' BlockLiveSets OpId := fun _ _ f s =>
+  fmap (fun x =>
+    {| blockLiveGen   := blockLiveGen   s
+     ; blockLiveKill  := blockLiveKill  s
+     ; blockLiveIn    := blockLiveIn    s
+     ; blockLiveOut   := blockLiveOut   s
+     ; blockFirstOpId := blockFirstOpId s
+     ; blockLastOpId  := x
+     |}) (f (blockLastOpId s)).
+
 Variable maxReg : nat.          (* max number of registers *)
 Definition PhysReg := 'I_maxReg.
 
@@ -102,14 +177,9 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
   @snd _ _ <$> forFoldM (1, emptyIntMap) blocks (fun acc b =>
     let: (idx, m) := acc in
     let: (opsb, opsm, opse) := blockOps binfo b in
-    let liveSet :=
-        {| blockLiveGen   := emptyIntSet
-         ; blockLiveKill  := emptyIntSet
-         ; blockLiveIn    := emptyIntSet
-         ; blockLiveOut   := emptyIntSet
-         ; blockFirstOpId := idx + (size opsb).*2
-         ; blockLastOpId  := idx
-         |} in
+    let liveSet := emptyBlockLiveSets
+                     &+ _blockFirstOpId .~ idx + (size opsb).*2
+                     &+ _blockLastOpId  .~ idx in
     let: (lastIdx', liveSet3) :=
       forFold (idx, liveSet) (opsb ++ opsm ++ opse) $ fun acc o =>
         let: (lastIdx, liveSet1) := acc in
@@ -119,32 +189,14 @@ Definition computeLocalLiveSets (blocks : seq blockType1) :
          let liveSet2 :=
            forFold liveSet1 inputs $ fun liveSet2 v =>
              if @varId maxReg v isn't inr vid then liveSet2 else
-             if ~~ (IntSet_member vid (blockLiveKill liveSet2))
-             then {| blockLiveGen   := IntSet_insert vid (blockLiveGen liveSet2)
-                   ; blockLiveKill  := blockLiveKill liveSet2
-                   ; blockLiveIn    := blockLiveIn liveSet2
-                   ; blockLiveOut   := blockLiveOut liveSet2
-                   ; blockFirstOpId := blockFirstOpId liveSet2
-                   ; blockLastOpId  := lastIdx
-                   |}
+             if ~~ IntSet_member vid (blockLiveKill liveSet2)
+             then liveSet2 &+ _blockLiveGen %~ IntSet_insert vid
              else liveSet2 in
          let liveSet3 :=
            forFold liveSet2 others $ fun liveSet3 v =>
              if @varId maxReg v isn't inr vid then liveSet3 else
-             {| blockLiveGen   := blockLiveGen liveSet3
-              ; blockLiveKill  := IntSet_insert vid (blockLiveKill liveSet3)
-              ; blockLiveIn    := blockLiveIn liveSet3
-              ; blockLiveOut   := blockLiveOut liveSet3
-              ; blockFirstOpId := blockFirstOpId liveSet3
-              ; blockLastOpId  := lastIdx
-              |} in
-         {| blockLiveGen   := blockLiveGen liveSet3
-          ; blockLiveKill  := blockLiveKill liveSet3
-          ; blockLiveIn    := blockLiveIn liveSet3
-          ; blockLiveOut   := blockLiveOut liveSet3
-          ; blockFirstOpId := blockFirstOpId liveSet3
-          ; blockLastOpId  := lastIdx
-          |})
+             liveSet3 &+ _blockLiveKill %~ IntSet_insert vid in
+         liveSet3 &+ _blockLastOpId .~ lastIdx)
       in
     k <-- blockId binfo b ;;
     pure (lastIdx', IntMap_insert k liveSet3 m)).
@@ -167,39 +219,21 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
     | None => pure liveSets1    (* jww (2015-02-14): should never happen *)
     | Some liveSet =>
       suxs <-- blockSuccessors binfo b ;;
-      let liveSet1' :=
-          {| blockLiveGen   := blockLiveGen liveSet
-           ; blockLiveKill  := blockLiveKill liveSet
-           ; blockLiveIn    := blockLiveIn liveSet
-           ; blockLiveOut   := emptyIntSet
-           ; blockFirstOpId := blockFirstOpId liveSet
-           ; blockLastOpId  := blockLastOpId liveSet
-           |} in
+      let liveSet1' := liveSet &+ _blockLiveOut .~ emptyIntSet in
       let liveSet2 := forFold liveSet1' suxs $ fun liveSet2 s_bid =>
           match IntMap_lookup s_bid liveSets1 with
           | None => liveSet2  (* jww (2015-02-14): should never happen *)
           | Some sux =>
-            {| blockLiveGen   := blockLiveGen liveSet2
-             ; blockLiveKill  := blockLiveKill liveSet2
-             ; blockLiveIn    := blockLiveIn liveSet2
-             ; blockLiveOut   := IntSet_union (blockLiveOut liveSet2)
-                                              (blockLiveIn sux)
-             ; blockFirstOpId := blockFirstOpId liveSet2
-             ; blockLastOpId  := blockLastOpId liveSet2
-             |}
+            liveSet2 &+ _blockLiveOut %~ fun outs =>
+              IntSet_union outs (blockLiveIn sux)
           end
         in
       pure $ IntMap_insert bid
-        {| blockLiveGen   := blockLiveGen liveSet2
-         ; blockLiveKill  := blockLiveKill liveSet2
-         ; blockLiveIn    :=
-             IntSet_union (IntSet_difference (blockLiveOut liveSet2)
-                                             (blockLiveKill liveSet2))
-                          (blockLiveGen liveSet2)
-         ; blockLiveOut   := blockLiveOut liveSet2
-         ; blockFirstOpId := blockFirstOpId liveSet2
-         ; blockLastOpId  := blockLastOpId liveSet2
-         |} liveSets1
+        (liveSet2 &+ _blockLiveIn .~
+           IntSet_union (IntSet_difference (blockLiveOut liveSet2)
+                                           (blockLiveKill liveSet2))
+                        (blockLiveGen liveSet2))
+        liveSets1
     end.
 
 Definition computeGlobalLiveSetsRecursively (blocks : seq blockType1)
@@ -215,3 +249,22 @@ Definition computeGlobalLiveSetsRecursively (blocks : seq blockType1)
   go (size blocks) liveSets.
 
 End LiveSets.
+
+Module VerifyLensLaws.
+
+Include LensLaws.
+
+Program Instance Lens__blockLiveGen : LensLaws _blockLiveGen.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__blockLiveKill : LensLaws _blockLiveKill.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__blockLiveIn : LensLaws _blockLiveIn.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__blockLiveOut : LensLaws _blockLiveOut.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__blockFirstOpId : LensLaws _blockFirstOpId.
+Obligation 2. by case: x. Qed.
+Program Instance Lens__blockLastOpId : LensLaws _blockLastOpId.
+Obligation 2. by case: x. Qed.
+
+End VerifyLensLaws.
