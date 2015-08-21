@@ -284,7 +284,7 @@ Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
 
 (* Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt. *)
 
-Definition checkLiveness (vars : IntSet) : Verified unit :=
+Definition checkLiveness (vars : IntSet) (clearOut : bool) : Verified unit :=
   if useVerifier isn't VerifyEnabledStrict then pure tt else
   st <-- use _verDesc ;;
   (forM_ (IntSet_toList vars) $ fun var =>
@@ -296,12 +296,13 @@ Definition checkLiveness (vars : IntSet) : Verified unit :=
   (* Clear out any resident registers which liveness tells us are not set.
      That is, even though there may be contents "left over", we don't want to
      rely on that, but only on the liveness information. *)
-  vfoldl_with_index (fun reg act p =>
-                       if p ^_ residency is Some v
-                       then unless (IntSet_member v vars) $
-                              clearReg reg v
-                       else pure tt)
-                    (pure tt) (rsAllocs st).
+  when clearOut $
+    vfoldl_with_index (fun reg act p =>
+                         if p ^_ residency is Some v
+                         then unless (IntSet_member v vars) $
+                                clearReg reg v
+                         else pure tt)
+                      (pure tt) (rsAllocs st).
 
 Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   Verified unit :=
@@ -319,13 +320,13 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
         when (IntSet_size liveIns > 0) $
           errorT $ BlockWithoutPredecessors bid
      else pure tt)) ;;
-  checkLiveness liveIns.
+  checkLiveness liveIns true.
 
 Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
   (* Check to ensure that all "live out" variables are resident in registers
      at the end of the block. *)
-  checkLiveness liveOuts ;;
+  checkLiveness liveOuts false ;;
 
   (* Clear out all known allocations, saving them for this block. *)
   allocs <-- use _verState ;;
