@@ -236,7 +236,8 @@ Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
    written. There is no contention in this case, even if it might actually
    mean that the program is assuming the variable is live somehow in a
    register or on the stack. *)
-Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
+Definition resolvingMoves (allocs : seq (Allocation maxReg))
+  (liveIn : option IntSet) (from to : nat) :
   IntMap ResGraphEdge :=
 
   (* First determine all of the variables which are live at [from] *at the end
@@ -269,6 +270,10 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
                             (i, snd (shouldKeep int to), outputBegin int to))
                       | i <- allocs & fst (shouldKeep (intVal i) to)] in
 
+  let varNotLive vid := if liveIn is Some ins
+                        then ~~ IntSet_member vid ins
+                        else false in
+
   (* We use an [IntMap] here to easily detect via merge which variables are
      coming into being, and which are being dropped. *)
   IntMap_mergeWithKey
@@ -285,9 +290,11 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg)) (from to : nat) :
             else None
        else
          let mmv := match intReg x, intReg y with
-            | Some xr, Some yr => Some (Move xr vid yr)
+            | Some xr, Some yr => Some (if outb || varNotLive vid
+                                        then FreeReg xr vid
+                                        else Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some xr => Some (if outb
+            | None,    Some xr => Some (if outb || varNotLive vid
                                         then AllocReg vid xr
                                         else Restore vid xr)
             | None,    None    => None
@@ -327,9 +334,9 @@ Definition BlockMoves : Type :=
   (Graph ResGraphNode ResGraphEdge_eqType *
    Graph ResGraphNode ResGraphEdge_eqType).
 
-Definition movesBetween (allocs : seq (Allocation maxReg)) (from to : nat) :
-  seq ResGraphEdge :=
-  IntMap_foldl (flip cons) [::] $ resolvingMoves allocs from to.
+Definition movesBetween (allocs : seq (Allocation maxReg))
+  (liveIn : option IntSet) (from to : nat) : seq ResGraphEdge :=
+  IntMap_foldl (flip cons) [::] $ resolvingMoves allocs liveIn from to.
 
 Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
   (in_from : bool) (moves : seq ResGraphEdge) : IntMap BlockMoves :=
@@ -349,8 +356,8 @@ Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to (liveIn : IntSet) (mappings : IntMap BlockMoves) :
   IntMap BlockMoves :=
   applyMappings bid mappings in_from $
-                movesBetween allocs (blockLastOpId from)
-                                    (blockFirstOpId to).
+                movesBetween allocs (Some liveIn)
+                             (blockLastOpId from) (blockFirstOpId to).
 
 Definition resolveDataFlow (allocs : seq (Allocation maxReg))
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
@@ -390,18 +397,20 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
       let mappings' :=
         if isFirst
         then applyMappings bid mappings false $
-                           movesBetween allocs 1 (blockFirstOpId from)
+                           movesBetween allocs None 1 (blockFirstOpId from)
         else mappings in
-      suxs <-- blockSuccessors binfo b ;;
+
       (* If [in_from] is [true], resolving moves are inserted at the end of
          the [from] block, rather than the beginning of the [to] block. *)
+      suxs <-- blockSuccessors binfo b ;;
       let in_from := size suxs <= 1 in
       let mappings'' :=
         if size suxs == 0
         then
           applyMappings bid mappings' true $
-                        movesBetween allocs (blockLastOpId from)
-                                            (blockLastOpId from).+2
+                        movesBetween allocs None
+                                     (blockLastOpId from)
+                                     (blockLastOpId from).+2
         else
           forFold mappings' suxs $ fun ms s_bid =>
             (* jww (2015-01-28): Failure here should be impossible *)

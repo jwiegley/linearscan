@@ -108,7 +108,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg)) op :
   transitions <--
     (if assnBlockBeg assn <= opid < assnBlockEnd assn
      then
-       let moves := determineMoves (resolvingMoves allocs opid opid.+2) in
+       let moves := determineMoves (resolvingMoves allocs None opid opid.+2) in
        moves' <-- verifyResolutions opid useVerifier moves ;;
        lift $ generateMoves moves'
      else pure [::]) ;;
