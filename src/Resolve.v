@@ -195,19 +195,25 @@ Definition determineEdge (x : ResGraphEdge) :
 Definition compareNodes (x y : option ResGraphNode) : bool := x < y.
 
 Definition compareEdges (x y : ResGraphEdge) : bool :=
-  ~~ (resGhost x && ~~ resGhost y).
+  if resEnd x == resEnd y
+  then resGhost x && ~~ resGhost y
+  else true.
 
 Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   match resMove x with
   | Move       fr fv tr    =>
-    [:: {| resMove  := Spill fr fv
-         ; resGhost := false
-         ; resBeg   := resBeg x
-         ; resEnd   := None |}
-     ;  {| resMove  := Restore fv tr
+    (* [:: {| resMove  := Spill fr fv *)
+    (*      ; resGhost := false *)
+    (*      ; resBeg   := resBeg x *)
+    (*      ; resEnd   := None |} *)
+    (*  ;  {| resMove  := Restore fv tr *)
+    (*      ; resGhost := resGhost x *)
+    (*      ; resBeg   := None *)
+    (*      ; resEnd   := resEnd x |} ] *)
+    [:: {| resMove  := Swap tr fv fr fv
          ; resGhost := resGhost x
-         ; resBeg   := None
-         ; resEnd   := resEnd x |} ]
+         ; resBeg   := resEnd x
+         ; resEnd   := resBeg x |} ]
   | Transfer   fr fv tr    =>
     [:: {| resMove  := FreeReg fr fv
          ; resGhost := false
@@ -231,7 +237,8 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   end.
 
 Definition sortMoves (x : Graph ResGraphNode ResGraphEdge_eqType) :
-  seq ResGraphEdge := topsort x splitEdge compareEdges.
+  (* jww (2015-08-22): Why is rev necessary here? *)
+  seq ResGraphEdge := sortBy compareEdges (snd (topsort splitEdge x)).
 
 Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
   sortMoves (IntMap_foldl (flip addEdge) (emptyGraph determineEdge) moves).

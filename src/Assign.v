@@ -64,7 +64,7 @@ Definition _assnBlockEnd : Lens' AssnStateDesc OpId := fun _ _ f s =>
 
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   mType (seq opType2) :=
-  forFoldrM [::] moves $ fun mv acc =>
+  forFoldrM [::] moves $ fun mv rest =>
     let k := fmap (@Some _) in
     mops <-- match mv with
       | Swap    sreg svid dreg dvid => k $ swapOp oinfo sreg svid dreg dvid
@@ -73,7 +73,7 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
       | Restore dvid dreg           => k $ restoreOp oinfo dvid dreg
       | _ => pure None
       end ;;
-    pure $ if mops is Some ops then ops ++ acc else acc.
+    pure $ if mops is Some ops then ops ++ rest else rest.
 
 Definition varAllocs opid (allocs : seq (Allocation maxReg)) kind vid :
   seq (VarId * PhysReg) :=
