@@ -388,6 +388,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
         pure $ resMove mv :: acc
 
     | Transfer fromReg fromVar toReg =>
+      checkResidency fromReg fromVar ;;
       unless (fromReg == toReg) $
         releaseReg fromReg fromVar ;;
         reserveReg toReg fromVar ;;

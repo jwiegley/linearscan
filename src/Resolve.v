@@ -309,15 +309,15 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
             else None
        else
          let mmv := match intReg x, intReg y with
-            | Some xr, Some yr => Some (if outb || varNotLive vid
-                                        then if outb
-                                             then Transfer xr vid yr
-                                             else FreeReg xr vid
-                                        else Move xr vid yr)
+            | Some xr, Some yr => Some (if outb
+                                        then Transfer xr vid yr
+                                        else if varNotLive vid
+                                             then FreeReg xr vid
+                                             else Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some xr => if outb || varNotLive vid
-                                  then Some (AllocReg vid xr)
-                                  else Some (Restore vid xr)
+            | None,    Some yr => Some (if outb || varNotLive vid
+                                        then AllocReg vid yr
+                                        else Restore vid yr)
             | None,    None    => None
             end in
          let anchor x := (inl <$> intReg x) <|> Some (inr vid) in
