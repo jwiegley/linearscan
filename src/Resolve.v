@@ -28,6 +28,7 @@ Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Inductive ResolvingMove :=
   | Move       of PhysReg & VarId & PhysReg
+  | Transfer   of PhysReg & VarId & PhysReg
   | Swap       of PhysReg & VarId & PhysReg & VarId
   | Spill      of PhysReg & VarId
   | Restore    of VarId & PhysReg
@@ -39,6 +40,7 @@ Inductive ResolvingMove :=
 
 Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
+  | RSTransfer   of nat & VarId & nat
   | RSSwap       of nat & VarId & nat & VarId
   | RSSpill      of nat & VarId
   | RSRestore    of VarId & nat
@@ -53,6 +55,7 @@ Inductive ResolvingMoveSet : Set :=
 Definition weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
   | Move       fr fv tr    => RSMove       fr fv tr
+  | Transfer   fr fv tr    => RSTransfer   fr fv tr
   | Swap       fr fv tr tv => RSSwap       fr fv tr tv
   | Spill      fr tv       => RSSpill      fr tv
   | Restore    fv tr       => RSRestore    fv tr
@@ -70,6 +73,8 @@ Definition eqResolvingMove s1 s2 :=
   match s1, s2 with
   | Move fr1 fv1 tr1,     Move fr2 fv2 tr2     => [&& fr1 == fr2
                                                   ,   fv1 == fv2 & tr1 == tr2]
+  | Transfer fr1 fv1 tr1, Transfer fr2 fv2 tr2 => [&& fr1 == fr2
+                                                  ,   fv1 == fv2 & tr1 == tr2]
   | Swap fr1 fv1 tr1 tv1, Swap fr2 fv2 tr2 tv2 => [&& fr1 == fr2, fv1 == fv2
                                                   ,   tr1 == tr2 & tv1 == tv2]
   | Spill fr1 fv1,        Spill fr2 fv2        => [&& fr1 == fr2 & fv1 == fv2]
@@ -84,11 +89,15 @@ Definition eqResolvingMove s1 s2 :=
 Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
-  case=> [fr1 fv1 tr1|fr1 fv1 tr1 tv1|fr1 fv1
+  case=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1 tr1 tv1|fr1 fv1
          |tv1 tr1|fv1 tr1|fr1 tv1(* |tv1|fv1 *)];
-  case=> [fr2 fv2 tr2|fr2 fv2 tr2 tv2|fr2 fv2
+  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2 tr2 tv2|fr2 fv2
          |tv2 tr2|fv2 tr2|fr2 tv2(* |tv2|fv2 *)] /=;
   try by constructor.
+  - case: (fr1 =P fr2) => [<-|?];
+    case: (fv1 =P fv2) => [<-|?];
+    case: (tr1 =P tr2) => [<-|?];
+    first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
@@ -125,6 +134,7 @@ End EqResolvingMove.
 Definition eqResolvingMoveKind (x y : ResolvingMove) : bool :=
   match x, y with
   | Move       _ _ _,   Move       _ _ _   => true
+  | Transfer   _ _ _,   Transfer   _ _ _   => true
   | Swap       _ _ _ _, Swap       _ _ _ _ => true
   | Spill      _ _,     Spill      _ _     => true
   | Restore    _ _,     Restore    _ _     => true
@@ -195,6 +205,15 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
          ; resBeg   := resBeg x
          ; resEnd   := None |}
      ;  {| resMove  := Restore fv tr
+         ; resGhost := resGhost x
+         ; resBeg   := None
+         ; resEnd   := resEnd x |} ]
+  | Transfer   fr fv tr    =>
+    [:: {| resMove  := FreeReg fr fv
+         ; resGhost := false
+         ; resBeg   := resBeg x
+         ; resEnd   := None |}
+     ;  {| resMove  := AllocReg fv tr
          ; resGhost := resGhost x
          ; resBeg   := None
          ; resEnd   := resEnd x |} ]
@@ -291,12 +310,14 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
        else
          let mmv := match intReg x, intReg y with
             | Some xr, Some yr => Some (if outb || varNotLive vid
-                                        then FreeReg xr vid
+                                        then if outb
+                                             then Transfer xr vid yr
+                                             else FreeReg xr vid
                                         else Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some xr => Some (if outb || varNotLive vid
-                                        then AllocReg vid xr
-                                        else Restore vid xr)
+            | None,    Some xr => if outb || varNotLive vid
+                                  then Some (AllocReg vid xr)
+                                  else Some (Restore vid xr)
             | None,    None    => None
             end in
          let anchor x := (inl <$> intReg x) <|> Some (inr vid) in

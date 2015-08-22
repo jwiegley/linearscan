@@ -376,6 +376,9 @@ instance Show LS.ResolvingMoveSet where
   show (LS.RSMove fr fv tr) =
       "move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
+  show (LS.RSTransfer fr fv tr) =
+      "xfer (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
+           "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSSwap fr fv tr tv) =
       "swap (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show tv ++ ")"
