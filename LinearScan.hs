@@ -110,20 +110,18 @@ showOp1' :: (op1 -> String)
          -> [LS.AllocError]
          -> op1
          -> String
-showOp1' showop pos _ins _outs rms aerrs o =
-    -- let showerv (Left r)  = "r" ++ show r
-    --     showerv (Right v) = "v" ++ show v in
-    -- let render Nothing = ""
-    --     render (Just r) = "=r" ++ show r in
-    -- let marker label (i, erv, reg) =
-    --         "<" ++ label ++ " " ++ showerv erv ++
-    --         (if i == either id id erv
-    --          then ""
-    --          else "[" ++ show i ++ "]") ++ render reg ++ ">\n" in
+showOp1' showop pos ins outs rms aerrs o =
+    let render Nothing = ""
+        render (Just r) = "=r" ++ show r in
+    let marker label (_i, Left r, _reg) =
+            "<" ++ label ++ " r" ++ show r ++ ">\n"
+        marker label (i, Right v, reg) =
+            "<" ++ label ++ " v" ++ show v ++
+            "[" ++ show i ++ "]" ++ render reg ++ ">\n" in
     let leader = show pos ++ ": " in
     let width = length leader in
-    -- concatMap (marker "End") outs ++
-    -- concatMap (marker "Beg") ins ++
+    concatMap (marker "End") outs ++
+    concatMap (marker "Beg") ins ++
     leader ++ showop o ++ "\n" ++
     concatMap (\x -> replicate width ' ' ++ "!!! " ++
                      replicate 8 ' ' ++ show x ++ "\n") aerrs ++
@@ -153,26 +151,22 @@ data ScanStateDesc = ScanStateDesc
     , allocations    :: IntMap PhysReg
     }
 
--- deriving instance Show LS.IntervalDesc
--- deriving instance Show LS.RangeDesc
--- deriving instance Show LS.UsePos
-
 instance Show ScanStateDesc where
     show sd =
         "Unhandled:\n"
-            ++ concatMap (\(i, _) -> "  " ++ showInterval i ++ "\n")
+            ++ concatMap (\(i, _) -> "  " ++ showInterval sd i ++ "\n")
                          (M.toList (unhandled sd)) ++
         "Active:\n"
             ++ concatMap (\(i, r) ->
-                           "  r" ++ show r ++ showInterval i ++ "\n")
+                           "  r" ++ show r ++ showInterval sd i ++ "\n")
                          (M.toList (active sd)) ++
         "Inactive:\n"
             ++ concatMap (\(i, r) ->
-                           "  r" ++ show r ++ showInterval i ++ "\n")
+                           "  r" ++ show r ++ showInterval sd i ++ "\n")
                          (M.toList (inactive sd)) ++
         "Handled:\n"
             ++ concatMap (\(i, r) ->
-                           "  " ++ showReg r ++ showInterval i ++ "\n")
+                           "  " ++ showReg r ++ showInterval sd i ++ "\n")
                          (M.toList (handled sd)) ++
         "Fixed:\n"
             ++ concatMap (\(reg, mi) ->
@@ -182,10 +176,11 @@ instance Show ScanStateDesc where
                                "  " ++ showIntervalDesc reg i True ++ "\n")
                          (zip [0..] (fixedIntervals sd))
       where
-        showInterval i = showIntervalDesc i (intervals sd !! i) False
-
         showReg Nothing = "<stack>"
         showReg (Just r) = "r" ++ show r
+
+showInterval :: ScanStateDesc -> Int -> String
+showInterval sd i = showIntervalDesc i (intervals sd !! i) False
 
 showIntervalDesc :: Int -> LS.IntervalDesc -> Bool -> String
 showIntervalDesc i (LS.Build_IntervalDesc iv ib ie rs) isReg =
@@ -295,21 +290,21 @@ showOps1 oinfo sd rms aerrs pos (o:os) =
              if LS.iend i == here
              then (idx, Right (LS.ivar i), mreg) : eacc
              else eacc) in
-    -- let r _idx acc Nothing = acc
-    --     r idx (bacc, eacc) (Just i) =
-    --         let mreg = M.lookup idx allocs in
-    --         (if LS.ibeg i == here
-    --          then (idx, Left idx, mreg) : bacc
-    --          else bacc,
-    --          if LS.iend i == here
-    --          then (idx, Left idx, mreg) : eacc
-    --          else eacc) in
+    let r _idx acc Nothing = acc
+        r idx (bacc, eacc) (Just i) =
+            let mreg = M.lookup idx allocs in
+            (if LS.ibeg i == here
+             then (idx, Left idx, mreg) : bacc
+             else bacc,
+             if LS.iend i == here
+             then (idx, Left idx, mreg) : eacc
+             else eacc) in
     let (begs, ends) = LS.vfoldl'_with_index 0 k ([], []) (intervals sd) in
     let entriesIn = fromMaybe [] . M.lookup (pos*2+1) in
-    -- let (begs', ends') =
-    --         LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
-    --                               (fixedIntervals sd) in
-    showOp1' (showOp1 oinfo) (pos*2+1) begs ends
+    let (begs', ends') =
+            LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
+                                  (fixedIntervals sd) in
+    showOp1' (showOp1 oinfo) (pos*2+1) begs' ends'
              (entriesIn rms) (entriesIn aerrs) o
         ++ showOps1 oinfo sd rms aerrs (pos+1) os
 
@@ -364,7 +359,7 @@ data Details m blk1 blk2 op1 op2 = Details
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
     , allocatedBlocks :: Either (IntMap [LS.AllocError]) [blk2]
-    , _scanStatePre   :: Maybe ScanStateDesc
+    , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
     , opInfo          :: LinearScan.OpInfo m op1 op2
@@ -400,22 +395,25 @@ showDetails :: Monad m
             => Details m blk1 blk2 op1 op2
             -> IntMap [LS.AllocError] -> m String
 showDetails err allocErrs = do
-    -- pre  <- showScanStateDesc (scanStatePre err)
+    let preUnhandled Nothing = ""
+        preUnhandled (Just sd) =
+            "Original:\n" ++
+                concatMap (\(i, _) -> "  " ++ showInterval sd i ++ "\n")
+                          (M.toList (unhandled sd))
     post <- showScanStateDesc (scanStatePost err)
+                             (preUnhandled (scanStatePre err))
     return $ "Reason: " ++ show (reason err) ++ "\n\n"
-          -- ++ ">>> ScanState before allocation:\n"
-          -- ++ pre ++ "\n"
           ++ ">>> ScanState after allocation:\n"
           ++ post ++ "\n"
           ++ ">>> " ++ show (loopState err) ++ "\n"
   where
-    showScanStateDesc Nothing = return ""
-    showScanStateDesc (Just sd) =
+    showScanStateDesc Nothing _ = return ""
+    showScanStateDesc (Just sd) preUnhandled =
         liftM2 (++)
             (showBlocks1 (blockInfo err) (opInfo err) sd
                          (liveSets err) (resolvingMoves err) allocErrs
                          (orderedBlocks err))
-            (return ("\n" ++ show sd))
+            (return ("\n" ++ preUnhandled ++ show sd))
 
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
@@ -476,7 +474,6 @@ allocate maxReg binfo oinfo useVerifier blocks = do
             Left m -> do
                 dets <- showDetails res' m
                 return $ Left (dets,
-                    -- jww (2015-07-02): NYI
                     concatMap (\(pos, es) ->
                                 ("At position " ++ show pos) : map show es)
                               (M.toList m))
