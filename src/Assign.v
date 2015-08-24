@@ -64,16 +64,15 @@ Definition _assnBlockEnd : Lens' AssnStateDesc OpId := fun _ _ f s =>
 
 Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
   mType (seq opType2) :=
-  forFoldrM [::] moves $ fun mv rest =>
+  forFoldM [::] moves $ fun acc mv =>
     let k := fmap (@Some _) in
     mops <-- match mv with
-      | Swap    sreg svid dreg dvid => k $ swapOp oinfo sreg svid dreg dvid
-      | Move    sreg svid dreg      => k $ moveOp oinfo sreg svid dreg
-      | Spill   sreg svid           => k $ saveOp oinfo sreg svid
-      | Restore dvid dreg           => k $ restoreOp oinfo dvid dreg
+      | Move    sreg svid dreg => k $ moveOp oinfo sreg svid dreg
+      | Spill   sreg svid      => k $ saveOp oinfo sreg svid
+      | Restore dvid dreg      => k $ restoreOp oinfo dvid dreg
       | _ => pure None
       end ;;
-    pure $ if mops is Some ops then ops ++ rest else rest.
+    pure $ if mops is Some ops then acc ++ ops else acc.
 
 Definition varAllocs opid (allocs : seq (Allocation maxReg)) kind vid :
   seq (VarId * PhysReg) :=
@@ -194,9 +193,10 @@ Definition assignRegNum
   res <-- considerOps allocs liveSets mappings loops blocks
                       (newVerifiedSig maxReg newAssnStateDesc) ;;
   let: (bs, st) := res in
-  pure (verMoves st, if IntMap_toList (verErrors st) is [::]
-                     then inr bs
-                     else inl (verErrors st)).
+  pure (verMoves st,
+        if IntMap_toList (verErrors st) is [::]
+        then inr bs
+        else inl (verErrors st)).
 
 End Assign.
 

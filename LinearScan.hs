@@ -95,10 +95,9 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 data OpInfo m op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
     , opRefs      :: op1 -> [LinearScan.VarInfo]
-    , moveOp      :: PhysReg  -> LS.VarId -> PhysReg   -> m [op2]
-    , swapOp      :: PhysReg  -> LS.VarId -> PhysReg   -> LS.VarId -> m [op2]
+    , moveOp      :: PhysReg  -> LS.VarId -> PhysReg -> m [op2]
     , saveOp      :: PhysReg  -> LS.VarId -> m [op2]
-    , restoreOp   :: LS.VarId -> PhysReg   -> m [op2]
+    , restoreOp   :: LS.VarId -> PhysReg -> m [op2]
     , applyAllocs :: op1 -> [(LS.VarId, PhysReg)] -> m [op2]
     , showOp1     :: op1 -> String
     }
@@ -134,13 +133,12 @@ deriving instance Show OpKind
 
 fromOpInfo :: Monad m
            => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
-fromOpInfo (OpInfo a b c d e f g h) =
+fromOpInfo (OpInfo a b c d e f g) =
     LS.Build_OpInfo a (map fromVarInfo . b)
         (\r1 r2 -> U.unsafeCoerce (c r1 r2))
         (\r1 r2 -> U.unsafeCoerce (d r1 r2))
         (\r1 r2 -> U.unsafeCoerce (e r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (f r1 r2))
-        (\r1 r2 -> U.unsafeCoerce (g r1 r2)) h
+        (\r1 r2 -> U.unsafeCoerce (f r1 r2)) g
 
 data ScanStateDesc = ScanStateDesc
     { _nextInterval  :: Int
@@ -379,9 +377,6 @@ instance Show LS.ResolvingMoveSet where
   show (LS.RSTransfer fr fv tr) =
       "xfer (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSSwap fr fv tr tv) =
-      "swap (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
-           "(r" ++ show tr ++ " v" ++ show tv ++ ")"
   show (LS.RSSpill fr tv)    =
       "spill (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSRestore fv tr)  =
@@ -394,6 +389,7 @@ instance Show LS.ResolvingMoveSet where
       "assign (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)  =
       "clear (r" ++ show fr ++ " v" ++ show tv ++ ")"
+  show (LS.RSLooped x)  = "!LOOPED! " ++ show x
   -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
   -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
 

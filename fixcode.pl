@@ -4,7 +4,7 @@ while (<>) {
     s/import qualified (.*)/import qualified LinearScan.\1 as \1/;
     s/import qualified LinearScan\.GHC/import qualified GHC/;
     s{import qualified LinearScan\.Prelude as Prelude}{
-import Debug.Trace (trace, traceShow)
+import Debug.Trace (trace, traceShow, traceShowId)
 import qualified Prelude
 import qualified Data.IntMap
 import qualified Data.IntSet
@@ -38,6 +38,7 @@ import qualified Hask.Utils
     s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
 
     s/\(Prelude\.map  \( rs\)\)/rs/;
+    s/mapLeft  /mapLeft Prelude.id /g;
     s/\(Data\.IntMap\.map  ranges\)/ranges/;
 
     print;

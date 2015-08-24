@@ -49,12 +49,13 @@ Inductive AllocError :=
   | VarNotAllocated of VarId
   | VarNotResident of VarId
   | VarNotResidentForReg of VarId & nat & option VarId
-  | VarNotReservedForReg of VarId & nat & option VarId
+  | VarNotReservedForReg of VarId & nat & option VarId & nat
   | PhysRegAlreadyResidentForVar of nat & VarId
   | PhysRegAlreadyReservedForVar of nat & VarId
   | RegAlreadyReservedToVar of nat & VarId & VarId
   | BlockWithoutPredecessors of BlockId
   | UnknownPredecessorBlock of BlockId & BlockId
+  | LoopInResolvingMoves of ResolvingMoveSet
   | ErrorAtBlockEnd of BlockId.
 
 Inductive RegState : RegStateDesc -> Prop :=
@@ -213,15 +214,16 @@ Definition reserveReg (reg : PhysReg) (var : VarId) : Verified unit :=
               errorT $ RegAlreadyReservedToVar reg v var
        else pure tt.
 
-Definition isReserved (reg : PhysReg) (var : VarId) : Verified bool :=
+Definition isReserved (reg : PhysReg) (var : VarId) : Verified (option VarId) :=
   st <-- use _verDesc ;;
-  pure (vnth (rsAllocs st) reg ^_ reservation == Some var).
+  pure (vnth (rsAllocs st) reg ^_ reservation).
 
 Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
   st <-- use _verDesc ;;
   let err := errorT $ VarNotReservedForReg var reg
-                    (vnth (rsAllocs st) reg ^_ reservation) in
-  if vnth (rsAllocs st) reg ^_ reservation is Some var'
+                        (vnth (rsAllocs st) reg ^_ reservation) 1 in
+  res <-- isReserved reg var ;;
+  if res is Some var'
   then unless (var == var') err
   else if useVerifier is VerifyEnabledStrict
        then err
@@ -233,7 +235,7 @@ Definition releaseReg (reg : PhysReg) (var : VarId) : Verified unit :=
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
   else let err := errorT $ VarNotReservedForReg var reg
-                         (vnth (rsAllocs st) reg ^_ reservation) in
+                         (vnth (rsAllocs st) reg ^_ reservation) 2 in
        if useVerifier is VerifyEnabledStrict
        then err
        else if vnth (rsAllocs st) reg ^_ reservation is None
@@ -246,34 +248,34 @@ Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (AssignRegS H)
   else let err := errorT $ VarNotReservedForReg var reg
-                         (vnth (rsAllocs st) reg ^_ reservation) in
+                         (vnth (rsAllocs st) reg ^_ reservation) 3 in
        if useVerifier is VerifyEnabledStrict
        then err
        else if vnth (rsAllocs st) reg ^_ reservation is None
             then pure tt
             else err.
 
-Definition isResident (reg : PhysReg) (var : VarId) : Verified bool :=
+Definition isResident (reg : PhysReg) (var : VarId) : Verified (option VarId) :=
   st <-- use _verDesc ;;
-  pure (vnth (rsAllocs st) reg ^_ residency == Some var).
+  pure (vnth (rsAllocs st) reg ^_ residency).
 
 Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
   st <-- use _verDesc ;;
-  let err := errorT $ VarNotResidentForReg var reg
-                    (vnth (rsAllocs st) reg ^_ residency) in
-  if vnth (rsAllocs st) reg ^_ residency is Some var'
+  res <-- isResident reg var ;;
+  let err := errorT $ VarNotResidentForReg var reg res in
+  if res is Some var'
   then unless (var == var') err
   else if useVerifier is VerifyEnabledStrict
        then err
        else pure tt.
 
 Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
-  addMove $ RSClearReg var reg ;;
+  addMove $ RSClearReg reg var ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
   then _verState .= packRegState (ClearRegS H)
   else let err := errorT $ VarNotResidentForReg var reg
-                         (vnth (rsAllocs st) reg ^_ residency) in
+                             (vnth (rsAllocs st) reg ^_ residency) in
        if useVerifier is VerifyEnabledStrict
        then err
        else if vnth (rsAllocs st) reg ^_ residency is None
@@ -362,8 +364,7 @@ Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
            match varKind ref with
            | Input  => checkResidency reg var
            | Temp   => checkReservation reg var
-           | Output => checkReservation reg var ;;
-                       assignReg reg var
+           | Output => assignReg reg var
            end
        end)
    else pure tt) ;;
@@ -374,7 +375,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
   Verified (seq (ResolvingMove maxReg)) :=
   if useVerifier is VerifyDisabled
   then pure $ map (@resMove maxReg) moves else
-  fmap rev $ forFoldM [::] moves $ fun acc mv =>
+  forFoldM [::] moves $ fun acc mv =>
     st <-- use _verDesc ;;
     match resMove mv with
     | Move fromReg fromVar toReg =>
@@ -385,7 +386,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
         addMove (weakenResolvingMove (resMove mv)) ;;
         assignReg toReg fromVar ;;
         when (resGhost mv) (releaseReg toReg fromVar) ;;
-        pure $ resMove mv :: acc
+        pure $ rcons acc (resMove mv)
 
     | Transfer fromReg fromVar toReg =>
       checkResidency fromReg fromVar ;;
@@ -395,24 +396,12 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
         when (resGhost mv) (releaseReg toReg fromVar) ;;
         pure acc
 
-    | Swap fromReg fromVar toReg toVar =>
-      checkResidency fromReg fromVar ;;
-      checkResidency toReg toVar ;;
-      releaseReg fromReg fromVar ;;
-      releaseReg toReg toVar ;;
-      addMove (weakenResolvingMove (resMove mv)) ;;
-      reserveReg fromReg toVar ;;
-      reserveReg toReg fromVar ;;
-      assignReg fromReg toVar ;;
-      assignReg toReg fromVar ;;
-      pure $ resMove mv :: acc
-
     | Spill fromReg toSpillSlot =>
       releaseReg fromReg toSpillSlot ;;
       check <-- isResident fromReg toSpillSlot ;;
-      if check
+      if isJust check
       then addMove (weakenResolvingMove (resMove mv)) ;;
-           pure $ resMove mv :: acc
+           pure $ rcons acc (resMove mv)
       else pure acc
 
     | Restore fromSpillSlot toReg =>
@@ -421,7 +410,7 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
       assignReg toReg fromSpillSlot ;;
       when (resGhost mv)
         (releaseReg toReg fromSpillSlot) ;;
-      pure $ resMove mv :: acc
+      pure $ rcons acc (resMove mv)
 
     | AllocReg toVar toReg =>
       reserveReg toReg toVar ;;
@@ -432,6 +421,11 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
     | FreeReg fromReg fromVar =>
       releaseReg fromReg fromVar ;;
       pure acc
+
+    | Looped x =>
+      errorT $ LoopInResolvingMoves (weakenResolvingMove x) ;;
+      addMove (weakenResolvingMove (resMove mv)) ;;
+      pure $ rcons acc (resMove mv)
 
     (* | AllocStack toVar => pure acc *)
     (* | FreeStack fromVar => pure acc *)

@@ -29,11 +29,11 @@ Variable oinfo : OpInfo maxReg opType1 opType2.
 Inductive ResolvingMove :=
   | Move       of PhysReg & VarId & PhysReg
   | Transfer   of PhysReg & VarId & PhysReg
-  | Swap       of PhysReg & VarId & PhysReg & VarId
   | Spill      of PhysReg & VarId
   | Restore    of VarId & PhysReg
   | AllocReg   of VarId & PhysReg
   | FreeReg    of PhysReg & VarId
+  | Looped     of ResolvingMove
   (* | AllocStack of VarId *)
   (* | FreeStack  of VarId *)
 .
@@ -41,46 +41,49 @@ Inductive ResolvingMove :=
 Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
   | RSTransfer   of nat & VarId & nat
-  | RSSwap       of nat & VarId & nat & VarId
   | RSSpill      of nat & VarId
   | RSRestore    of VarId & nat
   | RSAllocReg   of VarId & nat
   | RSFreeReg    of nat & VarId
-  | RSAssignReg  of nat & VarId
+  | RSAssignReg  of VarId & nat
   | RSClearReg   of nat & VarId
+  | RSLooped     of ResolvingMoveSet
   (* | RSAllocStack of VarId *)
   (* | RSFreeStack  of VarId *)
 .
 
-Definition weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
+Definition mapLeft `(f : a -> c) `(x : a + b) : c + b :=
+  match x with
+  | inl l => inl (f l)
+  | inr r => inr r
+  end.
+
+Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
   | Move       fr fv tr    => RSMove       fr fv tr
   | Transfer   fr fv tr    => RSTransfer   fr fv tr
-  | Swap       fr fv tr tv => RSSwap       fr fv tr tv
   | Spill      fr tv       => RSSpill      fr tv
   | Restore    fv tr       => RSRestore    fv tr
   | AllocReg   fv tr       => RSAllocReg   fv tr
   | FreeReg    fr tv       => RSFreeReg    fr tv
+  | Looped     x           => RSLooped     (weakenResolvingMove x)
   (* | AllocStack tv          => RSAllocStack tv *)
   (* | FreeStack  fv          => RSFreeStack  fv *)
   end.
 
 Section EqResolvingMove.
 
-Implicit Type s : ResolvingMove.
-
-Definition eqResolvingMove s1 s2 :=
+Fixpoint eqResolvingMove s1 s2 :=
   match s1, s2 with
   | Move fr1 fv1 tr1,     Move fr2 fv2 tr2     => [&& fr1 == fr2
                                                   ,   fv1 == fv2 & tr1 == tr2]
   | Transfer fr1 fv1 tr1, Transfer fr2 fv2 tr2 => [&& fr1 == fr2
                                                   ,   fv1 == fv2 & tr1 == tr2]
-  | Swap fr1 fv1 tr1 tv1, Swap fr2 fv2 tr2 tv2 => [&& fr1 == fr2, fv1 == fv2
-                                                  ,   tr1 == tr2 & tv1 == tv2]
   | Spill fr1 fv1,        Spill fr2 fv2        => [&& fr1 == fr2 & fv1 == fv2]
   | Restore tv1 tr1,      Restore tv2 tr2      => [&& tv1 == tv2 & tr1 == tr2]
   | AllocReg fv1 tr1,     AllocReg fv2 tr2     => [&& fv1 == fv2 & tr1 == tr2]
   | FreeReg fr1 tv1,      FreeReg fr2 tv2      => [&& fr1 == fr2 & tv1 == tv2]
+  | Looped x,             Looped y             => eqResolvingMove x y
   (* | AllocStack tv1,       AllocStack tv2       => tv1 == tv2 *)
   (* | FreeStack fv1,        FreeStack fv2        => fv1 == fv2 *)
   | _, _ => false
@@ -89,10 +92,10 @@ Definition eqResolvingMove s1 s2 :=
 Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
-  case=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1 tr1 tv1|fr1 fv1
-         |tv1 tr1|fv1 tr1|fr1 tv1(* |tv1|fv1 *)];
-  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2 tr2 tv2|fr2 fv2
-         |tv2 tr2|fv2 tr2|fr2 tv2(* |tv2|fv2 *)] /=;
+  elim=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1
+         |tv1 tr1|fv1 tr1|fr1 tv1|x IHx(* |tv1|fv1 *)];
+  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2
+         |tv2 tr2|fv2 tr2|fr2 tv2|y(* |tv2|fv2 *)] /=;
   try by constructor.
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
@@ -101,11 +104,6 @@ Proof.
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
-    first [ by constructor | by right; case ].
-  - case: (fr1 =P fr2) => [<-|?];
-    case: (fv1 =P fv2) => [<-|?];
-    case: (tr1 =P tr2) => [<-|?];
-    case: (tv1 =P tv2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
@@ -119,6 +117,13 @@ Proof.
   - case: (fr1 =P fr2) => [<-|?];
     case: (tv1 =P tv2) => [<-|?];
     first [ by constructor | by right; case ].
+  - specialize (IHx y).
+    case: IHx; constructor.
+      by rewrite p.
+    rewrite /not in n *.
+    move=> H.
+    inversion H.
+    contradiction.
   (* - case: (tv1 =P tv2) => [<-|?]; *)
   (*   first [ by constructor | by right; case ]. *)
   (* - case: (fv1 =P fv2) => [<-|?]; *)
@@ -135,51 +140,75 @@ Definition eqResolvingMoveKind (x y : ResolvingMove) : bool :=
   match x, y with
   | Move       _ _ _,   Move       _ _ _   => true
   | Transfer   _ _ _,   Transfer   _ _ _   => true
-  | Swap       _ _ _ _, Swap       _ _ _ _ => true
   | Spill      _ _,     Spill      _ _     => true
   | Restore    _ _,     Restore    _ _     => true
   | AllocReg   _ _,     AllocReg   _ _     => true
   | FreeReg    _ _,     FreeReg    _ _     => true
+  | Looped     _,       Looped     _       => true
   | _,                  _                  => false
   end.
 
-Definition ResGraphNode := sum_eqType (ordinal_eqType maxReg) nat_eqType.
+Inductive ResGraphNode :=
+  | RegNode of PhysReg
+  | VarNode of VarId
+  | VirtNode of ResGraphNode.
+
+Section EqResGraphNode.
+
+Fixpoint eqResGraphNode s1 s2 :=
+  match s1, s2 with
+  | RegNode r1, RegNode r2 => r1 == r2
+  | VarNode v1, VarNode v2 => v1 == v2
+  | VirtNode n1,
+    VirtNode n2 => eqResGraphNode n1 n2
+  | _, _ => false
+  end.
+
+Lemma eqResGraphNodeP : Equality.axiom eqResGraphNode.
+Proof.
+  move.
+  elim=> [r1|v1|n1 IHn];
+  case=> [r2|v2|n2] /=;
+  try by constructor.
+  - case: (r1 =P r2) => [<-|?];
+    first [ by constructor | by right; case ].
+  - case: (v1 =P v2) => [<-|?];
+    first [ by constructor | by right; case ].
+  - specialize (IHn n2).
+    case: IHn; constructor.
+      by rewrite p.
+    rewrite /not in n *.
+    move=> H.
+    inversion H.
+    contradiction.
+Qed.
+
+Canonical ResGraphNode_eqMixin := EqMixin eqResGraphNodeP.
+Canonical ResGraphNode_eqType :=
+  Eval hnf in EqType ResGraphNode ResGraphNode_eqMixin.
+
+End EqResGraphNode.
 
 Record ResGraphEdge := {
   resMove  : ResolvingMove;
-  resGhost : bool;
-  resBeg   : option ResGraphNode;
-  resEnd   : option ResGraphNode
+  resGhost : bool
 }.
 
 Section EqResGraphEdge.
 
-Implicit Type s : ResGraphEdge.
-
 Definition eqResGraphEdge s1 s2 :=
   match s1, s2 with
-  | {| resMove  := a1
-     ; resGhost := b1
-     ; resBeg   := c1
-     ; resEnd   := d1
-     |},
-    {| resMove  := a2
-     ; resGhost := b2
-     ; resBeg   := c2
-     ; resEnd   := d2
-     |} =>
-    [&& a1 == a2, b1 == b2, c1 == c2 & d1 == d2]
+  | {| resMove  := a1; resGhost := b1 |},
+    {| resMove  := a2; resGhost := b2 |} => [&& a1 == a2 & b1 == b2]
   end.
 
 Lemma eqResGraphEdgeP : Equality.axiom eqResGraphEdge.
 Proof.
   move.
-  case=> [a1 b1 c1 d1].
-  case=> [a2 b2 c2 d2] /=.
+  case=> [a1 b1].
+  case=> [a2 b2] /=.
   case: (a1 =P a2) => [<-|?]; last by right; case.
   case: (b1 =P b2) => [<-|?]; last by right; case.
-  case: (c1 =P c2) => [<-|?]; last by right; case.
-  case: (d1 =P d2) => [<-|?]; last by right; case.
   by constructor.
 Qed.
 
@@ -189,59 +218,54 @@ Canonical ResGraphEdge_eqType :=
 
 End EqResGraphEdge.
 
-Definition determineEdge (x : ResGraphEdge) :
-  option ResGraphNode * option ResGraphNode := (resBeg x, resEnd x).
+(* Determine the lexicographical sorting of edges. This is not done by a flow
+   of values, but of inverse dependencies: that is, each pair is (ACQUIRE,
+   RELEASE), and we desire that anything acquired has is released first. *)
+(* jww (2015-08-23): There should be a way to get rid of [Transfer] *)
+Definition determineEdge (x : ResGraphEdge) : ResGraphNode * ResGraphNode :=
+  let fix go m := match m with
+    (* Instruction            Acquires      Releases *)
+    (* -------------------     ----------  ---------- *)
+    | Move       fr fv tr => (RegNode tr, RegNode fr)
+    | Transfer   fr fv tr => (RegNode tr, RegNode fr)
 
-Definition compareNodes (x y : option ResGraphNode) : bool := x < y.
+    | Spill      fr tv    => (VirtNode (VarNode tv), RegNode fr)
+    | Restore    fv tr    => (RegNode tr, VarNode fv)
+
+    | FreeReg    fr tv    => (VirtNode (VarNode tv), RegNode fr)
+    | AllocReg   fv tr    => (RegNode tr, VarNode fv)
+
+    | Looped     x        => go x
+    end in
+  go (resMove x).
 
 Definition compareEdges (x y : ResGraphEdge) : bool :=
-  if resEnd x == resEnd y
-  then resGhost x && ~~ resGhost y
-  else true.
+  let xe := determineEdge x in
+  let ye := determineEdge y in
+  if snd xe == snd ye
+  then ~~ resGhost x && resGhost y
+  else false.                   (* retain input ordering *)
 
 Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   match resMove x with
-  | Move       fr fv tr    =>
-    (* [:: {| resMove  := Spill fr fv *)
-    (*      ; resGhost := false *)
-    (*      ; resBeg   := resBeg x *)
-    (*      ; resEnd   := None |} *)
-    (*  ;  {| resMove  := Restore fv tr *)
-    (*      ; resGhost := resGhost x *)
-    (*      ; resBeg   := None *)
-    (*      ; resEnd   := resEnd x |} ] *)
-    [:: {| resMove  := Swap tr fv fr fv
-         ; resGhost := resGhost x
-         ; resBeg   := resEnd x
-         ; resEnd   := resBeg x |} ]
-  | Transfer   fr fv tr    =>
-    [:: {| resMove  := FreeReg fr fv
-         ; resGhost := false
-         ; resBeg   := resBeg x
-         ; resEnd   := None |}
-     ;  {| resMove  := AllocReg fv tr
-         ; resGhost := resGhost x
-         ; resBeg   := None
-         ; resEnd   := resEnd x |} ]
-  | Swap       fr fv tr tv =>
-    [:: {| resMove  := Swap tr tv fr fv
-         ; resGhost := resGhost x
-         ; resBeg   := resEnd x
-         ; resEnd   := resBeg x |} ]
-  | Spill      fr fv       => [::] (* jww (2015-07-07): Need to use temp slot *)
-  | Restore    tv tr       => [::]
-  | AllocReg   tv tr       => [::]
-  | FreeReg    fr fv       => [::]
-  (* | AllocStack tv          => [::] *)
-  (* | FreeStack  fv          => [::] *)
+  | Move     fr fv tr => [:: {| resMove  := Spill fr fv
+                              ; resGhost := false |}
+                          ;  {| resMove  := Restore fv tr
+                              ; resGhost := resGhost x |} ]
+  | Transfer fr fv tr => [:: {| resMove  := FreeReg fr fv
+                              ; resGhost := false |}
+                          ;  {| resMove  := AllocReg fv tr
+                              ; resGhost := resGhost x |} ]
+  | Looped _          => [:: x]
+  | _                 => [:: {| resMove  := Looped (resMove x)
+                              ; resGhost := resGhost x |}]
   end.
 
-Definition sortMoves (x : Graph ResGraphNode ResGraphEdge_eqType) :
-  (* jww (2015-08-22): Why is rev necessary here? *)
-  seq ResGraphEdge := sortBy compareEdges (snd (topsort splitEdge x)).
+Definition sortMoves (x : Graph ResGraphNode_eqType ResGraphEdge_eqType) :
+  seq ResGraphEdge := sortBy compareEdges (snd (topsort x splitEdge)).
 
 Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
-  sortMoves (IntMap_foldl (flip addEdge) (emptyGraph determineEdge) moves).
+  sortMoves (IntMap_foldr addEdge (emptyGraph determineEdge) moves).
 
 (* Assuming a transition [from] one point in the procedure [to] another --
    where these two positions may be contiguous, or connected via a branch --
@@ -255,7 +279,6 @@ Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
     - A move from one register to another
     - A move from the stack to a register
     - A move from a register to the stack
-    - A swap between two registers
 
    Note: if a variable is not live in [from] but is live in [to], or vice
    versa, this is not considered and is just regarded as how the program was
@@ -309,30 +332,27 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
        then if intReg y is Some reg
             then if ghost
                  then Some {| resMove  := FreeReg reg vid
-                            ; resGhost := true
-                            ; resBeg   := Some (inl reg)
-                            ; resEnd   := Some (inr vid) |}
+                            ; resGhost := true |}
                  else None
             else None
        else
          let mmv := match intReg x, intReg y with
-            | Some xr, Some yr => Some (if outb
-                                        then Transfer xr vid yr
-                                        else if varNotLive vid
-                                             then FreeReg xr vid
-                                             else Move xr vid yr)
+            | Some xr, Some yr =>
+                if outb
+                then Some (Transfer xr vid yr)
+                else if varNotLive vid
+                     then Some (FreeReg xr vid)
+                     else Some (Move xr vid yr)
             | Some xr, None    => Some (Spill xr vid)
-            | None,    Some yr => Some (if outb || varNotLive vid
-                                        then AllocReg vid yr
-                                        else Restore vid yr)
+            | None,    Some yr =>
+                if outb || varNotLive vid
+                then Some (AllocReg vid yr)
+                else Some (Restore vid yr)
             | None,    None    => None
             end in
-         let anchor x := (inl <$> intReg x) <|> Some (inr vid) in
          if mmv is Some mv
          then Some {| resMove  := mv
-                    ; resGhost := ghost
-                    ; resBeg   := anchor x
-                    ; resEnd   := anchor y |}
+                    ; resGhost := ghost |}
          else None)
 
     (IntMap_foldlWithKey
@@ -340,9 +360,7 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
           if intReg x is Some r
           then IntMap_insert vid
              {| resMove  := FreeReg r vid
-              ; resGhost := false
-              ; resBeg   := Some (inl r)
-              ; resEnd   := Some (inr vid) |} acc
+              ; resGhost := false |} acc
           else (* FreeStack vid *) acc) emptyIntMap)
 
     (IntMap_foldlWithKey
@@ -351,24 +369,18 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
           if intReg y is Some r
           then IntMap_insert vid
              {| resMove  := AllocReg vid r
-              ; resGhost := ghost
-              ; resBeg   := Some (inr vid)
-              ; resEnd   := Some (inl r) |} acc
+              ; resGhost := ghost |} acc
           else (* AllocStack vid *) acc) emptyIntMap)
 
     liveAtFrom liveAtTo.
 
 Definition BlockMoves : Type :=
-  (Graph ResGraphNode ResGraphEdge_eqType *
-   Graph ResGraphNode ResGraphEdge_eqType).
-
-Definition movesBetween (allocs : seq (Allocation maxReg))
-  (liveIn : option IntSet) (from to : nat) : seq ResGraphEdge :=
-  IntMap_foldl (flip cons) [::] $ resolvingMoves allocs liveIn from to.
+  (Graph ResGraphNode_eqType ResGraphEdge_eqType *
+   Graph ResGraphNode_eqType ResGraphEdge_eqType).
 
 Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
-  (in_from : bool) (moves : seq ResGraphEdge) : IntMap BlockMoves :=
-  forFold mappings moves $ fun ms mv =>
+  (in_from : bool) (moves : IntMap ResGraphEdge) : IntMap BlockMoves :=
+  let go ms mv :=
     let addToGraphs e xs :=
         let: (gbeg, gend) := xs in
         if in_from
@@ -378,14 +390,15 @@ Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
     let f mxs := addToGraphs mv $ if mxs is Some xs
                                   then xs
                                   else (eg, eg) in
-    IntMap_alter (@Some _ \o f) bid ms.
+    IntMap_alter (@Some _ \o f) bid ms in
+  IntMap_foldl go mappings moves.
 
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to (liveIn : IntSet) (mappings : IntMap BlockMoves) :
   IntMap BlockMoves :=
   applyMappings bid mappings in_from $
-                movesBetween allocs (Some liveIn)
-                             (blockLastOpId from) (blockFirstOpId to).
+                resolvingMoves allocs (Some liveIn)
+                               (blockLastOpId from) (blockFirstOpId to).
 
 Definition resolveDataFlow (allocs : seq (Allocation maxReg))
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
@@ -425,7 +438,7 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
       let mappings' :=
         if isFirst
         then applyMappings bid mappings false $
-                           movesBetween allocs None 1 (blockFirstOpId from)
+                           resolvingMoves allocs None 1 (blockFirstOpId from)
         else mappings in
 
       (* If [in_from] is [true], resolving moves are inserted at the end of
@@ -436,9 +449,9 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
         if size suxs == 0
         then
           applyMappings bid mappings' true $
-                        movesBetween allocs None
-                                     (blockLastOpId from)
-                                     (blockLastOpId from).+2
+                        resolvingMoves allocs None
+                                       (blockLastOpId from)
+                                       (blockLastOpId from).+2
         else
           forFold mappings' suxs $ fun ms s_bid =>
             (* jww (2015-01-28): Failure here should be impossible *)
