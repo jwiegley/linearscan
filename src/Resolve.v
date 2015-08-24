@@ -446,11 +446,7 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
       let in_from := size suxs <= 1 in
       let mappings'' :=
         if size suxs == 0
-        then
-          applyMappings bid mappings' true $
-                        resolvingMoves allocs None
-                                       (blockLastOpId from)
-                                       (blockLastOpId from).+2
+        then mappings'
         else
           forFold mappings' suxs $ fun ms s_bid =>
             (* jww (2015-01-28): Failure here should be impossible *)
