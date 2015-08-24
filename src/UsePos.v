@@ -8,30 +8,21 @@ Generalizable All Variables.
 Inductive VarKind : Set := Input | Temp | Output.
 
 Definition VarKind_leq (x y : VarKind) : bool :=
-  match x with
-    | Input => true
-    | Temp => if y is Input then false else true
-    | Output => if y is Output then true else false
+  match x, y with
+    | Output, _      => false
+    | Temp,   Input  => false
+    | _,  _          => true
   end.
 
-Example VarKind_leq_ex1 : VarKind_leq Input Input.
-Proof. by []. Qed.
-Example VarKind_leq_ex2 : VarKind_leq Input Temp.
-Proof. by []. Qed.
-Example VarKind_leq_ex3 : VarKind_leq Input Output.
-Proof. by []. Qed.
-Example VarKind_leq_ex4 : ~~ VarKind_leq Temp Input.
-Proof. by []. Qed.
-Example VarKind_leq_ex5 : VarKind_leq Temp Temp.
-Proof. by []. Qed.
-Example VarKind_leq_ex6 : VarKind_leq Temp Output.
-Proof. by []. Qed.
-Example VarKind_leq_ex7 : ~~ VarKind_leq Output Input.
-Proof. by []. Qed.
-Example VarKind_leq_ex8 : ~~ VarKind_leq Output Temp.
-Proof. by []. Qed.
-Example VarKind_leq_ex9 : VarKind_leq Output Output.
-Proof. by []. Qed.
+Example VarKind_leq_ex1 :    VarKind_leq Input  Input.  Proof. by []. Qed.
+Example VarKind_leq_ex2 :    VarKind_leq Input  Temp.   Proof. by []. Qed.
+Example VarKind_leq_ex3 :    VarKind_leq Input  Output. Proof. by []. Qed.
+Example VarKind_leq_ex4 : ~~ VarKind_leq Temp   Input.  Proof. by []. Qed.
+Example VarKind_leq_ex5 :    VarKind_leq Temp   Temp.   Proof. by []. Qed.
+Example VarKind_leq_ex6 :    VarKind_leq Temp   Output. Proof. by []. Qed.
+Example VarKind_leq_ex7 : ~~ VarKind_leq Output Input.  Proof. by []. Qed.
+Example VarKind_leq_ex8 : ~~ VarKind_leq Output Temp.   Proof. by []. Qed.
+Example VarKind_leq_ex9 : ~~ VarKind_leq Output Output. Proof. by []. Qed.
 
 Section EqVarKind.
 
@@ -39,24 +30,21 @@ Implicit Type s : VarKind.
 
 Fixpoint eqVarKind s1 s2 {struct s2} :=
   match s1, s2 with
-  | Input, Input   => true
-  | Temp, Temp     => true
+  | Input,  Input  => true
+  | Temp,   Temp   => true
   | Output, Output => true
   | _, _           => false
   end.
 
 Lemma eqVarKindP : Equality.axiom eqVarKind.
 Proof.
-  move.
-  move=> b1 b2 /=.
-  case: b1; case: b2=> /=;
+  case; case=> /=;
   constructor=> //=;
   by case.
 Qed.
 
 Canonical VarKind_eqMixin := EqMixin eqVarKindP.
-Canonical VarKind_eqType :=
-  Eval hnf in EqType VarKind VarKind_eqMixin.
+Canonical VarKind_eqType  := Eval hnf in EqType VarKind VarKind_eqMixin.
 
 End EqVarKind.
 
@@ -75,12 +63,7 @@ Record UsePos : Set := {
 
 Coercion uloc : UsePos >-> nat.
 
-Module UsePosNotations.
-Notation " (| x |) " := {| uloc := x; regReq := false |}.
-Notation " (! x !) " := {| uloc := x; regReq := true |}.
-End UsePosNotations.
-
-Definition upos_le (x y : UsePos) : bool := uloc x <= uloc y.
+Definition upos_le (x y : UsePos) : bool := x <= y.
 Arguments upos_le x y /.
 
 (* A [UsePos] is within bound of a range position if, be it an input-only use
@@ -153,7 +136,7 @@ Proof.
 Qed.
 
 Canonical upos_eqMixin := EqMixin equposP.
-Canonical upos_eqType := Eval hnf in EqType UsePos upos_eqMixin.
+Canonical upos_eqType  := Eval hnf in EqType UsePos upos_eqMixin.
 
 End EqUpos.
 
