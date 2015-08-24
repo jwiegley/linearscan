@@ -76,7 +76,6 @@ data VarInfo = VarInfo
     }
 
 deriving instance Eq LS.VarKind
--- deriving instance Show LS.VarKind
 
 fromVarInfo :: LinearScan.VarInfo -> LS.VarInfo
 fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
@@ -108,9 +107,10 @@ showOp1' :: (op1 -> String)
          -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
          -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
          -> [LS.ResolvingMoveSet]
+         -> [LS.AllocError]
          -> op1
          -> String
-showOp1' showop pos _ins _outs rms o =
+showOp1' showop pos _ins _outs rms aerrs o =
     -- let showerv (Left r)  = "r" ++ show r
     --     showerv (Right v) = "v" ++ show v in
     -- let render Nothing = ""
@@ -125,6 +125,8 @@ showOp1' showop pos _ins _outs rms o =
     -- concatMap (marker "End") outs ++
     -- concatMap (marker "Beg") ins ++
     leader ++ showop o ++ "\n" ++
+    concatMap (\x -> replicate width ' ' ++ "!!! " ++
+                     replicate 8 ' ' ++ show x ++ "\n") aerrs ++
     concatMap (\x -> replicate width ' ' ++
                      replicate 8 ' ' ++ show x ++ "\n") rms
 
@@ -277,11 +279,12 @@ showBlock1 getops bid pos liveIns liveOuts showops b =
 showOps1 :: LinearScan.OpInfo accType op1 op2
          -> ScanStateDesc
          -> IntMap [LS.ResolvingMoveSet]
+         -> IntMap [LS.AllocError]
          -> Int
          -> [op1]
          -> String
-showOps1 _ _ _ _ [] = ""
-showOps1 oinfo sd rms pos (o:os) =
+showOps1 _ _ _ _ _ [] = ""
+showOps1 oinfo sd rms aerrs pos (o:os) =
     let here = pos*2+1 in
     let allocs = allocations sd in
     let k idx (bacc, eacc) i =
@@ -301,14 +304,14 @@ showOps1 oinfo sd rms pos (o:os) =
     --          if LS.iend i == here
     --          then (idx, Left idx, mreg) : eacc
     --          else eacc) in
-    let (begs, ends) =
-            LS.vfoldl'_with_index 0 k ([], []) (intervals sd) in
+    let (begs, ends) = LS.vfoldl'_with_index 0 k ([], []) (intervals sd) in
+    let entriesIn = fromMaybe [] . M.lookup (pos*2+1) in
     -- let (begs', ends') =
     --         LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
     --                               (fixedIntervals sd) in
     showOp1' (showOp1 oinfo) (pos*2+1) begs ends
-        (fromMaybe [] (M.lookup (pos*2+1) rms)) o
-        ++ showOps1 oinfo sd rms (pos+1) os
+             (entriesIn rms) (entriesIn aerrs) o
+        ++ showOps1 oinfo sd rms aerrs (pos+1) os
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -326,22 +329,22 @@ showBlocks1 :: Monad m
             -> ScanStateDesc
             -> IntMap LS.BlockLiveSets
             -> IntMap [LS.ResolvingMoveSet]
+            -> IntMap [LS.AllocError]
             -> [blk1]
             -> m String
-showBlocks1 binfo oinfo sd ls rms = go 0
+showBlocks1 binfo oinfo sd ls rms aerrs = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
         bid <- LinearScan.blockId binfo b
-        let (liveIn, liveOut) =
-                 case M.lookup bid ls of
-                     Nothing -> (S.empty, S.empty)
-                     Just s  -> (S.fromList (LS.blockLiveIn s),
-                                 S.fromList (LS.blockLiveOut s))
-        let allops blk =
-                let (x, y, z) = LinearScan.blockOps binfo blk in
-                x ++ y ++ z
-        (showBlock1 allops bid pos liveIn liveOut (showOps1 oinfo sd rms) b ++)
+        let (liveIn, liveOut) = case M.lookup bid ls of
+                Nothing -> (S.empty, S.empty)
+                Just s  -> (S.fromList (LS.blockLiveIn s),
+                            S.fromList (LS.blockLiveOut s))
+        let allops blk = let (x, y, z) = LinearScan.blockOps binfo blk
+                         in x ++ y ++ z
+        (showBlock1 allops bid pos liveIn liveOut
+                    (showOps1 oinfo sd rms aerrs) b ++)
             `liftM` go (pos + length (allops b)) bs
 
 fromBlockInfo :: Monad m
@@ -389,18 +392,14 @@ instance Show LS.ResolvingMoveSet where
       "assign (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)  =
       "clear (r" ++ show fr ++ " v" ++ show tv ++ ")"
-  show (LS.RSLooped x)  = "!LOOPED! " ++ show x
+  show (LS.RSLooped x)  = "!!!LOOPED! " ++ show x
   -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
   -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
 
--- showResolvingMoves :: IntMap [LS.ResolvingMoveSet] -> String
--- showResolvingMoves =
---     M.foldlWithKey' (\acc k mv ->
---         acc ++ "    " ++ show k ++ " => "
---             ++ L.intercalate "\n         " (map show mv) ++ "\n") ""
-
-showDetails :: Monad m => Details m blk1 blk2 op1 op2 -> m String
-showDetails err = do
+showDetails :: Monad m
+            => Details m blk1 blk2 op1 op2
+            -> IntMap [LS.AllocError] -> m String
+showDetails err allocErrs = do
     -- pre  <- showScanStateDesc (scanStatePre err)
     post <- showScanStateDesc (scanStatePost err)
     return $ "Reason: " ++ show (reason err) ++ "\n\n"
@@ -408,16 +407,15 @@ showDetails err = do
           -- ++ pre ++ "\n"
           ++ ">>> ScanState after allocation:\n"
           ++ post ++ "\n"
-          -- ++ ">>> ResolvingMoves =\n"
-          -- ++ showResolvingMoves (resolvingMoves err) ++ "\n"
           ++ ">>> " ++ show (loopState err) ++ "\n"
   where
     showScanStateDesc Nothing = return ""
     showScanStateDesc (Just sd) =
-        liftM2 (++) (showBlocks1 (blockInfo err) (opInfo err) sd
-                                 (liveSets err) (resolvingMoves err)
-                                 (orderedBlocks err))
-                    (return ("\n" ++ show sd))
+        liftM2 (++)
+            (showBlocks1 (blockInfo err) (opInfo err) sd
+                         (liveSets err) (resolvingMoves err) allocErrs
+                         (orderedBlocks err))
+            (return ("\n" ++ show sd))
 
 deriving instance Show LS.FinalStage
 deriving instance Show LS.BlockLiveSets
@@ -472,11 +470,11 @@ allocate maxReg binfo oinfo useVerifier blocks = do
     let res' = toDetails res binfo oinfo
     case reason res' of
         Just (err, _) -> do
-            dets <- showDetails res'
+            dets <- showDetails res' M.empty
             return $ Left (dets, map reasonToStr err)
         Nothing -> case allocatedBlocks res' of
             Left m -> do
-                dets <- showDetails res'
+                dets <- showDetails res' m
                 return $ Left (dets,
                     -- jww (2015-07-02): NYI
                     concatMap (\(pos, es) ->

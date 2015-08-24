@@ -41,8 +41,7 @@ Definition reservation :
 
 Definition newRegStateDesc : RegStateDesc :=
   {| rsAllocs := vconst (None, None)
-   ; rsStack  := emptyIntSet
-   |}.
+   ; rsStack  := emptyIntSet |}.
 
 (* The pattern is: actual, actual, expected *)
 Inductive AllocError :=
@@ -50,13 +49,11 @@ Inductive AllocError :=
   | VarNotResident of VarId
   | VarNotResidentForReg of VarId & nat & option VarId & nat
   | VarNotReservedForReg of VarId & nat & option VarId & nat
-  | PhysRegAlreadyResidentForVar of nat & VarId
   | PhysRegAlreadyReservedForVar of nat & VarId
   | RegAlreadyReservedToVar of nat & VarId & VarId
   | BlockWithoutPredecessors of BlockId
   | UnknownPredecessorBlock of BlockId & BlockId
-  | LoopInResolvingMoves of ResolvingMoveSet
-  | ErrorAtBlockEnd of BlockId.
+  | LoopInResolvingMoves of ResolvingMoveSet.
 
 Inductive RegState : RegStateDesc -> Prop :=
   | StartState : RegState newRegStateDesc
