@@ -48,7 +48,7 @@ Definition newRegStateDesc : RegStateDesc :=
 Inductive AllocError :=
   | VarNotAllocated of VarId
   | VarNotResident of VarId
-  | VarNotResidentForReg of VarId & nat & option VarId
+  | VarNotResidentForReg of VarId & nat & option VarId & nat
   | VarNotReservedForReg of VarId & nat & option VarId & nat
   | PhysRegAlreadyResidentForVar of nat & VarId
   | PhysRegAlreadyReservedForVar of nat & VarId
@@ -262,7 +262,7 @@ Definition isResident (reg : PhysReg) (var : VarId) : Verified (option VarId) :=
 Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
   st <-- use _verDesc ;;
   res <-- isResident reg var ;;
-  let err := errorT $ VarNotResidentForReg var reg res in
+  let err := errorT $ VarNotResidentForReg var reg res 1 in
   if res is Some var'
   then unless (var == var') err
   else if useVerifier is VerifyEnabledStrict
@@ -275,7 +275,7 @@ Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
   if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
   then _verState .= packRegState (ClearRegS H)
   else let err := errorT $ VarNotResidentForReg var reg
-                             (vnth (rsAllocs st) reg ^_ residency) in
+                             (vnth (rsAllocs st) reg ^_ residency) 2 in
        if useVerifier is VerifyEnabledStrict
        then err
        else if vnth (rsAllocs st) reg ^_ residency is None
@@ -389,7 +389,6 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
         pure $ rcons acc (resMove mv)
 
     | Transfer fromReg fromVar toReg =>
-      checkResidency fromReg fromVar ;;
       unless (fromReg == toReg) $
         releaseReg fromReg fromVar ;;
         reserveReg toReg fromVar ;;
