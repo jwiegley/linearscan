@@ -694,22 +694,21 @@ Definition hasInputsAt (rd : RangeDesc) (pos : nat) : bool :=
            else b) false (ups rd).
 
 Definition hasOnlyOutputsAt (rd : RangeDesc) (pos : nat) : bool :=
-  let xs := foldl (fun acc u =>
-                     if uloc u == pos
-                     then u :: acc
-                     else acc) [::] (ups rd) in
-  (size xs > 0) && ~~ has (fun u => uvar u != Output) xs.
+  let xs := [seq u <- ups rd | uloc u == pos] in
+  (size xs > 0) && all (fun u => uvar u == Output) xs.
 
-Definition rangesIntersect (x : RangeDesc) (y : RangeDesc) : option nat :=
+Definition rangesJoinedAt (x y : RangeDesc) (pos : nat) : bool :=
+  hasInputsAt x pos && ~~ hasOnlyOutputsAt y pos.
+
+Definition rangesIntersect (x y : RangeDesc) : option nat :=
   if (rbeg x < rend y) && (rbeg y < rend x)
-  then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
-  else if [&& rend x == rbeg y
-          ,   hasInputsAt x (rend x)
-          &   ~~ hasOnlyOutputsAt y (rbeg y) ]
-       then Some (rend x)
-       else if [&& rend y == rbeg x
-                ,   hasInputsAt y (rend y)
-                &   ~~ hasOnlyOutputsAt x (rbeg x) ]
+  then (* The ranges clearly overlap each other *)
+       Some (if rbeg x < rbeg y then rbeg y else rbeg x)
+  else if (rend x == rbeg y) && rangesJoinedAt x y (rend x)
+       then (* The ranges don't overlap, but using the same register for both
+               would result in an assignment overlap. *)
+            Some (rend x)
+       else if (rend y == rbeg x) && rangesJoinedAt y x (rend y)
             then Some (rend y)
             else None.
 
