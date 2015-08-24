@@ -72,21 +72,23 @@ Proof.
   by case: (vertices g) => //= [*] in Hin *.
 Qed.
 
-Definition topsort (g0 : Graph) (split : b -> seq b) : seq a * seq b :=
-  let fix go fuel g :=
+Definition topsort (g0 : Graph) (split : b -> seq b) : seq a * seq (nat * b) :=
+  let fix go fuel depth g :=
     (* jww (2015-08-23): Proof is sorely needed to avoid this possibility. *)
-    if fuel isn't S fuel then (vertices g, edges g) else
+    if fuel isn't S fuel then (vertices g, [seq (depth, i) | i <- edges g]) else
     (* Identify vertices that have no incoming edge (i.e., the "in-degree" of
        these vertices is zero). *)
     let noInbound := [seq v <- vertices g | nilp (inbound v g)] in
     if noInbound is [::]
     then if edges g isn't e :: _
          then ([::], [::])
-         else go fuel (foldr addEdge (removeEdge e g) (split e))
+         else go fuel depth.+1 (foldr addEdge (removeEdge e g) (split e))
     else
-      let: (ns', es') := go fuel (foldr removeVertex g noInbound) in
-      (noInbound ++ ns', flatten [seq outbound n g | n <- noInbound] ++ es') in
-  go (size (vertices g0)).*2 g0.
+      let: (ns', es') := go fuel depth.+1 (foldr removeVertex g noInbound) in
+      (noInbound ++ ns', [seq (depth, i)
+                         | i <- flatten [seq outbound n g
+                                        | n <- noInbound]] ++ es') in
+  go (size (vertices g0)).*2 0 g0.
 
 End Graph.
 
@@ -124,7 +126,8 @@ Example topsort_ex1 :
     end in
 
   let: (verts, xs) := topsort g swap in
-  [&& topologically_sorted g verts xs
+
+  [&& topologically_sorted g verts [seq snd x | x <- xs]
 
   ,   verts ==
       [:: Just 9
@@ -139,12 +142,12 @@ Example topsort_ex1 :
       ;   Just 10 ]
 
   &   xs ==
-      [:: (Just 9,  Just 7)
-      ;   (Just 7,  Just 1)
-      ;   (Just 1,  Just 3)
-      ;   (Just 5,  Just 4)
-      ;   (Just 5,  Just 6)
-      ;   (Just 6,  Just 2)
-      ;   (Just 2,  Just 4)
-      ;   (Just 11, Just 10) ] ].
+      [:: (0,  (Just 9,  Just 7))
+      ;   (1,  (Just 7,  Just 1))
+      ;   (2,  (Just 1,  Just 3))
+      ;   (5,  (Just 5,  Just 4))
+      ;   (5,  (Just 5,  Just 6))
+      ;   (6,  (Just 6,  Just 2))
+      ;   (7,  (Just 2,  Just 4))
+      ;   (10, (Just 11, Just 10)) ] ].
 Proof. by []. Qed.

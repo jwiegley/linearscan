@@ -239,11 +239,11 @@ Definition determineEdge (x : ResGraphEdge) : ResGraphNode * ResGraphNode :=
     end in
   go (resMove x).
 
-Definition compareEdges (x y : ResGraphEdge) : bool :=
-  let xe := determineEdge x in
-  let ye := determineEdge y in
-  if snd xe == snd ye
-  then ~~ resGhost x && resGhost y
+Definition compareEdges (x y : nat * ResGraphEdge) : bool :=
+  let xe := determineEdge (snd x) in
+  let ye := determineEdge (snd y) in
+  if (fst x == fst y) && (fst xe == fst ye)
+  then resGhost (snd x) && ~~ resGhost (snd y)
   else false.                   (* retain input ordering *)
 
 Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
@@ -262,7 +262,8 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   end.
 
 Definition sortMoves (x : Graph ResGraphNode_eqType ResGraphEdge_eqType) :
-  seq ResGraphEdge := sortBy compareEdges (snd (topsort x splitEdge)).
+  seq ResGraphEdge :=
+  [seq snd i | i <- sortBy compareEdges (snd (topsort x splitEdge))].
 
 Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
   sortMoves (IntMap_foldr addEdge (emptyGraph determineEdge) moves).
