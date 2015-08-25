@@ -412,7 +412,9 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
         reserveReg toReg fromVar ;;
         addMove (weakenResolvingMove (resMove mv)) ;;
         check <-- isResident fromReg fromVar ;;
-        when (isJust check) (assignReg toReg fromVar) ;;
+        (if useVerifier is VerifyEnabledStrict
+         then when (isJust check) (assignReg toReg fromVar)
+         else assignReg toReg fromVar) ;;
         when (resGhost mv) (releaseReg toReg fromVar) ;;
         pure $ rcons acc (resMove mv)
 
