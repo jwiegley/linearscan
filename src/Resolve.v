@@ -265,8 +265,10 @@ Definition sortMoves (x : Graph ResGraphNode_eqType ResGraphEdge_eqType) :
   seq ResGraphEdge :=
   [seq snd i | i <- sortBy compareEdges (snd (topsort x splitEdge))].
 
-Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
-  sortMoves (IntMap_foldr addEdge (emptyGraph determineEdge) moves).
+Definition determineMoves (moves : IntMap (seq ResGraphEdge)) :
+  seq ResGraphEdge :=
+  sortMoves (IntMap_foldr (flip (foldr addEdge))
+                          (emptyGraph determineEdge) moves).
 
 (* Assuming a transition [from] one point in the procedure [to] another --
    where these two positions may be contiguous, or connected via a branch --
@@ -288,14 +290,22 @@ Definition determineMoves (moves : IntMap ResGraphEdge) : seq ResGraphEdge :=
    register or on the stack. *)
 Definition resolvingMoves (allocs : seq (Allocation maxReg))
   (liveIn : option IntSet) (from to : nat) :
-  IntMap ResGraphEdge :=
+  IntMap (seq ResGraphEdge) :=
+
+  let collect P {a} (Q : Allocation maxReg -> option a -> option a)
+              i rest : IntMap a :=
+    let int := intVal i in
+    if P int
+    then IntMap_alter (Q i) (ivar int) rest
+    else rest in
 
   (* First determine all of the variables which are live at [from] *at the end
      of that instruction*, either in registers or on the stack.  Then gather
      the variables live at [to] *at the beginning of that instruction*. *)
-  let liveAtFrom :=
-      IntMap_fromList [seq (ivar (intVal i), i) | i <- allocs
-                      & ibeg (intVal i) <= from < iend (intVal i)] in
+  let liveAtFrom : IntMap (Allocation maxReg) :=
+    foldr (collect (fun i => ibeg i <= from < iend i)
+                   (fun a _ => Some a))
+          emptyIntMap allocs in
 
   (* This function is greatly complicated by the fact that there are
      zero-length "ephemeral" allocations, where a value is loaded into a
@@ -314,11 +324,15 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
 
   let outputBegin int pos := hasOnlyOutputsAt (NE_head (rds int)).1 pos in
 
-  let liveAtTo :=
-      IntMap_fromList [seq let int := intVal i in
-                           (ivar int,
-                            (i, snd (shouldKeep int to), outputBegin int to))
-                      | i <- allocs & fst (shouldKeep (intVal i) to)] in
+  let liveAtTo : IntMap (seq (Allocation maxReg * bool * bool)) :=
+    foldr (collect (fun i => fst (shouldKeep i to))
+                   (fun a rest =>
+                      Some ((a, snd (shouldKeep (intVal a) to),
+                             outputBegin (intVal a) to)
+                              :: if rest is Some xs
+                                 then xs
+                                 else [::])))
+          emptyIntMap allocs in
 
   let varNotLive vid := if liveIn is Some ins
                         then ~~ IntSet_member vid ins
@@ -327,49 +341,51 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
   (* We use an [IntMap] here to easily detect via merge which variables are
      coming into being, and which are being dropped. *)
   IntMap_mergeWithKey
-    (fun vid x yp =>
-       let: (y, ghost, outb) := yp in
-       if intReg x == intReg y
-       then if intReg y is Some reg
-            then if ghost
-                 then Some {| resMove  := FreeReg reg vid
-                            ; resGhost := true |}
-                 else None
-            else None
-       else
-         let mmv := match intReg x, intReg y with
-            | Some xr, Some yr =>
-                if outb || varNotLive vid
-                then Some (Transfer xr vid yr)
-                else Some (Move xr vid yr)
-            | Some xr, None    => Some (Spill xr vid)
-            | None,    Some yr =>
-                if outb || varNotLive vid
-                then Some (AllocReg vid yr)
-                else Some (Restore vid yr)
-            | None,    None    => None
-            end in
-         if mmv is Some mv
-         then Some {| resMove  := mv
-                    ; resGhost := ghost |}
-         else None)
+    (fun vid x yps =>
+       let go acc yp :=
+         let: (y, ghost, outb) := yp in
+         if intReg x == intReg y
+         then if intReg y is Some reg
+              then if ghost
+                   then [:: {| resMove  := FreeReg reg vid
+                             ; resGhost := true |} ]
+                   else [::]
+              else [::]
+         else
+           let mmv := match intReg x, intReg y with
+              | Some xr, Some yr => Some (if outb || varNotLive vid
+                                          then Transfer xr vid yr
+                                          else Move xr vid yr)
+              | Some xr, None    => Some (Spill xr vid)
+              | None,    Some yr => Some (if outb || varNotLive vid
+                                          then AllocReg vid yr
+                                          else Restore vid yr)
+              | None,    None    => None
+              end in
+           if mmv is Some mv
+           then [:: {| resMove  := mv
+                     ; resGhost := ghost |} ]
+           else [::] in
+      listToMaybe (foldl go [::] yps))
 
     (IntMap_foldlWithKey
        (fun acc vid x =>
           if intReg x is Some r
-          then IntMap_insert vid
+          then IntMap_addToList vid
              {| resMove  := FreeReg r vid
               ; resGhost := false |} acc
           else (* FreeStack vid *) acc) emptyIntMap)
 
     (IntMap_foldlWithKey
-       (fun acc vid yp =>
-          let: (y, ghost, outb) := yp in
-          if intReg y is Some r
-          then IntMap_insert vid
-             {| resMove  := AllocReg vid r
-              ; resGhost := ghost |} acc
-          else (* AllocStack vid *) acc) emptyIntMap)
+       (fun acc vid yps =>
+          let go acc yp :=
+            let: (y, ghost, outb) := yp in
+            if intReg y is Some r
+            then IntMap_addToList vid
+               {| resMove  := AllocReg vid r
+                ; resGhost := ghost |} acc
+            else (* AllocStack vid *) acc in
+          foldl go acc yps) emptyIntMap)
 
     liveAtFrom liveAtTo.
 
@@ -378,7 +394,7 @@ Definition BlockMoves : Type :=
    Graph ResGraphNode_eqType ResGraphEdge_eqType).
 
 Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
-  (in_from : bool) (moves : IntMap ResGraphEdge) : IntMap BlockMoves :=
+  (in_from : bool) (moves : IntMap (seq ResGraphEdge)) : IntMap BlockMoves :=
   let go ms mv :=
     let addToGraphs e xs :=
       let: (gbeg, gend) := xs in
@@ -390,7 +406,7 @@ Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
                                   then xs
                                   else (eg, eg) in
     IntMap_alter (@Some _ \o f) bid ms in
-  IntMap_foldl go mappings moves.
+  IntMap_foldl (foldl go) mappings moves.
 
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   bid in_from from to (liveIn : IntSet) (mappings : IntMap BlockMoves) :
