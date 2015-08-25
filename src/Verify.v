@@ -34,6 +34,15 @@ Record RegStateDesc := {
   rsStack  : IntSet
 }.
 
+Record RegStateDescSet := {
+  _rsAllocs : seq (option VarId * option VarId);
+  _rsStack  : IntSet
+}.
+
+Definition fromRegStateDesc (x : RegStateDesc) : RegStateDescSet :=
+  {| _rsAllocs := vec_to_seq (rsAllocs x)
+   ; _rsStack  := rsStack x |}.
+
 Definition residency :
   Lens' (option VarId * option VarId) (option VarId) := _1.
 Definition reservation :
@@ -116,7 +125,7 @@ Record VerifiedSig := {
   (* [verBlocks] gives the final allocation state for every handled block *)
   verBlocks : IntMap RegStateSig;
   verMoves  : IntMap (seq ResolvingMoveSet);
-  verErrors : IntMap (seq AllocError);
+  verErrors : IntMap (RegStateDescSet * seq AllocError);
   verExt    : A
 }.
 
@@ -165,15 +174,16 @@ Definition _verMoves :
      |}) (f (verMoves s)).
 
 Definition _verErrors :
-  Lens' VerifiedSig (IntMap (seq AllocError)) := fun _ _ f s =>
-  fmap (fun x =>
-    {| verDesc   := verDesc s
-     ; verState  := verState s
-     ; verBlocks := verBlocks s
-     ; verMoves  := verMoves s
-     ; verErrors := x
-     ; verExt    := verExt s
-     |}) (f (verErrors s)).
+  Lens' VerifiedSig (IntMap (RegStateDescSet * seq AllocError)) :=
+  fun _ _ f s =>
+      fmap (fun x =>
+        {| verDesc   := verDesc s
+         ; verState  := verState s
+         ; verBlocks := verBlocks s
+         ; verMoves  := verMoves s
+         ; verErrors := x
+         ; verExt    := verExt s
+         |}) (f (verErrors s)).
 
 Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
   fmap (fun x =>
@@ -190,7 +200,12 @@ Definition Verified := StateT VerifiedSig mType.
 Variable pc : OpId.
 
 Definition errorsT (errs : seq AllocError) : Verified unit :=
-  _verErrors %= IntMap_insert pc errs.
+  st <-- use _verDesc ;;
+  _verErrors %= fun m =>
+    flip (IntMap_insert pc) m $
+      if IntMap_lookup pc m is Some (d, prevErrs)
+      then (d, prevErrs ++ errs)
+      else (fromRegStateDesc st, errs).
 
 Definition errorT (err : AllocError) : Verified unit := errorsT [:: err].
 
@@ -232,7 +247,7 @@ Definition releaseReg (reg : PhysReg) (var : VarId) : Verified unit :=
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
   else let err := errorT $ VarNotReservedForReg var reg
-                         (vnth (rsAllocs st) reg ^_ reservation) 2 in
+                             (vnth (rsAllocs st) reg ^_ reservation) 2 in
        if useVerifier is VerifyEnabledStrict
        then err
        else if vnth (rsAllocs st) reg ^_ reservation is None

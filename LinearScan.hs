@@ -107,26 +107,30 @@ showOp1' :: (op1 -> String)
          -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
          -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
          -> [LS.ResolvingMoveSet]
-         -> [LS.AllocError]
+         -> Maybe (LS.RegStateDescSet, [LS.AllocError])
          -> op1
          -> String
-showOp1' showop pos ins outs rms aerrs o =
+showOp1' showop pos ins outs rms maerrs o =
     let render Nothing = ""
         render (Just r) = "=r" ++ show r in
     let marker label (_i, Left r, _reg) =
-            "<" ++ label ++ " r" ++ show r ++ ">\n"
+            "    <" ++ label ++ " r" ++ show r ++ ">\n"
         marker label (i, Right v, reg) =
-            "<" ++ label ++ " v" ++ show v ++
+            "    <" ++ label ++ " v" ++ show v ++
             "[" ++ show i ++ "]" ++ render reg ++ ">\n" in
     let leader = show pos ++ ": " in
     let width = length leader in
     concatMap (marker "End") outs ++
     concatMap (marker "Beg") ins ++
     leader ++ showop o ++ "\n" ++
-    concatMap (\x -> replicate width ' ' ++ "!!! " ++
-                     replicate 8 ' ' ++ show x ++ "\n") aerrs ++
-    concatMap (\x -> replicate width ' ' ++
-                     replicate 8 ' ' ++ show x ++ "\n") rms
+    (case maerrs of
+          Nothing -> ""
+          Just (regState, aerrs) ->
+              concatMap (\x -> replicate width ' ' ++ "!!! " ++
+                               replicate 8 ' ' ++ show x ++ "\n") aerrs ++
+              (unlines . map (replicate (width + 12) ' ' ++) . lines . show
+                   $ regState)) ++
+    concatMap (\x -> replicate (width + 8) ' ' ++ show x ++ "\n") rms
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
@@ -263,18 +267,59 @@ showBlock1 :: (blk1 -> [op1])
            -> LS.OpId
            -> IntSet
            -> IntSet
+           -> LoopState
            -> (LS.OpId -> [op1] -> String)
            -> blk1
            -> String
-showBlock1 getops bid pos liveIns liveOuts showops b =
-    "\nBlock " ++ show bid ++
-    " => IN:" ++ show liveIns ++ " OUT:" ++ show liveOuts ++ "\n" ++
-    showops pos (getops b)
+showBlock1 getops bid pos liveIns liveOuts loopInfo showops b =
+    "\n    [ BLOCK " ++ show bid ++ " ]\n"
+        ++ "        Live In   => " ++ show (S.toList liveIns) ++ "\n"
+        ++ "        Live Kill => " ++ show (S.toList liveKill) ++ "\n"
+        ++ "        Live Gen  => " ++ show (S.toList liveGen) ++ "\n"
+        ++ "        Live Out  => " ++ show (S.toList liveOuts) ++ "\n"
+        ++ "        Incoming  =>" ++ (if null branches
+                                   then " Entry"
+                                   else branches) ++ "\n"
+        ++ (if null loops
+            then ""
+            else "        Loops     =>" ++ loops ++ "\n")
+        ++ showops pos (getops b)
+  where
+    liveGen  = liveOuts `S.difference` liveIns
+    liveKill = liveIns  `S.difference` liveOuts
+
+    branches =
+        let fwds = case M.lookup bid (forwardBranches loopInfo) of
+                Nothing -> ""
+                Just fwds' -> " FWD" ++ show (S.toList fwds')
+            bwds = case M.lookup bid (backwardBranches loopInfo) of
+                Nothing -> ""
+                Just bwds' -> " BKWD" ++ show (S.toList bwds')
+        in fwds ++ bwds
+
+    loops =
+        let hdr = if bid `elem` loopHeaderBlocks loopInfo
+                  then " Header"
+                  else ""
+            e   = if S.member bid (loopEndBlocks loopInfo)
+                  then " End"
+                  else ""
+            idxs = case foldr (\(idx, blks) rest ->
+                                if S.member bid blks
+                                then idx : rest
+                                else rest) []
+                              (M.toList (loopIndices loopInfo)) of
+                       [] -> ""
+                       xs -> " IDX" ++ show xs
+            d   = case M.lookup bid (loopDepths loopInfo) of
+                Nothing -> ""
+                Just (_, d') -> " Depth=" ++ show d'
+        in hdr ++ e ++ idxs ++ d
 
 showOps1 :: LinearScan.OpInfo accType op1 op2
          -> ScanStateDesc
          -> IntMap [LS.ResolvingMoveSet]
-         -> IntMap [LS.AllocError]
+         -> IntMap (LS.RegStateDescSet, [LS.AllocError])
          -> Int
          -> [op1]
          -> String
@@ -305,7 +350,7 @@ showOps1 oinfo sd rms aerrs pos (o:os) =
             LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
                                   (fixedIntervals sd) in
     showOp1' (showOp1 oinfo) (pos*2+1) begs' ends'
-             (entriesIn rms) (entriesIn aerrs) o
+             (entriesIn rms) (M.lookup (pos*2+1) aerrs) o
         ++ showOps1 oinfo sd rms aerrs (pos+1) os
 
 -- | From the point of view of this library, a basic block is nothing more
@@ -324,10 +369,11 @@ showBlocks1 :: Monad m
             -> ScanStateDesc
             -> IntMap LS.BlockLiveSets
             -> IntMap [LS.ResolvingMoveSet]
-            -> IntMap [LS.AllocError]
+            -> IntMap (LS.RegStateDescSet, [LS.AllocError])
+            -> LoopState
             -> [blk1]
             -> m String
-showBlocks1 binfo oinfo sd ls rms aerrs = go 0
+showBlocks1 binfo oinfo sd ls rms aerrs loopInfo = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
@@ -338,7 +384,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs = go 0
                             S.fromList (LS.blockLiveOut s))
         let allops blk = let (x, y, z) = LinearScan.blockOps binfo blk
                          in x ++ y ++ z
-        (showBlock1 allops bid pos liveIn liveOut
+        (showBlock1 allops bid pos liveIn liveOut loopInfo
                     (showOps1 oinfo sd rms aerrs) b ++)
             `liftM` go (pos + length (allops b)) bs
 
@@ -358,7 +404,8 @@ data Details m blk1 blk2 op1 op2 = Details
     , resolvingMoves  :: IntMap [LS.ResolvingMoveSet]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
-    , allocatedBlocks :: Either (IntMap [LS.AllocError]) [blk2]
+    , allocatedBlocks :: Either (IntMap (LS.RegStateDescSet, [LS.AllocError]))
+                             [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -367,6 +414,20 @@ data Details m blk1 blk2 op1 op2 = Details
     }
 
 deriving instance Show LS.AllocError
+
+instance Show LS.RegStateDescSet where
+  show (LS.Build_RegStateDescSet allocs _stack) =
+      foldr (\(reg, (residency, reservation)) rest ->
+              let info = (case reservation of
+                               Nothing -> ""
+                               Just v  -> "v" ++ show v) ++
+                         (case residency of
+                               Nothing -> ""
+                               Just v  -> "=v" ++ show v) in
+              (if null info
+               then ""
+               else "r" ++ show reg ++ " -> " ++ info ++ "\n") ++ rest)
+            "" (zip ([0..] :: [Int]) allocs)
 
 instance Show LS.ResolvingMoveSet where
   show (LS.RSMove fr fv tr) =
@@ -393,7 +454,7 @@ instance Show LS.ResolvingMoveSet where
 
 showDetails :: Monad m
             => Details m blk1 blk2 op1 op2
-            -> IntMap [LS.AllocError] -> m String
+            -> IntMap (LS.RegStateDescSet, [LS.AllocError]) -> m String
 showDetails err allocErrs = do
     let preUnhandled Nothing = ""
         preUnhandled (Just sd) =
@@ -412,7 +473,7 @@ showDetails err allocErrs = do
         liftM2 (++)
             (showBlocks1 (blockInfo err) (opInfo err) sd
                          (liveSets err) (resolvingMoves err) allocErrs
-                         (orderedBlocks err))
+                         (loopState err) (orderedBlocks err))
             (return ("\n" ++ preUnhandled ++ show sd))
 
 deriving instance Show LS.FinalStage
@@ -474,7 +535,7 @@ allocate maxReg binfo oinfo useVerifier blocks = do
             Left m -> do
                 dets <- showDetails res' m
                 return $ Left (dets,
-                    concatMap (\(pos, es) ->
+                    concatMap (\(pos, (_, es)) ->
                                 ("At position " ++ show pos) : map show es)
                               (M.toList m))
             Right blks -> return $ Right blks
