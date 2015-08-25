@@ -381,10 +381,10 @@ Definition applyMappings (bid : BlockId) (mappings : IntMap BlockMoves)
   (in_from : bool) (moves : IntMap ResGraphEdge) : IntMap BlockMoves :=
   let go ms mv :=
     let addToGraphs e xs :=
-        let: (gbeg, gend) := xs in
-        if in_from
-        then (gbeg, addEdge e gend)
-        else (addEdge e gbeg, gend) in
+      let: (gbeg, gend) := xs in
+      if in_from
+      then (gbeg, addEdge e gend)
+      else (addEdge e gbeg, gend) in
     let eg := emptyGraph determineEdge in
     let f mxs := addToGraphs mv $ if mxs is Some xs
                                   then xs

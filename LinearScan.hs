@@ -291,10 +291,10 @@ showBlock1 getops bid pos liveIns liveOuts loopInfo showops b =
     branches =
         let fwds = case M.lookup bid (forwardBranches loopInfo) of
                 Nothing -> ""
-                Just fwds' -> " FWD" ++ show (S.toList fwds')
+                Just fwds' -> " Fwd" ++ show (S.toList fwds')
             bwds = case M.lookup bid (backwardBranches loopInfo) of
                 Nothing -> ""
-                Just bwds' -> " BKWD" ++ show (S.toList bwds')
+                Just bwds' -> " Bkwd" ++ show (S.toList bwds')
         in fwds ++ bwds
 
     loops =
@@ -310,7 +310,7 @@ showBlock1 getops bid pos liveIns liveOuts loopInfo showops b =
                                 else rest) []
                               (M.toList (loopIndices loopInfo)) of
                        [] -> ""
-                       xs -> " IDX" ++ show xs
+                       xs -> " Idx" ++ show xs
             d   = case M.lookup bid (loopDepths loopInfo) of
                 Nothing -> ""
                 Just (_, d') -> " Depth=" ++ show d'
