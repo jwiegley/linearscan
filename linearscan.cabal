@@ -106,6 +106,7 @@ library
     Hask.Utils
   cpp-options:    -DMAX_REG=4 -DREG_SIZE=8
   ghc-options:    -fno-warn-deprecated-flags
+  other-extensions: Safe
   hs-source-dirs: . Hask/haskell
   build-depends:  base >=4.7 && <5.0
     , containers
