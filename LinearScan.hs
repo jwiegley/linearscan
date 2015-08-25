@@ -267,21 +267,35 @@ showBlock1 :: (blk1 -> [op1])
            -> IntSet
            -> IntSet
            -> LoopState
+           -> Maybe LS.RegStateDescSet
+           -> Maybe LS.RegStateDescSet
            -> (LS.OpId -> [op1] -> String)
            -> blk1
            -> String
-showBlock1 getops bid pos liveIns liveOuts loopInfo showops b =
+showBlock1 getops bid pos liveIns liveOuts loopInfo initials finals showops b =
     "\n    [ BLOCK " ++ show bid ++ " ]\n"
         ++ "        Live In   => " ++ show (S.toList liveIns) ++ "\n"
         ++ "        Live Kill => " ++ show (S.toList liveKill) ++ "\n"
         ++ "        Live Gen  => " ++ show (S.toList liveGen) ++ "\n"
         ++ "        Live Out  => " ++ show (S.toList liveOuts) ++ "\n"
         ++ "        Incoming  =>" ++ (if null branches
-                                   then " Entry"
-                                   else branches) ++ "\n"
+                                      then " Entry"
+                                      else branches) ++ "\n"
         ++ (if null loops
             then ""
             else "        Loops     =>" ++ loops ++ "\n")
+        ++ (case initials of
+                 Nothing -> ""
+                 Just xs ->
+                     "        Inputs    =>\n"
+                         ++ (unlines . map (replicate 12 ' ' ++)
+                                     . lines . show $ xs))
+        ++ (case finals of
+                 Nothing -> ""
+                 Just xs ->
+                     "        Outputs   =>\n"
+                         ++ (unlines . map (replicate 12 ' ' ++)
+                                     . lines . show $ xs))
         ++ showops pos (getops b)
   where
     liveGen  = liveOuts `S.difference` liveIns
@@ -367,10 +381,12 @@ showBlocks1 :: Monad m
             -> IntMap LS.BlockLiveSets
             -> IntMap [LS.ResolvingMoveSet]
             -> IntMap (LS.RegStateDescSet, [LS.AllocError])
+            -> IntMap LS.RegStateDescSet
+            -> IntMap LS.RegStateDescSet
             -> LoopState
             -> [blk1]
             -> m String
-showBlocks1 binfo oinfo sd ls rms aerrs loopInfo = go 0
+showBlocks1 binfo oinfo sd ls rms aerrs initials finals loopInfo = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
@@ -382,6 +398,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs loopInfo = go 0
         let allops blk = let (x, y, z) = LinearScan.blockOps binfo blk
                          in x ++ y ++ z
         (showBlock1 allops bid pos liveIn liveOut loopInfo
+                    (M.lookup bid initials) (M.lookup bid finals)
                     (showOps1 oinfo sd rms aerrs) b ++)
             `liftM` go (pos + length (allops b)) bs
 
@@ -401,8 +418,9 @@ data Details m blk1 blk2 op1 op2 = Details
     , resolvingMoves  :: IntMap [LS.ResolvingMoveSet]
     , _inputBlocks    :: [blk1]
     , orderedBlocks   :: [blk1]
-    , allocatedBlocks :: Either (IntMap (LS.RegStateDescSet, [LS.AllocError]))
-                             [blk2]
+    , allocatedBlocks :: Either (IntMap (LS.RegStateDescSet, [LS.AllocError]),
+                                 IntMap LS.RegStateDescSet,
+                                 IntMap LS.RegStateDescSet) [blk2]
     , scanStatePre    :: Maybe ScanStateDesc
     , scanStatePost   :: Maybe ScanStateDesc
     , blockInfo       :: LinearScan.BlockInfo m blk1 blk2 op1 op2
@@ -451,8 +469,11 @@ instance Show LS.ResolvingMoveSet where
 
 showDetails :: Monad m
             => Details m blk1 blk2 op1 op2
-            -> IntMap (LS.RegStateDescSet, [LS.AllocError]) -> m String
-showDetails err allocErrs = do
+            -> IntMap (LS.RegStateDescSet, [LS.AllocError])
+            -> IntMap LS.RegStateDescSet
+            -> IntMap LS.RegStateDescSet
+            -> m String
+showDetails err allocErrs initials finals = do
     let preUnhandled Nothing = ""
         preUnhandled (Just sd) =
             "Original:\n" ++
@@ -469,7 +490,8 @@ showDetails err allocErrs = do
     showScanStateDesc (Just sd) preUnhandled =
         liftM2 (++)
             (showBlocks1 (blockInfo err) (opInfo err) sd
-                         (liveSets err) (resolvingMoves err) allocErrs
+                         (liveSets err) (resolvingMoves err)
+                         allocErrs initials finals
                          (loopState err) (orderedBlocks err))
             (return ("\n" ++ preUnhandled ++ show sd))
 
@@ -497,7 +519,9 @@ toDetails :: LS.Details blk1 blk2
           -> Details m blk1 blk2 op1 op2
 toDetails (LS.Build_Details a b c d e f g h i) binfo oinfo =
     Details a (M.fromList b) (M.fromList c) d e
-        (either (Left . M.fromList) Right f)
+        (either (\((x, y), z) ->
+                  Left (M.fromList x, M.fromList y, M.fromList z))
+                Right f)
         (fmap toScanStateDesc g) (fmap toScanStateDesc h)
         binfo oinfo (toLoopState i)
 
@@ -526,11 +550,11 @@ allocate maxReg binfo oinfo useVerifier blocks = do
     let res' = toDetails res binfo oinfo
     case reason res' of
         Just (err, _) -> do
-            dets <- showDetails res' M.empty
+            dets <- showDetails res' M.empty M.empty M.empty
             return $ Left (dets, map reasonToStr err)
         Nothing -> case allocatedBlocks res' of
-            Left m -> do
-                dets <- showDetails res' m
+            Left (m, initials, finals) -> do
+                dets <- showDetails res' m initials finals
                 return $ Left (dets,
                     concatMap (\(pos, (_, es)) ->
                                 ("At position " ++ show pos) : map show es)

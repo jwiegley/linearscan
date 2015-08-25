@@ -71,43 +71,37 @@ Inductive RegState : RegStateDesc -> Prop :=
     vnth (rsAllocs st) r ^_ reservation == None ->
     RegState
       {| rsAllocs := vmodify (rsAllocs st) r (reservation .~ Some v)
-       ; rsStack  := rsStack st
-       |}
+       ; rsStack  := rsStack st |}
 
   | ReleaseRegS st r v :
     vnth (rsAllocs st) r ^_ reservation == Some v ->
     RegState
       {| rsAllocs := vmodify (rsAllocs st) r (reservation .~ None)
-       ; rsStack  := rsStack st
-       |}
+       ; rsStack  := rsStack st |}
 
   | AssignRegS st r v :
     vnth (rsAllocs st) r ^_ reservation == Some v ->
     RegState
       {| rsAllocs := vmodify (rsAllocs st) r (residency .~ Some v)
-       ; rsStack  := rsStack st
-       |}
+       ; rsStack  := rsStack st |}
 
   | ClearRegS st r v :
     vnth (rsAllocs st) r ^_ residency == Some v ->
     RegState
       {| rsAllocs := vmodify (rsAllocs st) r (residency .~ None)
-       ; rsStack  := rsStack st
-       |}
+       ; rsStack  := rsStack st |}
 
   | AllocStackS st v :
     ~~ IntSet_member v (rsStack st) ->
     RegState
       {| rsAllocs := rsAllocs st
-       ; rsStack  := IntSet_insert v (rsStack st)
-       |}
+       ; rsStack  := IntSet_insert v (rsStack st) |}
 
   | FreeStackS st v :
     IntSet_member v (rsStack st) ->
     RegState
       {| rsAllocs := rsAllocs st
-       ; rsStack  := IntSet_delete v (rsStack st)
-       |}.
+       ; rsStack  := IntSet_delete v (rsStack st) |}.
 
 Definition RegStateSig := { rd : RegStateDesc | RegState rd }.
 
@@ -123,7 +117,8 @@ Record VerifiedSig := {
   verDesc   : RegStateDesc;
   verState  : RegState verDesc;
   (* [verBlocks] gives the final allocation state for every handled block *)
-  verBlocks : IntMap RegStateSig;
+  verInit   : IntMap RegStateSig;
+  verFinal  : IntMap RegStateSig;
   verMoves  : IntMap (seq ResolvingMoveSet);
   verErrors : IntMap (RegStateDescSet * seq AllocError);
   verExt    : A
@@ -132,7 +127,8 @@ Record VerifiedSig := {
 Definition newVerifiedSig (i : A) :=
   {| verDesc   := newRegStateDesc
    ; verState  := StartState
-   ; verBlocks := emptyIntMap
+   ; verInit   := emptyIntMap
+   ; verFinal  := emptyIntMap
    ; verMoves  := emptyIntMap
    ; verErrors := emptyIntMap
    ; verExt    := i |}.
@@ -145,29 +141,44 @@ Definition _verState :
   fmap (fun x =>
     {| verDesc   := x.1
      ; verState  := x.2
-     ; verBlocks := verBlocks s
+     ; verInit   := verInit s
+     ; verFinal  := verFinal s
      ; verMoves  := verMoves s
      ; verErrors := verErrors s
      ; verExt    := verExt s
      |}) (f (verDesc s; verState s)).
 
-Definition _verBlocks : Lens' VerifiedSig (IntMap RegStateSig) :=
+Definition _verInit : Lens' VerifiedSig (IntMap RegStateSig) :=
   fun _ _ f s =>
   fmap (fun x =>
     {| verDesc   := verDesc s
      ; verState  := verState s
-     ; verBlocks := x
+     ; verInit   := x
+     ; verFinal  := verFinal s
      ; verMoves  := verMoves s
      ; verErrors := verErrors s
      ; verExt    := verExt s
-     |}) (f (verBlocks s)).
+     |}) (f (verInit s)).
+
+Definition _verFinal : Lens' VerifiedSig (IntMap RegStateSig) :=
+  fun _ _ f s =>
+  fmap (fun x =>
+    {| verDesc   := verDesc s
+     ; verState  := verState s
+     ; verInit   := verInit s
+     ; verFinal  := x
+     ; verMoves  := verMoves s
+     ; verErrors := verErrors s
+     ; verExt    := verExt s
+     |}) (f (verFinal s)).
 
 Definition _verMoves :
   Lens' VerifiedSig (IntMap (seq ResolvingMoveSet)) := fun _ _ f s =>
   fmap (fun x =>
     {| verDesc   := verDesc s
      ; verState  := verState s
-     ; verBlocks := verBlocks s
+     ; verInit   := verInit s
+     ; verFinal  := verFinal s
      ; verMoves  := x
      ; verErrors := verErrors s
      ; verExt    := verExt s
@@ -179,7 +190,8 @@ Definition _verErrors :
       fmap (fun x =>
         {| verDesc   := verDesc s
          ; verState  := verState s
-         ; verBlocks := verBlocks s
+         ; verInit   := verInit s
+         ; verFinal  := verFinal s
          ; verMoves  := verMoves s
          ; verErrors := x
          ; verExt    := verExt s
@@ -189,7 +201,8 @@ Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
   fmap (fun x =>
     {| verDesc   := verDesc s
      ; verState  := verState s
-     ; verBlocks := verBlocks s
+     ; verInit   := verInit s
+     ; verFinal  := verFinal s
      ; verMoves  := verMoves s
      ; verErrors := verErrors s
      ; verExt    := x
@@ -298,25 +311,24 @@ Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
 
 (* Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt. *)
 
-Definition checkLiveness (vars : IntSet) (clearOut : bool) : Verified unit :=
+Definition checkLiveness (vars : IntSet) : Verified unit :=
   if useVerifier isn't VerifyEnabledStrict then pure tt else
   st <-- use _verDesc ;;
   (forM_ (IntSet_toList vars) $ fun var =>
      unless (vfoldl_with_index (fun reg b p =>
        b || if p ^_ residency is Some var then true else false)
                                false (rsAllocs st)) $
-       errorT $ VarNotResident var) ;;
+       errorT $ VarNotResident var) (* ;;
 
   (* Clear out any resident registers which liveness tells us are not set.
      That is, even though there may be contents "left over", we don't want to
      rely on that, but only on the liveness information. *)
-  when clearOut $
-    vfoldl_with_index (fun reg act p =>
-                         if p ^_ residency is Some v
-                         then unless (IntSet_member v vars) $
-                                clearReg reg v
-                         else pure tt)
-                      (pure tt) (rsAllocs st).
+  vfoldl_with_index (fun reg act p => act >>
+                       if p ^_ residency is Some v
+                       then unless (IntSet_member v vars) $
+                              clearReg reg v
+                       else pure tt)
+                    (pure tt) (rsAllocs st) *).
 
 Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   Verified unit :=
@@ -324,7 +336,7 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   (if IntMap_lookup bid (forwardBranches loops) is Some fwds
    then
      forM_ (IntSet_toList fwds) (fun pred =>
-       exits <-- use _verBlocks ;;
+       exits <-- use _verFinal ;;
        if IntMap_lookup pred exits isn't Some allocs
        then errorT $ UnknownPredecessorBlock bid pred
        else _verState .= allocs)
@@ -334,19 +346,23 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
         when (IntSet_size liveIns > 0) $
           errorT $ BlockWithoutPredecessors bid
      else pure tt)) ;;
-  checkLiveness liveIns true.
+
+  checkLiveness liveIns ;;
+
+  allocs <-- use _verState ;;
+  _verInit %= IntMap_insert bid allocs.
 
 Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
   (* Check to ensure that all "live out" variables are resident in registers
      at the end of the block. *)
-  checkLiveness liveOuts false ;;
+  checkLiveness liveOuts ;;
 
   (* Clear out all known allocations, saving them for this block. *)
   allocs <-- use _verState ;;
-  _verState .= packRegState StartState ;;
+  _verFinal %= IntMap_insert bid allocs ;;
 
-  _verBlocks %= IntMap_insert bid allocs.
+  _verState .= packRegState StartState.
 
 Definition verifyApplyAllocs (op : opType1) (allocs : seq (VarId * PhysReg)) :
   Verified (seq opType2) :=
@@ -391,12 +407,12 @@ Definition verifyResolutions (moves : seq (@ResGraphEdge maxReg)) :
     st <-- use _verDesc ;;
     match resMove mv with
     | Move fromReg fromVar toReg =>
-      checkResidency fromReg fromVar ;;
       unless (fromReg == toReg) $
         releaseReg fromReg fromVar ;;
         reserveReg toReg fromVar ;;
         addMove (weakenResolvingMove (resMove mv)) ;;
-        assignReg toReg fromVar ;;
+        check <-- isResident fromReg fromVar ;;
+        when (isJust check) (assignReg toReg fromVar) ;;
         when (resGhost mv) (releaseReg toReg fromVar) ;;
         pure $ rcons acc (resMove mv)
 
@@ -454,7 +470,9 @@ Variable P : a -> Prop.
 (* Program Instance Lens__verDesc : GetterLaws (@_verDesc maxReg a). *)
 Program Instance Lens__verState : LensLaws (@_verState maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verBlocks : LensLaws (@_verBlocks maxReg a).
+Program Instance Lens__verInit : LensLaws (@_verInit maxReg a).
+Obligation 2. by case: x. Qed.
+Program Instance Lens__verFinal : LensLaws (@_verFinal maxReg a).
 Obligation 2. by case: x. Qed.
 Program Instance Lens__verMoves : LensLaws (@_verMoves maxReg a).
 Obligation 2. by case: x. Qed.

@@ -67,7 +67,9 @@ Record Details {blockType1 blockType2 : Set} (maxReg : nat) : Set := {
   resolvingMoves  : IntMap (seq ResolvingMoveSet);
   inputBlocks     : seq blockType1;
   orderedBlocks   : seq blockType1;
-  allocatedBlocks : IntMap (RegStateDescSet * seq AllocError)
+  allocatedBlocks : (IntMap (RegStateDescSet * seq AllocError) *
+                     IntMap RegStateDescSet *
+                     IntMap RegStateDescSet)
                         + seq blockType2;
   scanStatePre    : option (ScanStateDescSet maxReg);
   scanStatePost   : option (ScanStateDescSet maxReg);
@@ -110,8 +112,15 @@ Definition linearScan
         res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
                              mappings loops blocks1 ;;
         let: (moves, blocks2) := res in
+        let blockInfo := match blocks2 with
+          | inr xs => inr xs
+          | inl vs =>
+              inl (verErrors vs,
+                   IntMap_map (fun x => fromRegStateDesc x.1) (verInit vs),
+                   IntMap_map (fun x => fromRegStateDesc x.1) (verFinal vs))
+          end in
         pure $ Build_Details _ _ maxReg None
-          liveSets' moves blocks blocks1 blocks2
+          liveSets' moves blocks blocks1 blockInfo
           (Some (toScanStateDescSet ssig.1))
           (Some (toScanStateDescSet sd)) loops
       end
