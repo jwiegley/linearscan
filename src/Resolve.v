@@ -338,35 +338,73 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
                         then ~~ IntSet_member vid ins
                         else false in
 
-  (* We use an [IntMap] here to easily detect via merge which variables are
-     coming into being, and which are being dropped. *)
+  let regsReferenced : IntMap (seq PhysReg) :=
+    IntMap_mergeWithKey
+      (fun vid x yps =>
+         let go acc yp :=
+           let: (y, _, _) := yp in
+           if intReg x != intReg y
+           then
+             let next := if intReg y is Some yreg
+                         then yreg :: acc
+                         else acc in
+             if intReg x is Some xreg
+             then xreg :: next
+             else next
+           else acc in
+         Some (foldl go [::] yps))
+      (IntMap_foldlWithKey
+         (fun acc vid x =>
+            if intReg x is Some xreg
+            then IntMap_addToList vid xreg acc
+            else acc) emptyIntMap)
+      (IntMap_foldlWithKey
+         (fun acc vid yps =>
+            let go acc yp :=
+              let: (y, _, _) := yp in
+              if intReg y is Some yreg
+              then IntMap_addToList vid yreg acc
+              else acc in
+            foldl go acc yps) emptyIntMap)
+      liveAtFrom liveAtTo in
+  let otherRegs :=
+      getIntSet (concat [seq (map (@nat_of_ord maxReg) \o snd) x
+                        | x <- IntMap_toList regsReferenced]) in
+
+  (* We use an [IntMap] here to detect via merge which variables are coming
+     into being, and which are being dropped. *)
   IntMap_mergeWithKey
     (fun vid x yps =>
-       let go acc yp :=
+       let go yp :=
          let: (y, ghost, outb) := yp in
          if intReg x == intReg y
          then if intReg y is Some reg
               then if ghost
                    then [:: {| resMove  := FreeReg reg vid
                              ; resGhost := true |} ]
-                   else [::]
+                   else if IntSet_member reg otherRegs
+                        then [:: {| resMove  := FreeReg reg vid
+                                  ; resGhost := false |}
+                             ;   {| resMove  := AllocReg vid reg
+                                  ; resGhost := false |} ]
+                        else [::]
               else [::]
          else
            let mmv := match intReg x, intReg y with
-              | Some xr, Some yr => Some (if outb || varNotLive vid
-                                          then Transfer xr vid yr
-                                          else Move xr vid yr)
-              | Some xr, None    => Some (Spill xr vid)
-              | None,    Some yr => Some (if outb || varNotLive vid
-                                          then AllocReg vid yr
-                                          else Restore vid yr)
-              | None,    None    => None
-              end in
+             | Some xr, Some yr => Some (if outb || varNotLive vid
+                                         then Transfer xr vid yr
+                                         else Move xr vid yr)
+             | Some xr, None    => Some (Spill xr vid)
+             | None,    Some yr => Some (if outb || varNotLive vid
+                                         then AllocReg vid yr
+                                         else Restore vid yr)
+             | None,    None    => None
+             end in
            if mmv is Some mv
            then [:: {| resMove  := mv
                      ; resGhost := ghost |} ]
            else [::] in
-      listToMaybe (foldl go [::] yps))
+      listToMaybe (foldl (fun acc x => acc ++ go x) [::] yps))
 
     (IntMap_foldlWithKey
        (fun acc vid x =>

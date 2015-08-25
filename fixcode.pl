@@ -38,6 +38,7 @@ import qualified Hask.Utils
     s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
 
     s/\(Prelude\.map  \( rs\)\)/rs/;
+    s/\(Prelude\.map \)/(Prelude.map Prelude.id)/;
     s/mapLeft  /mapLeft Prelude.id /g;
     s/\(Data\.IntMap\.map  ranges\)/ranges/;
 
