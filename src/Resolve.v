@@ -246,6 +246,13 @@ Definition compareEdges (x y : nat * ResGraphEdge) : bool :=
   then resGhost (snd x) && ~~ resGhost (snd y)
   else false.                   (* retain input ordering *)
 
+Definition isEdgeSplittable (x : ResGraphEdge) : bool :=
+  match resMove x with
+  | Move     _ _ _ => true
+  | Transfer _ _ _ => true
+  | _              => false
+  end.
+
 Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
   match resMove x with
   | Move     fr fv tr => [:: {| resMove  := Spill fr fv
@@ -263,7 +270,8 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
 
 Definition sortMoves (x : Graph ResGraphNode_eqType ResGraphEdge_eqType) :
   seq ResGraphEdge :=
-  [seq snd i | i <- sortBy compareEdges (snd (topsort x splitEdge))].
+  [seq snd i
+  | i <- sortBy compareEdges (snd (topsort x isEdgeSplittable splitEdge))].
 
 Definition determineMoves (moves : IntMap (seq ResGraphEdge)) :
   seq ResGraphEdge :=

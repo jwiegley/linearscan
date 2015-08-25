@@ -72,7 +72,8 @@ Proof.
   by case: (vertices g) => //= [*] in Hin *.
 Qed.
 
-Definition topsort (g0 : Graph) (split : b -> seq b) : seq a * seq (nat * b) :=
+Definition topsort (g0 : Graph) (splittable : b -> bool) (split : b -> seq b) :
+  seq a * seq (nat * b) :=
   let fix go fuel depth g :=
     (* jww (2015-08-23): Proof is sorely needed to avoid this possibility. *)
     if fuel isn't S fuel then (vertices g, [seq (depth, i) | i <- edges g]) else
@@ -82,7 +83,11 @@ Definition topsort (g0 : Graph) (split : b -> seq b) : seq a * seq (nat * b) :=
     if noInbound is [::]
     then if edges g isn't e :: _
          then ([::], [::])
-         else go fuel depth.+1 (foldr addEdge (removeEdge e g) (split e))
+         else
+           let x := if [seq e <- edges g | splittable e] is e' :: _
+                    then e'
+                    else e in
+           go fuel depth.+1 (foldr addEdge (removeEdge x g) (split x))
     else
       let: (ns', es') := go fuel depth.+1 (foldr removeVertex g noInbound) in
       (noInbound ++ ns', [seq (depth, i)
@@ -98,7 +103,7 @@ Arguments addEdge {a b} e g.
 Arguments removeEdge {a b} _ g.
 Arguments outbound {a b} _ g.
 Arguments inbound {a b} _ g.
-Arguments topsort {a b} g0 split.
+Arguments topsort {a b} g0 splittable split.
 
 Definition topologically_sorted `(g : Graph a b)
   (xs : seq a) (ys : seq b) : bool :=
@@ -118,6 +123,13 @@ Example topsort_ex1 :
     $ addEdge (Some  5, Some  6)
     $ emptyGraph id) in
 
+  let splittable mx := match mx with
+    | (Some x, Some y) => true
+    | (Some x, None)   => true
+    | (None,   Some y) => true
+    | (None,   None)   => false
+    end in
+
   let swap mx := match mx with
     | (Some x, Some y) => [:: (Some y, Some x)]
     | (Some x, None)   => [:: (Some x, None)]
@@ -125,7 +137,7 @@ Example topsort_ex1 :
     | (None,   None)   => [::]
     end in
 
-  let: (verts, xs) := topsort g swap in
+  let: (verts, xs) := topsort g splittable swap in
 
   [&& topologically_sorted g verts [seq snd x | x <- xs]
 

@@ -30,7 +30,6 @@ import           Data.IntSet (IntSet)
 import qualified Data.IntSet as S
 import qualified Data.List as L
 import           Data.Maybe (fromMaybe)
-import qualified Hask.Utils as LS
 import qualified LinearScan.Applicative as Coq
 import           LinearScan.Blocks
 import qualified LinearScan.Blocks as LS
@@ -327,28 +326,26 @@ showOps1 _ _ _ _ _ [] = ""
 showOps1 oinfo sd rms aerrs pos (o:os) =
     let here = pos*2+1 in
     let allocs = allocations sd in
-    let k idx (bacc, eacc) i =
+    let k (idx, i) (brest, erest) =
             let mreg = M.lookup idx allocs in
             (if LS.ibeg i == here
-             then (idx, Right (LS.ivar i), mreg) : bacc
-             else bacc,
+             then (idx, Right (LS.ivar i), mreg) : brest
+             else brest,
              if LS.iend i == here
-             then (idx, Right (LS.ivar i), mreg) : eacc
-             else eacc) in
-    let r _idx acc Nothing = acc
-        r idx (bacc, eacc) (Just i) =
+             then (idx, Right (LS.ivar i), mreg) : erest
+             else erest) in
+    let r (_idx, Nothing) rest = rest
+        r (idx, Just i) (brest, erest) =
             let mreg = M.lookup idx allocs in
             (if LS.ibeg i == here
-             then (idx, Left idx, mreg) : bacc
-             else bacc,
+             then (idx, Left idx, mreg) : brest
+             else brest,
              if LS.iend i == here
-             then (idx, Left idx, mreg) : eacc
-             else eacc) in
-    let (begs, ends) = LS.vfoldl'_with_index 0 k ([], []) (intervals sd) in
+             then (idx, Left idx, mreg) : erest
+             else erest) in
+    let (begs, ends) = foldr k ([], []) (zip [0..] (intervals sd)) in
     let entriesIn = fromMaybe [] . M.lookup (pos*2+1) in
-    let (begs', ends') =
-            LS.vfoldl'_with_index (0 :: Int) r (begs, ends)
-                                  (fixedIntervals sd) in
+    let (begs', ends') = foldr r (begs, ends) (zip [0..] (fixedIntervals sd)) in
     showOp1' (showOp1 oinfo) (pos*2+1) begs' ends'
              (entriesIn rms) (M.lookup (pos*2+1) aerrs) o
         ++ showOps1 oinfo sd rms aerrs (pos+1) os
@@ -434,20 +431,20 @@ instance Show LS.ResolvingMoveSet where
       "move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSTransfer fr fv tr) =
-      "xfer (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
+      "<xfer> (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSSpill fr tv)    =
       "spill (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSRestore fv tr)  =
       "restore (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSAllocReg fv tr) =
-      "reserve (r" ++ show tr ++ " v" ++ show fv ++ ")"
+      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSFreeReg fr tv)  =
-      "release (r" ++ show fr ++ " v" ++ show tv ++ ")"
+      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSAssignReg fv tr) =
-      "assign (r" ++ show tr ++ " v" ++ show fv ++ ")"
+      "<assign> (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)  =
-      "clear (r" ++ show fr ++ " v" ++ show tv ++ ")"
+      "<clear> (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSLooped x)  = "!!!LOOPED! " ++ show x
   -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
   -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
