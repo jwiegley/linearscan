@@ -83,7 +83,7 @@ Proof.
   by ordered.
 Qed.
 
-Definition compilePendingRanges {b e} (Hlt : b <= e)
+Definition compilePendingRanges {b e} (Hlt : b < e)
   (ranges : seq (BoundedRange b.*2.+1 e.*2.+1))
   (H : StronglySorted BoundedRange_leq ranges) :
   { rs : SortedRanges b.*2.+1
@@ -219,6 +219,12 @@ Next Obligation.
   rewrite [(z; H)]lock.
   rewrite /range_ltn map_comp (last_map rend) /= last_map -lock /=.
   move: (Range_bounded (last (z; H) zs).2).
+  case: zs => //= [|w ws].
+  by ordered.
+  move=> H3 H4 H5.
+  apply/(leq_trans _ H5).
+  apply/(leq_trans _ H3).
+  apply/ltnW.
   by ordered.
 Qed.
 Next Obligation.
@@ -231,7 +237,7 @@ Next Obligation.
   by ordered.
 Qed.
 
-Definition compressPendingRanges `(ranges : PendingRanges b e) (H : b <= e) :
+Definition compressPendingRanges `(ranges : PendingRanges b e) (H : b < e) :
   PendingRanges b e.
 Proof.
   case: ranges => [r|r rs].
@@ -253,7 +259,7 @@ Proof.
   exact: (rangesToBoundedRanges H1 H2 Hbound).
 Defined.
 
-Definition mergeIntoSortedRanges `(H : b <= e)
+Definition mergeIntoSortedRanges `(H : b < e)
   (pmap : IntMap (PendingRanges b e)) (rmap : IntMap (SortedRanges e.*2.+1)) :
   IntMap (SortedRanges b.*2.+1).
 Proof.
@@ -293,12 +299,13 @@ Proof.
   rewrite /= in Hend.
   split.
     move: (Range_proper r).
-    case: (ups rd) => [|u us] /= in Hend *;
+    move/andP=> [H1 H2] /=.
+    do 3 (apply/andP; split => //).
+    case: (ups rd) => //= [u us] in Hend H2 *.
     case: (uvar upos) => // in Hend *;
-    try case: (uvar u) => //= in Hend *;
-    try case E: (uloc u == rend rd) => // in Hend *;
-    try move/andP => [/andP [? H] ?];
-    try move/(leq_eqF E) in H;
+    case: (uvar u) => //= in Hend H2 *;
+    case E: (uloc u == rend rd) => // in Hend *;
+    try move/leq_eqF in E;
     by ordered.
   move: (Range_sorted r) => Hsorted.
   constructor=> // {Hbeg}.
@@ -341,9 +348,13 @@ Proof.
     + case E: (uvar upos) in Heqe rd *;
       move/eqP in Heqe; rewrite {}Heqe;
       try undoubled.
-      breakup; try undoubled.
-      apply/ltn_addn1.
-      by rewrite ltn_Sdouble.
+        breakup; try undoubled.
+        apply/ltn_addn1.
+        by undoubled.
+      breakup; try undoubled;
+      apply/ltn_addn1;
+      rewrite ltn_Sdouble;
+      by undoubled.
     + by constructor; constructor.
 
   rewrite /= => r.
@@ -483,7 +494,7 @@ Definition handleVars_combine {b pos e} (H : b <= pos < e) (vid : nat)
   (vars : seq (VarInfo maxReg)) (c1 : PendingRanges b e) :
   option (PendingRanges b e).
 Proof.
-  have Hlt : b <= e by ordered.
+  have Hlt : b < e by ordered.
   have c2 := compressPendingRanges c1 Hlt.
   have c3 := foldl (handleOutputVar H) (Some c2)
                    [seq k <- vars | varKind k == Output].
@@ -639,7 +650,7 @@ Proof.
                  else emptyIntSet in
      let ranges := emptyPendingRanges Hsz outs in
      let pending := reduceBlock bid E loops varUses ranges in
-     mergeIntoSortedRanges (ltnW Hsz) pending <$> IHbs (pos + sz)).
+     mergeIntoSortedRanges Hsz pending <$> IHbs (pos + sz)).
 Defined.
 
 Definition compileIntervals `(bs : BuildState pos) :

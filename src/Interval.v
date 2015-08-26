@@ -153,7 +153,7 @@ Qed.
 Lemma Interval_sorted `(i : Interval d) : StronglySorted range_ltn (rds d).
 Proof. by move/NE_StronglySorted_to_list: (Interval_NE_sorted i). Qed.
 
-Lemma Interval_bounded `(i : Interval d) : ibeg d <= iend d.
+Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
 Proof.
   move: (Interval_NE_sorted i).
   inv i.

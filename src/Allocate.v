@@ -74,15 +74,6 @@ Definition tryAllocateFreeReg {pre} :
         foldl (go (fun i => intervalsIntersect current (getInterval i)))
           actives (inactive sd) in
 
-    (* (* Eliminate any candidate register for which a register assignment *)
-    (*    overlap would occur. *) *)
-    (* let freeUntilPos := *)
-    (*     foldl (fun v reg => *)
-    (*              if verifyNewHandled sd current reg *)
-    (*              then v *)
-    (*              else updateRegisterPos v reg (Some 0)) *)
-    (*       freeUntilPos' (ord_enum maxReg) in *)
-
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
     let (reg, mres) := findEligibleRegister sd current freeUntilPos in
