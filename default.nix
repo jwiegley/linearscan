@@ -1,7 +1,7 @@
 { mkDerivation, base, containers, mtl, stdenv, transformers }:
 mkDerivation {
   pname = "linearscan";
-  version = "0.8.0";
+  version = "0.9.0";
   src = ./.;
   buildDepends = [ base containers mtl transformers ];
   homepage = "http://github.com/jwiegley/linearscan";

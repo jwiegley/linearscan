@@ -54,40 +54,6 @@ Program Definition optimalSplitPosition `(i : Interval d) (lb ub : nat) :
 Lemma optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
   optimalSplitPosition i lb ub <= ub.
 Proof. by []. Qed.
-(*   have Hord := ltn0ltn. *)
-(*   have Hlt := ltn_subn. *)
-(*   rewrite /optimalSplitPosition. *)
-(*   set b1 := (X in if X && _ then _ else _). *)
-(*   set b2 := lb < ub. *)
-(*   case B1: b1; case B2: b2; *)
-(*   rewrite /b1 in B1; *)
-(*   try (move/negbT in B1; *)
-(*        move: (posAtRangeEnd_spec B1)); *)
-(*   rewrite /b2 in B2; *)
-(*   rewrite ?orTb ?Bool.orb_false_l /=; *)
-(*   try specialize (Hord lb ub B2); *)
-(*   try specialize (Hlt lb ub B2 Hord); *)
-(*   by ordered. *)
-(* Qed. *)
-
-(* Lemma optimalSplitPosition_beg_spec `(i : Interval d) (lb ub : nat) : *)
-(*   lb < ub <= iend d -> optimalSplitPosition i lb ub < iend d. *)
-(* Proof. *)
-(*   have Hord := ltn0ltn. *)
-(*   have Hlt := ltn_subn. *)
-(*   rewrite /optimalSplitPosition. *)
-(*   set b1 := (X in if X && _ then _ else _). *)
-(*   set b2 := lb < ub. *)
-(*   case B1: b1; case B2: b2; *)
-(*   rewrite /b1 in B1; *)
-(*   try (move/negbT/norP: B1 => [B1 ?]; *)
-(*        move: (posAtRangeEnd_spec B1)); *)
-(*   rewrite /b2 in B2; *)
-(*   rewrite ?orTb ?Bool.orb_false_l /=; *)
-(*   try specialize (Hord lb ub B2); *)
-(*   try specialize (Hlt lb ub B2 Hord); *)
-(*   by ordered. *)
-(* Qed. *)
 
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
@@ -183,11 +149,6 @@ Proof.
     move/negbT in E.
     rewrite -ltnNge in E.
     by ordered.
-    (* have H : beg < splitPos2 <= iend i1.1. *)
-    (*   move: (optimalSplitPosition_spec i1.2 beg splitPos2). *)
-    (*   by ordered. *)
-    (* move: (optimalSplitPosition_beg_spec i1.2 H). *)
-    (* by ordered. *)
 
   (* Wimmer: "All active and inactive intervals for this register intersecting
      with current are split before the start of current and spilled to the
@@ -204,8 +165,7 @@ Proof.
      evidence for now, from the first use of [firstUseReqReg] and then
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
-    exact: inl (ECannotSpillIfRegisterRequiredBefore
-                  optSplitPos2 pos :: e3).
+    exact: inl (ECannotSpillIfRegisterRequiredBefore optSplitPos2 pos :: e3).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 

@@ -538,6 +538,7 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
   (ranges : IntMap (PendingRanges b e)) (Hlt : b <= pos < e) :
   IntMap (PendingRanges b e) :=
   (* If the operation is a function call, force a flush of every register.
+
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
   let refs  := opRefs oinfo op in

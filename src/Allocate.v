@@ -171,11 +171,6 @@ Definition allocateBlockedReg {pre} :
            // the fixed interval for reg
            if current intersects with the fixed interval for reg then
              split current before this intersection *)
-        (* mloc <<- overlapsWithFixedInterval reg ;; *)
-        (* match mloc with *)
-        (* | Some n => splitCurrentInterval (BeforePos n) (Some reg) *)
-        (* | None   => ipure tt *)
-        (* end ;;; *)
 
         (* The allocation failed, so we had to spill some part of the current
            interval instead. *)
@@ -196,8 +191,6 @@ Definition allocateBlockedReg {pre} :
            // the fixed interval for reg
            if current intersects with the fixed interval for reg then
              split current before this intersection *)
-        (* jww (2015-01-30): What if the fixed interval begins at the current
-           position? *)
         mloc <<- overlapsWithFixedInterval reg ;;;
         match mloc with
         | Some n => context (EOverlapsWithFixedInterval n reg) $
