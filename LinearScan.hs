@@ -96,40 +96,9 @@ data OpInfo m op1 op2 = OpInfo
     , moveOp      :: PhysReg  -> LS.VarId -> PhysReg -> m [op2]
     , saveOp      :: PhysReg  -> LS.VarId -> m [op2]
     , restoreOp   :: LS.VarId -> PhysReg -> m [op2]
-    , applyAllocs :: op1 -> [(LS.VarId, PhysReg)] -> m [op2]
+    , applyAllocs :: op1 -> [((LS.VarId, LS.VarKind), PhysReg)] -> m [op2]
     , showOp1     :: op1 -> String
     }
-
-showOp1' :: (op1 -> String)
-         -> LS.OpId
-           -- Interval Id, it's identity, and possible assigned reg
-         -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
-         -> [(Int, Either PhysReg LS.VarId, Maybe PhysReg)]
-         -> [LS.ResolvingMoveSet]
-         -> Maybe (LS.RegStateDescSet, [LS.AllocError])
-         -> op1
-         -> String
-showOp1' showop pos ins outs rms maerrs o =
-    let render Nothing = ""
-        render (Just r) = "=r" ++ show r in
-    let marker label (_i, Left r, _reg) =
-            "    <" ++ label ++ " r" ++ show r ++ ">\n"
-        marker label (i, Right v, reg) =
-            "    <" ++ label ++ " v" ++ show v ++
-            "[" ++ show i ++ "]" ++ render reg ++ ">\n" in
-    let leader = show pos ++ ": " in
-    let width = length leader in
-    concatMap (marker "End") outs ++
-    concatMap (marker "Beg") ins ++
-    leader ++ showop o ++ "\n" ++
-    (case maerrs of
-          Nothing -> ""
-          Just (regState, aerrs) ->
-              concatMap (\x -> replicate width ' ' ++ "!!! " ++
-                               replicate 8 ' ' ++ show x ++ "\n") aerrs ++
-              (unlines . map (replicate (width + 12) ' ' ++) . lines . show
-                   $ regState)) ++
-    concatMap (\x -> replicate (width + 8) ' ' ++ show x ++ "\n") rms
 
 deriving instance Eq OpKind
 deriving instance Show OpKind
@@ -329,6 +298,70 @@ showBlock1 getops bid pos liveIns liveOuts loopInfo initials finals showops b =
                 Just (_, d') -> " Depth=" ++ show d'
         in hdr ++ e ++ idxs ++ d
 
+opContext :: Int
+          -> ScanStateDesc
+          -> IntMap [LS.ResolvingMoveSet]
+          -> IntMap (LS.RegStateDescSet, [LS.AllocError])
+          -> Int
+          -> String
+opContext width sd rms aerrs here =
+    concatMap (marker "End") outs ++
+    concatMap (marker "Beg") ins ++
+    (case M.lookup here aerrs of
+          Nothing -> ""
+          Just (regState, allocErrs) ->
+              concatMap
+                  (\x -> replicate width ' ' ++ "!!! " ++
+                         replicate 8 ' ' ++ show x ++ "\n") allocErrs ++
+              (unlines . map (replicate (width + 12) ' ' ++)
+                   . lines . show $ regState)) ++
+    concatMap (\x -> replicate (width + 8) ' ' ++ show x ++ "\n")
+              (fromMaybe [] (M.lookup here rms))
+  where
+    render Nothing = ""
+    render (Just r) = "=r" ++ show r
+
+    marker label (_i, Left r, _reg) =
+        "    <" ++ label ++ " r" ++ show r ++ ">\n"
+    marker label (i, Right v, reg) =
+        "    <" ++ label ++ " v" ++ show v ++
+        "[" ++ show i ++ "]" ++ render reg ++ ">\n"
+
+    findInts p f z = foldr k z . zip [0..]
+      where
+        k (_idx, Nothing) rest = rest
+        k (idx, Just i) (brest, erest) =
+            let mreg = M.lookup idx (allocations sd) in
+            (if LS.ibeg i == p
+             then (idx, f idx i, mreg) : brest
+             else brest,
+             if LS.iend i == p
+             then (idx, f idx i, mreg) : erest
+             else erest)
+
+    (ins, outs) =
+        findInts here (\idx _ -> Left idx)
+            (findInts here (\_ i -> Right (LS.ivar i)) ([], [])
+                (map Just (intervals sd)))
+            (fixedIntervals sd)
+
+showOp1' :: (a -> String)
+         -> ScanStateDesc
+         -> Int
+         -> IntMap [LS.ResolvingMoveSet]
+         -> IntMap (LS.RegStateDescSet, [LS.AllocError])
+         -> a
+         -> String
+showOp1' showop sd pos rms aerrs o =
+    blank ++ "--------------------" ++ "\n" ++
+    opContext width sd rms aerrs pos ++
+    opContext width sd rms aerrs (pos+1) ++
+    leader ++ showop o ++ "\n"
+  where
+    leader = show pos ++ ": "
+    width  = length leader
+    blank  = replicate width ' '
+
 showOps1 :: LinearScan.OpInfo accType op1 op2
          -> ScanStateDesc
          -> IntMap [LS.ResolvingMoveSet]
@@ -338,30 +371,7 @@ showOps1 :: LinearScan.OpInfo accType op1 op2
          -> String
 showOps1 _ _ _ _ _ [] = ""
 showOps1 oinfo sd rms aerrs pos (o:os) =
-    let here = pos*2+1 in
-    let allocs = allocations sd in
-    let k (idx, i) (brest, erest) =
-            let mreg = M.lookup idx allocs in
-            (if LS.ibeg i == here
-             then (idx, Right (LS.ivar i), mreg) : brest
-             else brest,
-             if LS.iend i == here
-             then (idx, Right (LS.ivar i), mreg) : erest
-             else erest) in
-    let r (_idx, Nothing) rest = rest
-        r (idx, Just i) (brest, erest) =
-            let mreg = M.lookup idx allocs in
-            (if LS.ibeg i == here
-             then (idx, Left idx, mreg) : brest
-             else brest,
-             if LS.iend i == here
-             then (idx, Left idx, mreg) : erest
-             else erest) in
-    let (begs, ends) = foldr k ([], []) (zip [0..] (intervals sd)) in
-    let entriesIn = fromMaybe [] . M.lookup (pos*2+1) in
-    let (begs', ends') = foldr r (begs, ends) (zip [0..] (fixedIntervals sd)) in
-    showOp1' (showOp1 oinfo) (pos*2+1) begs' ends'
-             (entriesIn rms) (M.lookup (pos*2+1) aerrs) o
+    showOp1' (showOp1 oinfo) sd (pos*2+1) rms aerrs o
         ++ showOps1 oinfo sd rms aerrs (pos+1) os
 
 -- | From the point of view of this library, a basic block is nothing more
@@ -541,9 +551,9 @@ allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
          -> LinearScan.OpInfo m op1 op2
          -> LS.UseVerifier
-         -> [blk1] -> m (Either (String, [String]) [blk2])
-allocate 0 _ _ _ _  = return $ Left ("", ["Cannot allocate with no registers"])
-allocate _ _ _ _ [] = return $ Left ("", ["No basic blocks were provided"])
+         -> [blk1] -> m (String, Either [String] [blk2])
+allocate 0 _ _ _ _  = return ("", Left ["Cannot allocate with no registers"])
+allocate _ _ _ _ [] = return ("", Left ["No basic blocks were provided"])
 allocate maxReg binfo oinfo useVerifier blocks = do
     res <- U.unsafeCoerce $ LS.linearScan coqMonad maxReg
         (fromBlockInfo binfo) (fromOpInfo oinfo) useVerifier blocks
@@ -551,15 +561,19 @@ allocate maxReg binfo oinfo useVerifier blocks = do
     case reason res' of
         Just (err, _) -> do
             dets <- showDetails res' M.empty M.empty M.empty
-            return $ Left (dets, map reasonToStr err)
+            return (dets, Left (map reasonToStr err))
         Nothing -> case allocatedBlocks res' of
             Left (m, initials, finals) -> do
                 dets <- showDetails res' m initials finals
-                return $ Left (dets,
-                    concatMap (\(pos, (_, es)) ->
-                                ("At position " ++ show pos) : map show es)
-                              (M.toList m))
-            Right blks -> return $ Right blks
+                return (dets,
+                        Left (concatMap
+                                  (\(pos, (_, es)) ->
+                                    ("At position " ++ show pos)
+                                        : map show es)
+                             (M.toList m)))
+            Right blks -> do
+                dets <- showDetails res' M.empty M.empty M.empty
+                return (dets, Right blks)
   where
     reasonToStr r = case r of
         LS.EOverlapsWithFixedInterval pos reg ->

@@ -281,12 +281,8 @@ Defined.
 
 Definition upos_before_rend `(r : Range rd) (upos : UsePos) :=
   if ups rd is u :: _
-  then if (uvar upos != Input) && (uloc u == rend rd)
-       then upos <  u
-       else upos <= u
-  else if uvar upos is Input
-       then upos <= rend rd
-       else upos <  rend rd.
+  then upos <= u
+  else upos <  rend rd.
 Arguments upos_before_rend [rd] r upos /.
 
 Lemma validUsePosition `(r : Range rd) (upos : UsePos)
@@ -320,8 +316,10 @@ Proof.
   try exact Hend; auto.
 Defined.
 
-Definition makeNewRange {b pos e} (H : b <= pos < e)
-  (upos : UsePos) (Hodd : odd upos) (Heqe : uloc upos == pos.*2.+1) :
+Definition makeNewRange {b pos e} (H : b <= pos < e) (upos : UsePos)
+  (Heqe : uloc upos == if uvar upos is Input
+                       then pos.*2.+1
+                       else pos.*2.+2) :
   BoundedRange b.*2.+1 e.*2.+1.
 Proof.
   (* If the variable is only [Input], assume it starts from the beginning; and
@@ -330,21 +328,23 @@ Proof.
   pose rd :=
     {| rbeg := if uvar upos is Input
                then b.*2.+1
-               else pos.*2.+1
+               else pos.*2.+2
      ; rend := match uvar upos with
-               | Input  => pos.*2.+1
-               | Temp   => pos.*2.+2
+               | Input  => pos.*2.+2
+               | Temp   => pos.*2.+3
                | Output => e.*2.+1
                end
      ; ups  := [:: upos ] |}.
 
   apply: ((rd; _); _).
-   constructor=> /=.
-   + move/eqP in Heqe; rewrite {}Heqe.
-     case: (uvar upos) in rd *;
-     by undoubled.
-   + by constructor; constructor.
-   + by apply/andP; split.
+    constructor=> /=.
+    + case E: (uvar upos) in Heqe rd *;
+      move/eqP in Heqe; rewrite {}Heqe;
+      try undoubled.
+      breakup; try undoubled.
+      apply/ltn_addn1.
+      by rewrite ltn_Sdouble.
+    + by constructor; constructor.
 
   rewrite /= => r.
   case: (uvar upos).
@@ -352,18 +352,34 @@ Proof.
       move/eqP in U.
       by ordered.
     by undoubled.
-  + by undoubled.
-  + by undoubled.
+  + clear r rd Heqe.
+    apply/andP; split.
+      rewrite -doubleS.
+      by undoubled.
+    apply/ltn_addn1.
+    rewrite ltn_Sdouble.
+    by ordered.
+  + clear r rd Heqe.
+    apply/andP; split.
+      rewrite -doubleS.
+      by undoubled.
+    by ordered.
 Defined.
 
 Definition makeUsePos (pos : nat) (var : VarInfo maxReg) :
-  { u : UsePos | uloc u == pos.*2.+1 & odd u }.
+  { u : UsePos | uloc u == if uvar u is Input
+                           then pos.*2.+1
+                           else pos.*2.+2 }.
 Proof.
-  set upos := {| uloc   := pos.*2.+1
+  set upos := {| uloc   := if varKind var is Input
+                           then pos.*2.+1
+                           else pos.*2.+2
                ; regReq := regRequired var
                ; uvar   := varKind var |}.
-  have Hodd : odd upos by rewrite /= odd_double.
-  by exists upos.
+  exists upos;
+  rewrite /upos;
+  case: (varKind var) => //=;
+  by rewrite /= odd_double.
 Defined.
 
 (* This is the most complex of the variable handling functions, because under
@@ -374,11 +390,11 @@ Definition handleOutputVar {b pos e} (H : b <= pos < e)
   (range : option (PendingRanges b e)) (var : VarInfo maxReg) :
   option (PendingRanges b e).
 Proof.
-  move: (makeUsePos pos var) => [upos Heqe Hodd].
+  move: (makeUsePos pos var) => [upos Heqe].
 
   (* If no range exists yet, make a new one that extends from [pos] to [e]. *)
   case: range => [range|]; last first.
-    exact: Some [::: makeNewRange H Hodd Heqe].
+    exact (Some [::: makeNewRange H Heqe]).
 
   (* If [pos] fits within the current range, use it; otherwise, shift the
      beginning of the current range down to [pos] so that our use position may
@@ -396,6 +412,8 @@ Proof.
         exists r1.
         move: (Range_shift_spec Hr1) => [-> -> _].
         move/eqP: Heqe => ->.
+        case: (uvar upos);
+        rewrite -?doubleS;
         by undoubled.
       (* Is the use position at the beginning of the range output only? If so,
          then we can allow a lifetime hole between the current position and
@@ -403,17 +421,21 @@ Proof.
       case: (kind == Output).
         split. exact false.
         have H0 : b <= pos < pos.+1 by ordered.
-        pose NR := makeNewRange H0 Hodd Heqe.
+        pose NR := makeNewRange H0 Heqe.
         exists NR.1.
         rewrite /= {NR}.
         move/eqP: Heqe => ->.
-        by case: (uvar upos); undoubled.
+        case: (uvar upos);
+        rewrite -?doubleS;
+        by undoubled.
       split. exact true.
       pose r1 := Range_shift r.2 E.
       have Hr1: r1 = Range_shift r.2 E by [].
       exists r1.
       move: (Range_shift_spec Hr1) => [-> -> _].
       move/eqP: Heqe => ->.
+      case: (uvar upos);
+      rewrite -?doubleS;
       by undoubled.
     split. exact true.
     move/negbT in E; rewrite -ltnNge /= in E.
@@ -427,20 +449,23 @@ Proof.
      create a new one.  At the step where we combine the pending ranges, any
      overlapping ranges will be coalesced. *)
   case Hupos : (upos_before_rend r1.2 upos); last first.
-    exact: Some [::: makeNewRange H Hodd Heqe & range].
+    exact: Some [::: makeNewRange H Heqe & range].
 
   (* We have a valid range to put the use position in; derive this fact from
      what we know so far, and then cons our use position onto the front of the
      existing range. *)
   move: (validUsePosition Hbeg2 Hupos) => [Hloc Hsorted].
-  have br : BoundedRange b.*2.+1 e.*2.+1.
-    exists (Range_cons r1.2 Hloc Hsorted Hodd).
-    by rewrite /=; ordered.
 
   case: replaceFirst.
+    have br : BoundedRange b.*2.+1 e.*2.+1.
+      exists (Range_cons r1.2 Hloc Hsorted).
+      by rewrite /=; ordered.
     case: range => [_|_ rs].
       exact: Some [::: br].
     exact: Some [::: br & rs].
+  have br : BoundedRange b.*2.+1 e.*2.+1.
+    exists r1.
+    by ordered.
   exact: Some [::: br & range].
 Defined.
 
@@ -448,10 +473,10 @@ Definition handleVar {b pos e} (H : b <= pos < e)
   (range : option (PendingRanges b e)) (var : VarInfo maxReg) :
   option (PendingRanges b e).
 Proof.
-  move: (makeUsePos pos var) => [upos Heqe Hodd].
-  case: range => [range|]; last first.
-    exact: Some [::: makeNewRange H Hodd Heqe].
-  exact: Some [::: makeNewRange H Hodd Heqe & range].
+  move: (makeUsePos pos var) => [? Heqe].
+  case: range => [range|].
+    exact: Some [::: makeNewRange H Heqe & range].
+  exact: Some [::: makeNewRange H Heqe].
 Defined.
 
 Definition handleVars_combine {b pos e} (H : b <= pos < e) (vid : nat)
@@ -490,18 +515,10 @@ Proof.
   exact: m.
 Defined.
 
-Definition extractVarInfo (xs : NonEmpty (VarInfo maxReg)) :
-  seq (VarInfo maxReg).
-Proof.
-  case: xs => [x|x xs].
-    exact: [:: x].
-  exact: (x :: xs).
-Defined.
-
 Definition handleVars
   (varRefs : seq (VarInfo maxReg)) `(Hlt : b <= pos < e)
   `(ranges : IntMap (PendingRanges b e)) : IntMap (PendingRanges b e) :=
-  let vars := IntMap_map extractVarInfo $
+  let vars := IntMap_map NE_to_list $
               IntMap_groupOn (@nat_of_varId maxReg) varRefs in
   IntMap_mergeWithKey (handleVars_combine Hlt) (handleVars_onlyVars Hlt)
                       (handleVars_onlyRanges Hlt) vars ranges.
@@ -510,7 +527,6 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
   (ranges : IntMap (PendingRanges b e)) (Hlt : b <= pos < e) :
   IntMap (PendingRanges b e) :=
   (* If the operation is a function call, force a flush of every register.
-
      jww (2015-01-30): This needs to be improved to consider the calling
      convention of the operation. *)
   let refs  := opRefs oinfo op in

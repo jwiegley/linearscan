@@ -70,18 +70,18 @@ Definition tryAllocateFreeReg {pre} :
          freeUntilPos[it.reg] = next intersection of it with current *)
     let go f v p := let: (i, r) := p in updateRegisterPos v r (f i) in
     let actives := foldl (go (fun _ => Some 0)) (vconst None) (active sd) in
-    let freeUntilPos' :=
+    let freeUntilPos :=
         foldl (go (fun i => intervalsIntersect current (getInterval i)))
           actives (inactive sd) in
 
-    (* Eliminate any candidate register for which a register assignment
-       overlap would occur. *)
-    let freeUntilPos :=
-        foldl (fun v reg =>
-                 if verifyNewHandled sd current reg
-                 then v
-                 else updateRegisterPos v reg (Some 0))
-          freeUntilPos' (ord_enum maxReg) in
+    (* (* Eliminate any candidate register for which a register assignment *)
+    (*    overlap would occur. *) *)
+    (* let freeUntilPos := *)
+    (*     foldl (fun v reg => *)
+    (*              if verifyNewHandled sd current reg *)
+    (*              then v *)
+    (*              else updateRegisterPos v reg (Some 0)) *)
+    (*       freeUntilPos' (ord_enum maxReg) in *)
 
     (* reg = register with highest freeUntilPos *)
     (* mres = highest use position of the found register *)
@@ -134,18 +134,17 @@ Definition allocateBlockedReg {pre} :
          nextUsePos[it.reg] = next use of it after start of current *)
     let go (v : Vec (option nat) maxReg) (p : IntervalSig * PhysReg) :=
         let: (int, reg) := p in
-        let atPos u := ((pos    == uloc u) ||
-                        (pos.+1 == uloc u)) && regReq u in
+        let atPos u := (pos == uloc u) && regReq u in
         let pos' :=
             (* In calculating the highest use position of this register, if we
                know that it is being used at the current position, then it
                cannot be spilled there, and so we try to take it out of the
                running by returning one. *)
             match findIntervalUsePos int.2 atPos with
-            | Some _ => Some odd1
+            | Some _ => Some 0
             | None   => nextUseAfter int.2 pos
             end in
-        updateRegisterPos v reg (fmap (fun x => x.1) pos') in
+        updateRegisterPos v reg pos' in
 
     let resolve xs :=
         [seq (packInterval (getInterval (fst i)), snd i) | i <- xs] in
@@ -165,7 +164,7 @@ Definition allocateBlockedReg {pre} :
           | Some n =>
               n < if lookupUsePos current (fun u => pos <= uloc u)
                        is Some (nextUse; _)
-                  then nextUse.1
+                  then nextUse
                   else intervalEnd current
           end)
       then

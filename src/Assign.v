@@ -74,21 +74,18 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
       end ;;
     pure $ if mops is Some ops then acc ++ ops else acc.
 
-Definition varAllocs opid (allocs : seq (Allocation maxReg)) kind vid :
-  seq (VarId * PhysReg) :=
-  map (fun x => (vid, x)) $ catMaybes
+Definition varAllocs pos (allocs : seq (Allocation maxReg)) vid v :
+  seq ((VarId * VarKind) * PhysReg) :=
+  map (fun x => ((vid, @varKind maxReg v), x)) $ catMaybes
     [seq intReg i | i <- allocs
     & let int := intVal i in
       [&& ivar int == vid
-      ,   ibeg int <= opid
-      &   if kind is Input
-          then opid <= iend int
-          else opid <  iend int]].
+      ,   pos < iend int & ibeg int < pos.+2 ]].
 
-Definition varInfoAllocs opid (allocs : seq (Allocation maxReg)) v :
-  seq (VarId * PhysReg) :=
+Definition varInfoAllocs pos (allocs : seq (Allocation maxReg)) v :
+  seq ((VarId * VarKind) * PhysReg) :=
   if @varId maxReg v isn't inr vid then [::] else
-  varAllocs opid allocs (varKind v) vid.
+  varAllocs pos allocs vid v.
 
 Definition Verified := Verified maxReg mType AssnStateDesc.
 
@@ -96,25 +93,35 @@ Definition _verExt := @_verExt maxReg AssnStateDesc.
 
 Variable useVerifier : UseVerifier.
 
-Definition setAllocations (allocs : seq (Allocation maxReg)) op :
+Definition setAllocations (allocs : seq (Allocation maxReg))
+  (injector : Verified (seq opType2)) op :
   Verified (seq opType2) :=
   assn <-- use _verExt ;;
-  let opid  := assnOpId assn in
-  let vars  := opRefs oinfo op in
-  let regs  := concat $ map (varInfoAllocs opid allocs) vars in
-  ops <-- verifyApplyAllocs oinfo opid useVerifier op regs ;;
+  let opid := assnOpId assn in
+  let vars := opRefs oinfo op in
+  let regs := concat $ map (varInfoAllocs opid allocs) vars in
 
-  transitions <--
-    (if assnBlockBeg assn <= opid < assnBlockEnd assn
-     then
-       let moves := determineMoves (resolvingMoves allocs None opid opid.+2) in
-       moves' <-- verifyResolutions opid useVerifier moves ;;
-       lift $ generateMoves moves'
-     else pure [::]) ;;
+  let transitions b e :=
+    if assnBlockBeg assn <= b < assnBlockEnd assn
+    then let moves := determineMoves allocs None b e in
+         moves' <-- verifyResolutions e useVerifier moves ;;
+         lift $ generateMoves moves'
+    else pure [::] in
+
+  inputTransitions  <-- transitions opid.-1 opid ;;
+  outputTransitions <-- transitions opid opid.+1 ;;
+
+  injected <-- injector ;;
+
+  (* opid.+2 is used here so that verification action appear to have happened
+     after the current instruction, since they represent the "effect" of the
+     instruction. *)
+  verifyAllocs oinfo opid.+2 useVerifier op regs ;;
+  ops <-- lift $ applyAllocs oinfo op regs ;;
 
   _verExt \o+ _assnOpId += 2 ;;
 
-  pure $ ops ++ transitions.
+  pure $ inputTransitions ++ outputTransitions ++ injected ++ ops.
 
 Definition considerOps
   (allocs   : seq (Allocation maxReg))
@@ -131,38 +138,36 @@ Definition considerOps
 
     bid <-- lift $ blockId binfo blk ;;
     let: (liveIns, liveOuts) :=
-       if IntMap_lookup bid liveSets is Some bls
-       then (blockLiveIn bls, blockLiveOut bls)
-       else (emptyIntSet, emptyIntSet) in
+      if IntMap_lookup bid liveSets is Some bls
+      then (blockLiveIn bls, blockLiveOut bls)
+      else (emptyIntSet, emptyIntSet) in
+    let: (begMoves, endMoves) :=
+      fromMaybe ([::], [::]) (IntMap_lookup bid mappings) in
+    let k := setAllocations allocs in
+
+    let resolutions pos moves :=
+      opid   <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+      moves' <-- verifyResolutions pos useVerifier moves ;;
+      lift $ generateMoves moves' in
 
     verifyBlockBegin opid useVerifier bid liveIns loops ;;
 
-    let eg := emptyGraph (@determineEdge maxReg) in
-    let: (gbeg, gend) :=
-       if IntMap_lookup bid mappings is Some graphs
-       then graphs
-       else (eg, eg) in
+    opsb'  <-- concatMapM (k (pure [::])) opsb ;;
+    bmoves <-- resolutions opid.-1 begMoves ;;
+    opsm'  <-- concatMapM (k (pure [::])) opsm ;;
 
-    let k := setAllocations allocs in
-    opsb'     <-- concatMapM k opsb ;;
-
-    let begMoves := sortMoves gbeg in
-    opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
-    begMoves' <-- verifyResolutions opid.-2 useVerifier begMoves ;;
-    bmoves    <-- lift $ generateMoves begMoves' ;;
-
-    opsm'     <-- concatMapM k opsm ;;
-
-    let endMoves := sortMoves gend in
-    opid      <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
-    endMoves' <-- verifyResolutions opid.-2 useVerifier endMoves ;;
-    emoves    <-- lift $ generateMoves endMoves' ;;
-
-    opse'     <-- concatMapM k opse ;;
+    opse'  <-- match opse with
+      | e :: es =>
+          xs <-- concatMapM (k (pure [::])) (belast e es) ;;
+          x  <-- k (resolutions opid endMoves) (last e es) ;;
+          pure (xs ++ x)
+      | [::] =>
+          pure [::]
+      end ;;
 
     verifyBlockEnd opid useVerifier bid liveOuts ;;
 
-    let opsm'' := bmoves ++ opsm' ++ emoves in
+    let opsm'' := bmoves ++ opsm' in
     match opsb', opse' with
     | b :: bs, e :: es =>
         pure $ setBlockOps binfo blk

@@ -57,8 +57,7 @@ Arguments head_or_end rd /.
 Definition last_or_beg (rd : RangeDesc) := last_or (rbeg rd) (ups rd).
 Arguments last_or_beg rd /.
 
-Definition useWithinRange (b e : nat) (u : UsePos) :=
-  (b <= u) && upos_within_bound e u.
+Definition useWithinRange (b e : nat) (u : UsePos) := b <= u < e.
 Arguments useWithinRange b e u /.
 
 (* When [uses] is not [nil], then either [b < e] or [b <= e], depending on the
@@ -77,9 +76,8 @@ Arguments validRangeBounds b e uses /.
     any invariants. *)
 
 Record Range (rd : RangeDesc) : Prop := {
-  Range_proper   : validRangeBounds (rbeg rd) (rend rd) (ups rd);
-  Range_sorted   : StronglySorted upos_le (ups rd);
-  Range_uses_odd : all (odd \o uloc) (ups rd)
+  Range_proper : validRangeBounds (rbeg rd) (rend rd) (ups rd);
+  Range_sorted : StronglySorted upos_le (ups rd)
 }.
 
 Definition getRangeDesc `(r : Range d) := d.
@@ -105,7 +103,7 @@ Ltac reduce_last_use :=
 Lemma Range_bounded `(r : Range rd) : rbeg rd <= rend rd.
 Proof.
   case: rd => [? ? rus] /= in r *.
-  case: r => /= [Hproper _ _].
+  case: r => /= [Hproper _].
   case: rus => //= [u us] in Hproper *.
   by reduce_last_use; ordered.
 Qed.
@@ -114,7 +112,7 @@ Lemma Range_head_or_end_spec `(r : Range rd) (b : nat) :
   b < head_or_end rd -> b < rend rd.
 Proof.
   rewrite /head_or_end /head_or /=.
-  move: r => [Hproper Hsorted _].
+  move: r => [Hproper Hsorted].
   elim: (ups rd) => //= [u us IHus] in Hproper Hsorted *.
   move=> H.
   apply: IHus.
@@ -134,9 +132,8 @@ Proof.
   exists {| rbeg := b
           ; rend := rend rd
           ; ups  := ups rd |}.
-  move: r => [Hproper Hsorted Hallodd].
+  move: r => [Hproper Hsorted].
   constructor=> //=.
-  clear Hallodd.
   rewrite /= in H.
   elim: (ups rd) => //= [|u us IHus] in Hproper Hsorted H *.
     by ordered.
@@ -157,8 +154,7 @@ Definition Range_shift_spec `(r : Range rd) `(H : b < head_or_end rd) :
        &   ups  r1.1 = ups r ].
 Proof. by move=> r1; invert. Qed.
 
-Definition newRange (upos : UsePos) (Hodd : odd upos)
-  (Hinput : uvar upos != Input) : RangeSig.
+Definition newRange (upos : UsePos) (Hinput : uvar upos != Input) : RangeSig.
 Proof.
   exists {| rbeg := uloc upos
           ; rend := (uloc upos).+1
@@ -167,20 +163,16 @@ Proof.
   constructor=> //=.
   - by case (uvar upos); ordered.
   - by constructor; constructor.
-  - by apply/andP; split.
 Defined.
 
 Definition Range_cons (upos : UsePos) `(r : Range rd)
   (H : validRangeBounds (rbeg rd) (rend rd) (upos :: ups rd))
-  (HS : StronglySorted upos_le (upos :: ups rd))
-  (Hodd : odd upos) : RangeSig.
+  (HS : StronglySorted upos_le (upos :: ups rd)) : RangeSig.
 Proof.
   exists {| rbeg := rbeg rd
           ; rend := rend rd
           ; ups  := upos :: ups rd |}.
   constructor=> //=.
-  - apply/andP; split=> //.
-    exact: (Range_uses_odd r).
 Defined.
 
 Definition Range_split
@@ -199,7 +191,6 @@ Definition Range_split
 Proof.
   move=> *.
   move/StronglySorted_inv_app: (Range_sorted r) => [? ?].
-  move: all_cat (Range_uses_odd r) => -> /andP [? ?].
   split; constructor=> //=.
 Defined.
 
@@ -249,14 +240,11 @@ Proof.
     move: (Range_bounded r2).
     by reduce_last_use; ordered.
 
-  case: r1 => [/= Hr1a Hr1b Hr1c].
-  case: r2 => [/= Hr2a Hr2b Hr2c].
+  case: r1 => [/= Hr1a Hr1b].
+  case: r2 => [/= Hr2a Hr2b].
 
   constructor=> //=; last first.
-  - by rewrite all_cat; apply/andP; split.
-
-  - move=> {Hr1c Hr2c}.
-    apply: StronglySorted_cat => //.
+  - apply: StronglySorted_cat => //.
     move=> {Hr1b Hr2b rd' Hb He}.
     case: (ups rd1) => // [u1 us1] in Hr1a *;
     rewrite olast_last;
@@ -274,14 +262,14 @@ Proof.
     move/andP: Hr1a => [/andP [Hr1aA Hr1aB] Hr1aC].
     move/andP: Hr2a => [/andP [Hr2aA Hr2aB] Hr2aC].
     move: all_rcons Hr1aC => -> /andP [Hr1aDa Hr1aDb].
-    rewrite /useWithinRange /upos_within_bound in Hr1aDa.
+    rewrite /useWithinRange in Hr1aDa.
     abstract (
       case: (uvar u1) in Hr1aB *;
       case: (uvar u1e) in Hr1aDa Hr1aDb *;
       case: (uvar u2) in Hr2aC;
       by ordered).
 
-  - clear Hr1b Hr1c Hr2b Hr2c.
+  - clear Hr1b Hr2b.
     rewrite all_cat.
     case: (ups rd1) => [|u1 us1] in Hr1a *;
     case: (ups rd2) => /= [|u2 us2] in Hr2a *.
@@ -317,8 +305,8 @@ Definition Range_merge `(r1 : Range rd1) `(r2 : Range rd2) :
          ; ups  := sortBy upos_le (ups r1 ++ ups r2) |}.
 Proof.
   constructor=> //=.
-  - move: r1 => [Hproper1 _ _].
-    move: r2 => [Hproper2 _ _].
+  - move: r1 => [Hproper1 _].
+    move: r2 => [Hproper2 _].
     rewrite /validRangeBounds in Hproper1 Hproper2.
     rewrite -(@sortBy_all _ _ upos_le).
     case: (ups rd1) => [|u1 us1] in Hproper1 *;
@@ -336,7 +324,7 @@ Proof.
         rewrite /useWithinRange /=.
         elim: us2 => [|u2' us2' IHus2'] /= in Hproper2 *.
           by ordered.
-        have H : (rbeg rd2 <= u2 <= rend rd2) &&
+        have H : (rbeg rd2 <= u2 < rend rd2) &&
                  all (useWithinRange (rbeg rd2) (rend rd2)) us2'
           by ordered.
         specialize (IHus2' H).
@@ -386,7 +374,7 @@ Proof.
         case: (uvar u1) in Hproper1 *.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
           by ordered.
-        have H : (rbeg rd1 <= u1 <= rend rd1) &&
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
           by ordered.
         specialize (IHus1' H).
@@ -399,7 +387,6 @@ Proof.
         by ordered.
       + rewrite /useWithinRange /=.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
-          rewrite leq_max.
           by ordered.
         have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
@@ -414,7 +401,6 @@ Proof.
         by ordered.
       + rewrite /useWithinRange /=.
         elim: us1 => [|u1' us1' IHus1'] /= in Hproper1 *.
-          rewrite leq_max.
           by ordered.
         have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
@@ -475,7 +461,7 @@ Proof.
           | case: (uvar u2') in Hb *;
             rewrite leq_max;
             by apply/orP; right ].
-        have H : (rbeg rd1 <= u1 <= rend rd1) &&
+        have H : (rbeg rd1 <= u1 < rend rd1) &&
                  all (useWithinRange (rbeg rd1) (rend rd1)) us1'
           by ordered.
         specialize (IHus1' H).
@@ -558,11 +544,6 @@ Proof.
     try constructor;
     apply: StronglySorted_insert;
     try apply: sortBy_sorted;
-    by ordered.
-
-  - move: (Range_uses_odd r1).
-    move: (Range_uses_odd r2).
-    rewrite -(@sortBy_all _ _ upos_le) all_cat.
     by ordered.
 Defined.
 
@@ -687,117 +668,14 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition hasInputsAt (rd : RangeDesc) (pos : nat) : bool :=
-  foldl (fun b u =>
-           if b || ((uloc u == pos) && (uvar u == Input))
-           then true
-           else b) false (ups rd).
-
 Definition hasOnlyOutputsAt (rd : RangeDesc) (pos : nat) : bool :=
   let xs := [seq u <- ups rd | uloc u == pos] in
   (size xs > 0) && all (fun u => uvar u == Output) xs.
 
-Definition rangesJoinedAt (x y : RangeDesc) (pos : nat) : bool :=
-  hasInputsAt x pos && ~~ hasOnlyOutputsAt y pos.
-
 Definition rangesIntersect (x y : RangeDesc) : option nat :=
   if (rbeg x < rend y) && (rbeg y < rend x)
-  then (* The ranges clearly overlap each other *)
-       Some (if rbeg x < rbeg y then rbeg y else rbeg x)
-  else if (rend x == rbeg y) && rangesJoinedAt x y (rend x)
-       then (* The ranges don't overlap, but using the same register for both
-               would result in an assignment overlap. *)
-            Some (rend x)
-       else if (rend y == rbeg x) && rangesJoinedAt y x (rend y)
-            then Some (rend y)
-            else None.
-
-Example rangesIntersect_ex1 :
-  Some 4 = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                           {| rbeg := 4 ; rend := 8 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex2 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 8 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex3 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 6 ; rend := 8 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex4 :
-  None = rangesIntersect {| rbeg := 5 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex5 :
-  Some 3 = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                           {| rbeg := 3 ; rend := 5 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex6 :
-  Some 2 = rangesIntersect {| rbeg := 2 ; rend := 4 ; ups  := [::] |}
-                           {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex7 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex8 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 2 ; ups  := [::] |}
-                         {| rbeg := 2 ; rend := 5 ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex9 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5
-                          ; ups  := [:: {| uloc   := 5
-                                         ; regReq := false
-                                         ; uvar   := Output |}] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex10 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5 ; ups  := [::] |}
-                         {| rbeg := 5 ; rend := 5
-                          ; ups  := [:: {| uloc   := 5
-                                         ; regReq := false
-                                         ; uvar   := Input |}] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex11 :
-  Some 5 = rangesIntersect {| rbeg := 2 ; rend := 5
-                            ; ups  := [:: {| uloc   := 5
-                                           ; regReq := false
-                                           ; uvar   := Input |}] |}
-                           {| rbeg := 5 ; rend := 5
-                            ; ups  := [:: {| uloc   := 5
-                                           ; regReq := false
-                                           ; uvar   := Input |}] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex12 :
-  Some 5 = rangesIntersect {| rbeg := 2 ; rend := 5
-                            ; ups  := [:: {| uloc   := 5
-                                           ; regReq := false
-                                           ; uvar   := Input |}] |}
-                           {| rbeg := 5 ; rend := 5
-                            ; ups  := [::] |}.
-Proof. by []. Qed.
-
-Example rangesIntersect_ex13 :
-  None = rangesIntersect {| rbeg := 2 ; rend := 5
-                          ; ups  := [:: {| uloc   := 5
-                                         ; regReq := false
-                                         ; uvar   := Input |}] |}
-                         {| rbeg := 5 ; rend := 5
-                          ; ups  := [:: {| uloc   := 5
-                                         ; regReq := false
-                                         ; uvar   := Output |}] |}.
-Proof. by []. Qed.
+  then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
+  else None.
 
 Lemma rangesIntersect_sym : symmetric rangesIntersect.
 Admitted.
@@ -898,8 +776,7 @@ Proof.
     apply/allP=> [x Hin].
     move/allP: H1 => /(_ x Hin).
     rewrite /=.
-    reduce_last_use=> //.
-    exact/ltnW.
+    by reduce_last_use.
 
   have Hr2: (validRangeBounds before rend0 l2).
     rewrite /= /useWithinRange all_predI => {H1 Hsort1 Hsort2 r}.

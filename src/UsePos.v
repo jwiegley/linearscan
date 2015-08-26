@@ -100,12 +100,6 @@ Arguments upos_le x y /.
   instruction.  Hence this notion of a "use position not covered by a range",
   if it be input-only and coincide with the end of the previous range. *)
 
-Definition upos_within_bound (before : nat) (u : UsePos) :=
-  if uvar u is Input
-  then uloc u <= before
-  else uloc u < before.
-Arguments upos_within_bound before u /.
-
 Program Instance upos_le_trans : Transitive upos_le.
 Obligation 1. by ordered. Qed.
 

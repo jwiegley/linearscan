@@ -207,7 +207,7 @@ Proof. intros; inversion H; auto. Qed.
 
 Definition findIntervalUsePos `(i : Interval d) (f : UsePos -> bool) :
   option { r' : RangeSig & { u : UsePos | u \in ups r'.1
-                                        & ibeg d <= u <= iend d } }.
+                                        & ibeg d <= u < iend d } }.
 Proof.
   move: (Interval_exact_beg i).
   move: (Interval_exact_end i) => /=.
@@ -280,21 +280,17 @@ Proof.
 Defined.
 
 Definition lookupUsePos `(i : Interval d) (f : UsePos -> bool) :
-  option { u : oddnum | ibeg d <= u.1 <= iend d }.
+  option { u : nat | ibeg d <= u < iend d }.
   case: (findIntervalUsePos i f) => [[r [u Hin]]|];
     last exact: None.
-  move: (Range_uses_odd r.2).
-  move/allP => /(_ u Hin) /= Hodd H.
+  move=> /= H.
   apply: Some _.
-  exists (uloc u; Hodd).
+  exists (uloc u).
   exact: H.
 Defined.
 Arguments lookupUsePos [d] i f /.
 
-Definition intervalHasInputsAt (d : IntervalDesc) (pos : nat) : bool :=
-  NE_foldl (fun b (r : RangeSig) => b || hasInputsAt r.1 pos) false (rds d).
-
-Definition nextUseAfter `(i : Interval d) (pos : nat) : option oddnum :=
+Definition nextUseAfter `(i : Interval d) (pos : nat) : option nat :=
   if lookupUsePos i (fun u => pos < uloc u) is Some (n; _)
   then Some n
   else None.
@@ -325,10 +321,6 @@ Proof.
   by ordered.
 Qed.
 
-Definition singletonIntervalReqRes `(i : Interval d) : bool :=
-  [&& iend d - ibeg d == 1
-  &   isJust (lookupUsePos i regReq)].
-
 Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with
@@ -338,11 +330,6 @@ Definition firstUsePos (d : IntervalDesc) : option UsePos :=
       end in
   go (rds d).
 Arguments firstUsePos d /.
-
-Definition intervalBeginsWithInput (d : IntervalDesc) : bool :=
-  if firstUsePos d is Some u
-  then uvar u == Input
-  else false.
 
 Definition lastUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
@@ -368,14 +355,14 @@ Definition afterLifetimeHole (d : IntervalDesc) (pos : nat) : nat :=
 Arguments afterLifetimeHole d pos /.
 
 Definition firstUseReqReg `(i : Interval d) :
-  option { u : oddnum | ibeg d <= u.1 <= iend d } := lookupUsePos i regReq.
+  option { u : nat | ibeg d <= u < iend d } := lookupUsePos i regReq.
 Arguments firstUseReqReg [d] i /.
 
 Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) :
   option nat :=
   if (ibeg x < iend y) && (ibeg y < iend x)
   then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
-  else rangesIntersect (NE_last (rds x)).1 (NE_head (rds y)).1.
+  else None.
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 

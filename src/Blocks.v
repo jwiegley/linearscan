@@ -40,7 +40,7 @@ Record OpInfo `{Monad m} (opType1 opType2 : Set) := {
   moveOp      : PhysReg -> VarId -> PhysReg -> m (seq opType2);
   saveOp      : PhysReg -> VarId -> m (seq opType2);
   restoreOp   : VarId   -> PhysReg -> m (seq opType2);
-  applyAllocs : opType1 -> seq (VarId * PhysReg) -> m (seq opType2);
+  applyAllocs : opType1 -> seq (VarId * VarKind * PhysReg) -> m (seq opType2);
   showOp      : opType1 -> string
 }.
 
@@ -71,10 +71,6 @@ Definition allBlockOps (block : blockType1) : seq opType1 :=
   let: (a, b, c) := blockOps binfo block in a ++ b ++ c.
 
 Definition blockSize (block : blockType1) := size (allBlockOps block).
-
-(* jww (2015-01-12): Some of the things described by Wimmer in the section on
-   dealing with computing of intervals have yet to be done:
-    - Loop handling (reordering blocks to optimize allocation) *)
 
 Definition foldOps {a} (f : a -> opType1 -> a) (z : a) : seq blockType1 -> a :=
   foldl (fun bacc blk => foldl f bacc (allBlockOps blk)) z.

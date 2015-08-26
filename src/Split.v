@@ -248,17 +248,18 @@ Proof.
     have Hlt := ltn_subn.
     move: Hmid.
     rewrite /optSplitPos /optimalSplitPosition.
-    set b1 := (X in if X && _ then _ else _).
-    set b2 := (X in if _ && X then _ else _).
-    case B1: b1; case B2: b2;
-    rewrite /b1 in B1;
-    try (move/negbT/norP: B1 => [B1 ?];
-         move: (posAtRangeEnd_spec B1));
-    rewrite /b2 in B2;
-    rewrite ?orTb ?Bool.orb_false_l /=;
-    try specialize (Hord _ _ B2);
-    try specialize (Hlt _ _ B2 Hord);
     by ordered.
+    (* set b1 := (X in if X && _ then _ else _). *)
+    (* set b2 := (X in if _ && X then _ else _). *)
+    (* case B1: b1; case B2: b2; *)
+    (* rewrite /b1 in B1; *)
+    (* try (move/negbT/norP: B1 => [B1 ?]; *)
+    (*      move: (posAtRangeEnd_spec B1)); *)
+    (* rewrite /b2 in B2; *)
+    (* rewrite ?orTb ?Bool.orb_false_l /=; *)
+    (* try specialize (Hord _ _ B2); *)
+    (* try specialize (Hlt _ _ B2 Hord); *)
+    (* by ordered. *)
 
   have Hsize2 : 0 < size (unhandled sd).
     rewrite /= in sd st *.

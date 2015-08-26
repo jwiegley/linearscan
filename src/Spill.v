@@ -48,50 +48,46 @@ Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
    (anything lower and we cannot insert the split interval onto the unhandled
    list for reprocessing) and an absolute upper bound (anything higher is not
    valid according to the algorithm). Anything in between is fair game. *)
-Program Definition optimalSplitPosition `(i : Interval d) (lb ub : nat) : nat :=
-  if [|| posAtRangeEnd i ub        (* Avoid empty ranges *)
-     |   intervalHasInputsAt i ub  (* Avoid input at split pos *)
-     ] && (lb < ub)
-  then ub.-1
-  else ub.
+Program Definition optimalSplitPosition `(i : Interval d) (lb ub : nat) :
+  nat := ub.
 
 Lemma optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
   optimalSplitPosition i lb ub <= ub.
-Proof.
-  have Hord := ltn0ltn.
-  have Hlt := ltn_subn.
-  rewrite /optimalSplitPosition.
-  set b1 := (X in if X && _ then _ else _).
-  set b2 := lb < ub.
-  case B1: b1; case B2: b2;
-  rewrite /b1 in B1;
-  try (move/negbT in B1;
-       move: (posAtRangeEnd_spec B1));
-  rewrite /b2 in B2;
-  rewrite ?orTb ?Bool.orb_false_l /=;
-  try specialize (Hord lb ub B2);
-  try specialize (Hlt lb ub B2 Hord);
-  by ordered.
-Qed.
+Proof. by []. Qed.
+(*   have Hord := ltn0ltn. *)
+(*   have Hlt := ltn_subn. *)
+(*   rewrite /optimalSplitPosition. *)
+(*   set b1 := (X in if X && _ then _ else _). *)
+(*   set b2 := lb < ub. *)
+(*   case B1: b1; case B2: b2; *)
+(*   rewrite /b1 in B1; *)
+(*   try (move/negbT in B1; *)
+(*        move: (posAtRangeEnd_spec B1)); *)
+(*   rewrite /b2 in B2; *)
+(*   rewrite ?orTb ?Bool.orb_false_l /=; *)
+(*   try specialize (Hord lb ub B2); *)
+(*   try specialize (Hlt lb ub B2 Hord); *)
+(*   by ordered. *)
+(* Qed. *)
 
-Lemma optimalSplitPosition_beg_spec `(i : Interval d) (lb ub : nat) :
-  lb < ub <= iend d -> optimalSplitPosition i lb ub < iend d.
-Proof.
-  have Hord := ltn0ltn.
-  have Hlt := ltn_subn.
-  rewrite /optimalSplitPosition.
-  set b1 := (X in if X && _ then _ else _).
-  set b2 := lb < ub.
-  case B1: b1; case B2: b2;
-  rewrite /b1 in B1;
-  try (move/negbT/norP: B1 => [B1 ?];
-       move: (posAtRangeEnd_spec B1));
-  rewrite /b2 in B2;
-  rewrite ?orTb ?Bool.orb_false_l /=;
-  try specialize (Hord lb ub B2);
-  try specialize (Hlt lb ub B2 Hord);
-  by ordered.
-Qed.
+(* Lemma optimalSplitPosition_beg_spec `(i : Interval d) (lb ub : nat) : *)
+(*   lb < ub <= iend d -> optimalSplitPosition i lb ub < iend d. *)
+(* Proof. *)
+(*   have Hord := ltn0ltn. *)
+(*   have Hlt := ltn_subn. *)
+(*   rewrite /optimalSplitPosition. *)
+(*   set b1 := (X in if X && _ then _ else _). *)
+(*   set b2 := lb < ub. *)
+(*   case B1: b1; case B2: b2; *)
+(*   rewrite /b1 in B1; *)
+(*   try (move/negbT/norP: B1 => [B1 ?]; *)
+(*        move: (posAtRangeEnd_spec B1)); *)
+(*   rewrite /b2 in B2; *)
+(*   rewrite ?orTb ?Bool.orb_false_l /=; *)
+(*   try specialize (Hord lb ub B2); *)
+(*   try specialize (Hlt lb ub B2 Hord); *)
+(*   by ordered. *)
+(* Qed. *)
 
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)
@@ -155,9 +151,9 @@ Proof.
       apply H.
       by rewrite Hunh.
 
-  have e3 := EIntervalHasUsePosReqReg splitPos2.1 :: e2.
+  have e3 := EIntervalHasUsePosReqReg splitPos2 :: e2.
 
-  pose optSplitPos2 := optimalSplitPosition i1.2 beg splitPos2.1.
+  pose optSplitPos2 := optimalSplitPosition i1.2 beg splitPos2.
 
   case E: (ibeg i1.1 >= optSplitPos2).
     (* This interval goes back on the unhandled list, to be processed in a
@@ -183,13 +179,15 @@ Proof.
 
   have Hmid3 : ibeg i1.1 < optSplitPos2 < iend i1.1.
     clear -Hbeg Hmid2 E.
+    rewrite /optSplitPos2 /optimalSplitPosition.
     move/negbT in E.
     rewrite -ltnNge in E.
-    have H : beg < splitPos2.1 <= iend i1.1.
-      move: (optimalSplitPosition_spec i1.2 beg splitPos2.1).
-      by ordered.
-    move: (optimalSplitPosition_beg_spec i1.2 H).
     by ordered.
+    (* have H : beg < splitPos2 <= iend i1.1. *)
+    (*   move: (optimalSplitPosition_spec i1.2 beg splitPos2). *)
+    (*   by ordered. *)
+    (* move: (optimalSplitPosition_beg_spec i1.2 H). *)
+    (* by ordered. *)
 
   (* Wimmer: "All active and inactive intervals for this register intersecting
      with current are split before the start of current and spilled to the
@@ -207,7 +205,7 @@ Proof.
      [splitInterval] at the returned position. *)
   case Hreq: (firstUseReqReg i1_0.2) => [[pos ?]|].
     exact: inl (ECannotSpillIfRegisterRequiredBefore
-                  optSplitPos2 pos.1 :: e3).
+                  optSplitPos2 pos :: e3).
   rewrite [firstUseReqReg]lock in Hreq.
   move/eqP in Hreq.
 
