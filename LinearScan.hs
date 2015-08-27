@@ -241,7 +241,8 @@ showBlock1 :: (blk1 -> [op1])
            -> (LS.OpId -> [op1] -> String)
            -> blk1
            -> String
-showBlock1 getops bid pos liveIns liveOuts loopInfo initials finals showops b =
+showBlock1 getops bid pos liveIns liveOuts
+           loopInfo initials finals showops b =
     "\n    [ BLOCK " ++ show bid ++ " ]\n"
         ++ "        Live In   => " ++ show (S.toList liveIns) ++ "\n"
         ++ "        Live Kill => " ++ show (S.toList liveKill) ++ "\n"
@@ -265,19 +266,22 @@ showBlock1 getops bid pos liveIns liveOuts loopInfo initials finals showops b =
                      "        Outputs   =>\n"
                          ++ (unlines . map (replicate 12 ' ' ++)
                                      . lines . show $ xs))
-        ++ showops pos (getops b)
+        ++ dotLayout ++ showops pos (getops b)
   where
     liveGen  = liveOuts `S.difference` liveIns
     liveKill = liveIns  `S.difference` liveOuts
 
-    branches =
-        let fwds = case M.lookup bid (forwardBranches loopInfo) of
-                Nothing -> ""
-                Just fwds' -> " Fwd" ++ show (S.toList fwds')
-            bwds = case M.lookup bid (backwardBranches loopInfo) of
-                Nothing -> ""
-                Just bwds' -> " Bkwd" ++ show (S.toList bwds')
-        in fwds ++ bwds
+    fwds = maybe [] S.toList $ M.lookup bid (forwardBranches loopInfo)
+    bwds = maybe [] S.toList $ M.lookup bid (backwardBranches loopInfo)
+
+    fwdsStr = case fwds of
+        [] -> ""
+        xs -> " Fwd" ++ show xs
+    bwdsStr = case bwds of
+        [] -> ""
+        xs -> " Bkwd" ++ show xs
+
+    branches = fwdsStr ++ bwdsStr
 
     loops =
         let hdr = if bid `elem` loopHeaderBlocks loopInfo
@@ -297,6 +301,18 @@ showBlock1 getops bid pos liveIns liveOuts loopInfo initials finals showops b =
                 Nothing -> ""
                 Just (_, d') -> " Depth=" ++ show d'
         in hdr ++ e ++ idxs ++ d
+
+    dotLayout =
+        let leader = "        DOT       => " in
+        (if null branches
+         then leader ++ "L" ++ show bid ++ " [shape=box];\n"
+         else "") ++
+        concatMap (\x -> leader ++ "L" ++ show x
+                               ++ " -> L" ++ show bid
+                               ++ " [color=green];\n") fwds ++
+        concatMap (\x -> leader ++ "L" ++ show x
+                               ++ " -> L" ++ show bid
+                               ++ " [color=red];\n") bwds
 
 opContext :: Int
           -> ScanStateDesc
@@ -398,7 +414,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs initials finals loopInfo = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
-        bid <- LinearScan.blockId binfo b
+        bid  <- LinearScan.blockId binfo b
         let (liveIn, liveOut) = case M.lookup bid ls of
                 Nothing -> (S.empty, S.empty)
                 Just s  -> (S.fromList (LS.blockLiveIn s),
