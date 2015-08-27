@@ -345,33 +345,32 @@ opContext width sd rms aerrs here =
                 (map Just (intervals sd)))
             (fixedIntervals sd)
 
-showOp1' :: (a -> String)
-         -> ScanStateDesc
-         -> Int
-         -> IntMap [LS.ResolvingMoveSet]
-         -> IntMap (LS.RegStateDescSet, [LS.AllocError])
-         -> a
-         -> String
-showOp1' showop sd pos rms aerrs o =
-    opContext width sd rms aerrs pos ++
-    opContext width sd rms aerrs (pos+1) ++
-    leader ++ showop o ++ "\n"
-  where
-    leader = show pos ++ ": "
-    width  = length leader
-    blank  = replicate width ' '
-
-showOps1 :: LinearScan.OpInfo accType op1 op2
+showOps1 :: Bool
+         -> LinearScan.OpInfo accType op1 op2
          -> ScanStateDesc
          -> IntMap [LS.ResolvingMoveSet]
          -> IntMap (LS.RegStateDescSet, [LS.AllocError])
          -> Int
          -> [op1]
          -> String
-showOps1 _ _ _ _ _ [] = ""
-showOps1 oinfo sd rms aerrs pos (o:os) =
-    showOp1' (showOp1 oinfo) sd (pos*2+1) rms aerrs o
-        ++ showOps1 oinfo sd rms aerrs (pos+1) os
+showOps1 _ _ _ _ _ _ [] = ""
+showOps1 atBeg oinfo sd rms aerrs pos (o:os) =
+    showOp1' ++ showOps1 False oinfo sd rms aerrs (pos+1) os
+  where
+    showop = showOp1 oinfo
+    here   = pos*2+1
+    leader = show here ++ ": "
+    width  = length leader
+
+    showOp1' =
+        (if atBeg
+         then leader ++ showop o ++ "\n"
+         else "") ++
+        opContext width sd rms aerrs here ++
+        opContext width sd rms aerrs (here+1) ++
+        (if not atBeg
+         then leader ++ showop o ++ "\n"
+         else "")
 
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
@@ -408,7 +407,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs initials finals loopInfo = go 0
                          in x ++ y ++ z
         (showBlock1 allops bid pos liveIn liveOut loopInfo
                     (M.lookup bid initials) (M.lookup bid finals)
-                    (showOps1 oinfo sd rms aerrs) b ++)
+                    (showOps1 True oinfo sd rms aerrs) b ++)
             `liftM` go (pos + length (allops b)) bs
 
 fromBlockInfo :: Monad m
@@ -473,8 +472,8 @@ instance Show LS.ResolvingMoveSet where
   show (LS.RSClearReg fr tv)    =
       "<clear> (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSLooped x)          = "!!!LOOPED! " ++ show x
-  show (LS.RSAllocStack tv)     = "<alloc> (v" ++ show tv ++ ")>"
-  show (LS.RSFreeStack fv)      = "<free> (v" ++ show fv ++ ")>"
+  show (LS.RSAllocStack tv)     = "<alloc> (v" ++ show tv ++ ")"
+  show (LS.RSFreeStack fv)      = "<free> (v" ++ show fv ++ ")"
 
 showDetails :: Monad m
             => Details m blk1 blk2 op1 op2
