@@ -473,6 +473,7 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
         reserveReg toReg fromVar ;;
         addMove (weakenResolvingMove mv) ;;
         check <-- isResident fromReg ;;
+        (* jww (2015-08-27): This logic is a little screwy... *)
         (if useVerifier is VerifyEnabledStrict
          then when (isJust check) $
                 checkResidency fromReg fromVar ;;
@@ -499,6 +500,9 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
       else pure acc
 
     | Restore fromSpillSlot toReg =>
+      (* jww (2015-08-27): Should I be using aggregate resolving moves here
+         like this, or should I use a list in [ResolvingMove], which would
+         allow the topological sort to reorder them? *)
       reserveReg toReg fromSpillSlot ;;
       addMove (weakenResolvingMove mv) ;;
       freeStack fromSpillSlot ;;

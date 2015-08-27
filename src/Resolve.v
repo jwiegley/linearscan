@@ -254,6 +254,9 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
                                        else Move xr vid yr)
            | Some xr, None    => Some (Spill xr vid)
            | None,    Some yr => Some (if varNotLive vid || ~~ odd to
+                                       (* jww (2015-08-27): Change [AllocReg]
+                                          to [Promote], which implies
+                                          [FreeStack] followed by [AllocReg]. *)
                                        then AllocReg vid yr
                                        else Restore vid yr)
            | None,    None    => None
