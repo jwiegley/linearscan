@@ -167,38 +167,11 @@ Canonical ResGraphNode_eqType :=
 
 End EqResGraphNode.
 
-Record ResGraphEdge := {
-  resMove : ResolvingMove
-}.
-
-Section EqResGraphEdge.
-
-Definition eqResGraphEdge s1 s2 :=
-  match s1, s2 with
-  | {| resMove  := a1 |},
-    {| resMove  := a2 |} => a1 == a2
-  end.
-
-Lemma eqResGraphEdgeP : Equality.axiom eqResGraphEdge.
-Proof.
-  move.
-  case=> [a1].
-  case=> [a2] /=.
-  case: (a1 =P a2) => [<-|?]; last by right; case.
-  by constructor.
-Qed.
-
-Canonical ResGraphEdge_eqMixin := EqMixin eqResGraphEdgeP.
-Canonical ResGraphEdge_eqType :=
-  Eval hnf in EqType ResGraphEdge ResGraphEdge_eqMixin.
-
-End EqResGraphEdge.
-
 (* Determine the lexicographical sorting of edges. This is not done by a flow
    of values, but of inverse dependencies: that is, each pair is (ACQUIRE,
    RELEASE), and we desire that anything acquired has is released first. *)
 (* jww (2015-08-23): There should be a way to get rid of [Transfer] *)
-Definition determineEdge (x : ResGraphEdge) : ResGraphNode * ResGraphNode :=
+Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
   let fix go m := match m with
     (* Instruction            Acquires      Releases *)
     (* -------------------     ----------  ---------- *)
@@ -213,23 +186,21 @@ Definition determineEdge (x : ResGraphEdge) : ResGraphNode * ResGraphNode :=
 
     | Looped     x        => go x
     end in
-  go (resMove x).
+  go x.
 
-Definition isEdgeSplittable (x : ResGraphEdge) : bool :=
-  match resMove x with
+Definition isMoveSplittable (x : ResolvingMove) : bool :=
+  match x with
   | Move     _ _ _ => true
   | Transfer _ _ _ => true
   | _              => false
   end.
 
-Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
-  match resMove x with
-  | Move     fr fv tr => [:: {| resMove  := Spill fr fv |}
-                          ;  {| resMove  := Restore fv tr |} ]
-  | Transfer fr fv tr => [:: {| resMove  := FreeReg fr fv |}
-                          ;  {| resMove  := AllocReg fv tr |} ]
+Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
+  match x with
+  | Move     fr fv tr => [:: Spill fr fv; Restore fv tr]
+  | Transfer fr fv tr => [:: FreeReg fr fv; AllocReg fv tr]
   | Looped _          => [:: x]
-  | _                 => [:: {| resMove  := Looped (resMove x) |}]
+  | _                 => [:: Looped x]
   end.
 
 (* Assuming a transition [from] one point in the procedure [to] another --
@@ -251,7 +222,7 @@ Definition splitEdge (x : ResGraphEdge) : seq ResGraphEdge :=
    mean that the program is assuming the variable is live somehow in a
    register or on the stack. *)
 Definition resolvingMoves (allocs : seq (Allocation maxReg))
-  (liveIn : option IntSet) (from to : nat) : IntMap ResGraphEdge :=
+  (liveIn : option IntSet) (from to : nat) : IntMap ResolvingMove :=
 
   (* First determine all of the variables which are live at [from] *at the end
      of that instruction*, either in registers or on the stack.  Then gather
@@ -273,26 +244,23 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
     (fun vid mx my => match mx, my with
        | Some x, Some y =>
            if intReg x == intReg y then None else
-           let mmv := match intReg x, intReg y with
-             | Some xr, Some yr => Some (if varNotLive vid || ~~ odd to
-                                         then Transfer xr vid yr
-                                         else Move xr vid yr)
-             | Some xr, None    => Some (Spill xr vid)
-             | None,    Some yr => Some (if varNotLive vid || ~~ odd to
-                                         then AllocReg vid yr
-                                         else Restore vid yr)
-             | None,    None    => None
-             end in
-           if mmv is Some mv
-           then Some {| resMove  := mv |}
-           else None
+           match intReg x, intReg y with
+           | Some xr, Some yr => Some (if varNotLive vid || ~~ odd to
+                                       then Transfer xr vid yr
+                                       else Move xr vid yr)
+           | Some xr, None    => Some (Spill xr vid)
+           | None,    Some yr => Some (if varNotLive vid || ~~ odd to
+                                       then AllocReg vid yr
+                                       else Restore vid yr)
+           | None,    None    => None
+           end
        | Some x, None =>
            if intReg x is Some r
-           then Some {| resMove := FreeReg r vid |}
+           then Some (FreeReg r vid)
            else None
        | None, Some y =>
            if intReg y is Some r
-           then Some {| resMove := AllocReg vid r |}
+           then Some (AllocReg vid r)
            else None
        | None, None => None
        end)
@@ -301,8 +269,8 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
 Definition determineMoves (allocs : seq (Allocation maxReg))
   (liveIn : option IntSet) (from to : nat) : seq ResolvingMove :=
   let sortMoves x :=
-    [seq (resMove (snd i)) | i <- snd (topsort x isEdgeSplittable splitEdge)] in
-  sortMoves (IntMap_foldr addEdge (emptyGraph determineEdge)
+    [seq snd i | i <- snd (topsort x isMoveSplittable splitMove)] in
+  sortMoves (IntMap_foldr addEdge (emptyGraph determineNodes)
                           (resolvingMoves allocs liveIn from to)).
 
 Definition BlockMoves : Type := seq ResolvingMove * seq ResolvingMove.
