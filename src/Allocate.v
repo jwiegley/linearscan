@@ -482,7 +482,6 @@ Next Obligation.
 Qed.
 
 Require Import Coq.Program.Wf.
-(* Include Trace. *)
 
 (* Walk through all the intervals which had been defined previously as the
    [unhandled] list, and use those to determine register allocations.  The
@@ -497,10 +496,8 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
   then inl ([:: EFuelExhausted], packScanState st)
        (* jww (2015-01-20): Should be provably impossible *)
   else let fix go count ss :=
-    (* trace "walkIntervals: go" $ *)
     if count is S cnt
     then
-      (* trace "walkIntervals: count > 0" $ *)
       match handleInterval [::] ss with
       | inl err => inl (err, packScanState (thisState ss))
       | inr (_, ss') =>
@@ -521,11 +518,9 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
               ; thisHolds := weakenHasLen (thisHolds ss)
               ; thisState := thisState ss |} in
 
-    (* trace "walkIntervals: destructing list" $ *)
     match List.destruct_list (unhandled sd) with
     | inright _ => inr (packScanState st)
     | inleft (existT (_, pos) (_; H)) =>
-        (* trace "walkIntervals: found item" $ *)
         match go (count (fun x => snd x == pos) (unhandled sd))
                  {| thisDesc  := sd
                   ; thisHolds := newSSMorphHasLen (list_cons_nonzero H)
