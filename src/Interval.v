@@ -170,10 +170,50 @@ Qed.
 (* This version allows overlap in lifetime holes. *)
 Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) :
   option nat :=
-  NE_foldl (fun (acc : option nat) (xr : RangeSig) =>
-              NE_foldl (fun (acc' : option nat) (yr : RangeSig) =>
-                          option_choose acc' (rangesIntersect xr.2 yr.2))
-                       acc (rds j)) None (rds i).
+  head None [seq x <- [seq rangesIntersect x.1 y.1 | x <- rds i, y <- rds j]
+            | isJust x].
+
+Lemma isJust_head_filter_cat : forall a (xs ys : seq (option a)),
+  isJust (head None [seq x <- xs ++ ys | isJust x]) =
+  isJust (head None [seq x <- xs | isJust x]) ||
+  isJust (head None [seq y <- ys | isJust y]).
+Proof.
+  move=> a.
+  elim=> //= [x xs IHxs] ys.
+  case: ys => /= [|y ys].
+    rewrite Bool.orb_false_r.
+    case: (isJust x) => //=.
+    by rewrite cats0.
+  case A: (isJust x) => /=;
+  case B: (isJust y) => /=.
+  - by rewrite A B.
+  - by rewrite A.
+  - by rewrite IHxs /= B /= B.
+  - by rewrite IHxs /= B.
+Qed.
+
+Lemma intervalsOverlap_sym : symmetric (isJust .: intervalsOverlap).
+Proof.
+  move=> x y.
+  rewrite /funcomp /intervalsOverlap.
+  elim: (rds x) => /= [x'|x' xs' IHxs'].
+    elim: (rds y) => /= [?|y' ? ?].
+      by rewrite rangesIntersect_sym_nat.
+    rewrite rangesIntersect_sym_nat.
+    by case: (rangesIntersect y'.1 x'.1).
+  rewrite isJust_head_filter_cat {}IHxs' -isJust_head_filter_cat.
+  (* rewrite [in RHS]allpairs_map /=. *)
+  elim: (rds y) => /= [y'|y' ys' IHys'].
+    by rewrite rangesIntersect_sym_nat.
+  rewrite rangesIntersect_sym_nat.
+  case: (isJust (rangesIntersect y'.1 x'.1)) => //=.
+  rewrite [in RHS]isJust_head_filter_cat -{}IHys'
+          -[in RHS]isJust_head_filter_cat.
+  rewrite !isJust_head_filter_cat.
+  rewrite !orbA.
+  congr (_ || _).
+  by rewrite orbC.
+Qed.
 
 Lemma has_rangesIntersect_sym (y : RangeSig) (xs : seq RangeSig) :
    has (fun x => rangesIntersect y.1 x.1) xs
@@ -182,18 +222,6 @@ Proof.
   elim: xs => //= [x xs IHxs].
   by rewrite rangesIntersect_sym IHxs.
 Qed.
-
-Lemma intervalsOverlap_sym : symmetric intervalsOverlap.
-Proof.
-  move=> x y.
-  rewrite /intervalsOverlap.
-  case: x => [? xb xe [xr|xr xrs]] /=;
-  case: y => [? yb ye [yr|yr yrs]] /=.
-  - by rewrite rangesIntersect_sym.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in

@@ -78,6 +78,7 @@ library
     LinearScan.Logic
     LinearScan.Loops
     LinearScan.Main
+    LinearScan.Maybe
     LinearScan.Monad
     LinearScan.Morph
     LinearScan.Nat

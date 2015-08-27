@@ -466,15 +466,37 @@ Definition rangesIntersect (x y : RangeDesc) : option nat :=
   then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
   else None.
 
+Lemma rangesIntersect_sym_nat : forall x y,
+  rangesIntersect x y = rangesIntersect y x.
+Proof.
+  move=> x y.
+  rewrite /rangesIntersect.
+  case A: (rbeg x < rend y);
+  case B: (rbeg y < rend x);
+  case C: (rbeg x < rbeg y);
+  case D: (rbeg y < rbeg x);
+  intuition.
+    move/idP in C;
+    move/idP in D;
+    by ordered.
+  move/negbT in C.
+  move/negbT in D.
+  rewrite -leqNgt in C.
+  rewrite -leqNgt in D.
+  have ->: rbeg x = rbeg y by ordered.
+  by [].
+Qed.
+
 Lemma rangesIntersect_sym : symmetric rangesIntersect.
-Admitted.
-(* Proof. *)
-(*   move=> x y. *)
-(*   rewrite /rangesIntersect. *)
-(*   case: x => [xb xe [|xu xus]] /=; *)
-(*   case: y => [yb ye [|yu yus]] /=; *)
-(*   by intuition. *)
-(* Qed. *)
+Proof.
+  move=> x y.
+  rewrite /rangesIntersect.
+  case: x => [xb xe [|xu xus]] /=;
+  case: y => [yb ye [|yu yus]] /=;
+  case: (xb < ye);
+  case: (yb < xe);
+  by intuition.
+Qed.
 
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
   option { u : UsePos | u \in ups rd }.
