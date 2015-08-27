@@ -353,7 +353,6 @@ showOp1' :: (a -> String)
          -> a
          -> String
 showOp1' showop sd pos rms aerrs o =
-    blank ++ "--------------------" ++ "\n" ++
     opContext width sd rms aerrs pos ++
     opContext width sd rms aerrs (pos+1) ++
     leader ++ showop o ++ "\n"
@@ -455,27 +454,27 @@ instance Show LS.RegStateDescSet where
             "" (zip ([0..] :: [Int]) allocs)
 
 instance Show LS.ResolvingMoveSet where
-  show (LS.RSMove fr fv tr) =
+  show (LS.RSMove fr fv tr)     =
       "move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSTransfer fr fv tr) =
       "<xfer> (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSSpill fr tv)    =
+  show (LS.RSSpill fr tv)       =
       "spill (r" ++ show fr ++ " v" ++ show tv ++ ")"
-  show (LS.RSRestore fv tr)  =
+  show (LS.RSRestore fv tr)     =
       "restore (r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSAllocReg fv tr) =
+  show (LS.RSAllocReg fv tr)    =
       "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSFreeReg fr tv)  =
+  show (LS.RSFreeReg fr tv)     =
       "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")"
-  show (LS.RSAssignReg fv tr) =
+  show (LS.RSAssignReg fv tr)   =
       "<assign> (r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSClearReg fr tv)  =
+  show (LS.RSClearReg fr tv)    =
       "<clear> (r" ++ show fr ++ " v" ++ show tv ++ ")"
-  show (LS.RSLooped x)  = "!!!LOOPED! " ++ show x
-  -- show (LS.RSAllocStack tv)  = "<AllocStack (v" ++ show tv ++ ")>"
-  -- show (LS.RSFreeStack fv)   = "<FreeStack (v" ++ show fv ++ ")>"
+  show (LS.RSLooped x)          = "!!!LOOPED! " ++ show x
+  show (LS.RSAllocStack tv)     = "<alloc> (v" ++ show tv ++ ")>"
+  show (LS.RSFreeStack fv)      = "<free> (v" ++ show fv ++ ")>"
 
 showDetails :: Monad m
             => Details m blk1 blk2 op1 op2

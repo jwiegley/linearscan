@@ -33,10 +33,9 @@ Inductive ResolvingMove :=
   | Restore    of VarId & PhysReg
   | AllocReg   of VarId & PhysReg
   | FreeReg    of PhysReg & VarId
-  | Looped     of ResolvingMove
-  (* | AllocStack of VarId *)
-  (* | FreeStack  of VarId *)
-.
+  | AllocStack of VarId
+  | FreeStack  of VarId
+  | Looped     of ResolvingMove.
 
 Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
@@ -47,10 +46,9 @@ Inductive ResolvingMoveSet : Set :=
   | RSFreeReg    of nat & VarId
   | RSAssignReg  of VarId & nat
   | RSClearReg   of nat & VarId
-  | RSLooped     of ResolvingMoveSet
-  (* | RSAllocStack of VarId *)
-  (* | RSFreeStack  of VarId *)
-.
+  | RSAllocStack of VarId
+  | RSFreeStack  of VarId
+  | RSLooped     of ResolvingMoveSet.
 
 Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
@@ -60,9 +58,9 @@ Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   | Restore    fv tr       => RSRestore    fv tr
   | AllocReg   fv tr       => RSAllocReg   fv tr
   | FreeReg    fr tv       => RSFreeReg    fr tv
+  | AllocStack tv          => RSAllocStack tv
+  | FreeStack  fv          => RSFreeStack  fv
   | Looped     x           => RSLooped     (weakenResolvingMove x)
-  (* | AllocStack tv          => RSAllocStack tv *)
-  (* | FreeStack  fv          => RSFreeStack  fv *)
   end.
 
 Section EqResolvingMove.
@@ -77,9 +75,9 @@ Fixpoint eqResolvingMove s1 s2 :=
   | Restore tv1 tr1,      Restore tv2 tr2      => [&& tv1 == tv2 & tr1 == tr2]
   | AllocReg fv1 tr1,     AllocReg fv2 tr2     => [&& fv1 == fv2 & tr1 == tr2]
   | FreeReg fr1 tv1,      FreeReg fr2 tv2      => [&& fr1 == fr2 & tv1 == tv2]
+  | AllocStack tv1,       AllocStack tv2       => tv1 == tv2
+  | FreeStack fv1,        FreeStack fv2        => fv1 == fv2
   | Looped x,             Looped y             => eqResolvingMove x y
-  (* | AllocStack tv1,       AllocStack tv2       => tv1 == tv2 *)
-  (* | FreeStack fv1,        FreeStack fv2        => fv1 == fv2 *)
   | _, _ => false
   end.
 
@@ -87,9 +85,9 @@ Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
   elim=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1
-         |tv1 tr1|fv1 tr1|fr1 tv1|x IHx(* |tv1|fv1 *)];
+         |tv1 tr1|fv1 tr1|fr1 tv1|tv1|fv1|x IHx];
   case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2
-         |tv2 tr2|fv2 tr2|fr2 tv2|y(* |tv2|fv2 *)] /=;
+         |tv2 tr2|fv2 tr2|fr2 tv2|tv2|fv2|y] /=;
   try by constructor.
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
@@ -110,6 +108,10 @@ Proof.
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (tv1 =P tv2) => [<-|?];
+    first [ by constructor | by right; case ].
+  - case: (tv1 =P tv2) => [<-|?];
+    first [ by constructor | by right; case ].
+  - case: (fv1 =P fv2) => [<-|?];
     first [ by constructor | by right; case ].
   - specialize (IHx y).
     case: IHx; constructor.
@@ -184,6 +186,9 @@ Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
     | FreeReg    fr tv    => (VirtNode (VarNode tv), RegNode fr)
     | AllocReg   fv tr    => (RegNode tr, VarNode fv)
 
+    | FreeStack  fv       => (VirtNode (VarNode fv), VarNode fv)
+    | AllocStack tv       => (VarNode tv, VirtNode (VarNode tv))
+
     | Looped     x        => go x
     end in
   go x.
@@ -257,11 +262,11 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
        | Some x, None =>
            if intReg x is Some r
            then Some (FreeReg r vid)
-           else None
+           else Some (FreeStack vid)
        | None, Some y =>
            if intReg y is Some r
            then Some (AllocReg vid r)
-           else None
+           else Some (AllocStack vid)
        | None, None => None
        end)
     (allocsAt from) (allocsAt to).

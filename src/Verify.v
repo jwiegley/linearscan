@@ -58,6 +58,8 @@ Inductive AllocError :=
   | VarNotResident of VarId
   | VarNotResidentForReg of VarId & nat & option VarId & nat
   | VarNotReservedForReg of VarId & nat & option VarId & nat
+  | StackNotAllocatedForVar of VarId
+  | StackAlreadyAllocatedForVar of VarId
   | PhysRegAlreadyReservedForVar of nat & VarId
   | RegAlreadyReservedToVar of nat & VarId & VarId
   | BlockWithoutPredecessors of BlockId
@@ -307,9 +309,37 @@ Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
             then pure tt
             else err.
 
-(* Definition allocStack (v : 'I_maxVar) : Verified unit := pure tt. *)
+Definition isStackAllocated (var : VarId) : Verified bool :=
+  st <-- use _verDesc ;;
+  pure (IntSet_member var (rsStack st)).
 
-(* Definition freeStack (v : 'I_maxVar) : Verified unit := pure tt. *)
+Definition checkStack (var : VarId) : Verified unit :=
+  st  <-- use _verDesc ;;
+  res <-- isStackAllocated var ;;
+  let err := errorT $ StackNotAllocatedForVar var in
+  if useVerifier is VerifyEnabledStrict
+  then unless res err
+  else pure tt.
+
+Definition allocStack (var : VarId) : Verified unit :=
+  addMove $ RSAllocStack var ;;
+  st <-- use _verDesc ;;
+  if prop (~~ IntSet_member var (rsStack st)) is Some H
+  then _verState .= packRegState (AllocStackS H)
+  else let err := errorT $ StackAlreadyAllocatedForVar var in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else pure tt.
+
+Definition freeStack (var : VarId) : Verified unit :=
+  addMove $ RSFreeStack var ;;
+  st <-- use _verDesc ;;
+  if prop (IntSet_member var (rsStack st)) is Some H
+  then _verState .= packRegState (FreeStackS H)
+  else let err := errorT $ StackNotAllocatedForVar var in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else pure tt.
 
 Definition checkLiveness (vars : IntSet) : Verified unit :=
   if useVerifier isn't VerifyEnabledStrict then pure tt else
@@ -422,13 +452,15 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
       releaseReg fromReg toSpillSlot ;;
       check <-- isResident fromReg toSpillSlot ;;
       if isJust check
-      then addMove (weakenResolvingMove mv) ;;
+      then allocStack toSpillSlot ;;
+           addMove (weakenResolvingMove mv) ;;
            pure $ rcons acc mv
       else pure acc
 
     | Restore fromSpillSlot toReg =>
       reserveReg toReg fromSpillSlot ;;
       addMove (weakenResolvingMove mv) ;;
+      freeStack fromSpillSlot ;;
       assignReg toReg fromSpillSlot ;;
       pure $ rcons acc mv
 
@@ -445,8 +477,13 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
       addMove (weakenResolvingMove mv) ;;
       pure $ rcons acc mv
 
-    (* | AllocStack toVar => pure acc *)
-    (* | FreeStack fromVar => pure acc *)
+    | AllocStack toVar =>
+      allocStack toVar ;;
+      pure acc
+
+    | FreeStack fromVar =>
+      freeStack fromVar ;;
+      pure acc
     end.
 
 End Verify.
