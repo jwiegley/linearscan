@@ -309,27 +309,6 @@ Definition rangeFirstUsePos (rd : RangeDesc) : option UsePos :=
   if ups rd is u :: _ then Some u else None.
 Arguments rangeFirstUsePos rd /.
 
-Definition posAtRangeEnd `(i : Interval d) (pos : nat) : bool :=
-  let fix go xs :=
-      match xs with
-        | NE_Sing x => rend x.1 == pos
-        | NE_Cons x xs => (rend x.1 == pos) || go xs
-      end in
-  go (rds d).
-Arguments posAtRangeEnd [d] i pos /.
-
-Lemma posAtRangeEnd_spec `(i : Interval d) (pos : nat) :
-  ~~ posAtRangeEnd i pos -> pos != iend d.
-Proof.
-  rewrite /posAtRangeEnd.
-  move: (Interval_exact_end i) => Hint.
-  elim: (rds d) => /= [r|r rs IHrs] in Hint *.
-    by ordered.
-  specialize (IHrs Hint).
-  move/norP=> [H1 H2].
-  by ordered.
-Qed.
-
 Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with

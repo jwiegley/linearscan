@@ -99,6 +99,7 @@ Definition linearScan
       liveSets' emptyIntMap blocks blocks1 (inr [::])
       (Some (toScanStateDescSet ssig.1))
       (Some (toScanStateDescSet ssig'.1)) loops
+
   | inr ssig' =>
       match finalizeScanState ssig'.2 opCount.*2 with
       | inl err =>
@@ -106,6 +107,7 @@ Definition linearScan
           liveSets' emptyIntMap blocks blocks1 (inr [::])
           (Some (toScanStateDescSet ssig.1))
           (Some (toScanStateDescSet ssig'.1)) loops
+
       | inr (exist sd _) =>
         let allocs := determineAllocations sd in
         mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
@@ -119,6 +121,7 @@ Definition linearScan
                    IntMap_map (fun x => fromRegStateDesc x.1) (verInit vs),
                    IntMap_map (fun x => fromRegStateDesc x.1) (verFinal vs))
           end in
+
         pure $ Build_Details _ _ maxReg None
           liveSets' moves blocks blocks1 blockInfo
           (Some (toScanStateDescSet ssig.1))
