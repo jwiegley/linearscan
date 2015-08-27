@@ -66,40 +66,6 @@ Coercion uloc : UsePos >-> nat.
 Definition upos_le (x y : UsePos) : bool := x <= y.
 Arguments upos_le x y /.
 
-(* A [UsePos] is within bound of a range position if, be it an input-only use
-   position, it fall on or before that position; or, be it not input-only, it
-   fall before it.  Examples:
-
-   Input-Only use positions:
-
-     1                     21
-     |                     | use at 21
-     +---------------------+
-
-     1                     21
-     |         use at 13   |
-     +---------+-----------+
-
-   Non Input-Only use positions (i.e., Temp and/or Output):
-
-     1                     21
-     |                     | use at 19
-     +-------------------+-+
-
-     1                     21
-     |         use at 13   |
-     +---------+-----------+
-
-  The reason for this distinction is that, when a range ends, whatever
-  variables it had live in registers at that time should still be in those
-  registers, so they are in a sense "still live" for the next instruction, if
-  they are only being used as inputs there.  Thus, we want the range to *not*
-  cover that position just for the sake of those input variables, so we can
-  use those same registers as outputs for another variable; but we also need
-  to know that if the range is spilled, those inputs are reloaded before that
-  instruction.  Hence this notion of a "use position not covered by a range",
-  if it be input-only and coincide with the end of the previous range. *)
-
 Program Instance upos_le_trans : Transitive upos_le.
 Obligation 1. by ordered. Qed.
 
@@ -133,97 +99,6 @@ Canonical upos_eqMixin := EqMixin equposP.
 Canonical upos_eqType  := Eval hnf in EqType UsePos upos_eqMixin.
 
 End EqUpos.
-
-Lemma upos_eq : forall x y, x == y -> uloc x == uloc y.
-Proof.
-  move=> x y H.
-  move/eqP in H.
-  by rewrite H.
-Qed.
-
-Lemma all_ltn_leq : forall x y xs,
-  all (fun u : UsePos => y < u) xs -> x <= y
-    -> all (fun u : UsePos => x <= u) xs.
-Proof.
-  move=> x y.
-  elim=> [|z zs IHzs] //=.
-  move/andP => [H1 H2] H3.
-  apply/andP; split.
-    apply: (leq_trans H3 _).
-    exact/ltnW.
-  exact: IHzs.
-Qed.
-
-Lemma all_leq_ltn : forall x y xs,
-  all (fun u : UsePos => y <= u) xs -> x < y
-    -> all (fun u : UsePos => x <= u) xs.
-Proof.
-  move=> x y.
-  elim=> [|z zs IHzs] //=.
-  move/andP => [H1 H2] H3.
-  apply/andP; split.
-    by ordered.
-  exact: IHzs.
-Qed.
-
-Lemma all_last_ltn : forall x xs before,
-  x < before
-    -> all (fun y : UsePos => uloc y < before) xs
-    -> last_or x xs < before.
-Proof.
-  move=> x xs before Hlt Hall.
-  elim: xs => //= [y ys IHys] in x Hlt Hall *.
-  move/andP: Hall => [H1 H2].
-  exact: IHys.
-Qed.
-
-Lemma all_last_leq : forall x xs before,
-  x <= before
-    -> all (fun y : UsePos => uloc y <= before) xs
-    -> last_or x xs <= before.
-Proof.
-  move=> x xs before Hlt Hall.
-  elim: xs => //= [y ys IHys] in x Hlt Hall *.
-  move/andP: Hall => [H1 H2].
-  exact: IHys.
-Qed.
-
-Lemma last_rcons_upos : forall (b : nat) x (l1 : seq UsePos),
-  last b [seq uloc u | u <- rcons l1 x] = x.
-Proof. by move=> b x l1; elim: l1 b => //=. Qed.
-
-Lemma last_cat_upos : forall (b : nat) x (xs l1 : seq UsePos),
-  last b [seq uloc u | u <- l1 ++ x :: xs] =
-  last b [seq uloc u | u <- x :: xs].
-Proof.
-  move=> b x xs l1.
-  elim: xs => /= [|y ys IHys] in x l1 *.
-    by rewrite cats1 last_rcons_upos.
-  by rewrite -(IHys y l1) -cat1s catA cats1 !IHys.
-Qed.
-
-Lemma Forall_last_ltn : forall (y : UsePos) (ys : seq UsePos) (n : nat),
-  last (uloc y) [seq uloc u | u <- ys] < n
-    -> List.Forall (fun x : UsePos => y < x) ys -> y < n.
-Proof.
-  move=> y.
-  elim=> //= [z zs IHzs] n Hlast.
-  invert; subst.
-  apply: IHzs => //.
-  move/ltnW in H1.
-  exact (last_ltn Hlast H1).
-Qed.
-
-Lemma Forall_last_leq : forall (y : UsePos) (ys : seq UsePos) (n : nat),
-  last (uloc y) [seq uloc u | u <- ys] <= n
-    -> List.Forall (fun x : UsePos => y <= x) ys -> y <= n.
-Proof.
-  move=> y.
-  elim=> //= [z zs IHzs] n Hlast.
-  invert; subst.
-  apply: IHzs => //.
-  exact (last_leq Hlast H1).
-Qed.
 
 Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_le l

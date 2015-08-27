@@ -137,9 +137,6 @@ Definition setLoopDepths (depths : IntMap (nat * nat)) : State LoopState unit :=
    ; loopIndices      := loopIndices st
    ; loopDepths       := depths |}.
 
-Definition remainingBlocks (bs : IntMap blockType1) (st : LoopState) : nat :=
-  IntMap_size bs - IntSet_size (visitedBlocks st).
-
 Definition addReference (i x : nat) :
   IntMap IntSet -> IntMap IntSet :=
   IntMap_alter (fun macc => if macc is Some acc

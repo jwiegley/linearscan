@@ -47,7 +47,7 @@ Definition removeEdge (x : b) g : Graph :=
    ; edge_f   := edge_f g
    |}.
 
-Lemma removeEdge_same_vertices : forall g e,
+Theorem removeEdge_same_vertices : forall g e,
   size (vertices (removeEdge e g)) == size (vertices g).
 Proof. by []. Qed.
 

@@ -155,17 +155,6 @@ Definition Range_shift_spec `(r : Range rd) `(H : b < head_or_end rd) :
        &   ups  r1.1 = ups r ].
 Proof. by move=> r1; invert. Qed.
 
-Definition newRange (upos : UsePos) (Hinput : uvar upos != Input) : RangeSig.
-Proof.
-  exists {| rbeg := uloc upos
-          ; rend := (uloc upos).+1
-          ; ups  := [:: upos] |}.
-  move/negbTE in Hinput.
-  constructor=> //=.
-  - by case (uvar upos); ordered.
-  - by constructor; constructor.
-Defined.
-
 Definition Range_cons (upos : UsePos) `(r : Range rd)
   (H : validRangeBounds (rbeg rd) (rend rd) (upos :: ups rd))
   (HS : StronglySorted upos_le (upos :: ups rd)) : RangeSig.
@@ -205,20 +194,6 @@ Proof.
   apply/andP; split; last exact: IHxs.
   apply/andP; split;
   case: (uvar x) => {IHxs} in H1 H2 *;
-  by ordered.
-Qed.
-
-Lemma allWithinRange_cat {b1 e1 b2 e2 xs ys} :
-  all (useWithinRange b1 e1) xs -> all (useWithinRange b2 e2) ys
-    -> b1 < b2 -> e1 < e2
-    -> all (useWithinRange b1 e2) (xs ++ ys).
-Proof.
-  move=> H1 H2 Hb He.
-  rewrite all_cat.
-  apply/andP; split.
-    rewrite (allWithinRange_leq _ _ H1) //.
-    by ordered.
-  rewrite (allWithinRange_leq _ _ H2) //.
   by ordered.
 Qed.
 
@@ -337,7 +312,6 @@ Proof.
 Defined.
 
 Definition range_ltn (x y : RangeSig) : bool := rend x.1 < rbeg y.1.
-Definition range_leq (x y : RangeSig) : bool := rend x.1 <= rbeg y.1.
 
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.
@@ -355,9 +329,6 @@ Definition SortedRanges bound :=
   { rs : seq RangeSig
   | StronglySorted range_ltn rs
   & bound <= head bound [seq rbeg r.1 | r <- rs] }.
-
-Definition emptySortedRanges {b} : SortedRanges b.
-Proof. by exists [::] => //; constructor. Defined.
 
 Lemma Forall_ltn : forall (p r : RangeSig) rs,
   List.Forall (fun y : RangeSig => rend r.1 < rbeg y.1) rs
@@ -457,10 +428,6 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition hasOnlyOutputsAt (rd : RangeDesc) (pos : nat) : bool :=
-  let xs := [seq u <- ups rd | uloc u == pos] in
-  (size xs > 0) && all (fun u => uvar u == Output) xs.
-
 Definition rangesIntersect (x y : RangeDesc) : option nat :=
   if (rbeg x < rend y) && (rbeg y < rend x)
   then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
@@ -485,17 +452,6 @@ Proof.
   rewrite -leqNgt in D.
   have ->: rbeg x = rbeg y by ordered.
   by [].
-Qed.
-
-Lemma rangesIntersect_sym : symmetric rangesIntersect.
-Proof.
-  move=> x y.
-  rewrite /rangesIntersect.
-  case: x => [xb xe [|xu xus]] /=;
-  case: y => [yb ye [|yu yus]] /=;
-  case: (xb < ye);
-  case: (yb < xe);
-  by intuition.
 Qed.
 
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
@@ -621,45 +577,4 @@ Proof.
     by constructor.
   move=> /= r.
   by apply/andP; split.
-Defined.
-
-(* [prependRange] takes a [RangePair] and merges in the range under
-   construction, resulting in a new [SortedRanges] whose initial bound
-   is the beginning of the range that was merged in. *)
-Definition prependRange `(rp : BoundedRange b e)
-  `(ranges : SortedRanges e) `(H : b <= pos <= rbeg rp.1.1) :
-  { ranges' : SortedRanges pos
-  | rend (last rp.1 ranges.1).1 = rend (last rp.1 ranges'.1).1 }.
-Proof.
-  case: ranges => [rs Hsort Hbound].
-  case: rp => [r /= Hlt] in H *.
-  case: rs => [|x xs] in Hsort Hbound *.
-    apply: (exist2 _ _ [:: r] _ _; _) => //=.
-    - by constructor; constructor.
-    - by ordered.
-  move: (Range_bounded r.2).
-  move/andP: Hlt => [Hlt1 Hlt2].
-  rewrite /= in Hbound.
-  case Heqe: (rend r.1 == rbeg x.1); move=> ?.
-    pose r' := packRange (Range_cat r.2 x.2 Heqe).
-    apply: (exist2 _ _ [:: r' & xs] _ _; _) => /=.
-    - by constructor; inv Hsort.
-    - by ordered.
-    - inv Hsort; invert; subst.
-      by case: xs => //= in H2 H3 H4 H5 *.
-  move: (leq_trans Hlt2 Hbound) => Hleq.
-  move/(leq_eqF Heqe) in Hleq.
-  apply: (exist2 _ _ [:: r, x & xs] _ _; _) => /=;
-    try by ordered.
-  constructor=> //.
-  constructor=> //.
-  inv Hsort.
-  move: (Range_bounded x.2) => Hb.
-  rewrite /range_ltn /= in H2 H3 *.
-  case: xs => //= [y ys] in H2 H3 *.
-  constructor; inv H3.
-    by reduce_last_use; ordered.
-  move/Forall_all in H5; rewrite -all_map in H5;
-  apply/Forall_all; rewrite -all_map;
-  by reduce_last_use; match_all.
 Defined.

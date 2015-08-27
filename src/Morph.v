@@ -79,35 +79,6 @@ Definition SState (sd : ScanStateDesc maxReg) P Q :=
 
 Definition error_ {sd P Q a} err : SState sd P Q a := fun _ _ => inl err.
 
-Definition conseqSState `(x : SState sd P2 Q2 a)
-  `(f : forall a b, P1 a b -> P2 a b) `(g : forall a b, Q2 a b -> Q1 a b) :
-  SState sd P1 Q1 a :=
-  conseq x
-    (fun p => match p with
-       {| thisDesc  := desc
-        ; thisHolds := holds
-        ; thisState := state |} =>
-       {| thisDesc  := desc
-        ; thisHolds := f sd desc holds
-        ; thisState := state |}
-       end)
-    (fun q => match q with
-       {| thisDesc  := desc
-        ; thisHolds := holds
-        ; thisState := state |} =>
-       {| thisDesc  := desc
-        ; thisHolds := g sd desc holds
-        ; thisState := state |}
-       end).
-
-Definition strengthenSState `(x : SState sd P2 Q a)
-  `(f : forall a b, P1 a b -> P2 a b) : SState sd P1 Q a :=
-  conseqSState x f (fun _ _ => id).
-
-Definition weakenSState `(x : SState sd P Q2 a)
-  `(g : forall a b, Q2 a b -> Q1 a b) : SState sd P Q1 a :=
-  conseqSState x (fun _ _ => id) g.
-
 Definition withScanState {a pre} {P Q}
   (f : forall sd : ScanStateDesc maxReg, ScanState InUse sd
          -> SState pre P Q a) : SState pre P Q a :=
@@ -169,17 +140,6 @@ Defined.
 Definition weakenHasLen {pre} : forall sd,
   SSMorphHasLen pre sd -> SSMorph pre sd.
 Proof. by move=> ? [[?]]. Defined.
-
-Definition weakenHasLen_ {pre} : SState pre SSMorphHasLen SSMorph unit.
-Proof.
-  intros e HS.
-  apply inr.
-  split. apply tt.
-  destruct HS.
-  apply: Build_SSInfo.
-  - exact: thisHolds0.
-  - by [].
-Defined.
 
 Definition strengthenHasLen {pre} : forall sd,
   SSMorph pre sd -> option (SSMorphHasLen pre sd).

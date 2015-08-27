@@ -91,17 +91,6 @@ Definition posWithinInterval `(i : Interval d) (pos : nat) : bool :=
   intervalStart i <= pos < intervalEnd i.
 Arguments posWithinInterval [d] i pos /.
 
-(* This lemma proves that if an [Interval] is formed from the list of ranges,
-   where that list is at least a cons cell, then the end of the first element
-   of the list occurs before the beginning of the head of the rest of the
-   list. *)
-Lemma intervalConnected
-  `(i : Interval {| ivar := iv
-                  ; ibeg := ib
-                  ; iend := ie
-                  ; rds := NE_Cons r xs |}) : rend r.1 < rbeg (NE_head xs).1.
-Proof. by inv i. Qed.
-
 Lemma Interval_exact_beg `(i : Interval d) : ibeg d = rbeg (NE_head (rds d)).1.
 Proof. by inv i. Qed.
 
@@ -213,14 +202,6 @@ Proof.
   rewrite !orbA.
   congr (_ || _).
   by rewrite orbC.
-Qed.
-
-Lemma has_rangesIntersect_sym (y : RangeSig) (xs : seq RangeSig) :
-   has (fun x => rangesIntersect y.1 x.1) xs
-     = has (fun x => rangesIntersect x.1 y.1) xs.
-Proof.
-  elim: xs => //= [x xs IHxs].
-  by rewrite rangesIntersect_sym IHxs.
 Qed.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
