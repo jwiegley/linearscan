@@ -205,8 +205,7 @@ Proof.
 Qed.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
-  let f acc r := foldl (fun us u => cons u us) acc (ups r.1) in
-  NE_foldl f [::] (rds d).
+  flatten [seq ups r.1 | r <- rds d].
 Arguments allUsePos d /.
 
 Lemma NE_StronglySorted_inv : forall (A : Set) a l (R : A -> A -> Prop),

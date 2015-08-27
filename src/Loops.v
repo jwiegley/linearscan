@@ -249,8 +249,6 @@ Definition findLoopEnds (bs : IntMap blockType1) :
   then go (IntMap_size bs) b
   else pure tt.
 
-(* jww (2015-05-23): Verify that the output contains the input, plus the edge
-   resolution blocks that were inserted. *)
 Definition computeBlockOrder (blocks : seq blockType1) :
   mType (LoopState * seq blockType1) :=
   if blocks isn't b :: bs then pure (emptyLoopState, [::]) else

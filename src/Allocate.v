@@ -494,7 +494,6 @@ Fixpoint walkIntervals `(st : ScanState InUse sd) (positions : nat) :
        HANDLE_INTERVAL (current) *)
   if positions isn't S n
   then inl ([:: EFuelExhausted], packScanState st)
-       (* jww (2015-01-20): Should be provably impossible *)
   else let fix go count ss :=
     if count is S cnt
     then

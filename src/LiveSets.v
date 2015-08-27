@@ -222,7 +222,7 @@ Definition updateLiveSets (blockLiveSets : IntMap BlockLiveSets)
   forM_ suxs (fun s_bid =>
     if IntMap_lookup s_bid blockLiveSets is Some sux
     then _blockLiveOut %= flip IntSet_union (blockLiveIn sux)
-    else pure tt  (* jww (2015-02-14): should never happen *)) ;;
+    else pure tt) ;;
 
   ls <-- get ;;
   _blockLiveIn .=
@@ -235,7 +235,7 @@ Definition computeGlobalLiveSets (blocks : seq blockType1)
   forFoldrM liveSets blocks $ fun b liveSets1 =>
     bid <-- blockId binfo b ;;
     match IntMap_lookup bid liveSets1 with
-    | None => pure liveSets1    (* jww (2015-02-14): should never happen *)
+    | None => pure liveSets1
     | Some liveSet =>
         suxs <-- blockSuccessors binfo b ;;
         let (_, liveSet') := updateLiveSets liveSets suxs liveSet in

@@ -75,7 +75,6 @@ Qed.
 Definition topsort (g0 : Graph) (splittable : b -> bool) (split : b -> seq b) :
   seq a * seq (nat * b) :=
   let fix go fuel depth g :=
-    (* jww (2015-08-23): Proof is sorely needed to avoid this possibility. *)
     if fuel isn't S fuel then (vertices g, [seq (depth, i) | i <- edges g]) else
     (* Identify vertices that have no incoming edge (i.e., the "in-degree" of
        these vertices is zero). *)

@@ -509,11 +509,7 @@ Proof. exact. Defined.
 
 (* If a variable referenced for which no reservation was made (for example, an
    input variable that is not used as an output later in the block), we simply
-   add it.
-
-   jww (2015-03-01): Note that it should be provably impossible for an output
-   variable to be seen here for the first time, unless it is not a member of
-   the live out set. *)
+   add it. *)
 Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) :
   IntMap (seq (VarInfo maxReg)) -> IntMap (PendingRanges b e).
 Proof.

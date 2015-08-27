@@ -172,7 +172,6 @@ End EqResGraphNode.
 (* Determine the lexicographical sorting of edges. This is not done by a flow
    of values, but of inverse dependencies: that is, each pair is (ACQUIRE,
    RELEASE), and we desire that anything acquired has is released first. *)
-(* jww (2015-08-23): There should be a way to get rid of [Transfer] *)
 Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
   let fix go m := match m with
     (* Instruction            Acquires      Releases *)
@@ -325,7 +324,6 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
   fmap fst $ forFoldM (emptyIntMap, true) blocks $ fun z b =>
     let: (mappings, isFirst) := z in
     bid <-- blockId binfo b ;;
-    (* jww (2015-01-28): Failure here should be impossible *)
     if IntMap_lookup bid liveSets isn't Some from
     then pure (mappings, false)
     else
@@ -344,7 +342,6 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
         then mappings'
         else
           forFold mappings' suxs $ fun ms s_bid =>
-            (* jww (2015-01-28): Failure here should be impossible *)
             if IntMap_lookup s_bid liveSets isn't Some to then ms else
             let key := if in_from then bid else s_bid in
             checkBlockBoundary allocs (blockLiveIn to) key in_from
