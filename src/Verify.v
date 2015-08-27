@@ -241,7 +241,7 @@ Definition reserveReg (reg : PhysReg) (var : VarId) : Verified unit :=
               errorT $ RegAlreadyReservedToVar reg v var
        else pure tt.
 
-Definition isReserved (reg : PhysReg) (var : VarId) : Verified (option VarId) :=
+Definition isReserved (reg : PhysReg) : Verified (option VarId) :=
   st <-- use _verDesc ;;
   pure (vnth (rsAllocs st) reg ^_ reservation).
 
@@ -249,7 +249,7 @@ Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
   st <-- use _verDesc ;;
   let err := errorT $ VarNotReservedForReg var reg
                         (vnth (rsAllocs st) reg ^_ reservation) 1 in
-  res <-- isReserved reg var ;;
+  res <-- isReserved reg ;;
   if res is Some var'
   then unless (var == var') err
   else if useVerifier is VerifyEnabledStrict
@@ -282,13 +282,13 @@ Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
             then pure tt
             else err.
 
-Definition isResident (reg : PhysReg) (var : VarId) : Verified (option VarId) :=
+Definition isResident (reg : PhysReg) : Verified (option VarId) :=
   st <-- use _verDesc ;;
   pure (vnth (rsAllocs st) reg ^_ residency).
 
 Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
   st <-- use _verDesc ;;
-  res <-- isResident reg var ;;
+  res <-- isResident reg ;;
   let err := errorT $ VarNotResidentForReg var reg res 1 in
   if useVerifier is VerifyEnabledStrict
   then if res is Some var'
@@ -436,9 +436,11 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
         releaseReg fromReg fromVar ;;
         reserveReg toReg fromVar ;;
         addMove (weakenResolvingMove mv) ;;
-        check <-- isResident fromReg fromVar ;;
+        check <-- isResident fromReg ;;
         (if useVerifier is VerifyEnabledStrict
-         then when (isJust check) (assignReg toReg fromVar)
+         then when (isJust check) $
+                checkResidency fromReg fromVar ;;
+                assignReg toReg fromVar
          else assignReg toReg fromVar) ;;
         pure $ rcons acc mv
 
@@ -450,9 +452,12 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
 
     | Spill fromReg toSpillSlot =>
       releaseReg fromReg toSpillSlot ;;
-      check <-- isResident fromReg toSpillSlot ;;
+      check <-- isResident fromReg ;;
       if isJust check
-      then allocStack toSpillSlot ;;
+      then (if useVerifier is VerifyEnabledStrict
+            then checkResidency fromReg toSpillSlot
+            else pure tt) ;;
+           allocStack toSpillSlot ;;
            addMove (weakenResolvingMove mv) ;;
            pure $ rcons acc mv
       else pure acc
