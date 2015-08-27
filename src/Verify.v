@@ -1,12 +1,10 @@
 Require Import LinearScan.Lib.
-Require Import Hask.Control.Monad.Trans.Class.
-Require Import Hask.Control.Monad.Trans.Either.
 Require Import Hask.Control.Monad.Trans.State.
-Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.Resolve.
+Require Import LinearScan.Allocate.
 Require Import LinearScan.Loops.
 
 Set Implicit Arguments.
@@ -63,6 +61,8 @@ Inductive AllocError :=
   | PhysRegAlreadyReservedForVar of nat & VarId
   | RegAlreadyReservedToVar of nat & VarId & VarId
   | BlockWithoutPredecessors of BlockId
+  | AllocationDoesNotMatch of VarId & option (option nat)
+                                    & option (option nat) & nat
   | UnknownPredecessorBlock of BlockId & BlockId
   | LoopInResolvingMoves of ResolvingMoveSet.
 
@@ -213,6 +213,8 @@ Definition _verExt : Lens' VerifiedSig A := fun _ _ f s =>
 Definition Verified := StateT VerifiedSig mType.
 
 Variable pc : OpId.
+Variable intervals : seq (Allocation maxReg).
+Variable useVerifier : UseVerifier.
 
 Definition errorsT (errs : seq AllocError) : Verified unit :=
   st <-- use _verDesc ;;
@@ -224,12 +226,36 @@ Definition errorsT (errs : seq AllocError) : Verified unit :=
 
 Definition errorT (err : AllocError) : Verified unit := errorsT [:: err].
 
-Variable useVerifier : UseVerifier.
-
 Definition addMove (mv : ResolvingMoveSet) : Verified unit :=
   _verMoves %= IntMap_alter (fun mxs => @Some _ $ if mxs is Some xs
                                                   then rcons xs mv
                                                   else [:: mv]) pc.
+
+Definition allocationFor (var : VarId) (pos : nat) : option (option PhysReg) :=
+  match [seq i <- intervals
+             | let int := intVal i in
+               [&& ivar int == var
+               &   ibeg int <= pos < iend int ]] with
+  | [::]   => None                (* not allocated here *)
+  | [:: a] => (Some (intReg a))   (* allocated in reg or on stack *)
+  | _      => None                (* over-allocated! but see the Theorem
+                                     no_allocations_overlap in Spec.v *)
+  end.
+
+Definition variablesAtPos (pos : nat) : seq (VarId * option PhysReg) :=
+  [seq (ivar (intVal i), intReg i) | i <- intervals
+                                   & let int := intVal i in
+                                     ibeg int <= pos < iend int].
+
+Definition checkAllocation
+  (reg : option (option PhysReg)) (var : VarId) (pos : nat) :
+  Verified unit :=
+  let alloc := allocationFor var pos in
+  if alloc != reg
+  then errorT $ AllocationDoesNotMatch var
+                  (option_map (option_map (@nat_of_ord maxReg)) reg)
+                  (option_map (option_map (@nat_of_ord maxReg)) alloc) pos
+  else pure tt.
 
 Definition reserveReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSAllocReg var reg ;;
@@ -404,12 +430,14 @@ Definition verifyAllocs (op : opType1)
     | inl reg =>
       (* Direct register references are mostly left alone; we just check to
          make sure that it's not overwriting a variable in a register. *)
+
       (* st <-- use _verDesc ;; *)
       (* if varKind ref is Input *)
       (* then pure tt *)
       (* else if vnth (rsAllocs st) reg is (_, Some v) *)
       (*      then errorT $ PhysRegAlreadyReservedForVar reg v *)
       (*      else pure tt *)
+
       (* jww (2015-08-19): The above check doesn't fully work yet *)
       pure tt
 
@@ -417,10 +445,18 @@ Definition verifyAllocs (op : opType1)
         if maybeLookup allocs (var, varKind ref) isn't Some reg
         then errorT $ VarNotAllocated var
         else
+          (* We decrement the pc by 2 or 1 to offset what
+             [Assign.setAllocations] had added. *)
           match varKind ref with
-          | Input  => checkResidency reg var
-          | Temp   => checkReservation reg var
-          | Output => assignReg reg var
+          | Input  =>
+            checkAllocation (Some (Some reg)) var pc.-2 ;;
+            checkResidency reg var
+          | Temp   =>
+            checkAllocation (Some (Some reg)) var pc.-1 ;;
+            checkReservation reg var
+          | Output =>
+            checkAllocation (Some (Some reg)) var pc.-1 ;;
+            assignReg reg var
           end
     end.
 
@@ -489,6 +525,55 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
     | FreeStack fromVar =>
       freeStack fromVar ;;
       pure acc
+    end.
+
+Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
+  (from : nat) (to : nat) : Verified unit :=
+  if useVerifier is VerifyDisabled
+  then pure tt else
+  forM_ moves $ fun mv =>
+    st <-- use _verDesc ;;
+    match mv with
+    | Move fromReg fromVar toReg =>
+      checkAllocation (Some (Some fromReg)) fromVar from ;;
+      checkAllocation (Some (Some toReg)) fromVar to
+
+    | Transfer fromReg fromVar toReg =>
+      checkAllocation (Some (Some fromReg)) fromVar from ;;
+      checkAllocation (Some (Some toReg)) fromVar to
+
+    | Spill fromReg toSpillSlot =>
+      checkAllocation (Some (Some fromReg)) toSpillSlot from ;;
+      checkAllocation (Some None) toSpillSlot to
+
+    | Restore fromSpillSlot toReg =>
+      checkAllocation (Some None) fromSpillSlot from ;;
+      checkAllocation (Some (Some toReg)) fromSpillSlot to
+
+    | AllocReg toVar toReg =>
+      (* It's OK for a stack variable to be present here, since as an
+         optimized we do not restore if the next instructions immediately
+         overwrites it. *)
+      let alloc := allocationFor toVar from in
+      (if alloc is Some (Some otherReg)
+       then errorT $ AllocationDoesNotMatch toVar None
+                       (option_map (option_map (@nat_of_ord maxReg)) alloc) from
+       else pure tt) ;;
+      checkAllocation (Some (Some toReg)) toVar to
+
+    | FreeReg fromReg fromVar =>
+      checkAllocation (Some (Some fromReg)) fromVar from ;;
+      checkAllocation None fromVar to
+
+    | Looped x => pure tt
+
+    | AllocStack toVar =>
+      checkAllocation None toVar from ;;
+      checkAllocation (Some None) toVar to
+
+    | FreeStack fromVar =>
+      checkAllocation (Some None) fromVar from ;;
+      checkAllocation None fromVar to
     end.
 
 End Verify.

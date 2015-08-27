@@ -104,6 +104,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg))
   let transitions b e :=
     if assnBlockBeg assn <= b < assnBlockEnd assn
     then let moves := determineMoves allocs None b e in
+         verifyTransitions e allocs useVerifier moves b e ;;
          moves' <-- verifyResolutions e useVerifier moves ;;
          lift $ generateMoves moves'
     else pure [::] in
@@ -116,7 +117,7 @@ Definition setAllocations (allocs : seq (Allocation maxReg))
   (* opid.+2 is used here so that verification action appear to have happened
      after the current instruction, since they represent the "effect" of the
      instruction. *)
-  verifyAllocs oinfo opid.+2 useVerifier op regs ;;
+  verifyAllocs oinfo opid.+2 allocs useVerifier op regs ;;
   ops <-- lift $ applyAllocs oinfo op regs ;;
 
   _verExt \o+ _assnOpId += 2 ;;
@@ -136,34 +137,59 @@ Definition considerOps
     _verExt \o+ _assnBlockBeg .= opid + (size opsb).*2 ;;
     _verExt \o+ _assnBlockEnd .= opid + (size opsb + size opsm).*2 ;;
 
-    bid <-- lift $ blockId binfo blk ;;
+    bid  <-- lift $ blockId binfo blk ;;
+    suxs <-- lift $ blockSuccessors binfo blk ;;
     let: (liveIns, liveOuts) :=
       if IntMap_lookup bid liveSets is Some bls
       then (blockLiveIn bls, blockLiveOut bls)
       else (emptyIntSet, emptyIntSet) in
+    let: (froms, tos) :=
+       let fwds := maybe [::] IntSet_toList $
+                     IntMap_lookup bid (forwardBranches loops) in
+       let bwds := maybe [::] IntSet_toList $
+                     IntMap_lookup bid (backwardBranches loops) in
+       (concat $ map (fun b => if IntMap_lookup b liveSets is Some x
+                               then [:: blockLastOpId x]
+                               else [::]) (fwds ++ bwds),
+        concat $ map (fun b => if IntMap_lookup b liveSets is Some x
+                               then [:: blockFirstOpId x]
+                               else [::]) suxs) in
     let: (begMoves, endMoves) :=
       fromMaybe ([::], [::]) (IntMap_lookup bid mappings) in
     let k := setAllocations allocs in
 
-    let resolutions pos moves :=
-      opid   <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    let resolutions pos toFroms moves :=
+      (* jww (2015-08-27): In order to enable allocation-checking here, we'll
+         need to determine the from/to position of all incoming and outgoing
+         blocks, since the beginning and ending resolutions bridge those gaps.
+         We should confirm the validity of every combination. *)
+      match toFroms with
+      | inl froms => forM_ froms $ fun b =>
+          verifyTransitions pos allocs useVerifier moves b pos.+1
+      | inr tos => forM_ tos $ fun e =>
+          verifyTransitions pos allocs useVerifier moves pos e
+      end ;;
       moves' <-- verifyResolutions pos useVerifier moves ;;
       lift $ generateMoves moves' in
 
     verifyBlockBegin opid useVerifier bid liveIns loops ;;
 
     opsb'  <-- concatMapM (k (pure [::])) opsb ;;
-    bmoves <-- resolutions opid.-1 begMoves ;;
+    opid   <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+    bmoves <-- resolutions opid.-1 (inl froms) begMoves ;;
     opsm'  <-- concatMapM (k (pure [::])) opsm ;;
 
-    opse'  <-- match opse with
+    z <-- match opse with
       | e :: es =>
-          xs <-- concatMapM (k (pure [::])) (belast e es) ;;
-          x  <-- k (resolutions opid endMoves) (last e es) ;;
-          pure (xs ++ x)
+          xs   <-- concatMapM (k (pure [::])) (belast e es) ;;
+          opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+          x    <-- k (resolutions opid (inr tos) endMoves) (last e es) ;;
+          pure (xs ++ x, opid)
       | [::] =>
-          pure [::]
+          opid <-- use (stepdownl' (_verExt \o+ _assnOpId)) ;;
+          pure ([::], opid)
       end ;;
+    let: (opse', opid) := z in
 
     verifyBlockEnd opid useVerifier bid liveOuts ;;
 
