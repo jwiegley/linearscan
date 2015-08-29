@@ -62,7 +62,7 @@ Inductive AllocError :=
   | RegAlreadyReservedToVar of nat & VarId & VarId
   | BlockWithoutPredecessors of BlockId
   | AllocationDoesNotMatch of VarId & option (option nat)
-                                    & option (option nat) & nat
+                                    & option (option nat) & nat & nat
   | UnknownPredecessorBlock of BlockId & BlockId
   | LoopInResolvingMoves of ResolvingMoveSet.
 
@@ -248,13 +248,14 @@ Definition variablesAtPos (pos : nat) : seq (VarId * option PhysReg) :=
                                      ibeg int <= pos < iend int].
 
 Definition checkAllocation
-  (reg : option (option PhysReg)) (var : VarId) (pos : nat) :
+  (reg : option (option PhysReg)) (var : VarId) (pos idx : nat) :
   Verified unit :=
   let alloc := allocationFor var pos in
   if alloc != reg
   then errorT $ AllocationDoesNotMatch var
                   (option_map (option_map (@nat_of_ord maxReg)) reg)
-                  (option_map (option_map (@nat_of_ord maxReg)) alloc) pos
+                  (option_map (option_map (@nat_of_ord maxReg)) alloc)
+                  pos idx
   else pure tt.
 
 Definition reserveReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
@@ -451,13 +452,17 @@ Definition verifyAllocs (op : opType1)
              [Assign.setAllocations] had added. *)
           match varKind ref with
           | Input  =>
-            checkAllocation (Some (Some reg)) var pc.-2 ;;
+            (* jww (2015-08-29): It only needs to be resident at this point,
+               not necessarily allocated to a register. Some other variable
+               could be allocated, pending an upcoming write after the
+               resident value is used as an input. *)
+            (* checkAllocation (Some (Some reg)) var pc.-2 1 ;; *)
             checkResidency reg var
           | Temp   =>
-            checkAllocation (Some (Some reg)) var pc.-1 ;;
+            checkAllocation (Some (Some reg)) var pc.-1 2 ;;
             checkReservation reg var
           | Output =>
-            checkAllocation (Some (Some reg)) var pc.-1 ;;
+            checkAllocation (Some (Some reg)) var pc.-1 3 ;;
             assignReg reg var
           end
     end.
@@ -544,20 +549,20 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
     st <-- use _verDesc ;;
     match mv with
     | Move fromReg fromVar toReg =>
-      checkAllocation (Some (Some fromReg)) fromVar from ;;
-      checkAllocation (Some (Some toReg)) fromVar to
+      checkAllocation (Some (Some fromReg)) fromVar from 4 ;;
+      checkAllocation (Some (Some toReg)) fromVar to 5
 
     | Transfer fromReg fromVar toReg =>
-      checkAllocation (Some (Some fromReg)) fromVar from ;;
-      checkAllocation (Some (Some toReg)) fromVar to
+      checkAllocation (Some (Some fromReg)) fromVar from 6 ;;
+      checkAllocation (Some (Some toReg)) fromVar to 7
 
     | Spill fromReg toSpillSlot fromSplit =>
-      checkAllocation (Some (Some fromReg)) toSpillSlot from ;;
-      unless fromSplit $ checkAllocation (Some None) toSpillSlot to
+      checkAllocation (Some (Some fromReg)) toSpillSlot from 8 ;;
+      unless fromSplit $ checkAllocation (Some None) toSpillSlot to 9
 
     | Restore fromSpillSlot toReg fromSplit =>
-      unless fromSplit $ checkAllocation (Some None) fromSpillSlot from ;;
-      checkAllocation (Some (Some toReg)) fromSpillSlot to
+      unless fromSplit $ checkAllocation (Some None) fromSpillSlot from 10 ;;
+      checkAllocation (Some (Some toReg)) fromSpillSlot to 11
 
     | AllocReg toVar toReg fromSplit =>
       (* It's OK for a stack variable to be present here, since as an
@@ -567,23 +572,24 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
         (let alloc := allocationFor toVar from in
          (if alloc is Some (Some otherReg)
           then errorT $ AllocationDoesNotMatch toVar None
-                (option_map (option_map (@nat_of_ord maxReg)) alloc) from
+                (option_map (option_map (@nat_of_ord maxReg)) alloc)
+                from 12
           else pure tt)) ;;
-      checkAllocation (Some (Some toReg)) toVar to
+      checkAllocation (Some (Some toReg)) toVar to 13
 
     | FreeReg fromReg fromVar fromSplit =>
-      checkAllocation (Some (Some fromReg)) fromVar from ;;
-      unless fromSplit $ checkAllocation None fromVar to
+      checkAllocation (Some (Some fromReg)) fromVar from 14 ;;
+      unless fromSplit $ checkAllocation None fromVar to 15
 
     | Looped x => pure tt
 
     | AllocStack toVar =>
-      checkAllocation None toVar from ;;
-      checkAllocation (Some None) toVar to
+      checkAllocation None toVar from 16 ;;
+      checkAllocation (Some None) toVar to 17
 
     | FreeStack fromVar =>
-      checkAllocation (Some None) fromVar from ;;
-      checkAllocation None fromVar to
+      checkAllocation (Some None) fromVar from 18 ;;
+      checkAllocation None fromVar to 19
     end.
 
 End Verify.
