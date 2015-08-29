@@ -68,8 +68,8 @@ Definition generateMoves (moves : seq (ResolvingMove maxReg)) :
     let k := fmap (@Some _) in
     mops <-- match mv with
       | Move    sreg svid dreg => k $ moveOp oinfo sreg svid dreg
-      | Spill   sreg svid      => k $ saveOp oinfo sreg svid
-      | Restore dvid dreg      => k $ restoreOp oinfo dvid dreg
+      | Spill   sreg svid _    => k $ saveOp oinfo sreg svid
+      | Restore dvid dreg _    => k $ restoreOp oinfo dvid dreg
       | _ => pure None
       end ;;
     pure $ if mops is Some ops then acc ++ ops else acc.

@@ -475,14 +475,14 @@ instance Show LS.ResolvingMoveSet where
   show (LS.RSTransfer fr fv tr) =
       "<xfer> (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSSpill fr tv)       =
-      "spill (r" ++ show fr ++ " v" ++ show tv ++ ")"
-  show (LS.RSRestore fv tr)     =
-      "restore (r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSAllocReg fv tr)    =
-      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")"
-  show (LS.RSFreeReg fr tv)     =
-      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")"
+  show (LS.RSSpill fr tv b)       =
+      "spill (r" ++ show fr ++ " v" ++ show tv ++ ") " ++ show b
+  show (LS.RSRestore fv tr b)     =
+      "restore (r" ++ show tr ++ " v" ++ show fv ++ ") " ++ show b
+  show (LS.RSAllocReg fv tr b)    =
+      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ") " ++ show b
+  show (LS.RSFreeReg fr tv b)     =
+      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ") " ++ show b
   show (LS.RSAssignReg fv tr)   =
       "<assign> (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)    =

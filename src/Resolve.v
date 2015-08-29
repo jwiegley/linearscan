@@ -29,10 +29,10 @@ Variable oinfo : OpInfo maxReg opType1 opType2.
 Inductive ResolvingMove :=
   | Move       of PhysReg & VarId & PhysReg
   | Transfer   of PhysReg & VarId & PhysReg
-  | Spill      of PhysReg & VarId
-  | Restore    of VarId & PhysReg
-  | AllocReg   of VarId & PhysReg
-  | FreeReg    of PhysReg & VarId
+  | Spill      of PhysReg & VarId & bool (* true if resulting from a split *)
+  | Restore    of VarId & PhysReg & bool
+  | AllocReg   of VarId & PhysReg & bool
+  | FreeReg    of PhysReg & VarId & bool
   | AllocStack of VarId
   | FreeStack  of VarId
   | Looped     of ResolvingMove.
@@ -40,10 +40,10 @@ Inductive ResolvingMove :=
 Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
   | RSTransfer   of nat & VarId & nat
-  | RSSpill      of nat & VarId
-  | RSRestore    of VarId & nat
-  | RSAllocReg   of VarId & nat
-  | RSFreeReg    of nat & VarId
+  | RSSpill      of nat & VarId & bool
+  | RSRestore    of VarId & nat & bool
+  | RSAllocReg   of VarId & nat & bool
+  | RSFreeReg    of nat & VarId & bool
   | RSAssignReg  of VarId & nat
   | RSClearReg   of nat & VarId
   | RSAllocStack of VarId
@@ -54,10 +54,10 @@ Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
   | Move       fr fv tr    => RSMove       fr fv tr
   | Transfer   fr fv tr    => RSTransfer   fr fv tr
-  | Spill      fr tv       => RSSpill      fr tv
-  | Restore    fv tr       => RSRestore    fv tr
-  | AllocReg   fv tr       => RSAllocReg   fv tr
-  | FreeReg    fr tv       => RSFreeReg    fr tv
+  | Spill      fr tv b     => RSSpill      fr tv b
+  | Restore    fv tr b     => RSRestore    fv tr b
+  | AllocReg   fv tr b     => RSAllocReg   fv tr b
+  | FreeReg    fr tv b     => RSFreeReg    fr tv b
   | AllocStack tv          => RSAllocStack tv
   | FreeStack  fv          => RSFreeStack  fv
   | Looped     x           => RSLooped     (weakenResolvingMove x)
@@ -71,10 +71,14 @@ Fixpoint eqResolvingMove s1 s2 :=
                                                   ,   fv1 == fv2 & tr1 == tr2]
   | Transfer fr1 fv1 tr1, Transfer fr2 fv2 tr2 => [&& fr1 == fr2
                                                   ,   fv1 == fv2 & tr1 == tr2]
-  | Spill fr1 fv1,        Spill fr2 fv2        => [&& fr1 == fr2 & fv1 == fv2]
-  | Restore tv1 tr1,      Restore tv2 tr2      => [&& tv1 == tv2 & tr1 == tr2]
-  | AllocReg fv1 tr1,     AllocReg fv2 tr2     => [&& fv1 == fv2 & tr1 == tr2]
-  | FreeReg fr1 tv1,      FreeReg fr2 tv2      => [&& fr1 == fr2 & tv1 == tv2]
+  | Spill fr1 fv1 b1,     Spill fr2 fv2 b2     => [&& fr1 == fr2 , fv1 == fv2
+                                                  &   b1  == b2]
+  | Restore tv1 tr1 b1,   Restore tv2 tr2 b2   => [&& tv1 == tv2 , tr1 == tr2
+                                                  &   b1  == b2]
+  | AllocReg fv1 tr1 b1,  AllocReg fv2 tr2 b2  => [&& fv1 == fv2 , tr1 == tr2
+                                                  &   b1  == b2]
+  | FreeReg fr1 tv1 b1,   FreeReg fr2 tv2 b2   => [&& fr1 == fr2 , tv1 == tv2
+                                                  &   b1  == b2]
   | AllocStack tv1,       AllocStack tv2       => tv1 == tv2
   | FreeStack fv1,        FreeStack fv2        => fv1 == fv2
   | Looped x,             Looped y             => eqResolvingMove x y
@@ -84,10 +88,10 @@ Fixpoint eqResolvingMove s1 s2 :=
 Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
-  elim=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1
-         |tv1 tr1|fv1 tr1|fr1 tv1|tv1|fv1|x IHx];
-  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2
-         |tv2 tr2|fv2 tr2|fr2 tv2|tv2|fv2|y] /=;
+  elim=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1 b1
+         |tv1 tr1 b1|fv1 tr1 b1|fr1 tv1 b1|tv1|fv1|x IHx];
+  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2 b2
+         |tv2 tr2 b2|fv2 tr2 b2|fr2 tv2 b2|tv2|fv2|y] /=;
   try by constructor.
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
@@ -99,15 +103,19 @@ Proof.
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
+    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (tv1 =P tv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
+    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (fv1 =P fv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
+    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (tv1 =P tv2) => [<-|?];
+    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (tv1 =P tv2) => [<-|?];
     first [ by constructor | by right; case ].
@@ -179,11 +187,11 @@ Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
     | Move       fr fv tr => (RegNode tr, RegNode fr)
     | Transfer   fr fv tr => (RegNode tr, RegNode fr)
 
-    | Spill      fr tv    => (VirtNode (VarNode tv), RegNode fr)
-    | Restore    fv tr    => (RegNode tr, VarNode fv)
+    | Spill      fr tv _  => (VirtNode (VarNode tv), RegNode fr)
+    | Restore    fv tr _  => (RegNode tr, VarNode fv)
 
-    | FreeReg    fr tv    => (VirtNode (VarNode tv), RegNode fr)
-    | AllocReg   fv tr    => (RegNode tr, VarNode fv)
+    | FreeReg    fr tv _  => (VirtNode (VarNode tv), RegNode fr)
+    | AllocReg   fv tr _  => (RegNode tr, VarNode fv)
 
     | FreeStack  fv       => (VirtNode (VarNode fv), VarNode fv)
     | AllocStack tv       => (VarNode tv, VirtNode (VarNode tv))
@@ -201,8 +209,8 @@ Definition isMoveSplittable (x : ResolvingMove) : bool :=
 
 Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
   match x with
-  | Move     fr fv tr => [:: Spill fr fv; Restore fv tr]
-  | Transfer fr fv tr => [:: FreeReg fr fv; AllocReg fv tr]
+  | Move     fr fv tr => [:: Spill fr fv true; Restore fv tr true]
+  | Transfer fr fv tr => [:: FreeReg fr fv true; AllocReg fv tr true]
   | Looped _          => [:: x]
   | _                 => [:: Looped x]
   end.
@@ -252,22 +260,22 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
            | Some xr, Some yr => Some (if varNotLive vid || ~~ odd to
                                        then Transfer xr vid yr
                                        else Move xr vid yr)
-           | Some xr, None    => Some (Spill xr vid)
+           | Some xr, None    => Some (Spill xr vid false)
            | None,    Some yr => Some (if varNotLive vid || ~~ odd to
                                        (* jww (2015-08-27): Change [AllocReg]
                                           to [Promote], which implies
                                           [FreeStack] followed by [AllocReg]. *)
-                                       then AllocReg vid yr
-                                       else Restore vid yr)
+                                       then AllocReg vid yr false
+                                       else Restore vid yr false)
            | None,    None    => None
            end
        | Some x, None =>
            if intReg x is Some r
-           then Some (FreeReg r vid)
+           then Some (FreeReg r vid false)
            else Some (FreeStack vid)
        | None, Some y =>
            if intReg y is Some r
-           then Some (AllocReg vid r)
+           then Some (AllocReg vid r false)
            else Some (AllocStack vid)
        | None, None => None
        end)
