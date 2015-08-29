@@ -468,6 +468,10 @@ instance Show LS.RegStateDescSet where
                else "r" ++ show reg ++ " -> " ++ info ++ "\n") ++ rest)
             "" (zip ([0..] :: [Int]) allocs)
 
+showSplit :: Bool -> String
+showSplit True  = " {split}"
+showSplit False = ""
+
 instance Show LS.ResolvingMoveSet where
   show (LS.RSMove fr fv tr)     =
       "move (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
@@ -476,13 +480,13 @@ instance Show LS.ResolvingMoveSet where
       "<xfer> (r" ++ show fr ++ " v" ++ show fv ++ ") " ++
            "(r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSSpill fr tv b)       =
-      "spill (r" ++ show fr ++ " v" ++ show tv ++ ") " ++ show b
+      "spill (r" ++ show fr ++ " v" ++ show tv ++ ")" ++ showSplit b
   show (LS.RSRestore fv tr b)     =
-      "restore (r" ++ show tr ++ " v" ++ show fv ++ ") " ++ show b
+      "restore (r" ++ show tr ++ " v" ++ show fv ++ ")" ++ showSplit b
   show (LS.RSAllocReg fv tr b)    =
-      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ") " ++ show b
+      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")" ++ showSplit b
   show (LS.RSFreeReg fr tv b)     =
-      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ") " ++ show b
+      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")" ++ showSplit b
   show (LS.RSAssignReg fv tr)   =
       "<assign> (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)    =
