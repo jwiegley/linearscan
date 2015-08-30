@@ -600,7 +600,7 @@ Theorem no_allocations_intersect `(st : @ScanState maxReg InUse sd)
   between_all (negb .: intervalsIntersect)
               (handledIntervalDescsForReg sd reg) &&
   if vnth (fixedIntervals sd) reg is Some int
-  then all (fun x => ~~ intervalsIntersect int.1 x)
+  then all (fun x => ~~ intervalIntersectsWithSubrange x int.1)
            (handledIntervalDescsForReg sd reg)
   else true.
 Proof.
@@ -691,9 +691,7 @@ Proof.
     inversion B.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
     move=> IHst /andP [H2 H3].
-    apply/andP; split => //.
-    (* by rewrite (sym_neg intervalsIntersect_sym). *)
-    admit.
+    by apply/andP; split => //.
   - Case "ScanState_moveInactiveToHandled".
     move: IHst H0.
     case: spilled.
@@ -704,10 +702,8 @@ Proof.
     inversion B.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
     move=> IHst /andP [H2 H3].
-    apply/andP; split => //.
-    (* by rewrite (sym_neg intervalsIntersect_sym). *)
-    admit.
-Admitted.
+    by apply/andP; split => //.
+Qed.
 
 Theorem mem_map_fst (A B : eqType) (x : A) (y : B) (xs : seq (A * B)) :
   (x, y) \in xs -> x \in [seq fst i | i <- xs].

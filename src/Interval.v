@@ -339,13 +339,15 @@ Proof.
 Qed.
 
 Definition intervalIntersectsWithSubrange (x y : IntervalDesc) : option nat :=
-  foldl (fun acc r =>
-           option_choose acc (if (ibeg x < rend r.1) &&
-                                 (rbeg r.1 < iend x)
-                              then Some (if ibeg x < rbeg r.1
-                                         then rbeg r.1
-                                         else ibeg x)
-                              else None)) None (rds y).
+  let fix go rs :=
+      if rs isn't r :: rs
+      then None
+      else if (ibeg x < rend r.1) && (rbeg r.1 < iend x)
+           then Some (if ibeg x < rbeg r.1
+                      then rbeg r.1
+                      else ibeg x)
+           else go rs in
+  go (rds y).
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 
