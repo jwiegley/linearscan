@@ -5,13 +5,15 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
-Inductive VarKind : Set := Input | Temp | Output.
+Inductive VarKind : Set := Input | InputOutput | Temp | Output.
 
 Definition VarKind_leq (x y : VarKind) : bool :=
   match x, y with
-    | Output, _      => false
-    | Temp,   Input  => false
-    | _,  _          => true
+    | Output, _           => false
+    | Temp,   InputOutput => false
+    | Temp,   Input       => false
+    | InputOutput, Input  => false
+    | _,  _               => true
   end.
 
 Example VarKind_leq_ex1 :    VarKind_leq Input  Input.  Proof. by []. Qed.
@@ -30,10 +32,11 @@ Implicit Type s : VarKind.
 
 Fixpoint eqVarKind s1 s2 {struct s2} :=
   match s1, s2 with
-  | Input,  Input  => true
-  | Temp,   Temp   => true
-  | Output, Output => true
-  | _, _           => false
+  | Input,  Input             => true
+  | InputOutput,  InputOutput => true
+  | Temp,   Temp              => true
+  | Output, Output            => true
+  | _, _                      => false
   end.
 
 Lemma eqVarKindP : Equality.axiom eqVarKind.

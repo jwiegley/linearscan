@@ -128,7 +128,7 @@ Proof.
     first by [].
 
   (* Owing to the way the list is sorted, this is the only check we need for
-     overlap and adjacency. *)
+     intersection and adjacency. *)
   case E: (range_ltn r1.1 r2').
     rewrite /=.
     apply: exist2 _ _ (exist2 _ _ [:: r1.1, r2' & rs2'] _ _) _ _.
@@ -147,8 +147,8 @@ Proof.
   move: r1 => [[rd1 r1] Hr1] /= in Hs Hf Hconn E *.
   move: r2' => [rd2' r2'] /= in Hs Hf E R2 H2a H2b H3 H4 *.
 
-  (* Otherwise, if the ranges are directly adjacent, or overlap, coalesce them
-     into a single range. *)
+  (* Otherwise, if the ranges are directly adjacent, or intersect, coalesce
+     them into a single range. *)
   apply: exist2 _ _
     (exist2 _ _ [:: packRange (Range_merge r1 r2') & rs2'] _ _) _ _.
 
@@ -333,13 +333,14 @@ Proof.
      if [Output], that it persists until the end.  Only [Temp] variables are
      handled using a single-instruction range. *)
   pose rd :=
-    {| rbeg := if uvar upos is Input
+    {| rbeg := if (uvar upos == Input) || (uvar upos == InputOutput)
                then b.*2.+1
                else pos.*2.+2
      ; rend := match uvar upos with
-               | Input  => pos.*2.+2
-               | Temp   => pos.*2.+3
-               | Output => e.*2.+1
+               | Input       => pos.*2.+2
+               | Temp        => pos.*2.+3
+               | InputOutput => e.*2.+1
+               | Output      => e.*2.+1
                end
      ; ups  := [:: upos ] |}.
 
@@ -347,13 +348,10 @@ Proof.
     constructor=> /=.
     + case E: (uvar upos) in Heqe rd *;
       move/eqP in Heqe; rewrite {}Heqe;
-      try undoubled.
-        breakup; try undoubled.
-        apply/ltn_addn1.
-        by undoubled.
+      try undoubled;
       breakup; try undoubled;
       apply/ltn_addn1;
-      rewrite ltn_Sdouble;
+      rewrite -?doubleS ?ltn_Sdouble;
       by undoubled.
     + by constructor; constructor.
 
@@ -363,18 +361,19 @@ Proof.
       move/eqP in U.
       by ordered.
     by undoubled.
+  (* jww (2015-08-29): Remove this repetition. *)
   + clear r rd Heqe.
-    apply/andP; split.
-      rewrite -doubleS.
-      by undoubled.
-    apply/ltn_addn1.
-    rewrite ltn_Sdouble.
-    by ordered.
+    apply/andP; split;
+    rewrite -?doubleS ?ltn_Sdouble;
+    by undoubled.
   + clear r rd Heqe.
-    apply/andP; split.
-      rewrite -doubleS.
-      by undoubled.
-    by ordered.
+    apply/andP; split;
+    rewrite -?doubleS ?ltn_Sdouble;
+    by undoubled.
+  + clear r rd Heqe.
+    apply/andP; split;
+    rewrite -?doubleS ?ltn_Sdouble;
+    by undoubled.
 Defined.
 
 Definition makeUsePos (pos : nat) (var : VarInfo maxReg) :
@@ -458,7 +457,7 @@ Proof.
   (* Check whether our use position actually fits within the end of the
      current range, after shifting.  If not, ignore the current range and just
      create a new one.  At the step where we combine the pending ranges, any
-     overlapping ranges will be coalesced. *)
+     intersecting ranges will be coalesced. *)
   case Hupos : (upos_before_rend r1.2 upos); last first.
     exact: Some [::: makeNewRange H Heqe & range].
 

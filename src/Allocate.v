@@ -1,6 +1,7 @@
 Require Import LinearScan.Lib.
 Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
+Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.ScanState.
@@ -23,11 +24,11 @@ Definition PhysReg := 'I_maxReg.
 
 Open Scope program_scope.
 
-Definition overlapsWithFixedInterval {pre} (reg : PhysReg) :
+Definition intersectsWithFixedInterval {pre} (reg : PhysReg) :
   SState pre (@SSMorphHasLen maxReg) (@SSMorphHasLen maxReg) (option nat) :=
   withCursor (maxReg:=maxReg) $ fun sd cur =>
     ipure $ if vnth (fixedIntervals sd) reg is Some i
-            then intervalsOverlap (curIntDetails cur).2 i.2
+            then intervalIntersectsWithSubrange (curIntDetails cur).1 i.1
             else None.
 
 Definition updateRegisterPos (v : Vec (option nat) maxReg)
@@ -49,7 +50,7 @@ Definition findEligibleRegister (sd : ScanStateDesc maxReg)
     vfoldl_with_index (fun reg acc (mint : option IntervalSig) =>
       let: (fup, fai) := acc in
       if mint is Some int
-      then let op := intervalsOverlap int.2 current in
+      then let op := intervalIntersectsWithSubrange current int.2 in
            (updateRegisterPos fup reg op, vreplace fai reg (isJust op))
       else acc) (xs, vconst false) (fixedIntervals sd) in
   registerWithHighestPos registers_exist fixedAndIntersects xs.
@@ -191,9 +192,9 @@ Definition allocateBlockedReg {pre} :
            // the fixed interval for reg
            if current intersects with the fixed interval for reg then
              split current before this intersection *)
-        mloc <<- overlapsWithFixedInterval reg ;;;
+        mloc <<- intersectsWithFixedInterval reg ;;;
         match mloc with
-        | Some n => context (EOverlapsWithFixedInterval n reg) $
+        | Some n => context (EIntersectsWithFixedInterval n reg) $
                       splitCurrentInterval (BeforePos n)
         | None   => ipure tt
         end ;;;

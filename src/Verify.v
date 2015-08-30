@@ -231,15 +231,17 @@ Definition addMove (mv : ResolvingMoveSet) : Verified unit :=
                                                   then rcons xs mv
                                                   else [:: mv]) pc.
 
+Definition allocationsAt (pos : nat) : seq (Allocation maxReg) :=
+  [seq i | i <- intervals
+         & let int := intVal i in
+           ibeg int <= pos < iend int].
+
 Definition allocationFor (var : VarId) (pos : nat) : option (option PhysReg) :=
-  match [seq i <- intervals
-             | let int := intVal i in
-               [&& ivar int == var
-               &   ibeg int <= pos < iend int ]] with
+  match [seq i <- allocationsAt pos | ivar (intVal i) == var] with
   | [::]   => None                (* not allocated here *)
-  | [:: a] => (Some (intReg a))   (* allocated in reg or on stack *)
+  | [:: a] => Some (intReg a)     (* allocated in reg or on stack *)
   | _      => None                (* over-allocated! but see the Theorem
-                                     no_allocations_overlap in Spec.v *)
+                                     no_allocations_intersect in Spec.v *)
   end.
 
 Definition variablesAtPos (pos : nat) : seq (VarId * option PhysReg) :=
@@ -298,11 +300,30 @@ Definition releaseReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
             then pure tt
             else err.
 
+Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
+  addMove $ RSClearReg reg var ;;
+  st <-- use _verDesc ;;
+  if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
+  then _verState .= packRegState (ClearRegS H)
+  else let err := errorT $ VarNotResidentForReg var reg
+                             (vnth (rsAllocs st) reg ^_ residency) 2 in
+       if useVerifier is VerifyEnabledStrict
+       then err
+       else if vnth (rsAllocs st) reg ^_ residency is None
+            then pure tt
+            else err.
+
 Definition assignReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSAssignReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
-  then _verState .= packRegState (AssignRegS H)
+  then (* When a variable is assigned to a register, all of its older
+          values in other registers are invalidated. *)
+       vfoldr_with_index (fun reg x act =>
+                            if fst x == Some var
+                            then clearReg reg var >> act
+                            else act) (pure tt) (rsAllocs st) ;;
+       _verState .= packRegState (AssignRegS H)
   else let err := errorT $ VarNotReservedForReg var reg
                          (vnth (rsAllocs st) reg ^_ reservation) 3 in
        if useVerifier is VerifyEnabledStrict
@@ -324,19 +345,6 @@ Definition checkResidency (reg : PhysReg) (var : VarId) : Verified unit :=
        then unless (var == var') err
        else err
   else pure tt.
-
-Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
-  addMove $ RSClearReg reg var ;;
-  st <-- use _verDesc ;;
-  if prop (vnth (rsAllocs st) reg ^_ residency == Some var) is Some H
-  then _verState .= packRegState (ClearRegS H)
-  else let err := errorT $ VarNotResidentForReg var reg
-                             (vnth (rsAllocs st) reg ^_ residency) 2 in
-       if useVerifier is VerifyEnabledStrict
-       then err
-       else if vnth (rsAllocs st) reg ^_ residency is None
-            then pure tt
-            else err.
 
 Definition isStackAllocated (var : VarId) : Verified bool :=
   st <-- use _verDesc ;;
@@ -370,12 +378,15 @@ Definition freeStack (var : VarId) : Verified unit :=
        then err
        else pure tt.
 
+(* jww (2015-08-30): This function is no longer being used, because liveness
+   analysis does not necessarily mean that variable is actively being used,
+   but merely that it could be used along that path. *)
 Definition checkLiveness (vars : IntSet) : Verified unit :=
   if useVerifier isn't VerifyEnabledStrict then pure tt else
   st <-- use _verDesc ;;
   (forM_ (IntSet_toList vars) $ fun var =>
      unless (vfoldl_with_index (fun reg b p =>
-       b || if p ^_ residency is Some var then true else false)
+       b || if p ^_ residency == Some var then true else false)
                                false (rsAllocs st)) $
        errorT $ VarNotResident var) (* ;;
 
@@ -406,7 +417,7 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
           errorT $ BlockWithoutPredecessors bid
      else pure tt)) ;;
 
-  checkLiveness liveIns ;;
+  (* checkLiveness liveIns ;; *)
 
   allocs <-- use _verState ;;
   _verInit %= IntMap_insert bid allocs.
@@ -415,7 +426,7 @@ Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
   (* Check to ensure that all "live out" variables are resident in registers
      at the end of the block. *)
-  checkLiveness liveOuts ;;
+  (* checkLiveness liveOuts ;; *)
 
   (* Clear out all known allocations, saving them for this block. *)
   allocs <-- use _verState ;;
@@ -434,22 +445,23 @@ Definition verifyAllocs (op : opType1)
       (* Direct register references are mostly left alone; we just check to
          make sure that it's not overwriting a variable in a register. *)
 
-      (* st <-- use _verDesc ;; *)
-      (* if varKind ref is Input *)
-      (* then pure tt *)
-      (* else if vnth (rsAllocs st) reg is (_, Some v) *)
-      (*      then errorT $ PhysRegAlreadyReservedForVar reg v *)
-      (*      else pure tt *)
-
-      (* jww (2015-08-19): The above check doesn't fully work yet *)
-      pure tt
+      when (varKind ref != Input)
+        (st <-- use _verDesc ;;
+         if vnth (rsAllocs st) reg ^_ reservation is Some v
+         then errorT $ PhysRegAlreadyReservedForVar reg v
+         else
+           if [seq i <- allocationsAt pc.-1 | intReg i == Some reg ] is x :: _
+           then errorT $ AllocationDoesNotMatch (ivar (intVal x)) None
+                           (Some (option_map (@nat_of_ord maxReg) (intReg x)))
+                           pc.-1 0
+           else pure tt)
 
     | inr var =>
         if maybeLookup allocs (var, varKind ref) isn't Some reg
         then errorT $ VarNotAllocated var
         else
-          (* We decrement the pc by 2 or 1 to offset what
-             [Assign.setAllocations] had added. *)
+          (* We decrement pc by 2 or 1 to offset what [Assign.setAllocations]
+             had added. *)
           match varKind ref with
           | Input  =>
             (* jww (2015-08-29): It only needs to be resident at this point,
@@ -458,6 +470,9 @@ Definition verifyAllocs (op : opType1)
                resident value is used as an input. *)
             (* checkAllocation (Some (Some reg)) var pc.-2 1 ;; *)
             checkResidency reg var
+          | InputOutput =>
+            checkResidency reg var ;;
+            checkAllocation (Some (Some reg)) var pc.-1 1
           | Temp   =>
             checkAllocation (Some (Some reg)) var pc.-1 2 ;;
             checkReservation reg var
@@ -570,7 +585,7 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
          overwrites it. *)
       unless fromSplit
         (let alloc := allocationFor toVar from in
-         (if alloc is Some (Some otherReg)
+         (if alloc is Some (Some _)
           then errorT $ AllocationDoesNotMatch toVar None
                 (option_map (option_map (@nat_of_ord maxReg)) alloc)
                 from 12

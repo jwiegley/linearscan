@@ -156,12 +156,6 @@ Proof.
   by ordered.
 Qed.
 
-(* This version allows overlap in lifetime holes. *)
-Definition intervalsOverlap (i : IntervalDesc) (j : IntervalDesc) :
-  option nat :=
-  head None [seq x <- [seq rangesIntersect x.1 y.1 | x <- rds i, y <- rds j]
-            | isJust x].
-
 Lemma isJust_head_filter_cat : forall a (xs ys : seq (option a)),
   isJust (head None [seq x <- xs ++ ys | isJust x]) =
   isJust (head None [seq x <- xs | isJust x]) ||
@@ -179,29 +173,6 @@ Proof.
   - by rewrite A.
   - by rewrite IHxs /= B /= B.
   - by rewrite IHxs /= B.
-Qed.
-
-Lemma intervalsOverlap_sym : symmetric (isJust .: intervalsOverlap).
-Proof.
-  move=> x y.
-  rewrite /funcomp /intervalsOverlap.
-  elim: (rds x) => /= [x'|x' xs' IHxs'].
-    elim: (rds y) => /= [?|y' ? ?].
-      by rewrite rangesIntersect_sym_nat.
-    rewrite rangesIntersect_sym_nat.
-    by case: (rangesIntersect y'.1 x'.1).
-  rewrite isJust_head_filter_cat {}IHxs' -isJust_head_filter_cat.
-  (* rewrite [in RHS]allpairs_map /=. *)
-  elim: (rds y) => /= [y'|y' ys' IHys'].
-    by rewrite rangesIntersect_sym_nat.
-  rewrite rangesIntersect_sym_nat.
-  case: (isJust (rangesIntersect y'.1 x'.1)) => //=.
-  rewrite [in RHS]isJust_head_filter_cat -{}IHys'
-          -[in RHS]isJust_head_filter_cat.
-  rewrite !isJust_head_filter_cat.
-  rewrite !orbA.
-  congr (_ || _).
-  by rewrite orbC.
 Qed.
 
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
@@ -345,11 +316,36 @@ Definition firstUseReqReg `(i : Interval d) :
   option { u : nat | ibeg d <= u < iend d } := lookupUsePos i regReq.
 Arguments firstUseReqReg [d] i /.
 
-Definition intervalsIntersect (x : IntervalDesc) (y : IntervalDesc) :
+Definition intervalsIntersect (x y : IntervalDesc) :
   option nat :=
   if (ibeg x < iend y) && (ibeg y < iend x)
   then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
   else None.
+
+Lemma intervalsIntersect_sym : symmetric (isJust .: intervalsIntersect).
+Proof.
+  move=> x y.
+  rewrite /intervalsIntersect.
+  case A: (ibeg x < iend y);
+  case B: (ibeg y < iend x);
+  case C: (ibeg x < ibeg y);
+  case D: (ibeg y < ibeg x);
+  intuition;
+  try move/idP in C;
+  try move/negbT in D;
+  try move/idP in D;
+  try move/negbT in D;
+  by ordered.
+Qed.
+
+Definition intervalIntersectsWithSubrange (x y : IntervalDesc) : option nat :=
+  foldl (fun acc r =>
+           option_choose acc (if (ibeg x < rend r.1) &&
+                                 (rbeg r.1 < iend x)
+                              then Some (if ibeg x < rbeg r.1
+                                         then rbeg r.1
+                                         else ibeg x)
+                              else None)) None (rds y).
 
 Notation IntervalSig := { d : IntervalDesc | Interval d }.
 

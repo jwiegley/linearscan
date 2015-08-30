@@ -175,16 +175,19 @@ showUsePositions [] = ""
 showUsePositions [u] = go u
   where
     go (LS.Build_UsePos n req v) =
-        (case v of LS.Input  -> "i"
-                   LS.Output -> "o"
-                   LS.Temp   -> "T")
+        (case v of LS.Input       -> "i"
+                   LS.InputOutput -> "I"
+                   LS.Output      -> "o"
+                   LS.Temp        -> "T")
             ++ show n ++ (if req then "" else "?")
 showUsePositions (u:us) = go u ++ " " ++ showUsePositions us
   where
+    -- jww (2015-08-29): Remove this repetition.
     go (LS.Build_UsePos n req v) =
-        (case v of LS.Input  -> "i"
-                   LS.Output -> "o"
-                   LS.Temp   -> "T")
+        (case v of LS.Input       -> "i"
+                   LS.InputOutput -> "I"
+                   LS.Output      -> "o"
+                   LS.Temp        -> "T")
             ++ show n ++ (if req then "" else "?")
 
 toScanStateDesc :: LS.ScanStateDescSet -> ScanStateDesc
@@ -594,7 +597,7 @@ allocate maxReg binfo oinfo useVerifier blocks = do
                 return (dets, Right blks)
   where
     reasonToStr r = case r of
-        LS.EOverlapsWithFixedInterval pos reg ->
+        LS.EIntersectsWithFixedInterval pos reg ->
             "Current interval intersects with " ++
             "fixed interval for register " ++ show reg ++ " at " ++ show pos
         LS.ESplitAssignedIntervalForReg xid reg pos ->

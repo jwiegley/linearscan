@@ -92,7 +92,7 @@ Definition verifyNewHandled (sd : ScanStateDesc) (int : IntervalDesc)
   let check y := ~~ intervalsIntersect int y in
   all check (handledIntervalDescsForReg sd reg) &&
   if vnth (fixedIntervals sd) reg is Some i
-  then ~~ intervalsOverlap int i.1
+  then ~~ intervalIntersectsWithSubrange int i.1
   else true.
 
 (** ** ScanState *)

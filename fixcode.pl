@@ -42,6 +42,7 @@ import qualified Hask.Utils
     s/^   vars = IntMap.coq_IntMap_map $/   vars = Prelude.id /;
     s/Maybe\.option_map \(Maybe\.option_map \) reg/reg/;
     s/Maybe\.option_map \(Maybe\.option_map \) alloc/alloc/;
+    s/Maybe\.option_map  \(Allocate\.intReg/(Allocate.intReg/;
     s/mapLeft  /mapLeft Prelude.id /g;
     s/\(Data\.IntMap\.map  ranges\)/ranges/;
 

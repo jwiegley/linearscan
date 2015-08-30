@@ -29,7 +29,7 @@ Inductive SplitPositionT : Set :=
 Definition TrueIfActiveT : Set := bool.
 
 Inductive SSTrace : Set :=
-  | EOverlapsWithFixedInterval of nat & PhysRegT
+  | EIntersectsWithFixedInterval of nat & PhysRegT
   | ESplitAssignedIntervalForReg of IntervalIdT & PhysRegT & SplitPositionT
   | ESplitActiveOrInactiveInterval
       of IntervalIdT & TrueIfActiveT & SplitPositionT

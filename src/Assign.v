@@ -80,7 +80,9 @@ Definition varAllocs pos (allocs : seq (Allocation maxReg)) vid v :
     [seq intReg i | i <- allocs
     & let int := intVal i in
       [&& ivar int == vid
-      ,   pos < iend int & ibeg int < pos.+2 ]].
+      &   if @varKind maxReg v is Input
+          then (pos    < iend int) && (ibeg int < pos.+1)
+          else (pos.+1 < iend int) && (ibeg int < pos.+2)]].
 
 Definition varInfoAllocs pos (allocs : seq (Allocation maxReg)) v :
   seq ((VarId * VarKind) * PhysReg) :=
@@ -191,7 +193,7 @@ Definition considerOps
       end ;;
     let: (opse', opid) := z in
 
-    verifyBlockEnd opid useVerifier bid liveOuts ;;
+    verifyBlockEnd useVerifier bid liveOuts ;;
 
     let opsm'' := bmoves ++ opsm' in
     match opsb', opse' with
