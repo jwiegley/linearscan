@@ -282,9 +282,7 @@ Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
   res <-- isReserved reg ;;
   if res is Some var'
   then unless (var == var') err
-  else if useVerifier is VerifyEnabledStrict
-       then err
-       else pure tt.
+  else err.
 
 Definition releaseReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
   Verified unit :=
@@ -292,13 +290,8 @@ Definition releaseReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
-  else let err := errorT $ VarNotReservedForReg var reg
-                             (vnth (rsAllocs st) reg ^_ reservation) 2 in
-       if useVerifier is VerifyEnabledStrict
-       then err
-       else if vnth (rsAllocs st) reg ^_ reservation is None
-            then pure tt
-            else err.
+  else errorT $ VarNotReservedForReg var reg
+                  (vnth (rsAllocs st) reg ^_ reservation) 2.
 
 Definition clearReg (reg : PhysReg) (var : VarId) : Verified unit :=
   addMove $ RSClearReg reg var ;;
