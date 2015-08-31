@@ -521,7 +521,9 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
       (* jww (2015-08-27): Should I be using aggregate resolving moves here
          like this, or should I use a list in [ResolvingMove], which would
          allow the topological sort to reorder them? *)
-      reserveReg toReg fromSpillSlot fromSplit ;;
+      check <-- isReserved toReg ;;
+      unless (check == Some fromSpillSlot)
+        (reserveReg toReg fromSpillSlot fromSplit) ;;
       addMove (weakenResolvingMove mv) ;;
       freeStack fromSpillSlot ;;
       assignReg toReg fromSpillSlot ;;
