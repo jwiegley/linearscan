@@ -43,6 +43,10 @@ description:
   takes a list of information about basic blocks to an equivalent list, with
   annotations indicating allocation choices.
 
+Source-repository head
+  type:     git
+  location: https://github.com/jwiegley/linearscan
+
 library
   default-language: Haskell2010
   exposed-modules:
