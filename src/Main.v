@@ -93,7 +93,7 @@ Definition linearScan
   ssig <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
   (* allocate registers *)
   let opCount := (countOps binfo blocks1).+1 in
-  match walkIntervals registers_exist ssig.2 opCount.*2 with
+  match walkIntervals registers_exist ssig.2 opCount.*2.+1 with
   | inl (err, ssig') =>
     pure $ Build_Details _ _ maxReg (Some (err, AllocatingRegistersFailed))
       liveSets' emptyIntMap blocks blocks1 (inr [::])
