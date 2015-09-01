@@ -64,18 +64,18 @@ Definition newSSMorphHasLen (sd : ScanStateDesc maxReg)
   (H : size (unhandled sd) > 0) : SSMorphHasLen sd sd.
 Proof. repeat (constructor; auto). Defined.
 
-Record SSInfo (startDesc : ScanStateDesc maxReg) P := {
+Record SSInfo P := {
     thisDesc  : ScanStateDesc maxReg;
-    thisHolds : P startDesc thisDesc;
+    thisHolds : P thisDesc;
     thisState : ScanState InUse thisDesc
 }.
 
-Arguments thisDesc  {_ P} _.
-Arguments thisHolds {_ P} _.
-Arguments thisState {_ P} _.
+Arguments thisDesc  {P} _.
+Arguments thisHolds {P} _.
+Arguments thisState {P} _.
 
 Definition SState (sd : ScanStateDesc maxReg) P Q :=
-  Context SSTrace (SSInfo sd P) (SSInfo sd Q).
+  Context SSTrace (SSInfo (P sd)) (SSInfo (Q sd)).
 
 Definition error_ {sd P Q a} err : SState sd P Q a := fun _ _ => inl err.
 
@@ -93,7 +93,7 @@ Proof.
   intros e i.
   destruct i.
   specialize (f thisDesc0 thisState0).
-  assert (SSInfo thisDesc0 P).
+  assert (SSInfo (P thisDesc0)).
     eapply {| thisDesc  := _
             ; thisHolds := _ |}.
   apply (f e) in X.
