@@ -136,11 +136,10 @@ Section EqResGraphNode.
 
 Fixpoint eqResGraphNode s1 s2 :=
   match s1, s2 with
-  | RegNode r1, RegNode r2 => r1 == r2
-  | VarNode v1, VarNode v2 => v1 == v2
-  | VirtNode n1,
-    VirtNode n2 => eqResGraphNode n1 n2
-  | _, _ => false
+  | RegNode r1,  RegNode r2  => r1 == r2
+  | VarNode v1,  VarNode v2  => v1 == v2
+  | VirtNode n1, VirtNode n2 => eqResGraphNode n1 n2
+  | _, _                     => false
   end.
 
 Lemma eqResGraphNodeP : Equality.axiom eqResGraphNode.
@@ -173,8 +172,8 @@ End EqResGraphNode.
    RELEASE), and we desire that anything acquired has is released first. *)
 Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
   let fix go m := match m with
-    (* Instruction            Acquires      Releases *)
-    (* -------------------     ----------  ---------- *)
+    (* Instruction            Acquires    Releases   *)
+    (* -------------------    ----------  ---------- *)
     | Move       fr fv tr => (RegNode tr, RegNode fr)
 
     | Spill      fr tv _  => (VirtNode (VarNode tv), RegNode fr)
@@ -191,16 +190,13 @@ Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
   go x.
 
 Definition isMoveSplittable (x : ResolvingMove) : bool :=
-  match x with
-  | Move     _ _ _ => true
-  | _              => false
-  end.
+  if x is Move _ _ _ then true else false.
 
 Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
   match x with
-  | Move     fr fv tr => [:: Spill fr fv true; Restore fv tr true]
-  | Looped _          => [:: x]
-  | _                 => [:: Looped x]
+  | Move fr fv tr => [:: Spill fr fv true; Restore fv tr true]
+  | Looped _      => [:: x]
+  | _             => [:: Looped x]
   end.
 
 (* Assuming a transition [from] one point in the procedure [to] another --
@@ -251,9 +247,6 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
                                        else [:: Move xr vid yr])
            | Some xr, None    => Some [:: Spill xr vid false]
            | None,    Some yr => Some (if varNotLive vid || ~~ odd to
-                                       (* jww (2015-08-27): Change [AllocReg]
-                                          to [Promote], which implies
-                                          [FreeStack] followed by [AllocReg]. *)
                                        then [:: AllocReg vid yr false]
                                        else [:: Restore vid yr false])
            | None,    None    => None
