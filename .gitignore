@@ -5,6 +5,7 @@
 .coq-native/
 /LinearScan/
 /Makefile.coq
+/default.nix
 /doc/cpp/linearscan.aux
 /doc/cpp/linearscan.bbl
 /doc/cpp/linearscan.blg
@@ -16,6 +17,7 @@
 /doc/linearscan.v.log
 /doc/linearscan.v.out
 /doc/linearscan.v.tex
+/shell.nix
 Setup
 dist
 html
