@@ -496,12 +496,6 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
          else assignReg toReg fromVar) ;;
         pure $ rcons acc mv
 
-    | Transfer fromReg fromVar toReg =>
-      unless (fromReg == toReg) $
-        releaseReg fromReg fromVar false ;;
-        reserveReg toReg fromVar false ;;
-        pure acc
-
     | Spill fromReg toSpillSlot fromSplit =>
       releaseReg fromReg toSpillSlot fromSplit ;;
       check <-- isResident fromReg ;;
@@ -561,10 +555,6 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
     | Move fromReg fromVar toReg =>
       checkAllocation (Some (Some fromReg)) fromVar from 4 ;;
       checkAllocation (Some (Some toReg)) fromVar to 5
-
-    | Transfer fromReg fromVar toReg =>
-      checkAllocation (Some (Some fromReg)) fromVar from 6 ;;
-      checkAllocation (Some (Some toReg)) fromVar to 7
 
     | Spill fromReg toSpillSlot fromSplit =>
       checkAllocation (Some (Some fromReg)) toSpillSlot from 8 ;;

@@ -28,7 +28,6 @@ Variable oinfo : OpInfo maxReg opType1 opType2.
 
 Inductive ResolvingMove :=
   | Move       of PhysReg & VarId & PhysReg
-  | Transfer   of PhysReg & VarId & PhysReg
   | Spill      of PhysReg & VarId & bool (* true if resulting from a split *)
   | Restore    of VarId & PhysReg & bool
   | AllocReg   of VarId & PhysReg & bool
@@ -39,7 +38,6 @@ Inductive ResolvingMove :=
 
 Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
-  | RSTransfer   of nat & VarId & nat
   | RSSpill      of nat & VarId & bool
   | RSRestore    of VarId & nat & bool
   | RSAllocReg   of VarId & nat & bool
@@ -53,7 +51,6 @@ Inductive ResolvingMoveSet : Set :=
 Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
   | Move       fr fv tr    => RSMove       fr fv tr
-  | Transfer   fr fv tr    => RSTransfer   fr fv tr
   | Spill      fr tv b     => RSSpill      fr tv b
   | Restore    fv tr b     => RSRestore    fv tr b
   | AllocReg   fv tr b     => RSAllocReg   fv tr b
@@ -68,8 +65,6 @@ Section EqResolvingMove.
 Fixpoint eqResolvingMove s1 s2 :=
   match s1, s2 with
   | Move fr1 fv1 tr1,     Move fr2 fv2 tr2     => [&& fr1 == fr2
-                                                  ,   fv1 == fv2 & tr1 == tr2]
-  | Transfer fr1 fv1 tr1, Transfer fr2 fv2 tr2 => [&& fr1 == fr2
                                                   ,   fv1 == fv2 & tr1 == tr2]
   | Spill fr1 fv1 b1,     Spill fr2 fv2 b2     => [&& fr1 == fr2 , fv1 == fv2
                                                   &   b1  == b2]
@@ -88,15 +83,11 @@ Fixpoint eqResolvingMove s1 s2 :=
 Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
-  elim=> [fr1 fv1 tr1|fr1 fv1 tr1|fr1 fv1 b1
-         |tv1 tr1 b1|fv1 tr1 b1|fr1 tv1 b1|tv1|fv1|x IHx];
-  case=> [fr2 fv2 tr2|fr2 fv2 tr2|fr2 fv2 b2
-         |tv2 tr2 b2|fv2 tr2 b2|fr2 tv2 b2|tv2|fv2|y] /=;
+  elim=> [fr1 fv1 tr1|fr1 fv1 b1|tv1 tr1 b1|fv1 tr1 b1
+         |fr1 tv1 b1|tv1|fv1|x IHx];
+  case=> [fr2 fv2 tr2|fr2 fv2 b2|tv2 tr2 b2|fv2 tr2 b2
+         |fr2 tv2 b2|tv2|fv2|y] /=;
   try by constructor.
-  - case: (fr1 =P fr2) => [<-|?];
-    case: (fv1 =P fv2) => [<-|?];
-    case: (tr1 =P tr2) => [<-|?];
-    first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
@@ -185,7 +176,6 @@ Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
     (* Instruction            Acquires      Releases *)
     (* -------------------     ----------  ---------- *)
     | Move       fr fv tr => (RegNode tr, RegNode fr)
-    | Transfer   fr fv tr => (RegNode tr, RegNode fr)
 
     | Spill      fr tv _  => (VirtNode (VarNode tv), RegNode fr)
     | Restore    fv tr _  => (RegNode tr, VarNode fv)
@@ -203,14 +193,12 @@ Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
 Definition isMoveSplittable (x : ResolvingMove) : bool :=
   match x with
   | Move     _ _ _ => true
-  | Transfer _ _ _ => true
   | _              => false
   end.
 
 Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
   match x with
   | Move     fr fv tr => [:: Spill fr fv true; Restore fv tr true]
-  | Transfer fr fv tr => [:: FreeReg fr fv true; AllocReg fv tr true]
   | Looped _          => [:: x]
   | _                 => [:: Looped x]
   end.
@@ -234,7 +222,7 @@ Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
    mean that the program is assuming the variable is live somehow in a
    register or on the stack. *)
 Definition resolvingMoves (allocs : seq (Allocation maxReg))
-  (liveIn : option IntSet) (from to : nat) : IntMap ResolvingMove :=
+  (liveIn : option IntSet) (from to : nat) : IntMap (seq ResolvingMove) :=
 
   (* First determine all of the variables which are live at [from] *at the end
      of that instruction*, either in registers or on the stack.  Then gather
@@ -258,25 +246,26 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
            if intReg x == intReg y then None else
            match intReg x, intReg y with
            | Some xr, Some yr => Some (if varNotLive vid || ~~ odd to
-                                       then Transfer xr vid yr
-                                       else Move xr vid yr)
-           | Some xr, None    => Some (Spill xr vid false)
+                                       then [:: FreeReg xr vid true
+                                            ;   AllocReg vid yr true]
+                                       else [:: Move xr vid yr])
+           | Some xr, None    => Some [:: Spill xr vid false]
            | None,    Some yr => Some (if varNotLive vid || ~~ odd to
                                        (* jww (2015-08-27): Change [AllocReg]
                                           to [Promote], which implies
                                           [FreeStack] followed by [AllocReg]. *)
-                                       then AllocReg vid yr false
-                                       else Restore vid yr false)
+                                       then [:: AllocReg vid yr false]
+                                       else [:: Restore vid yr false])
            | None,    None    => None
            end
        | Some x, None =>
            if intReg x is Some r
-           then Some (FreeReg r vid false)
-           else Some (FreeStack vid)
+           then Some [:: FreeReg r vid false]
+           else Some [:: FreeStack vid]
        | None, Some y =>
            if intReg y is Some r
-           then Some (AllocReg vid r false)
-           else Some (AllocStack vid)
+           then Some [:: AllocReg vid r false]
+           else Some [:: AllocStack vid]
        | None, None => None
        end)
     (allocsAt from) (allocsAt to).
@@ -285,7 +274,7 @@ Definition determineMoves (allocs : seq (Allocation maxReg))
   (liveIn : option IntSet) (from to : nat) : seq ResolvingMove :=
   let sortMoves x :=
     [seq snd i | i <- snd (topsort x isMoveSplittable splitMove)] in
-  sortMoves (IntMap_foldr addEdge (emptyGraph determineNodes)
+  sortMoves (IntMap_foldr (flip (foldr addEdge)) (emptyGraph determineNodes)
                           (resolvingMoves allocs liveIn from to)).
 
 Definition BlockMoves : Type := seq ResolvingMove * seq ResolvingMove.
