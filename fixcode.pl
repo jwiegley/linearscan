@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 while (<>) {
-    s/import qualified (.*)/import qualified LinearScan.\1 as \1/;
+    s/import qualified (?<!LinearScan)(.*)/import qualified LinearScan.\2 as \2/;
     s/import qualified LinearScan\.GHC/import qualified GHC/;
     s{import qualified LinearScan\.Prelude as Prelude}{
 import Debug.Trace (trace, traceShow, traceShowId)
