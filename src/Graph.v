@@ -1,4 +1,5 @@
 Require Import Lib.
+Require Import Trace.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -8,157 +9,139 @@ Generalizable All Variables.
 Section Graph.
 
 Variable a : eqType.
-Variable b : eqType.
 
 Record Graph := {
   vertices : seq a;
-  edges    : seq b;
-  edge_f   : b -> a * a
+  edges    : seq (a * a)
 }.
 
-Definition emptyGraph (f : b -> a * a) : Graph :=
+Definition emptyGraph : Graph :=
   {| vertices := [::]
-   ; edges    := [::]
-   ; edge_f   := f
-   |}.
+   ; edges    := [::] |}.
 
 Definition addVertex v (g : Graph) : Graph :=
-  (fun vg =>
-    {| vertices := if v \in vg then vg else v :: vg
-     ; edges    := edges g
-     ; edge_f   := edge_f g
-     |})
+  (fun vg => {| vertices := if v \in vg then vg else v :: vg
+              ; edges    := edges g |})
   (vertices g).
 
 Definition addEdge e (g : Graph) : Graph :=
-  let g' :=
-    (fun eg =>
-      {| vertices := vertices g
-       ; edges    := if e \in eg then eg else e :: eg
-       ; edge_f   := edge_f g
-       |})
-    (edges g) in
-  let: (a, z) := edge_f g' e in
-  addVertex a (addVertex z g').
+  (fun eg => {| vertices := vertices g
+              ; edges    := if e \in eg then eg else e :: eg |})
+  (edges g).
 
-Definition removeEdge (x : b) g : Graph :=
+Definition graphInsert e (g : Graph) : Graph :=
+  addVertex (fst e) (addVertex (snd e) (addEdge e g)).
+
+Definition removeEdge (x : a * a) g : Graph :=
   {| vertices := vertices g
-   ; edges    := rem x (edges g)
-   ; edge_f   := edge_f g
-   |}.
+   ; edges    := rem x (edges g) |}.
 
 Theorem removeEdge_same_vertices : forall g e,
   size (vertices (removeEdge e g)) == size (vertices g).
 Proof. by []. Qed.
 
-Definition connections f (x : a) g : seq b :=
-  filter ((fun y : a => y == x) \o f \o edge_f g) (edges g).
+Definition outbound (x : a) (g : Graph) : seq (a * a) :=
+  [seq e <- edges g | x == fst e].
 
-Definition outbound : a -> Graph -> seq b := connections fst.
-Definition inbound  : a -> Graph -> seq b := connections snd.
+Definition inbound (x : a) (g : Graph) : seq (a * a) :=
+  [seq e <- edges g | x == snd e].
 
 Definition removeVertex (v : a) g : Graph :=
   foldr removeEdge {| vertices := rem v (vertices g)
-                    ; edges    := edges g
-                    ; edge_f   := edge_f g |} (outbound v g).
+                    ; edges    := edges g |} (inbound v g ++ outbound v g).
 
 Lemma removeVertex_spec : forall g v,
   v \in vertices g -> size (vertices (removeVertex v g)) < size (vertices g).
 Proof.
   move=> g v Hin.
   rewrite /removeVertex.
-  elim: (outbound v g) => //= in Hin *.
+  elim: (inbound v g ++ outbound v g) => //= in Hin *.
   rewrite size_rem //.
   by case: (vertices g) => //= [*] in Hin *.
 Qed.
 
-Definition topsort (g0 : Graph) (splittable : b -> bool) (split : b -> seq b) :
-  seq a * seq (nat * b) :=
-  let fix go fuel depth g :=
-    if fuel isn't S fuel then (vertices g, [seq (depth, i) | i <- edges g]) else
-    (* Identify vertices that have no incoming edge (i.e., the "in-degree" of
-       these vertices is zero). *)
-    let noInbound := [seq v <- vertices g | nilp (inbound v g)] in
-    if noInbound is [::]
-    then if edges g isn't e :: _
-         then ([::], [::])
-         else
-           let x := if [seq e <- edges g | splittable e] is e' :: _
-                    then e'
-                    else e in
-           go fuel depth.+1 (foldr addEdge (removeEdge x g) (split x))
-    else
-      let: (ns', es') := go fuel depth.+1 (foldr removeVertex g noInbound) in
-      (noInbound ++ ns', [seq (depth, i)
-                         | i <- flatten [seq outbound n g
-                                        | n <- noInbound]] ++ es') in
-  go (size (vertices g0)).*2 0 g0.
-
 End Graph.
 
-Arguments emptyGraph {a b} f.
-Arguments addVertex {a b} v g.
-Arguments addEdge {a b} e g.
-Arguments removeEdge {a b} _ g.
-Arguments outbound {a b} _ g.
-Arguments inbound {a b} _ g.
-Arguments topsort {a b} g0 splittable split.
+Arguments emptyGraph {a}.
+Arguments addVertex {a} v g.
+Arguments addEdge {a} e g.
+Arguments graphInsert {a} e g.
+Arguments removeVertex {a} _ g.
+Arguments removeEdge {a} _ g.
+Arguments outbound {a} _ g.
+Arguments inbound {a} _ g.
 
-Definition topologically_sorted `(g : Graph a b)
-  (xs : seq a) (ys : seq b) : bool :=
-  perm_eq (vertices g) xs &&
-  all (fun x => let: (a, b) := edge_f g x in index a xs < index b xs) ys.
+Definition topsort {a : eqType}
+  (splittable : a -> bool) (split : a -> Graph a -> Graph a)
+  (g0 : Graph a) : seq a :=
+  let fix go fuel (g : Graph a) :=
+    if fuel isn't S fuel then vertices g else
+    (* Identify vertices that have no incoming edge (i.e., the "in-degree"
+       of these vertices is zero). *)
+    let noInbound := [seq v <- vertices g | nilp (inbound v g)] in
+    if noInbound is [::]
+    then if vertices g isn't v :: vs
+         then [::]
+         else if [seq x <- v :: vs | splittable x] is x :: _
+              then go fuel (split x g)
+              else vertices g   (* jww (2015-09-02): indicate error! *)
+    else noInbound ++ go fuel (foldr removeVertex g noInbound) in
+  go (size (vertices g0)).*2 g0.
+
+Arguments topsort {a} splittable split g0.
+
+(* Definition topologically_sorted `(g : Graph a) (xs : seq a) : bool := *)
+(*   [&& perm_eq (vertices g) xs *)
+(*   &   all (fun x : a * a => *)
+(*              let: (a, b) := x in *)
+(*              if inl a \in xs *)
+(*              then if inl b \in xs *)
+(*                   then index (inl a) xs < index (inl b) xs *)
+(*                   else index (inl a) xs > index (inr b) xs *)
+(*              else if inl b \in xs *)
+(*                   then index (inr a) xs < index (inl b) xs *)
+(*                   else index (inr a) xs > index (inr b) xs) (edges g)]. *)
 
 Example topsort_ex1 :
   let g :=
-    ( addEdge (Some  1, Some  3)
-    $ addEdge (Some  4, Some  5)
-    $ addEdge (Some  9, Some  7)
-    $ addEdge (Some 10, Some 11)
-    $ addEdge (Some 11, Some 10)
-    $ addEdge (Some  7, Some  1)
-    $ addEdge (Some  6, Some  2)
-    $ addEdge (Some  2, Some  4)
-    $ addEdge (Some  5, Some  6)
-    $ emptyGraph id) in
+    ( graphInsert (inl  1, inl  3)
+    $ graphInsert (inl  4, inl  5)
+    $ graphInsert (inl  9, inl  7)
+    $ graphInsert (inl 10, inl 11)
+    $ graphInsert (inl 11, inl 10)
+    $ graphInsert (inl  7, inl  1)
+    $ graphInsert (inl  6, inl  2)
+    $ graphInsert (inl  2, inl  4)
+    $ graphInsert (inl  5, inl  6)
+    $ emptyGraph) in
 
-  let splittable mx := match mx with
-    | (Some x, Some y) => true
-    | (Some x, None)   => true
-    | (None,   Some y) => true
-    | (None,   None)   => false
+  let splittable x := match x with
+    | inl _ => true
+    | _ => false
     end in
 
-  let swap mx := match mx with
-    | (Some x, Some y) => [:: (Some y, Some x)]
-    | (Some x, None)   => [:: (Some x, None)]
-    | (None,   Some y) => [:: (None,   Some y)]
-    | (None,   None)   => [::]
+  let split x g := match x with
+    | inl x =>
+        {| vertices := rem (inl x) $ if inr x \in vertices g
+                                     then vertices g
+                                     else inr x :: vertices g
+         ; edges    := let f e :=
+                         let: (a, b) := e in
+                         if a == inl x
+                         then (inr x, b)
+                         else e in
+                       map f (edges g) |}
+    | _ => g
     end in
 
-  let: (verts, xs) := topsort g splittable swap in
+  let: xs := topsort splittable split g in
+  [&& (* topologically_sorted g xs *)
 
-  [&& topologically_sorted g verts [seq snd x | x <- xs]
+  (* ,    *)
+      vertices g == [:: inl 3; inl 9; inl 11; inl 10; inl 7
+                    ;   inl 1; inl 2; inl 4; inl 5; inl 6]
 
-  ,   verts ==
-      [:: Just 9
-      ;   Just 7
-      ;   Just 1
-      ;   Just 3
-      ;   Just 5
-      ;   Just 6
-      ;   Just 2
-      ;   Just 4
-      ;   Just 11
-      ;   Just 10 ]
-
-  &   xs ==
-      [:: (0,  (Just 9,  Just 7))
-      ;   (1,  (Just 7,  Just 1))
-      ;   (2,  (Just 1,  Just 3))
-      ;   (5,  (Just 5,  Just 4))
-      ;   (5,  (Just 5,  Just 6))
-      ;   (6,  (Just 6,  Just 2))
-      ;   (7,  (Just 2,  Just 4))
-      ;   (10, (Just 11, Just 10)) ] ].
+  &   xs == [:: inl 9; inl 7; inl 1; inl 3
+            ;   inr 11; inl 10                 (* cycle was broken at 11 *)
+            ;   inr 2; inl 4; inl 5; inl 6 ]]. (* cycle broken at 2 *)
 Proof. by []. Qed.

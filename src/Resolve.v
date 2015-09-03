@@ -1,5 +1,6 @@
 Require Import LinearScan.Lib.
 Require Import Hask.Data.Maybe.
+Require Import LinearScan.Trace.
 Require Import LinearScan.Graph.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.
@@ -128,26 +129,35 @@ Canonical ResolvingMove_eqType :=
 End EqResolvingMove.
 
 Inductive ResGraphNode :=
-  | RegNode  of PhysReg
-  | VarNode  of VarId
-  | VirtNode of ResGraphNode.
+  | RegAlloc   of VarId & PhysReg
+  | StackAlloc of VarId
+  | RegNode    of PhysReg
+  | VarNode    of VarId
+  | VirtNode   of ResGraphNode.
 
 Section EqResGraphNode.
 
 Fixpoint eqResGraphNode s1 s2 :=
   match s1, s2 with
-  | RegNode r1,  RegNode r2  => r1 == r2
-  | VarNode v1,  VarNode v2  => v1 == v2
-  | VirtNode n1, VirtNode n2 => eqResGraphNode n1 n2
-  | _, _                     => false
+  | RegAlloc   v1 r1, RegAlloc   v2 r2 => [&& v1 == v2 & r1 == r2]
+  | StackAlloc v1,    StackAlloc v2    => v1 == v2
+  | RegNode r1,       RegNode r2       => r1 == r2
+  | VarNode v1,       VarNode v2       => v1 == v2
+  | VirtNode n1,      VirtNode n2      => eqResGraphNode n1 n2
+  | _, _ => false
   end.
 
 Lemma eqResGraphNodeP : Equality.axiom eqResGraphNode.
 Proof.
   move.
-  elim=> [r1|v1|n1 IHn];
-  case=> [r2|v2|n2] /=;
+  elim=> [r1 v1|v1|r1|v1|n1 IHn];
+  case=> [r2 v2|v2|r2|v2|n2] /=;
   try by constructor.
+  - case: (r1 =P r2) => [<-|?];
+    case: (v1 =P v2) => [<-|?];
+    first [ by constructor | by right; case ].
+  - case: (v1 =P v2) => [<-|?];
+    first [ by constructor | by right; case ].
   - case: (r1 =P r2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (v1 =P v2) => [<-|?];
@@ -167,36 +177,77 @@ Canonical ResGraphNode_eqType :=
 
 End EqResGraphNode.
 
-(* Determine the lexicographical sorting of edges. This is not done by a flow
-   of values, but of inverse dependencies: that is, each pair is (ACQUIRE,
-   RELEASE), and we desire that anything acquired has is released first. *)
-Definition determineNodes (x : ResolvingMove) : ResGraphNode * ResGraphNode :=
-  let fix go m := match m with
-    (* Instruction            Acquires    Releases   *)
-    (* -------------------    ----------  ---------- *)
-    | Move       fr fv tr => (RegNode tr, RegNode fr)
+(* (* Determine the lexicographical sorting of edges. This is not done by a flow *)
+(*    of values, but of inverse dependencies: that is, each pair is (ACQUIRE, *)
+(*    RELEASE), and we desire that anything acquired has is released first. *) *)
+(* Definition determineNodes (x : ResolvingMove) : *)
+(*   seq ResGraphNode * ResGraphNode := *)
+(*   let fix go m := match m with *)
+(*     | Move       fr fv tr => ([:: RegNode fr *)
+(*                               ;   RegAlloc fv tr], RegNode tr) *)
 
-    | Spill      fr tv _  => (VirtNode (VarNode tv), RegNode fr)
-    | Restore    fv tr _  => (RegNode tr, VarNode fv)
+(*     | Spill      fr tv _  => ([:: RegNode fr *)
+(*                               ;   StackAlloc tv], VarNode tv) *)
+(*     | Restore    fv tr _  => ([:: VarNode fv *)
+(*                               ;   RegAlloc fv tr], RegNode tr) *)
 
-    | FreeReg    fr tv _  => (VirtNode (VarNode tv), RegNode fr)
-    | AllocReg   fv tr _  => (RegNode tr, VarNode fv)
+(*     | FreeReg    fr tv _  => ([:: RegAlloc tv fr], RegNode fr) *)
+(*     | AllocReg   fv tr _  => ([:: RegNode tr], RegAlloc fv tr) *)
 
-    | FreeStack  fv       => (VirtNode (VarNode fv), VarNode fv)
-    | AllocStack tv       => (VarNode tv, VirtNode (VarNode tv))
+(*     | FreeStack  fv       => ([:: StackAlloc fv], VarNode fv) *)
+(*     | AllocStack tv       => ([:: VarNode tv], StackAlloc tv) *)
 
-    | Looped     x        => go x
-    end in
-  go x.
+(*     | Looped     x        => go x *)
+(*     end in *)
+(*   go x. *)
+
+Definition addResolvingEdge (x y : ResolvingMove) : bool :=
+  match x, y with
+  | Move fr1 _ _,       Move _ _ tr2       => fr1 == tr2
+  | Move fr1 _ _,       Restore _ tr2 _    => fr1 == tr2
+  | Move _ fv1 tr1,     Spill fr2 fv2 _    => [&& fv1 == fv2 & tr1 == fr2]
+  | Move fr1 fv1 _,     FreeReg fr2 tv2 _  => [&& fv1 == tv2 & fr1 == fr2]
+  | AllocReg fv1 tr1 _, Move _ fv2 tr2     => [&& fv1 == fv2 & tr1 == tr2]
+
+  | Spill fr1 _ _,      Restore _ tr2 _    => fr1 == tr2
+  | Spill fr1 _ _,      AllocReg _ tr2 _   => fr1 == tr2
+  | Spill fr1 fv1 _,    FreeReg fr2 tv2 _  => [&& fv1 == tv2 & fr1 == fr2]
+  | AllocStack tv1,     Spill _ fv2   _    => tv1 == fv2
+
+  | Restore tv1 tr1 _,  Move fr2 fv2 _     => [&& tv1 == fv2 & tr1 == fr2]
+  | Restore tv1 tr1 _,  Spill fr2 fv2 _    => [&& tv1 == fv2 & tr1 == fr2]
+  | Restore tv1 _ _,    FreeStack fv2      => tv1 == fv2
+  | AllocReg fv1 tr1 _, Restore tv2 tr2 _  => [&& fv1 == tv2 & tr1 == tr2]
+
+  | FreeReg fr1 _ _,    AllocReg _ tr2 _   => fr1 == tr2
+  | FreeReg fr1 _ _,    Restore _ tr2 _    => fr1 == tr2
+  | AllocReg fv2 tr2 _, FreeReg fr1 tv1 _  => [&& tv1 == fv2 & fr1 == tr2]
+
+  | _, _ => false
+  end.
+
+Definition addResolution (x : ResolvingMove) (g : Graph ResolvingMove_eqType) :
+  Graph ResolvingMove_eqType :=
+  let f x y z := if addResolvingEdge x y
+                 then addEdge (x, y) z
+                 else z in
+  foldr (fun y => f y x \o f x y) (addVertex x g) (vertices g).
+
+Definition addResolutions :
+  Graph ResolvingMove_eqType -> seq ResolvingMove
+    -> Graph ResolvingMove_eqType :=
+  foldr addResolution.
 
 Definition isMoveSplittable (x : ResolvingMove) : bool :=
   if x is Move _ _ _ then true else false.
 
-Definition splitMove (x : ResolvingMove) : seq ResolvingMove :=
+Definition splitMove (x : ResolvingMove) (g : Graph ResolvingMove_eqType) :
+  Graph ResolvingMove_eqType :=
   match x with
-  | Move fr fv tr => [:: Spill fr fv true; Restore fv tr true]
-  | Looped _      => [:: x]
-  | _             => [:: Looped x]
+  | Move fr fv tr => addResolutions (removeVertex x g)
+                                    [:: Spill fr fv true; Restore fv tr true]
+  | Looped _      => g
+  | _             => addVertex (Looped x) (removeVertex x g)
   end.
 
 (* Assuming a transition [from] one point in the procedure [to] another --
@@ -265,9 +316,8 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
 
 Definition determineMoves (allocs : seq (Allocation maxReg))
   (liveIn : option IntSet) (from to : nat) : seq ResolvingMove :=
-  let sortMoves x :=
-    [seq snd i | i <- snd (topsort x isMoveSplittable splitMove)] in
-  sortMoves (IntMap_foldr (flip (foldr addEdge)) (emptyGraph determineNodes)
+  let sortMoves := topsort isMoveSplittable splitMove in
+  sortMoves (IntMap_foldr (flip addResolutions) emptyGraph
                           (resolvingMoves allocs liveIn from to)).
 
 Definition BlockMoves : Type := seq ResolvingMove * seq ResolvingMove.
