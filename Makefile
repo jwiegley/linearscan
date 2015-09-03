@@ -1,4 +1,4 @@
-COQFLAGS = ""
+COQFLAGS = "-no-native-compiler"
 MISSING  =								\
 	find . -name '*.v' ! -name Notes.v				\
 		! -name Extract.v					\
@@ -11,55 +11,45 @@ MISSING  =								\
 VFILES = $(wildcard src/*.v)
 VOFILES = $(patsubst %.v,%.vo,$(VFILES))
 
-all: $(VOFILES) LinearScan/Main.hs		\
-     LinearScan/Eqtype.hs			\
-     LinearScan/Choice.hs			\
-     LinearScan/Fintype.hs			\
-     LinearScan/Seq.hs				\
-     LinearScan/Ssrbool.hs			\
-     LinearScan/Ssreflect.hs			\
-     LinearScan/Ssrfun.hs			\
-     LinearScan/Ssrnat.hs
+all: $(VOFILES) LinearScan/Main.hs
 	-@$(MISSING) || exit 0
 
 %.vo: %.v Makefile.coq
-	@$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
+	$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
 	@$(MAKE) LinearScan/Main.hs
 
 LinearScan/Main.hs: src/Main.vo
 	@if [ ! -d LinearScan ]; then rm -f LinearScan; fi
 	@if [ ! -d LinearScan ]; then mkdir LinearScan; fi
-	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' | \
-	    while read file; do mv $$file LinearScan; done
-	@perl -i fixcode.pl LinearScan/*.hs
-
-LinearScan/Eqtype.hs: LinearScan/eqtype.hs
-	@mv $< $@
-
-LinearScan/Choice.hs: LinearScan/choice.hs
-	@mv $< $@
-
-LinearScan/Fintype.hs: LinearScan/fintype.hs
-	@mv $< $@
-
-LinearScan/Seq.hs: LinearScan/seq.hs
-	@mv $< $@
-
-LinearScan/Ssrbool.hs: LinearScan/ssrbool.hs
-	@mv $< $@
-
-LinearScan/Ssreflect.hs: LinearScan/ssreflect.hs
-	@mv $< $@
-
-LinearScan/Ssrfun.hs: LinearScan/ssrfun.hs
-	@mv $< $@
-
-LinearScan/Ssrnat.hs: LinearScan/ssrnat.hs
-	@mv $< $@
+	@ls -1 *.hs | egrep -v '(Setup|LinearScan).hs' |	\
+	    while read file; do					\
+              if ! grep "module LinearScan" $$file; then	\
+	        perl -i fixcode.pl $$file;			\
+              fi;						\
+	      if [[ "$$file" = "eqtype.hs" ]]; then		\
+                mv eqtype.hs LinearScan/Eqtype.hs;		\
+	      elif [[ "$$file" = "choice.hs" ]]; then		\
+                mv choice.hs LinearScan/Choice.hs;		\
+	      elif [[ "$$file" = "fintype.hs" ]]; then		\
+                mv fintype.hs LinearScan/Fintype.hs;		\
+	      elif [[ "$$file" = "seq.hs" ]]; then		\
+                mv seq.hs LinearScan/Seq.hs;			\
+	      elif [[ "$$file" = "ssrbool.hs" ]]; then		\
+                mv ssrbool.hs LinearScan/Ssrbool.hs;		\
+	      elif [[ "$$file" = "ssreflect.hs" ]]; then	\
+                mv ssreflect.hs LinearScan/Ssreflect.hs;	\
+	      elif [[ "$$file" = "ssrfun.hs" ]]; then		\
+                mv ssrfun.hs LinearScan/Ssrfun.hs;		\
+	      elif [[ "$$file" = "ssrnat.hs" ]]; then		\
+                mv ssrnat.hs LinearScan/Ssrnat.hs;		\
+              else						\
+                mv $$file LinearScan;				\
+	      fi						\
+            done
 
 Makefile.coq: _CoqProject
-	@coq_makefile -f _CoqProject -o $@
-	@perl -i fixmake.pl $@
+	coq_makefile -f _CoqProject -o $@
+	perl -i fixmake.pl $@
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean

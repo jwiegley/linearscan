@@ -1,8 +1,6 @@
 #!/usr/bin/env perl
 
 while (<>) {
-    print if /^module LinearScan/ .. eof;
-
     s/import qualified (?<!LinearScan)(.*)/import qualified LinearScan.\1 as \1/;
     s/import qualified LinearScan\.GHC/import qualified GHC/;
     s{import qualified LinearScan\.Prelude as Prelude}{
