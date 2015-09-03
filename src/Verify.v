@@ -483,66 +483,45 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
     st <-- use _verDesc ;;
     match mv with
     | Move fromReg fromVar toReg =>
-      unless (fromReg == toReg) $
-        releaseReg fromReg fromVar false ;;
-        reserveReg toReg fromVar false ;;
-        addMove (weakenResolvingMove mv) ;;
-        check <-- isResident fromReg ;;
-        (* jww (2015-08-27): This logic is a little screwy... *)
-        (if useVerifier is VerifyEnabledStrict
-         then when (isJust check) $
-                checkResidency fromReg fromVar ;;
-                assignReg toReg fromVar
-         else assignReg toReg fromVar) ;;
-        pure $ rcons acc mv
+      checkResidency fromReg fromVar ;;
+      checkReservation toReg fromVar ;;
+      addMove (weakenResolvingMove mv) ;;
+      pure $ rcons acc mv
 
     | Spill fromReg toSpillSlot fromSplit =>
-      releaseReg fromReg toSpillSlot fromSplit ;;
+      checkStack toSpillSlot ;;
       check <-- isResident fromReg ;;
-      if isJust check
-      then
-        (* jww (2015-08-29): It's OK for the residency to not match, if it is
-           never restored afterwards. *)
-        (* (if useVerifier is VerifyEnabledStrict *)
-        (*  then checkResidency fromReg toSpillSlot *)
-        (*  else pure tt) ;; *)
-        allocStack toSpillSlot ;;
-        addMove (weakenResolvingMove mv) ;;
-        pure $ rcons acc mv
-      else pure acc
+      (* Spills are not necessary if the variable is not resident. *)
+      if check == Some toSpillSlot
+      then addMove (weakenResolvingMove mv) ;;
+           pure $ rcons acc mv
+      else let mv' := FreeStack maxReg toSpillSlot in
+           addMove (weakenResolvingMove mv') ;;
+           pure $ rcons acc mv'
 
     | Restore fromSpillSlot toReg fromSplit =>
-      (* jww (2015-08-27): Should I be using aggregate resolving moves here
-         like this, or should I use a list in [ResolvingMove], which would
-         allow the topological sort to reorder them? *)
-      check <-- isReserved toReg ;;
-      unless (check == Some fromSpillSlot)
-        (reserveReg toReg fromSpillSlot fromSplit) ;;
+      checkStack fromSpillSlot ;;
+      checkReservation toReg fromSpillSlot ;;
       addMove (weakenResolvingMove mv) ;;
-      freeStack fromSpillSlot ;;
-      assignReg toReg fromSpillSlot ;;
       pure $ rcons acc mv
 
     | AllocReg toVar toReg fromSplit =>
       reserveReg toReg toVar fromSplit ;;
       pure acc
-
     | FreeReg fromReg fromVar fromSplit =>
       releaseReg fromReg fromVar fromSplit ;;
       pure acc
+
+    | AssignReg fromVar toReg => assignReg toReg fromVar ;; pure acc
+    | ClearReg fromReg toVar  => clearReg fromReg toVar  ;; pure acc
+
+    | AllocStack toVar  => allocStack toVar  ;; pure acc
+    | FreeStack fromVar => freeStack fromVar ;; pure acc
 
     | Looped x =>
       errorT $ LoopInResolvingMoves (weakenResolvingMove x) ;;
       addMove (weakenResolvingMove mv) ;;
       pure $ rcons acc mv
-
-    | AllocStack toVar =>
-      allocStack toVar ;;
-      pure acc
-
-    | FreeStack fromVar =>
-      freeStack fromVar ;;
-      pure acc
     end.
 
 Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
@@ -557,39 +536,26 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
       checkAllocation (Some (Some toReg)) fromVar to 5
 
     | Spill fromReg toSpillSlot fromSplit =>
-      checkAllocation (Some (Some fromReg)) toSpillSlot from 8 ;;
-      unless fromSplit $ checkAllocation (Some None) toSpillSlot to 9
-
+      checkAllocation (Some (Some fromReg)) toSpillSlot from 6 ;;
+      unless fromSplit $ checkAllocation (Some None) toSpillSlot to 7
     | Restore fromSpillSlot toReg fromSplit =>
-      unless fromSplit $ checkAllocation (Some None) fromSpillSlot from 10 ;;
-      checkAllocation (Some (Some toReg)) fromSpillSlot to 11
+      unless fromSplit $ checkAllocation (Some None) fromSpillSlot from 8 ;;
+      checkAllocation (Some (Some toReg)) fromSpillSlot to 9
 
     | AllocReg toVar toReg fromSplit =>
-      (* It's OK for a stack variable to be present here, since as an
-         optimized we do not restore if the next instructions immediately
-         overwrites it. *)
-      unless fromSplit
-        (let alloc := allocationFor toVar from in
-         (if alloc is Some (Some _)
-          then errorT $ AllocationDoesNotMatch toVar None
-                (option_map (option_map (@nat_of_ord maxReg)) alloc)
-                from 12
-          else pure tt)) ;;
-      checkAllocation (Some (Some toReg)) toVar to 13
-
+      checkAllocation (Some (Some toReg)) toVar to 10
     | FreeReg fromReg fromVar fromSplit =>
-      checkAllocation (Some (Some fromReg)) fromVar from 14 ;;
-      unless fromSplit $ checkAllocation None fromVar to 15
+      checkAllocation (Some (Some fromReg)) fromVar from 11
+
+    | AssignReg fromVar toReg =>
+      checkAllocation (Some (Some toReg)) fromVar to 12
+    | ClearReg fromReg toVar =>
+      checkAllocation (Some (Some fromReg)) toVar from 13
+
+    | AllocStack toVar  => checkAllocation (Some None) toVar to 14
+    | FreeStack fromVar => checkAllocation (Some None) fromVar from 15
 
     | Looped x => pure tt
-
-    | AllocStack toVar =>
-      checkAllocation None toVar from 16 ;;
-      checkAllocation (Some None) toVar to 17
-
-    | FreeStack fromVar =>
-      checkAllocation (Some None) fromVar from 18 ;;
-      checkAllocation None fromVar to 19
     end.
 
 End Verify.
