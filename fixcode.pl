@@ -1,7 +1,9 @@
 #!/usr/bin/env perl
 
 while (<>) {
-    s/import qualified (?<!LinearScan)(.*)/import qualified LinearScan.\2 as \2/;
+    print if /^module LinearScan/ .. eof;
+
+    s/import qualified (?<!LinearScan)(.*)/import qualified LinearScan.\1 as \1/;
     s/import qualified LinearScan\.GHC/import qualified GHC/;
     s{import qualified LinearScan\.Prelude as Prelude}{
 import Debug.Trace (trace, traceShow, traceShowId)
@@ -15,7 +17,7 @@ import qualified Hask.Utils
 };
 
     s/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/;
-    s/module (.+?) where/module LinearScan.\1 where/;
+    s/module (?<!LinearScan)(.+?) where/module LinearScan.\1 where/;
 
     # Sometimes when generating type synonyms, the extraction mechanism will
     # inexplicably flip type arguments. We undo these bugs here.
