@@ -1,5 +1,5 @@
 name:          linearscan
-version:       0.10.1
+version:       0.10.2
 synopsis:      Linear scan register allocator, formally verified in Coq
 homepage:      http://github.com/jwiegley/linearscan
 license:       BSD3
