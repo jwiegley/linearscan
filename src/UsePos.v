@@ -28,9 +28,7 @@ Example VarKind_leq_ex9 : ~~ VarKind_leq Output Output. Proof. by []. Qed.
 
 Section EqVarKind.
 
-Implicit Type s : VarKind.
-
-Fixpoint eqVarKind s1 s2 {struct s2} :=
+Definition eqVarKind s1 s2 :=
   match s1, s2 with
   | Input,  Input             => true
   | InputOutput,  InputOutput => true
@@ -40,11 +38,7 @@ Fixpoint eqVarKind s1 s2 {struct s2} :=
   end.
 
 Lemma eqVarKindP : Equality.axiom eqVarKind.
-Proof.
-  case; case=> /=;
-  constructor=> //=;
-  by case.
-Qed.
+Proof. by case; case=> /=; constructor=> //=; case. Qed.
 
 Canonical VarKind_eqMixin := EqMixin eqVarKindP.
 Canonical VarKind_eqType  := Eval hnf in EqType VarKind VarKind_eqMixin.
@@ -63,20 +57,6 @@ Record UsePos : Set := {
   regReq : bool;
   uvar   : VarKind
 }.
-
-Coercion uloc : UsePos >-> nat.
-
-Definition upos_le (x y : UsePos) : bool := x <= y.
-Arguments upos_le x y /.
-
-Program Instance upos_le_trans : Transitive upos_le.
-Obligation 1. by ordered. Qed.
-
-Definition head_or x xs := head x [seq uloc u | u <- xs].
-Arguments head_or x xs /.
-
-Definition last_or x xs := last x [seq uloc u | u <- xs].
-Arguments last_or x xs /.
 
 Section EqUpos.
 
@@ -102,6 +82,20 @@ Canonical upos_eqMixin := EqMixin equposP.
 Canonical upos_eqType  := Eval hnf in EqType UsePos upos_eqMixin.
 
 End EqUpos.
+
+Coercion uloc : UsePos >-> nat.
+
+Definition upos_le : rel UsePos := leq.
+Arguments upos_le x y /.
+
+Program Instance upos_le_trans : Transitive upos_le.
+Obligation 1. by ordered. Qed.
+
+Definition head_or x xs := head x [seq uloc u | u <- xs].
+Arguments head_or x xs /.
+
+Definition last_or x xs := last x [seq uloc u | u <- xs].
+Arguments last_or x xs /.
 
 Lemma span_all_leq (l : list UsePos) : forall (x : nat) l1 l2,
   StronglySorted upos_le l

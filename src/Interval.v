@@ -82,19 +82,20 @@ Definition packInterval `(i : Interval d) := exist Interval d i.
 Arguments packInterval [d] i /.
 
 Definition intervalStart `(Interval i) : nat := ibeg i.
-Definition intervalEnd   `(Interval i) : nat := iend i.
-
 Arguments intervalStart [i] _ /.
+Definition intervalEnd   `(Interval i) : nat := iend i.
 Arguments intervalEnd [i] _ /.
 
 Definition posWithinInterval `(i : Interval d) (pos : nat) : bool :=
   intervalStart i <= pos < intervalEnd i.
 Arguments posWithinInterval [d] i pos /.
 
-Lemma Interval_exact_beg `(i : Interval d) : ibeg d = rbeg (NE_head (rds d)).1.
+Theorem Interval_exact_beg `(i : Interval d) :
+  ibeg d = rbeg (NE_head (rds d)).1.
 Proof. by inv i. Qed.
 
-Lemma Interval_exact_end `(i : Interval d) : iend d = rend (NE_last (rds d)).1.
+Theorem Interval_exact_end `(i : Interval d) :
+  iend d = rend (NE_last (rds d)).1.
 Proof. by inv i. Qed.
 
 Definition intervalUncons
@@ -119,7 +120,7 @@ Proof.
   exact.
 Defined.
 
-Lemma Interval_NE_sorted `(i : Interval d) :
+Theorem Interval_NE_sorted `(i : Interval d) :
   NE_StronglySorted range_ltn (rds d).
 Proof.
   induction i; simpl in *.
@@ -139,10 +140,10 @@ Proof.
   - by inv IHi.
 Qed.
 
-Lemma Interval_sorted `(i : Interval d) : StronglySorted range_ltn (rds d).
+Corollary Interval_sorted `(i : Interval d) : StronglySorted range_ltn (rds d).
 Proof. by move/NE_StronglySorted_to_list: (Interval_NE_sorted i). Qed.
 
-Lemma Interval_bounded `(i : Interval d) : ibeg d < iend d.
+Theorem Interval_bounded `(i : Interval d) : ibeg d < iend d.
 Proof.
   move: (Interval_NE_sorted i).
   inv i.
@@ -166,8 +167,8 @@ Lemma NE_StronglySorted_inv : forall (A : Set) a l (R : A -> A -> Prop),
 Proof. intros; inversion H; auto. Qed.
 
 Definition findIntervalUsePos `(i : Interval d) (f : UsePos -> bool) :
-  option { r' : RangeSig & { u : UsePos | u \in ups r'.1
-                                        & ibeg d <= u < iend d } }.
+  option { r' : RangeSig
+         & { u : UsePos | u \in ups r'.1 & ibeg d <= u < iend d } }.
 Proof.
   move: (Interval_exact_beg i).
   move: (Interval_exact_end i) => /=.

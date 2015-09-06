@@ -26,36 +26,8 @@ Record RangeDesc : Set := {
   ups  : seq UsePos
 }.
 
-Section EqRange.
-
-Definition eqrange s1 s2 :=
-  match s1, s2 with
-  | {| rbeg := rb1; rend := re1; ups := rus1 |},
-    {| rbeg := rb2; rend := re2; ups := rus2 |} =>
-      [&& rb1 == rb2, re1 == re2 & rus1 == rus2]
-  end.
-
-Lemma eqrangeP : Equality.axiom eqrange.
-Proof.
-  move.
-  case=> [rb1 re1 rus1].
-  case=> [rb2 re2 rus2] /=.
-  case: (rb1 =P rb2) => [<-|neqx]; last by right; case.
-  case: (re1 =P re2) => [<-|neqx]; last by right; case.
-  case: (rus1 =P rus2) => [<-|neqx]; last by right; case.
-  by constructor.
-Qed.
-
-Canonical range_eqMixin := EqMixin eqrangeP.
-Canonical range_eqType := Eval hnf in EqType RangeDesc range_eqMixin.
-
-End EqRange.
-
 Definition head_or_end (rd : RangeDesc) := head_or (rend rd) (ups rd).
 Arguments head_or_end rd /.
-
-Definition last_or_beg (rd : RangeDesc) := last_or (rbeg rd) (ups rd).
-Arguments last_or_beg rd /.
 
 Definition useWithinRange (b e : nat) (u : UsePos) := b <= u < e.
 Arguments useWithinRange b e u /.
@@ -106,7 +78,7 @@ Proof.
   by reduce_last_use; ordered.
 Qed.
 
-Lemma Range_head_or_end_spec `(r : Range rd) (b : nat) :
+Theorem Range_head_or_end_spec `(r : Range rd) (b : nat) :
   b < head_or_end rd -> b < rend rd.
 Proof.
   rewrite /head_or_end /head_or /=.
@@ -148,7 +120,7 @@ Proof.
     by ordered.
 Defined.
 
-Definition Range_shift_spec `(r : Range rd) `(H : b < head_or_end rd) :
+Theorem Range_shift_spec `(r : Range rd) `(H : b < head_or_end rd) :
   forall r1, r1 = Range_shift r H
     -> [/\ rbeg r1.1 = b
        ,   rend r1.1 = rend r
@@ -466,25 +438,6 @@ Record SplitRange (rd r1 r2 : RangeDesc) (before : nat) : Prop := {
 Definition splittable_range_pos (pos : nat) (rd : RangeDesc) :=
   rbeg rd < pos < rend rd.
 Arguments splittable_range_pos pos rd /.
-
-(* Legal split positions:
-
-   Assume a Range from 1-11, with use positions at 1 (must *not* be
-   input-only), 5, 9 and 11 (must be input-only).  This is written:
-
-     1-11 [1 5 9 ->11]
-
-   - Cannot split at 1.
-   - Split at  3: 1-3  [1    ]  3-11 [5 9 ->11]
-   - Split at  5: 1-5  [1    ]  5-11 [5 9 ->11]
-   - Split at  7: 1-7  [1 5  ]  7-11 [  9 ->11]
-   - Split at  9: 1-9  [1 5  ]  9-11 [  9 ->11]
-   - Split at 11: 1-11 [1 5 9] 11-11 [    ->11]
-   - Cannot split at 13.
-
-   Note that is possible to produce a zero-width range by splitting at the end
-   when no input variable is there.  The algorithms above this can interpret
-   this as meaning that the range did not split at all. *)
 
 Definition SubRangesOf `(r : Range rd) (before : nat) :=
   { p : RangeSig * RangeSig
