@@ -196,6 +196,30 @@ Proof.
   exact: perm_to_rem.
 Qed.
 
+Lemma lift_bounded : forall n (x : 'I_n), ord_max != widen_ord (leqnSn n) x.
+Proof.
+  move=> n.
+  case=> /= m Hlt.
+  rewrite /ord_max /lift.
+  apply/eqP; invert.
+  move: H0 Hlt => ->.
+  by rewrite ltnn.
+Qed.
+
+Lemma no_ord_max : forall n (xs : seq ('I_n)),
+  ord_max \notin [ seq widen_id i | i <- xs ].
+Proof.
+  move=> n; elim=> // [x xs IHxs] /=.
+  rewrite in_cons /=.
+  apply/norP; split; last assumption.
+  exact: lift_bounded.
+Qed.
+
+Lemma map_widen_fst : forall (a : eqType) n (xs : seq ('I_n * a)),
+  [seq fst i | i <- [seq (@widen_fst n a) i | i <- xs]] =
+  [seq (@widen_id n) i | i <- [seq fst i | i <- xs]].
+Proof. move=> a n xs. by rewrite -!map_comp. Qed.
+
 Theorem lists_are_unique `(st : @ScanState maxReg b sd) :
   uniq (all_state_lists sd).
 Proof.
@@ -703,57 +727,4 @@ Proof.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
     move=> IHst /andP [H2 H3].
     by apply/andP; split => //.
-Qed.
-
-Theorem mem_map_fst (A B : eqType) (x : A) (y : B) (xs : seq (A * B)) :
-  (x, y) \in xs -> x \in [seq fst i | i <- xs].
-Proof.
-  elim: xs => //= [[w z] zs IHzs].
-  rewrite !in_cons.
-  move/orP=> [H|H] /=;
-  apply/orP.
-    move/eqP in H; inv H.
-    by left.
-  right.
-  exact: IHzs.
-Qed.
-
-Theorem cat_in_notin (A : eqType) x y (xs ys : seq A) :
-  x \in xs -> y \notin ys ++ xs -> x != y.
-Proof.
-  elim: xs => //= [z zs IHzs].
-  rewrite in_cons.
-  move/orP=> [H|H].
-    move/eqP in H; rewrite {}H {IHzs}.
-    rewrite mem_cat.
-    move/norP=> [H1 H2].
-    move: H2.
-    rewrite in_cons.
-    move/norP.
-    rewrite eq_sym.
-    by intuition.
-  move=> H1.
-  apply: IHzs => //.
-  move: H1.
-  rewrite !mem_cat.
-  move/norP=> [H2 H3].
-  apply/norP; split => //.
-  rewrite in_cons in H3.
-  by move/norP: H3 => [H3 H4].
-Qed.
-
-Theorem uniq_cat_in_notin (A : eqType) i (xs ys : seq A) :
-  i \in xs -> uniq (xs ++ ys) -> i \notin ys.
-Proof.
-  elim: ys => //= [y ys IHys].
-  rewrite uniq_catC cat_cons /=.
-  move=> H /andP [H1 H2].
-  rewrite in_cons.
-  apply/norP; split.
-    apply: cat_in_notin.
-      exact: H.
-    exact: H1.
-  apply: IHys.
-    exact: H.
-  by rewrite uniq_catC.
 Qed.

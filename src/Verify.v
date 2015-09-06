@@ -241,13 +241,8 @@ Definition allocationFor (var : VarId) (pos : nat) : option (option PhysReg) :=
   | [::]   => None                (* not allocated here *)
   | [:: a] => Some (intReg a)     (* allocated in reg or on stack *)
   | _      => None                (* over-allocated! but see the Theorem
-                                     no_allocations_intersect in Spec.v *)
+                                     [no_allocations_intersect] in Spec.v *)
   end.
-
-Definition variablesAtPos (pos : nat) : seq (VarId * option PhysReg) :=
-  [seq (ivar (intVal i), intReg i) | i <- intervals
-                                   & let int := intVal i in
-                                     ibeg int <= pos < iend int].
 
 Definition checkAllocation
   (reg : option (option PhysReg)) (var : VarId) (pos idx : nat) :

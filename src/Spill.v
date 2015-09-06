@@ -51,9 +51,20 @@ Tactic Notation "SpillCondition_cases" tactic(first) ident(c) :=
 Program Definition optimalSplitPosition `(i : Interval d) (lb ub : nat) :
   nat := ub.
 
-Lemma optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
+Theorem optimalSplitPosition_spec `(i : Interval d) (lb ub : nat) :
   optimalSplitPosition i lb ub <= ub.
 Proof. by []. Qed.
+
+Lemma widen_fst_inj : forall a n, injective (@widen_fst n a).
+Proof.
+  move=> a n.
+  rewrite /injective => [[[x1a H1] x1b] [[x2a H2] x2b]].
+  invert.
+  congr (_, _).
+  rewrite H0 in H1 *.
+  congr (Ordinal _).
+  exact: eq_irrelevance.
+Qed.
 
 Definition spillInterval `(st : ScanState InUse sd)
   (i1 : IntervalSig) `(Hunh : unhandled sd = (uid, beg) :: us)

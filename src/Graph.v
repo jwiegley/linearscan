@@ -50,7 +50,7 @@ Definition removeVertex (v : a) g : Graph :=
   foldr removeEdge {| vertices := rem v (vertices g)
                     ; edges    := edges g |} (inbound v g ++ outbound v g).
 
-Lemma removeVertex_spec : forall g v,
+Theorem removeVertex_spec : forall g v,
   v \in vertices g -> size (vertices (removeVertex v g)) < size (vertices g).
 Proof.
   move=> g v Hin.

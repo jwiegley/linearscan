@@ -255,7 +255,7 @@ Proof.
   apply Build_SSMorph; auto.
 Defined.
 
-Lemma moveInactiveToActive_spec
+Theorem moveInactiveToActive_spec
   `(st : ScanState InUse sd) `(H : x \in inactive sd)
   (Hreg : snd x \notin [seq snd i | i <- active sd]) :
   let: exist2 sd' st' sslen' := moveInactiveToActive st H Hreg in

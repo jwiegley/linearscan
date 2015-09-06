@@ -156,25 +156,6 @@ Proof.
   by ordered.
 Qed.
 
-Lemma isJust_head_filter_cat : forall a (xs ys : seq (option a)),
-  isJust (head None [seq x <- xs ++ ys | isJust x]) =
-  isJust (head None [seq x <- xs | isJust x]) ||
-  isJust (head None [seq y <- ys | isJust y]).
-Proof.
-  move=> a.
-  elim=> //= [x xs IHxs] ys.
-  case: ys => /= [|y ys].
-    rewrite Bool.orb_false_r.
-    case: (isJust x) => //=.
-    by rewrite cats0.
-  case A: (isJust x) => /=;
-  case B: (isJust y) => /=.
-  - by rewrite A B.
-  - by rewrite A.
-  - by rewrite IHxs /= B /= B.
-  - by rewrite IHxs /= B.
-Qed.
-
 Definition allUsePos (d : IntervalDesc) : seq UsePos :=
   flatten [seq ups r.1 | r <- rds d].
 Arguments allUsePos d /.
@@ -321,22 +302,6 @@ Definition intervalsIntersect (x y : IntervalDesc) :
   if (ibeg x < iend y) && (ibeg y < iend x)
   then Some (if ibeg x < ibeg y then ibeg y else ibeg x)
   else None.
-
-Lemma intervalsIntersect_sym : symmetric (isJust .: intervalsIntersect).
-Proof.
-  move=> x y.
-  rewrite /intervalsIntersect.
-  case A: (ibeg x < iend y);
-  case B: (ibeg y < iend x);
-  case C: (ibeg x < ibeg y);
-  case D: (ibeg y < ibeg x);
-  intuition;
-  try move/idP in C;
-  try move/negbT in D;
-  try move/idP in D;
-  try move/negbT in D;
-  by ordered.
-Qed.
 
 Definition intervalIntersectsWithSubrange (x y : IntervalDesc) : option nat :=
   let fix go rs :=

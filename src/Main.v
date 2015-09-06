@@ -133,12 +133,6 @@ Require Import Hask.Haskell.
 
 (* Set Extraction Conservative Types. *)
 
-Extraction Implicit widen_id [ n ].
-Extraction Implicit widen_fst [ n ].
-
-Extract Inlined Constant widen_id  => "".
-Extract Inlined Constant widen_fst => "Prelude.id".
-
 Separate Extraction linearScan.
 
 (* Show which axioms we depend on for this development. *)

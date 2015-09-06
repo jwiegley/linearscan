@@ -428,32 +428,6 @@ Proof.
   exact: NE_Forall_from_list.
 Qed.
 
-Definition rangesIntersect (x y : RangeDesc) : option nat :=
-  if (rbeg x < rend y) && (rbeg y < rend x)
-  then Some (if rbeg x < rbeg y then rbeg y else rbeg x)
-  else None.
-
-Lemma rangesIntersect_sym_nat : forall x y,
-  rangesIntersect x y = rangesIntersect y x.
-Proof.
-  move=> x y.
-  rewrite /rangesIntersect.
-  case A: (rbeg x < rend y);
-  case B: (rbeg y < rend x);
-  case C: (rbeg x < rbeg y);
-  case D: (rbeg y < rbeg x);
-  intuition.
-    move/idP in C;
-    move/idP in D;
-    by ordered.
-  move/negbT in C.
-  move/negbT in D.
-  rewrite -leqNgt in C.
-  rewrite -leqNgt in D.
-  have ->: rbeg x = rbeg y by ordered.
-  by [].
-Qed.
-
 Definition findRangeUsePos `(r : Range rd) (f : UsePos -> bool) :
   option { u : UsePos | u \in ups rd }.
 Proof.
