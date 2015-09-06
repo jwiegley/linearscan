@@ -183,6 +183,7 @@ Proof.
   (* The second interval will go back on the unhandled list, to be processed
      in a later iteration. Note: By definition of [insert] and
      [ScanState_newUnhandled], it cannot become the new first element.
+
      jww (2015-05-22): This should be proven. *)
   have := ScanState_newUnhandled st i1_1.2.
   rewrite Hunh => /=.

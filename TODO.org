@@ -1,11 +1,14 @@
+* TODO Improve handling of register made available to calls
+Right now I just drop a single allocation.
+* TODO Fix performance issues
+* TODO Enter TODO items for all jww comments
+* TODO Optimize by moving split positions
+** TODO Move split positions outside of inner loops
+** TODO Move split positions to block boundaries
 * DONE 21 Tempest cases are still failing
 * DONE regBlocked test is failing
 * DONE Several generated tests fail
-* TODO Improve handling of register made available to calls
-Right now I just drop a single allocation.
 * DONE Implement a VM for verifying allocations
-* TODO Fix performance issues
-* TODO Enter TODO items for all jww comments
 * DONE Write more edge-case tests
 * DONE Compute lifetime holes
 If a variable is last read at position 100, and written to at position 200,
@@ -19,6 +22,3 @@ I'm quite puzzled on this one.  This is the last bit of work needed for
 feature completeness on the Coq side.
 * DONE Insert pseudo-use positions at loop end blocks
 * DONE Resolve admits
-* TODO Optimize by moving split positions
-** TODO Move split positions to block boundaries
-** TODO Move split positions outside of inner loops

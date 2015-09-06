@@ -366,28 +366,6 @@ Definition freeStack (var : VarId) : Verified unit :=
        then err
        else pure tt.
 
-(* jww (2015-08-30): This function is no longer being used, because liveness
-   analysis does not necessarily mean that variable is actively being used,
-   but merely that it could be used along that path. *)
-Definition checkLiveness (vars : IntSet) : Verified unit :=
-  if useVerifier isn't VerifyEnabledStrict then pure tt else
-  st <-- use _verDesc ;;
-  (forM_ (IntSet_toList vars) $ fun var =>
-     unless (vfoldl_with_index (fun reg b p =>
-       b || if p ^_ residency == Some var then true else false)
-                               false (rsAllocs st)) $
-       errorT $ VarNotResident var) (* ;;
-
-  (* Clear out any resident registers which liveness tells us are not set.
-     That is, even though there may be contents "left over", we don't want to
-     rely on that, but only on the liveness information. *)
-  vfoldl_with_index (fun reg act p => act >>
-                       if p ^_ residency is Some v
-                       then unless (IntSet_member v vars) $
-                              clearReg reg v
-                       else pure tt)
-                    (pure tt) (rsAllocs st) *).
-
 Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
@@ -404,22 +382,14 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
         when (IntSet_size liveIns > 0) $
           errorT $ BlockWithoutPredecessors bid
      else pure tt)) ;;
-
-  (* checkLiveness liveIns ;; *)
-
   allocs <-- use _verState ;;
   _verInit %= IntMap_insert bid allocs.
 
 Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
-  (* Check to ensure that all "live out" variables are resident in registers
-     at the end of the block. *)
-  (* checkLiveness liveOuts ;; *)
-
   (* Clear out all known allocations, saving them for this block. *)
   allocs <-- use _verState ;;
   _verFinal %= IntMap_insert bid allocs ;;
-
   _verState .= packRegState StartState.
 
 Definition verifyAllocs (op : opType1)
@@ -448,25 +418,17 @@ Definition verifyAllocs (op : opType1)
         if maybeLookup allocs (var, varKind ref) isn't Some reg
         then errorT $ VarNotAllocated var
         else
-          (* We decrement pc by 2 or 1 to offset what [Assign.setAllocations]
-             had added. *)
+          (* We decrement pc by 1 to offset what [Assign.setAllocations]
+             added. *)
           match varKind ref with
-          | Input  =>
-            (* jww (2015-08-29): It only needs to be resident at this point,
-               not necessarily allocated to a register. Some other variable
-               could be allocated, pending an upcoming write after the
-               resident value is used as an input. *)
-            (* checkAllocation (Some (Some reg)) var pc.-2 1 ;; *)
-            checkResidency reg var
-          | InputOutput =>
-            checkResidency reg var ;;
-            checkAllocation (Some (Some reg)) var pc.-1 1
-          | Temp   =>
-            checkAllocation (Some (Some reg)) var pc.-1 2 ;;
-            checkReservation reg var
-          | Output =>
-            checkAllocation (Some (Some reg)) var pc.-1 3 ;;
-            assignReg reg var
+          | Input       => checkResidency reg var
+          | InputOutput => checkResidency reg var ;;
+                           checkAllocation (Some (Some reg)) var pc.-1 1 ;;
+                           assignReg reg var
+          | Temp        => checkAllocation (Some (Some reg)) var pc.-1 2 ;;
+                           checkReservation reg var
+          | Output      => checkAllocation (Some (Some reg)) var pc.-1 3 ;;
+                           assignReg reg var
           end
     end.
 

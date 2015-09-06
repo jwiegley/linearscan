@@ -161,10 +161,6 @@ Definition considerOps
     let k := setAllocations allocs in
 
     let resolutions pos toFroms moves :=
-      (* jww (2015-08-27): In order to enable allocation-checking here, we'll
-         need to determine the from/to position of all incoming and outgoing
-         blocks, since the beginning and ending resolutions bridge those gaps.
-         We should confirm the validity of every combination. *)
       match toFroms with
       | inl froms => forM_ froms $ fun b =>
           verifyTransitions pos allocs useVerifier moves b pos.+1
