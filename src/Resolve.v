@@ -1,11 +1,6 @@
 Require Import LinearScan.Lib.
-Require Import Hask.Data.Maybe.
-Require Import LinearScan.Trace.
 Require Import LinearScan.Graph.
-Require Import LinearScan.UsePos.
-Require Import LinearScan.Range.
 Require Import LinearScan.Interval.
-Require Import LinearScan.ScanState.
 Require Import LinearScan.Blocks.
 Require Import LinearScan.LiveSets.
 Require Import LinearScan.Allocate.
@@ -14,7 +9,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
-
 Section Resolve.
 
 Variable maxReg : nat.          (* max number of registers *)
@@ -23,16 +17,14 @@ Definition PhysReg := 'I_maxReg.
 Variables blockType1 blockType2 opType1 opType2 : Set.
 Variables mType : Type -> Type.
 Context `{mDict : Monad mType}.
-
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
-Variable oinfo : OpInfo maxReg opType1 opType2.
 
-Inductive ResolvingMove :=
+Inductive ResolvingMove : Type :=
   | Move       of PhysReg & VarId & PhysReg
   | Spill      of PhysReg & VarId & bool (* true if resulting from a split *)
   | Restore    of VarId & PhysReg & bool
-  | AllocReg   of VarId & PhysReg & bool
-  | FreeReg    of PhysReg & VarId & bool
+  | AllocReg   of VarId & PhysReg
+  | FreeReg    of PhysReg & VarId
   | AssignReg  of VarId & PhysReg
   | ClearReg   of PhysReg & VarId
   | AllocStack of VarId
@@ -43,8 +35,8 @@ Inductive ResolvingMoveSet : Set :=
   | RSMove       of nat & VarId & nat
   | RSSpill      of nat & VarId & bool
   | RSRestore    of VarId & nat & bool
-  | RSAllocReg   of VarId & nat & bool
-  | RSFreeReg    of nat & VarId & bool
+  | RSAllocReg   of VarId & nat
+  | RSFreeReg    of nat & VarId
   | RSAssignReg  of VarId & nat
   | RSClearReg   of nat & VarId
   | RSAllocStack of VarId
@@ -53,16 +45,16 @@ Inductive ResolvingMoveSet : Set :=
 
 Fixpoint weakenResolvingMove (x : ResolvingMove) : ResolvingMoveSet :=
   match x with
-  | Move       fr fv tr    => RSMove       fr fv tr
-  | Spill      fr tv b     => RSSpill      fr tv b
-  | Restore    fv tr b     => RSRestore    fv tr b
-  | AllocReg   fv tr b     => RSAllocReg   fv tr b
-  | FreeReg    fr tv b     => RSFreeReg    fr tv b
-  | AssignReg  fv tr       => RSAssignReg  fv tr
-  | ClearReg   fr tv       => RSClearReg   fr tv
-  | AllocStack tv          => RSAllocStack tv
-  | FreeStack  fv          => RSFreeStack  fv
-  | Looped     x           => RSLooped     (weakenResolvingMove x)
+  | Move       fr fv tr => RSMove       fr fv tr
+  | Spill      fr tv b  => RSSpill      fr tv b
+  | Restore    fv tr b  => RSRestore    fv tr b
+  | AllocReg   fv tr    => RSAllocReg   fv tr
+  | FreeReg    fr tv    => RSFreeReg    fr tv
+  | AssignReg  fv tr    => RSAssignReg  fv tr
+  | ClearReg   fr tv    => RSClearReg   fr tv
+  | AllocStack tv       => RSAllocStack tv
+  | FreeStack  fv       => RSFreeStack  fv
+  | Looped     x        => RSLooped     (weakenResolvingMove x)
   end.
 
 Section EqResolvingMove.
@@ -75,10 +67,8 @@ Fixpoint eqResolvingMove s1 s2 :=
                                                 &   b1  == b2]
   | Restore tv1 tr1 b1,  Restore tv2 tr2 b2  => [&& tv1 == tv2, tr1 == tr2
                                                 &   b1  == b2]
-  | AllocReg fv1 tr1 b1, AllocReg fv2 tr2 b2 => [&& fv1 == fv2, tr1 == tr2
-                                                &   b1  == b2]
-  | FreeReg fr1 tv1 b1,  FreeReg fr2 tv2 b2  => [&& fr1 == fr2, tv1 == tv2
-                                                &   b1  == b2]
+  | AllocReg fv1 tr1,    AllocReg fv2 tr2    => [&& fv1 == fv2 & tr1 == tr2]
+  | FreeReg fr1 tv1,     FreeReg fr2 tv2     => [&& fr1 == fr2 & tv1 == tv2]
   | AssignReg fv1 tr1,   AssignReg fv2 tr2   => [&& fv1 == fv2 & tr1 == tr2]
   | ClearReg fr1 tv1,    ClearReg fr2 tv2    => [&& fr1 == fr2 & tv1 == tv2]
   | AllocStack tv1,      AllocStack tv2      => tv1 == tv2
@@ -90,10 +80,10 @@ Fixpoint eqResolvingMove s1 s2 :=
 Lemma eqResolvingMoveP : Equality.axiom eqResolvingMove.
 Proof.
   move.
-  elim=> [fr1 fv1 tr1|fr1 fv1 b1|tv1 tr1 b1|fv1 tr1 b1
-         |fr1 tv1 b1|fr1 tv1|fr1 tv1|tv1|fv1|x IHx];
-  case=> [fr2 fv2 tr2|fr2 fv2 b2|tv2 tr2 b2|fv2 tr2 b2
-         |fr2 tv2 b2|fr2 tv2|fr2 tv2|tv2|fv2|y] /=;
+  elim=> [fr1 fv1 tr1|fr1 fv1 b1|tv1 tr1 b1|fv1 tr1
+         |fr1 tv1|fr1 tv1|fr1 tv1|tv1|fv1|x IHx];
+  case=> [fr2 fv2 tr2|fr2 fv2 b2|tv2 tr2 b2|fv2 tr2
+         |fr2 tv2|fr2 tv2|fr2 tv2|tv2|fv2|y] /=;
   try by constructor.
   - case: (fr1 =P fr2) => [<-|?];
     case: (fv1 =P fv2) => [<-|?];
@@ -109,11 +99,9 @@ Proof.
     first [ by constructor | by right; case ].
   - case: (fv1 =P fv2) => [<-|?];
     case: (tr1 =P tr2) => [<-|?];
-    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (tv1 =P tv2) => [<-|?];
-    case: (b1  =P b2) => [<-|?];
     first [ by constructor | by right; case ].
   - case: (fr1 =P fr2) => [<-|?];
     case: (tv1 =P tv2) => [<-|?];
@@ -140,44 +128,42 @@ Canonical ResolvingMove_eqType :=
 
 End EqResolvingMove.
 
-Definition addResolvingEdge (x y : ResolvingMove) : bool :=
+Definition shouldAddResolvingEdge (x y : ResolvingMove) : bool :=
   match x, y with
-  | Move fr1 _ _,       Move _ _ tr2      => fr1 == tr2
-  | Move fr1 _ _,       Restore _ tr2 _   => fr1 == tr2
-  | Move _ fv1 tr1,     Spill fr2 fv2 _   => [&& fv1 == fv2 & tr1 == fr2]
-  | Move _ fv1 tr1,     AssignReg fv2 tr2 => [&& fv1 == fv2 & tr1 == tr2]
-  | Move fr1 fv1 _,     FreeReg fr2 tv2 _ => [&& fv1 == tv2 & fr1 == fr2]
-  | AllocReg fv1 tr1 _, Move _ fv2 tr2    => [&& fv1 == fv2 & tr1 == tr2]
+  | Move fr1 _ _,      Move _ _ tr2      => fr1 == tr2
+  | Move fr1 _ _,      Restore _ tr2 _   => fr1 == tr2
+  | Move _ fv1 tr1,    Spill fr2 fv2 _   => [&& fv1 == fv2 & tr1 == fr2]
+  | Move _ fv1 tr1,    AssignReg fv2 tr2 => [&& fv1 == fv2 & tr1 == tr2]
+  | Move fr1 fv1 _,    FreeReg fr2 tv2   => [&& fv1 == tv2 & fr1 == fr2]
+  | AllocReg fv1 tr1,  Move _ fv2 tr2    => [&& fv1 == fv2 & tr1 == tr2]
 
-  | Spill fr1 _ _,      Restore _ tr2 _   => fr1 == tr2
-  | Spill fr1 _ _,      AllocReg _ tr2 _  => fr1 == tr2
-  | Spill fr1 fv1 _,    FreeReg fr2 tv2 _ => [&& fv1 == tv2 & fr1 == fr2]
-  | AllocStack tv1,     Spill _ fv2   _   => tv1 == fv2
+  | Spill fr1 _ _,     Restore _ tr2 _   => fr1 == tr2
+  | Spill fr1 _ _,     AllocReg _ tr2    => fr1 == tr2
+  | Spill fr1 fv1 _,   FreeReg fr2 tv2   => [&& fv1 == tv2 & fr1 == fr2]
+  | AllocStack tv1,    Spill _ fv2   _   => tv1 == fv2
 
-  | Restore tv1 tr1 _,  Move fr2 fv2 _    => [&& tv1 == fv2 & tr1 == fr2]
-  | Restore tv1 tr1 _,  Spill fr2 fv2 _   => [&& tv1 == fv2 & tr1 == fr2]
-  | Restore tv1 tr1 _,  AssignReg fv2 tr2 => [&& tv1 == fv2 & tr1 == tr2]
-  | Restore tv1 _ _,    FreeStack fv2     => tv1 == fv2
-  | AllocReg fv1 tr1 _, Restore tv2 tr2 _ => [&& fv1 == tv2 & tr1 == tr2]
+  | Restore tv1 tr1 _, Move fr2 fv2 _    => [&& tv1 == fv2 & tr1 == fr2]
+  | Restore tv1 tr1 _, Spill fr2 fv2 _   => [&& tv1 == fv2 & tr1 == fr2]
+  | Restore tv1 tr1 _, AssignReg fv2 tr2 => [&& tv1 == fv2 & tr1 == tr2]
+  | Restore tv1 _ _,   FreeStack fv2     => tv1 == fv2
+  | AllocReg fv1 tr1,  Restore tv2 tr2 _ => [&& fv1 == tv2 & tr1 == tr2]
 
-  | FreeReg fr1 _ _,    AllocReg _ tr2 _  => fr1 == tr2
-  | FreeReg fr1 _ _,    Restore _ tr2 _   => fr1 == tr2
-  | AllocReg fv2 tr2 _, FreeReg fr1 tv1 _ => [&& tv1 == fv2 & fr1 == tr2]
+  | FreeReg fr1 _,     AllocReg _ tr2    => fr1 == tr2
+  | FreeReg fr1 _,     Restore _ tr2 _   => fr1 == tr2
+  | AllocReg fv2 tr2,  FreeReg fr1 tv1   => [&& tv1 == fv2 & fr1 == tr2]
 
   | _, _ => false
   end.
 
 Definition addResolution (x : ResolvingMove) (g : Graph ResolvingMove_eqType) :
   Graph ResolvingMove_eqType :=
-  let f x y z := if addResolvingEdge x y
+  let f x y z := if shouldAddResolvingEdge x y
                  then addEdge (x, y) z
                  else z in
   foldr (fun y => f y x \o f x y) (addVertex x g) (vertices g).
 
-Definition addResolutions :
-  Graph ResolvingMove_eqType -> seq ResolvingMove
-    -> Graph ResolvingMove_eqType :=
-  foldr addResolution.
+Definition addResolutions : Graph ResolvingMove_eqType -> seq ResolvingMove
+  -> Graph ResolvingMove_eqType := foldr addResolution.
 
 Definition isMoveSplittable (x : ResolvingMove) : bool :=
   if x is Move _ _ _ then true else false.
@@ -236,20 +222,20 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
            match intReg x, intReg y with
            | Some xr, Some yr =>
                Some (if varNotLive vid || ~~ odd to
-                     then [:: FreeReg xr vid true
-                          ;   AllocReg vid yr true]
-                     else [:: FreeReg xr vid false
-                          ;   AllocReg vid yr false
+                     then [:: FreeReg xr vid
+                          ;   AllocReg vid yr]
+                     else [:: FreeReg xr vid
+                          ;   AllocReg vid yr
                           ;   Move xr vid yr
                           ;   AssignReg vid yr])
            | Some xr, None    =>
-               Some [:: FreeReg xr vid false
+               Some [:: FreeReg xr vid
                     ;   AllocStack vid
                     ;   Spill xr vid false]
            | None,    Some yr =>
                Some (if varNotLive vid || ~~ odd to
-                     then [:: AllocReg vid yr false]
-                     else [:: AllocReg vid yr false
+                     then [:: AllocReg vid yr]
+                     else [:: AllocReg vid yr
                           ;   Restore vid yr false
                           ;   AssignReg vid yr
                           ;   FreeStack vid])
@@ -258,11 +244,11 @@ Definition resolvingMoves (allocs : seq (Allocation maxReg))
            end
        | Some x, None =>
            if intReg x is Some r
-           then Some [:: FreeReg r vid false]
+           then Some [:: FreeReg r vid]
            else Some [:: FreeStack vid]
        | None, Some y =>
            if intReg y is Some r
-           then Some [:: AllocReg vid r false]
+           then Some [:: AllocReg vid r]
            else Some [:: AllocStack vid]
        | None, None => None
        end)
@@ -292,7 +278,7 @@ Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
 
 Definition resolveDataFlow (allocs : seq (Allocation maxReg))
   (blocks : seq blockType1) (liveSets : IntMap BlockLiveSets) :
-  mType (IntMap BlockMoves) :=
+  IntMap BlockMoves :=
   (* for each block from in blocks do
        for each successor to of from do
          // collect all resolving moves necessary between the blocks from
@@ -318,11 +304,11 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
          resolver.resolve_mappings()
        end for
      end for *)
-  fmap fst $ forFoldM (emptyIntMap, true) blocks $ fun z b =>
+  fst $ forFold (emptyIntMap, true) blocks $ fun z b =>
     let: (mappings, isFirst) := z in
-    bid <-- blockId binfo b ;;
+    let bid := blockId binfo b in
     if IntMap_lookup bid liveSets isn't Some from
-    then pure (mappings, false)
+    then (mappings, false)
     else
       let mappings' :=
         if isFirst
@@ -332,17 +318,16 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
 
       (* If [in_from] is [true], resolving moves are inserted at the end of
          the [from] block, rather than the beginning of the [to] block. *)
-      suxs <-- blockSuccessors binfo b ;;
+      let suxs := blockSuccessors binfo b in
       let in_from := size suxs <= 1 in
       let mappings'' :=
         if size suxs == 0
         then mappings'
-        else
-          forFold mappings' suxs $ fun ms s_bid =>
-            if IntMap_lookup s_bid liveSets isn't Some to then ms else
-            let key := if in_from then bid else s_bid in
-            checkBlockBoundary allocs (blockLiveIn to) key in_from
-                               (Some from) to ms in
-      pure (mappings'', false).
+        else forFold mappings' suxs $ fun ms s_bid =>
+          if IntMap_lookup s_bid liveSets isn't Some to then ms else
+          let key := if in_from then bid else s_bid in
+          checkBlockBoundary allocs (blockLiveIn to) key in_from
+                             (Some from) to ms in
+      (mappings'', false).
 
 End Resolve.

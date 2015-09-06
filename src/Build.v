@@ -629,24 +629,24 @@ Defined.
 
 Definition reduceBlocks (blocks : seq blockType1) (loops : LoopState)
   (varUses : IntMap IntSet) (liveSets : IntMap BlockLiveSets) {pos} :
-  mType (BuildState pos).
+  BuildState pos.
 Proof.
   elim: blocks => [|b blocks IHbs] in pos *.
-    exact: pure newBuildState.
+    exact: newBuildState.
 
   pose sz := blockSize binfo b.
   case E: (0 < sz);
     last exact: IHbs pos.
 
   have Hsz : pos < pos + sz by exact: ltn_plus.
-  exact
-    (bid <-- blockId binfo b ;;
-     let outs := if IntMap_lookup bid liveSets is Some ls
-                 then blockLiveOut ls
-                 else emptyIntSet in
-     let ranges := emptyPendingRanges Hsz outs in
-     let pending := reduceBlock bid E loops varUses ranges in
-     mergeIntoSortedRanges Hsz pending <$> IHbs (pos + sz)).
+
+  have bid := blockId binfo b.
+  have outs := if IntMap_lookup bid liveSets is Some ls
+               then blockLiveOut ls
+               else emptyIntSet.
+  have ranges := emptyPendingRanges Hsz outs.
+  have pending := reduceBlock bid E loops varUses ranges.
+  exact: mergeIntoSortedRanges Hsz pending (IHbs (pos + sz)).
 Defined.
 
 Definition compileIntervals `(bs : BuildState pos) :
@@ -668,21 +668,20 @@ Proof.
 Defined.
 
 Definition buildIntervals (blocks : seq blockType1) (loops : LoopState)
-  (liveSets : IntMap BlockLiveSets) :
-  mType (ScanStateSig maxReg InUse) :=
+  (liveSets : IntMap BlockLiveSets) : ScanStateSig maxReg InUse :=
   let add_unhandled_interval (ss  : ScanStateSig maxReg Pending) i :=
         packScanState (ScanState_newUnhandled ss.2 i.2 I) in
   let s0 := ScanState_nil maxReg in
   if blocks isn't b :: bs
-  then pure $ packScanState (ScanState_finalize s0)
+  then packScanState (ScanState_finalize s0)
   else
-    varUses <-- computeVarReferences binfo oinfo (b :: bs) loops ;;
-    reduced <-- reduceBlocks (pos:=0) (b :: bs) loops varUses liveSets ;;
+    let varUses := computeVarReferences binfo oinfo (b :: bs) loops in
+    let reduced := reduceBlocks (pos:=0) (b :: bs) loops varUses liveSets in
     let: (regs, vars) := compileIntervals reduced in
     let s1 := ScanState_setFixedIntervals s0 regs in
     let s2 := packScanState s1 in
     let s3 := IntMap_foldl add_unhandled_interval s2 vars in
     let s4 := ScanState_finalize s3.2 in
-    pure $ packScanState s4.
+    packScanState s4.
 
 End Build.

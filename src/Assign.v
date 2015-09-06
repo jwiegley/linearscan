@@ -139,8 +139,8 @@ Definition considerOps
     _verExt \o+ _assnBlockBeg .= opid + (size opsb).*2 ;;
     _verExt \o+ _assnBlockEnd .= opid + (size opsb + size opsm).*2 ;;
 
-    bid  <-- lift $ blockId binfo blk ;;
-    suxs <-- lift $ blockSuccessors binfo blk ;;
+    let bid  := blockId binfo blk in
+    let suxs := blockSuccessors binfo blk in
     let: (liveIns, liveOuts) :=
       if IntMap_lookup bid liveSets is Some bls
       then (blockLiveIn bls, blockLiveOut bls)

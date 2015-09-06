@@ -87,10 +87,10 @@ Definition linearScan
   let: (loops, blocks1) := z in
 
   (* create intervals with live ranges *)
-  liveSets  <-- computeLocalLiveSets binfo oinfo blocks1 ;;
-  liveSets' <-- computeGlobalLiveSetsRecursively binfo blocks1 liveSets ;;
+  let liveSets  := computeLocalLiveSets binfo oinfo blocks1 in
+  let liveSets' := computeGlobalLiveSetsRecursively binfo blocks1 liveSets in
 
-  ssig <-- buildIntervals binfo oinfo blocks1 loops liveSets' ;;
+  let ssig := buildIntervals binfo oinfo blocks1 loops liveSets' in
   (* allocate registers *)
   let opCount := (countOps binfo blocks1).+1 in
   match walkIntervals registers_exist ssig.2 opCount.*2.+1 with
@@ -110,7 +110,7 @@ Definition linearScan
 
       | inr (exist sd _) =>
         let allocs := determineAllocations sd in
-        mappings <-- resolveDataFlow binfo allocs blocks1 liveSets' ;;
+        let mappings := resolveDataFlow binfo allocs blocks1 liveSets' in
         res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
                              mappings loops blocks1 ;;
         let: (moves, blocks2) := res in

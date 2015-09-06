@@ -260,9 +260,9 @@ Definition checkAllocation
                   pos idx
   else pure tt.
 
-Definition reserveReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
+Definition reserveReg (reg : PhysReg) (var : VarId) :
   Verified unit :=
-  addMove $ RSAllocReg var reg fromSplit ;;
+  addMove $ RSAllocReg var reg ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == None) is Some H
   then _verState .= packRegState (ReserveRegS var H)
@@ -284,9 +284,9 @@ Definition checkReservation (reg : PhysReg) (var : VarId) : Verified unit :=
   then unless (var == var') err
   else err.
 
-Definition releaseReg (reg : PhysReg) (var : VarId) (fromSplit : bool) :
+Definition releaseReg (reg : PhysReg) (var : VarId) :
   Verified unit :=
-  addMove $ RSFreeReg reg var fromSplit ;;
+  addMove $ RSFreeReg reg var ;;
   st <-- use _verDesc ;;
   if prop (vnth (rsAllocs st) reg ^_ reservation == Some var) is Some H
   then _verState .= packRegState (ReleaseRegS H)
@@ -505,12 +505,8 @@ Definition verifyResolutions (moves : seq (@ResolvingMove maxReg)) :
       addMove (weakenResolvingMove mv) ;;
       pure $ rcons acc mv
 
-    | AllocReg toVar toReg fromSplit =>
-      reserveReg toReg toVar fromSplit ;;
-      pure acc
-    | FreeReg fromReg fromVar fromSplit =>
-      releaseReg fromReg fromVar fromSplit ;;
-      pure acc
+    | AllocReg toVar toReg    => reserveReg toReg toVar ;; pure acc
+    | FreeReg fromReg fromVar => releaseReg fromReg fromVar ;; pure acc
 
     | AssignReg fromVar toReg => assignReg toReg fromVar ;; pure acc
     | ClearReg fromReg toVar  => clearReg fromReg toVar  ;; pure acc
@@ -542,9 +538,9 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
       unless fromSplit $ checkAllocation (Some None) fromSpillSlot from 8 ;;
       checkAllocation (Some (Some toReg)) fromSpillSlot to 9
 
-    | AllocReg toVar toReg fromSplit =>
+    | AllocReg toVar toReg =>
       checkAllocation (Some (Some toReg)) toVar to 10
-    | FreeReg fromReg fromVar fromSplit =>
+    | FreeReg fromReg fromVar =>
       checkAllocation (Some (Some fromReg)) fromVar from 11
 
     | AssignReg fromVar toReg =>

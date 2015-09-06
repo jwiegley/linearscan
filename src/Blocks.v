@@ -47,8 +47,8 @@ Record OpInfo `{Monad m} (opType1 opType2 : Set) := {
 Definition BlockId := nat.
 
 Record BlockInfo `{Monad m} (blockType1 blockType2 opType1 opType2 : Set) := {
-  blockId         : blockType1 -> m BlockId;
-  blockSuccessors : blockType1 -> m (seq BlockId);
+  blockId         : blockType1 -> BlockId;
+  blockSuccessors : blockType1 -> seq BlockId;
 
   splitCriticalEdge : blockType1 -> blockType1
                         -> m (blockType1 * blockType1)%type;

@@ -198,12 +198,12 @@ Definition computeLiveSets b idx : State BlockLiveSets nat :=
     pure next.+2.
 
 Definition computeLocalLiveSets (blocks : seq blockType1) :
-  mType (IntMap BlockLiveSets) :=
-  @snd _ _ <$> forFoldM (1, emptyIntMap) blocks (fun acc b =>
+  IntMap BlockLiveSets :=
+  @snd _ _ $ forFold (1, emptyIntMap) blocks $ fun acc b =>
     let: (idx, m) := acc in
     let (idx', liveSets) := computeLiveSets b idx emptyBlockLiveSets in
-    k <-- blockId binfo b ;;
-    pure (idx', IntMap_insert k liveSets m)).
+    let k := blockId binfo b in
+    (idx', IntMap_insert k liveSets m).
 
 Definition updateLiveSets (blockLiveSets : IntMap BlockLiveSets)
   (suxs : seq BlockId) : State BlockLiveSets unit :=
@@ -231,26 +231,26 @@ Definition updateLiveSets (blockLiveSets : IntMap BlockLiveSets)
                  (blockLiveGen ls).
 
 Definition computeGlobalLiveSets (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : mType (IntMap BlockLiveSets) :=
-  forFoldrM liveSets blocks $ fun b liveSets1 =>
-    bid <-- blockId binfo b ;;
+  (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
+  forFoldr liveSets blocks $ fun b liveSets1 =>
+    let bid := blockId binfo b in
     match IntMap_lookup bid liveSets1 with
-    | None => pure liveSets1
+    | None => liveSets1
     | Some liveSet =>
-        suxs <-- blockSuccessors binfo b ;;
+        let suxs := blockSuccessors binfo b in
         let (_, liveSet') := updateLiveSets liveSets suxs liveSet in
-        pure $ IntMap_insert bid liveSet' liveSets1
+        IntMap_insert bid liveSet' liveSets1
     end.
 
 Definition computeGlobalLiveSetsRecursively (blocks : seq blockType1)
-  (liveSets : IntMap BlockLiveSets) : mType (IntMap BlockLiveSets) :=
+  (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
   let fix go n previous :=
     if n isn't S n
     then pure previous
     else
-      computed <-- computeGlobalLiveSets blocks previous ;;
+      let computed := computeGlobalLiveSets blocks previous in
       if previous == computed
-      then pure computed
+      then computed
       else go n computed in
   go (size blocks) liveSets.
 

@@ -394,8 +394,8 @@ showOps1 atBeg oinfo sd rms aerrs pos (o:os) =
 -- | From the point of view of this library, a basic block is nothing more
 --   than an ordered sequence of operations.
 data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
-    { blockId           :: blk1 -> m Int
-    , blockSuccessors   :: blk1 -> m [Int]
+    { blockId           :: blk1 -> Int
+    , blockSuccessors   :: blk1 -> [Int]
     , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
     , blockOps          :: blk1 -> ([op1], [op1], [op1])
     , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
@@ -417,7 +417,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs initials finals loopInfo = go 0
   where
     go _ [] = return ""
     go pos (b:bs) = do
-        bid  <- LinearScan.blockId binfo b
+        let bid = LinearScan.blockId binfo b
         let (liveIn, liveOut) = case M.lookup bid ls of
                 Nothing -> (S.empty, S.empty)
                 Just s  -> (S.fromList (LS.blockLiveIn s),
@@ -433,9 +433,7 @@ fromBlockInfo :: Monad m
               => LinearScan.BlockInfo m blk1 blk2 op1 op2
               -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
-    LS.Build_BlockInfo
-        (\r1 -> U.unsafeCoerce (a r1))
-        (\r1 -> U.unsafeCoerce (b r1))
+    LS.Build_BlockInfo a b
         (\r1 r2 -> U.unsafeCoerce (c r1 r2))
         (\blk -> let (x, y, z) = d blk in ((x, y), z)) e
 
@@ -483,10 +481,10 @@ instance Show LS.ResolvingMoveSet where
       "spill (r" ++ show fr ++ " v" ++ show tv ++ ")" ++ showSplit b
   show (LS.RSRestore fv tr b)     =
       "restore (r" ++ show tr ++ " v" ++ show fv ++ ")" ++ showSplit b
-  show (LS.RSAllocReg fv tr b)    =
-      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")" ++ showSplit b
-  show (LS.RSFreeReg fr tv b)     =
-      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")" ++ showSplit b
+  show (LS.RSAllocReg fv tr)    =
+      "<reserve> (r" ++ show tr ++ " v" ++ show fv ++ ")"
+  show (LS.RSFreeReg fr tv)     =
+      "<release> (r" ++ show fr ++ " v" ++ show tv ++ ")"
   show (LS.RSAssignReg fv tr)   =
       "<assign> (r" ++ show tr ++ " v" ++ show fv ++ ")"
   show (LS.RSClearReg fr tv)    =
