@@ -229,7 +229,7 @@ Proof.
       by rewrite (allWithinRange_leq Hb (leqnn _)).
     + rewrite /= in Hr1a.
       apply/andP; split. by ordered.
-      rewrite Bool.andb_true_r.
+      rewrite andbT.
       apply/andP; split.
         apply/andP; split. by ordered.
         by case: (uvar u1) in Hr1a *; ordered.

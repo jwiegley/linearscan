@@ -575,9 +575,8 @@ Proof.
   have Hlt : pos <= (pos + sz).-1 < pos + sz.
     apply/andP; split.
       by rewrite -subn1 -addnBA // leq_plus //.
-    apply/ltP.
-    apply: Lt.lt_pred_n_n.
-    apply/ltP.
+    rewrite prednK.
+      by ordered.
     rewrite addn_gt0.
     by apply/orP; right.
 
