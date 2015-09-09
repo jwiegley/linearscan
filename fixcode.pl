@@ -23,7 +23,5 @@ import qualified Hask.Utils
     s/_Blocks__//g; s/Blocks__//g;
     s/_MLS__MS__//g; s/MLS__MS__//g;
 
-    # s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
-
     print;
 }
