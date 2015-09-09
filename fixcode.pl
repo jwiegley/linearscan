@@ -17,34 +17,13 @@ import qualified Hask.Utils
     s/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/;
     s/module (?<!LinearScan)(.+?) where/module LinearScan.\1 where/;
 
-    # Sometimes when generating type synonyms, the extraction mechanism will
-    # inexplicably flip type arguments. We undo these bugs here.
-    s/o -> Prelude.Either a \(\(,\) errType i\)/i -> Prelude.Either errType ((,) a o)/;
-    s/a -> \(,\) i o/i -> (,) a o/;
-    s/b -> \[\] \(LinearScan__Block g\)/g -> [] (LinearScan__Block b)/;
-    s/opType -> \[\] blockType/blockType -> [] opType/;
-
     s/data Coq_simpl_fun/newtype Coq_simpl_fun/;
     s/_LinearScan__//g; s/LinearScan__//g;
     s/_Allocate__//g; s/Allocate__//g;
     s/_Blocks__//g; s/Blocks__//g;
     s/_MLS__MS__//g; s/MLS__MS__//g;
 
-    s/morphlen_transport maxReg b b' =/morphlen_transport maxReg b b' = GHC.Base.id/;
-
-    s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
-
-    s/_MyMachine__maxReg = 4/_MyMachine__maxReg = MAX_REG/;
-    s/_MyMachine__regSize = 32/_MyMachine__regSize = REG_SIZE/;
-
-    s/\(Prelude\.map  \( rs\)\)/rs/;
-    s/\(Prelude\.map \)/(Prelude.map Prelude.id)/;
-    s/^   vars = IntMap.coq_IntMap_map $/   vars = Prelude.id /;
-    s/Maybe\.option_map \(Maybe\.option_map \) reg/reg/;
-    s/Maybe\.option_map \(Maybe\.option_map \) alloc/alloc/;
-    s/Maybe\.option_map  \(Allocate\.intReg/(Allocate.intReg/;
-    s/mapLeft  /mapLeft Prelude.id /g;
-    s/\(Data\.IntMap\.map  ranges\)/ranges/;
+    # s/\(,\) \(\(Prelude\.succ\) \(\(Prelude\.succ\) \(unsafeCoerce n\)\)\)/(,) ((Prelude.succ) ((Prelude.succ) (unsafeCoerce n :: Prelude.Int)))/;
 
     print;
 }
