@@ -171,8 +171,7 @@ Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
 
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
-Definition computeLoopDepths (bs : IntMap blockType1) :
-  State LoopState unit :=
+Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
   st <-- get ;;
   let m := forFold emptyIntMap (IntSet_toList (loopEndBlocks st))
     (fun m endBlock =>
