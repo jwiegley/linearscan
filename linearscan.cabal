@@ -60,20 +60,19 @@ library
     LinearScan.Build
     LinearScan.Choice
     LinearScan.Class
-    LinearScan.Context
     LinearScan.Const
+    LinearScan.Context
+    LinearScan.Contravariant
     LinearScan.Cursor
     LinearScan.Datatypes
-    -- LinearScan.Either
-    -- LinearScan.Either0
     LinearScan.Eqtype
     LinearScan.Fintype
     LinearScan.Functor
     LinearScan.Graph
     LinearScan.Identity
+    LinearScan.Interval
     LinearScan.IntMap
     LinearScan.IntSet
-    LinearScan.Interval
     LinearScan.Lens
     LinearScan.Lib
     LinearScan.List0
