@@ -9,16 +9,16 @@
 module LinearScan
     ( -- * Main entry point
       allocate
+    , LS.UseVerifier(..)
       -- * Blocks
     , LinearScan.BlockInfo(..)
-    , LS.UseVerifier(..)
       -- * Operations
     , LinearScan.OpInfo(..)
     , OpKind(..)
       -- * Variables
-    , VarId
     , LinearScan.VarInfo(..)
     , LS.VarKind(..)
+    , VarId
     , PhysReg
     ) where
 
@@ -62,16 +62,22 @@ coqMonad :: forall m. (Monad m, Applicative m) => Coq.Monad (m Any)
 coqMonad = Coq.Build_Monad coqApplicative
     (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
 
--- | Each variable has associated allocation details, and a flag to indicate
---   whether it must be loaded into a register at its point of use.  Variables
---   are also distinguished by their kind, which allows for restricting the
---   scope of their lifetime.  For example, output variables are not needed in a
---   basic block until the first point of use, while the lifetime of input
---   variables extends until their final use.
+-- | Each "virtual variable" has details associated with it that affect the
+-- allocation procedure.
 data VarInfo = VarInfo
     { varId       :: Either PhysReg VarId
+      -- ^ Identify the variable, or if it is an explicit register reference.
+
     , varKind     :: LS.VarKind
+      -- ^ The kind of a variable determines the scope of its lifetime, and
+      -- when it is spilled or loaded to or from stack. For example, output
+      -- variables are not needed in a basic block until the first point of
+      -- use, while the lifetime of input variables extends until their final
+      -- use.
+
     , regRequired :: Bool
+      -- ^ If true, the variable's value must be loaded into a register at
+      -- this use position.
     }
 
 deriving instance Eq LS.VarKind
@@ -81,23 +87,41 @@ fromVarInfo (VarInfo a b c) = LS.Build_VarInfo a b c
 
 -- | Every operation may reference multiple variables and/or specific physical
 --   registers.  If a physical register is referenced, then that register is
---   considered unavailable for allocation over the range of such references.
+--   considered unavailable for allocation over its range of use.
 --
 --   Certain operations have special significance as to how basic blocks are
---   organized, and the lifetime of allocations.  Thus, if an operation begins
---   or ends a loop, or represents a method call, it should be indicated using
---   the 'OpKind' field.  Indication of calls is necessary in order to save
---   and restore all registers around a call, but indication of loops is
---   optional, as it's merely avoids reloading of spilled variables inside
---   loop bodies.
+--   organized and lifetime of allocations. Thus, if an operation begins or
+--   ends a loop, or represents a method call, this should be indicated using
+--   the 'OpKind' field. Indication of calls is necessary for saving and
+--   restoring all registers around a call, while indication of loops is
+--   optional, as it merely avoids reloading spilled variables inside loop
+--   bodies.
 data OpInfo m op1 op2 = OpInfo
     { opKind      :: op1 -> OpKind
+      -- ^ Return the kind of operator prior to allocation.
+
     , opRefs      :: op1 -> [LinearScan.VarInfo]
-    , moveOp      :: PhysReg  -> LS.VarId -> PhysReg -> m [op2]
-    , saveOp      :: PhysReg  -> LS.VarId -> m [op2]
+      -- ^ Return all variable references for the operation.
+
+    , moveOp      :: PhysReg -> LS.VarId -> PhysReg -> m [op2]
+      -- ^ Create move instruction(s) from one register to another, relating
+      -- to the given variable.
+
+    , saveOp      :: PhysReg -> LS.VarId -> m [op2]
+      -- ^ Create a spill instruction from the given restriction, to a stack
+      -- slot for the given variable.
+
     , restoreOp   :: LS.VarId -> PhysReg -> m [op2]
+      -- ^ Create a load instruction from the stack slot for the given
+      -- variable, to the given register.
+
     , applyAllocs :: op1 -> [((LS.VarId, LS.VarKind), PhysReg)] -> m [op2]
+      -- ^ Given an operation, and a set of register allocations for each
+      -- variable used by the operation (differentiated by type of use), apply
+      -- the allocations to create one or more post-allocation operations.
+
     , showOp1     :: op1 -> String
+      -- ^ Render the given pre-allocation operation as a string.
     }
 
 deriving instance Eq OpKind
@@ -395,10 +419,28 @@ showOps1 atBeg oinfo sd rms aerrs pos (o:os) =
 --   than an ordered sequence of operations.
 data BlockInfo m blk1 blk2 op1 op2 = BlockInfo
     { blockId           :: blk1 -> Int
+      -- ^ Identify the block with a unique number. The nature and ordering of
+      -- the number is not significant, only its uniqueness.
+
     , blockSuccessors   :: blk1 -> [Int]
+      -- ^ The immediate successors of a block.
+
     , splitCriticalEdge :: blk1 -> blk1 -> m (blk1, blk1)
+      -- ^ Given two blocks, insert a new block between them to break up a
+      -- "critical edge" (where the first block has multiple destinations due
+      -- to a conditional branch, for example, while the second block has
+      -- multiple originations due to branches from other blocks). The result
+      -- is the new pair of blocks at that boundary. Typically, only one of
+      -- the two will be a newly created block.
+
     , blockOps          :: blk1 -> ([op1], [op1], [op1])
+      -- ^ Return the entry, body, and exit operation of a block. Typically,
+      -- the entry operation is a "label", and the exit operation is a branch,
+      -- jump or return.
+
     , setBlockOps       :: blk1 -> [op2] -> [op2] -> [op2] -> blk2
+      -- ^ Replace the set of operations for a block with a set of allocated
+      -- operations.
     }
 
 showBlocks1 :: Monad m
@@ -551,23 +593,36 @@ toDetails (LS.Build_Details a b c d e f g h i) binfo oinfo =
         (fmap toScanStateDesc g) (fmap toScanStateDesc h)
         binfo oinfo (toLoopState i)
 
--- | Transform a list of basic blocks containing variable references, into an
---   equivalent list where each reference is associated with a register
---   allocation.  Artificial save and restore instructions may also be
---   inserted into blocks to indicate spilling and reloading of variables.
+-- | Transform a list of basic blocks, containing variable references, into an
+-- equivalent list where each reference has been associated with a register
+-- allocation. Artificial save and restore instructions may be inserted into
+-- those blocks to indicate spilling and reloading of variables.
 --
---   In order to call this function, the caller must provide records that
---   allow viewing and mutating of the original program graph.
+-- In order to call this function, the caller must provide records that
+-- functionally characterize these blocks and their operations according to an
+-- abstract API. This is done so that any program graph conforming to the API
+-- may be used, and no particular representation is required.
 --
---   If allocation is found to be impossible -- for example if there are
---   simply not enough registers -- a 'Left' value is returned, with a string
---   describing the error.
+-- A tuple is return where the first value is a textual dump that describes
+-- the complete allocation state. If this value is never forced, that data is
+-- not collected.
+--
+-- The second value is the resulting list of allocated blocks. If allocation
+-- is found to be impossible -- for example if there are not enough registers
+-- -- a 'Left' value is returned, with a list of strings describing the error
+-- and its possible context. This is usually when the textual dump should be
+-- provided, if one's user has selected verbose error output, for example.
 allocate :: forall m blk1 blk2 op1 op2. (Functor m, Applicative m, Monad m)
          => Int        -- ^ Maximum number of registers to use
          -> LinearScan.BlockInfo m blk1 blk2 op1 op2
+                      -- ^ Characterization of blocks
          -> LinearScan.OpInfo m op1 op2
+                      -- ^ Characterization of operations
          -> LS.UseVerifier
-         -> [blk1] -> m (String, Either [String] [blk2])
+                      -- ^ Whether to use the runtime verifier
+         -> [blk1]     -- ^ A topologically sorted list of blocks
+         -> m (String, Either [String] [blk2])
+                      -- ^ Status dump and allocated blocks, or error w/ context
 allocate 0 _ _ _ _  = return ("", Left ["Cannot allocate with no registers"])
 allocate _ _ _ _ [] = return ("", Left ["No basic blocks were provided"])
 allocate maxReg binfo oinfo useVerifier blocks = do
