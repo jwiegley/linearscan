@@ -266,7 +266,7 @@ Definition firstUsePos (d : IntervalDesc) : option UsePos :=
       match xs with
         | NE_Sing x => rangeFirstUsePos x.1
         | NE_Cons x xs =>
-            option_choose (rangeFirstUsePos x.1) (go xs)
+            Maybe_choose (rangeFirstUsePos x.1) (go xs)
       end in
   go (rds d).
 Arguments firstUsePos d /.
@@ -276,7 +276,7 @@ Definition lastUsePos (d : IntervalDesc) : option UsePos :=
       match xs with
         | NE_Sing x => olast (ups x.1)
         | NE_Cons x xs =>
-            option_choose (go xs) (olast (ups x.1))
+            Maybe_choose (go xs) (olast (ups x.1))
       end in
   go (rds d).
 Arguments lastUsePos d /.
