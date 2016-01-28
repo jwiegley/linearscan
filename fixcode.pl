@@ -14,7 +14,6 @@ import qualified Data.Functor.Identity
 import qualified Hask.Utils
 };
 
-    s/unsafeCoerce :: a -> b/--unsafeCoerce :: a -> b/;
     s/module (?<!LinearScan)(.+?) where/module LinearScan.\1 where/;
 
     s/data Coq_simpl_fun/newtype Coq_simpl_fun/;
