@@ -3,4 +3,4 @@
 	url = https://github.com/jwiegley/coq-haskell
 [submodule "Ssreflect"]
 	path = Ssreflect
-	url = git://github.com/jwiegley/ssreflect.git
+	url = https://github.com/jwiegley/ssreflect.git
