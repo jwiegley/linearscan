@@ -1,3 +1,11 @@
+* TODO Prove correctness
+** Compute block order based on loop depth analysis
+** Compute local live sets
+** Compute global live sets
+** Build live intervals
+** Allocate registers to intervals
+** Resolve data flow between blocks
+** Assign registers to instructions
 * TODO Improve handling of register made available to calls
 Right now I just drop a single allocation.
 * TODO Fix performance issues
