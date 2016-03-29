@@ -236,7 +236,7 @@ Proof.
       [seq fst i | i <- [seq widen_fst i | i <- inactive sd]] ++
       [seq fst i | i <- [seq widen_fst i | i <- handled sd]].
     rewrite (@perm_eq_uniq _ _ s2) /s2 /unh /n.
-      rewrite map_cons !map_widen_fst.
+      rewrite map_cons !map_widen_fst /=.
       apply/andP; split.
         rewrite !mem_cat.
         apply/norP; split. exact: no_ord_max.
@@ -618,6 +618,8 @@ Proof.
   exact: IHzs.
 Qed.
 
+Notation "f .: g" := (fun x y => f (g x y)) (at level 95).
+
 Theorem no_allocations_intersect `(st : @ScanState maxReg InUse sd)
   (registers_exist : maxReg > 0) :
   forall reg : PhysReg maxReg,
@@ -642,7 +644,7 @@ Proof.
       elim: (handled _) => //= [x xs IHxs] in IHst *.
       rewrite in_cons.
       move/norP=> [Hin1 Hin2].
-      case E: (snd x == Just reg) => //= in IHst *.
+      case E: (snd x == Some reg) => //= in IHst *.
         move/andP: IHst => [H1 H2].
         apply/andP; split => //.
           rewrite !vnth_vreplace_neq // {IHxs}.
@@ -650,7 +652,7 @@ Proof.
           move: Hin2.
           rewrite in_cons.
           move/norP=> [*].
-          case F: (snd y == Just reg) => //= in H1 H2 *.
+          case F: (snd y == Some reg) => //= in H1 H2 *.
             move/andP: H1 => [H10 H11].
             move/andP: H2 => [H20 H21].
             apply/andP; split => //.
@@ -662,9 +664,9 @@ Proof.
     - Case "ScanState_moveActiveToHandled".
       move: IHst H0.
       case: spilled.
-        by case B: (Nothing == Just reg).
+        by case B: (None == Some reg).
       rewrite /verifyNewHandled /handledIntervalDescsForReg /getInterval.
-      case B: (Just (snd x) == Just reg) => //=.
+      case B: (Some (snd x) == Some reg) => //=.
       move/eqP in B.
       inversion B.
       case: (vnth (fixedIntervals sd) (snd x)) => /= [int|];
@@ -673,9 +675,9 @@ Proof.
     - Case "ScanState_moveInactiveToHandled".
       move: IHst H0.
       case: spilled.
-        by case B: (Nothing == Just reg).
+        by case B: (None == Some reg).
       rewrite /verifyNewHandled /handledIntervalDescsForReg /getInterval.
-      case B: (Just (snd x) == Just reg) => //=.
+      case B: (Some (snd x) == Some reg) => //=.
       move/eqP in B.
       inversion B.
       case: (vnth (fixedIntervals sd) (snd x)) => /= [int|];
@@ -694,7 +696,7 @@ Proof.
     elim: (handled _) => //= [x xs IHxs] in IHst *.
     rewrite in_cons.
     move/norP=> [*].
-    case E: (snd x == Just reg) => //= in IHst *.
+    case E: (snd x == Some reg) => //= in IHst *.
       move/andP: IHst => [*].
       apply/andP; split => //.
         by rewrite vnth_vreplace_neq.
@@ -708,9 +710,9 @@ Proof.
   - Case "ScanState_moveActiveToHandled".
     move: IHst H0.
     case: spilled.
-      by case B: (Nothing == Just reg).
+      by case B: (None == Some reg).
     rewrite /verifyNewHandled /handledIntervalDescsForReg /getInterval.
-    case B: (Just (snd x) == Just reg) => //=.
+    case B: (Some (snd x) == Some reg) => //=.
     move/eqP in B.
     inversion B.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].
@@ -719,9 +721,9 @@ Proof.
   - Case "ScanState_moveInactiveToHandled".
     move: IHst H0.
     case: spilled.
-      by case B: (Nothing == Just reg).
+      by case B: (None == Some reg).
     rewrite /verifyNewHandled /handledIntervalDescsForReg /getInterval.
-    case B: (Just (snd x) == Just reg) => //=.
+    case B: (Some (snd x) == Some reg) => //=.
     move/eqP in B.
     inversion B.
     case: (vnth (fixedIntervals sd) (snd x)) => // [int].

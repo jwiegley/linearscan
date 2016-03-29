@@ -83,7 +83,7 @@ Definition linearScan
   (oinfo : @OpInfo maxReg m dict opType1 opType2)
   (useVerifier : UseVerifier) (blocks : seq blockType1) : m (Details maxReg) :=
   (* order blocks and operations (including loop detection) *)
-  z <-- computeBlockOrder binfo blocks ;;
+  z <- computeBlockOrder binfo blocks ;
   let: (loops, blocks1) := z in
 
   (* create intervals with live ranges *)
@@ -111,8 +111,8 @@ Definition linearScan
       | inr (exist sd _) =>
         let allocs := determineAllocations sd in
         let mappings := resolveDataFlow binfo allocs blocks1 liveSets' in
-        res <-- assignRegNum binfo oinfo useVerifier allocs liveSets'
-                             mappings loops blocks1 ;;
+        res <- assignRegNum binfo oinfo useVerifier allocs liveSets'
+                            mappings loops blocks1 ;
         let: (moves, blocks2) := res in
         let blockInfo := match blocks2 with
           | inr xs => inr xs
@@ -132,6 +132,16 @@ Definition linearScan
 Require Import Hask.Haskell.
 
 (* Set Extraction Conservative Types. *)
+
+Extract Inductive NonEmpty => "[]" ["(:[])" "(:)"]
+  "(\ns nc l -> case l of [x] -> ns x; (x:xs) -> nc x xs)".
+
+Extract Inlined Constant NE_length  => "Prelude.length".
+Extract Inlined Constant NE_to_list => "Prelude.id".
+Extract Inlined Constant NE_head    => "Prelude.head".
+Extract Inlined Constant NE_last    => "Prelude.last".
+Extract Inlined Constant NE_map     => "Prelude.map".
+Extract Inlined Constant NE_foldl   => "Data.List.foldl'".
 
 Separate Extraction linearScan.
 

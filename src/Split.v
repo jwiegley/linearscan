@@ -166,6 +166,20 @@ Proof.
   exact: (leq_trans H1 _).
 Defined.
 
+Lemma ltn0ltn : forall n m, n < m -> 0 < m.
+Proof.
+  move=> n.
+  elim=> [|m' IHm] //=.
+Qed.
+
+Lemma ltn_subn : forall n m, n < m -> m > 0 -> n <= m - 1.
+Proof.
+  move=> n.
+  elim=> [|m' IHm] //= H1 H2.
+  rewrite subn1 -pred_Sn.
+  exact H1.
+Qed.
+
 Definition splitActiveOrInactiveInterval `(st : ScanState InUse sd)
   `(Hunh : unhandled sd = (uid, beg) :: us)
   (xid : IntervalId sd) (pos : SplitPosition) (reg : PhysReg)

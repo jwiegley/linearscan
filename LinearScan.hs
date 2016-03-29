@@ -47,7 +47,7 @@ import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Verify as LS
 import qualified Unsafe.Coerce as U
 
-type Any = Functor.Any
+type Any = ()
 
 coqFunctor :: forall f. Functor f => Coq.Functor (f Any)
 coqFunctor _ _ g x =

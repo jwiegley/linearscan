@@ -260,7 +260,8 @@ Proof.
                    (vnth (vreplace (vshiftin (intervals sd) (i1_1.1; i1_1.2))
                                    (widen_ord Hle uid)
                                    (i1_0.1; i1_0.2)) (fst u')).2 == None.
-      case F: (lebf snd (widen_fst (uid, beg)) (ord_max, ibeg i1_1.1)) in U;
+      case F: (lebf (@snd _ _)
+                    (widen_fst (uid, beg)) (ord_max, ibeg i1_1.1)) in U;
       inversion U.
         have ->: widen_id uid = widen_ord Hle uid.
           rewrite /widen_id.
@@ -278,7 +279,8 @@ Proof.
 
     apply Build_SSMorphLen => //=;
     try apply Build_SSMorph => //=;
-    case F: (lebf snd (widen_fst (uid, beg)) (ord_max, ibeg i1_1.1)) in U;
+    case F: (lebf (@snd _ _)
+                  (widen_fst (uid, beg)) (ord_max, ibeg i1_1.1)) in U;
     inversion U => //;
     by rewrite insert_size.
 

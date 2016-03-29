@@ -350,8 +350,13 @@ Proof.
       move/eqP in Heqe; rewrite {}Heqe;
       try undoubled;
       breakup; try undoubled;
-      apply/ltn_addn1;
+      simpl in *;
+      try apply/ltn_addn1;
       rewrite -?doubleS ?ltn_Sdouble;
+      try undoubled.
+      rewrite doubleS.
+      apply ltnW.
+      apply ltn_addn1.
       by undoubled.
     + by constructor; constructor.
 
@@ -369,10 +374,20 @@ Proof.
   + clear r rd Heqe.
     apply/andP; split;
     rewrite -?doubleS ?ltn_Sdouble;
+    simpl in *;
+    try undoubled.
+    rewrite doubleS.
+    apply ltnW.
+    apply ltn_addn1.
     by undoubled.
   + clear r rd Heqe.
+    simpl in *.
     apply/andP; split;
     rewrite -?doubleS ?ltn_Sdouble;
+    try undoubled.
+    rewrite doubleS.
+    apply ltnW.
+    apply ltn_addn1.
     by undoubled.
 Defined.
 
@@ -424,7 +439,33 @@ Proof.
         move/eqP: Heqe => ->.
         case: (uvar upos);
         rewrite -?doubleS;
-        by undoubled.
+        try undoubled.
+          move/andP in H.
+          destruct H.
+          apply/andP; split.
+            apply/andP; split.
+              rewrite doubleS.
+              apply ltnW.
+              apply ltn_addn1.
+              by undoubled.
+            by undoubled.
+          by undoubled.
+          apply/andP; split.
+            apply/andP; split.
+              rewrite doubleS.
+              apply ltnW.
+              apply ltn_addn1.
+              by undoubled.
+            by undoubled.
+          by undoubled.
+          apply/andP; split.
+            apply/andP; split.
+              rewrite doubleS.
+              apply ltnW.
+              apply ltn_addn1.
+              by undoubled.
+            by undoubled.
+          by undoubled.
       (* Is the use position at the beginning of the range output only? If so,
          then we can allow a lifetime hole between the current position and
          the beginning of that range. *)
@@ -435,9 +476,35 @@ Proof.
         exists NR.1.
         rewrite /= {NR}.
         move/eqP: Heqe => ->.
-        case: (uvar upos);
+        case: (uvar upos) => /=;
         rewrite -?doubleS;
-        by undoubled.
+        try undoubled.
+          move/andP in H0.
+          destruct H0.
+          apply/andP; split.
+            apply/andP; split.
+              by undoubled.
+            rewrite doubleS.
+            apply ltnW.
+            apply ltn_addn1.
+            by undoubled.
+          by undoubled.
+          apply/andP; split.
+            apply/andP; split.
+              rewrite doubleS.
+              apply ltnW.
+              apply ltn_addn1.
+              by undoubled.
+            by undoubled.
+          by undoubled.
+          apply/andP; split.
+            apply/andP; split.
+              rewrite doubleS.
+              apply ltnW.
+              apply ltn_addn1.
+              by undoubled.
+            by undoubled.
+          by undoubled.
       split. exact true.
       pose r1 := Range_shift r.2 E.
       have Hr1: r1 = Range_shift r.2 E by [].
@@ -446,7 +513,33 @@ Proof.
       move/eqP: Heqe => ->.
       case: (uvar upos);
       rewrite -?doubleS;
-      by undoubled.
+      try undoubled.
+        move/andP in H.
+        destruct H.
+        apply/andP; split.
+          apply/andP; split.
+            rewrite doubleS.
+            apply ltnW.
+            apply ltn_addn1.
+            by undoubled.
+          by undoubled.
+        by undoubled.
+        apply/andP; split.
+          apply/andP; split.
+            rewrite doubleS.
+            apply ltnW.
+            apply ltn_addn1.
+            by undoubled.
+          by undoubled.
+        by undoubled.
+        apply/andP; split.
+          apply/andP; split.
+            rewrite doubleS.
+            apply ltnW.
+            apply ltn_addn1.
+            by undoubled.
+          by undoubled.
+        by undoubled.
     split. exact true.
     move/negbT in E; rewrite -ltnNge /= in E.
     exists r.
@@ -496,8 +589,9 @@ Proof.
   have Hlt : b < e by ordered.
   have c2 := compressPendingRanges c1 Hlt.
   have c3 := foldl (handleOutputVar H) (Some c2)
-                   [seq k <- vars | varKind k == Output].
-  have c4 := foldl (handleVar H) c3 [seq k <- vars | varKind k != Output].
+                   (filter (fun k => varKind k == Output) vars).
+  have c4 := foldl (handleVar H) c3
+                   (filter (fun k => varKind k != Output) vars).
   exact: c4.
 Defined.
 
@@ -514,8 +608,9 @@ Definition handleVars_onlyVars {b pos e} (H : b <= pos < e) :
 Proof.
   apply: IntMap_foldlWithKey _ emptyIntMap => m vid vars.
   have c2 := foldl (handleOutputVar H) None
-                   [seq k <- vars | varKind k == Output].
-  have c3 := foldl (handleVar H) c2 [seq k <- vars | varKind k != Output].
+                   (filter (fun k => varKind k == Output) vars).
+  have c3 := foldl (handleVar H) c2
+                   (filter (fun k => varKind k != Output) vars).
   case: c3 => [c3|].
     exact: IntMap_insert vid c3 m.
   exact: m.
@@ -551,14 +646,20 @@ Definition reduceOp {b pos e} (block : blockType1) (op : opType1)
                           | inr _ => true
                           end) refs in
       drop regsNeeded
-           [seq x <- [seq {| varId       := inl n
+           (filter (fun x => varId x \notin map (@varId maxReg) refs)
+                   [seq {| varId       := inl n
                            ; varKind     := Temp
                            ; regRequired := true
-                           |} | n in ord_enum maxReg]
-           | varId x \notin map (@varId maxReg) refs ] ++ refs
+                        |} | n in ord_enum maxReg]) ++ refs
     else refs in
 
   handleVars refs' Hlt ranges.
+
+Lemma leq_plus : forall m n, m <= m + n.
+Proof. elim=> [|m IHm] //=. Qed.
+
+Lemma ltn_plus : forall m n, 0 < n -> m < m + n.
+Proof. elim=> [|m IHm] //=. Qed.
 
 Definition reduceBlock {pos} (bid : BlockId) (block : blockType1)
   (Hsz : 0 < blockSize binfo block)

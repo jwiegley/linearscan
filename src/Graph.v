@@ -1,5 +1,6 @@
-Require Import Lib.
-Require Import Trace.
+Require Import Hask.Ltac.
+Require Import Hask.Ssr.
+(* Require Import Trace. *)
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -101,6 +102,8 @@ Arguments topsort {a} splittable split g0.
 (*              else if inl b \in xs *)
 (*                   then index (inr a) xs < index (inl b) xs *)
 (*                   else index (inr a) xs > index (inr b) xs) (edges g)]. *)
+
+Notation "f $ x" := (f x) (at level 60, right associativity, only parsing).
 
 Example topsort_ex1 :
   let g :=

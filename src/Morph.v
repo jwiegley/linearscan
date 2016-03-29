@@ -214,7 +214,7 @@ Definition moveActiveToHandled
   `(st : ScanState InUse sd) (spilled : bool) `(H: x \in active sd)
   (Hreq : let int := vnth (intervals sd) (fst x) in
           if spilled
-          then firstUseReqReg int.2 == Nothing
+          then firstUseReqReg int.2 == None
           else verifyNewHandled sd int.1 (snd x)) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'
@@ -266,7 +266,7 @@ Definition moveInactiveToHandled `(st : ScanState InUse sd)
   (spilled : bool) `(H : x \in inactive sd)
   (Hreq : let int := vnth (intervals sd) (fst x) in
           if spilled
-          then firstUseReqReg int.2 == Nothing
+          then firstUseReqReg int.2 == None
           else verifyNewHandled sd int.1 (snd x)) :
   { sd' : ScanStateDesc maxReg
   | ScanState InUse sd'

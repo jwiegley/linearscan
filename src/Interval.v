@@ -261,12 +261,18 @@ Definition rangeFirstUsePos (rd : RangeDesc) : option UsePos :=
   if ups rd is u :: _ then Some u else None.
 Arguments rangeFirstUsePos rd /.
 
+Definition option_choose {a} (x y : option a) : option a :=
+  match x with
+  | None => y
+  | Some _  => x
+  end.
+
 Definition firstUsePos (d : IntervalDesc) : option UsePos :=
   let fix go xs :=
       match xs with
         | NE_Sing x => rangeFirstUsePos x.1
         | NE_Cons x xs =>
-            Maybe_choose (rangeFirstUsePos x.1) (go xs)
+            option_choose (rangeFirstUsePos x.1) (go xs)
       end in
   go (rds d).
 Arguments firstUsePos d /.
@@ -276,7 +282,7 @@ Definition lastUsePos (d : IntervalDesc) : option UsePos :=
       match xs with
         | NE_Sing x => olast (ups x.1)
         | NE_Cons x xs =>
-            Maybe_choose (go xs) (olast (ups x.1))
+            option_choose (go xs) (olast (ups x.1))
       end in
   go (rds d).
 Arguments lastUsePos d /.

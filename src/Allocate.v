@@ -51,7 +51,7 @@ Definition findEligibleRegister (sd : ScanStateDesc maxReg)
       let: (fup, fai) := acc in
       if mint is Some int
       then let op := intervalIntersectsWithSubrange current int.2 in
-           (updateRegisterPos fup reg op, vreplace fai reg (isJust op))
+           (updateRegisterPos fup reg op, vreplace fai reg (isSome op))
       else acc) (xs, vconst false) (fixedIntervals sd) in
   registerWithHighestPos registers_exist fixedAndIntersects xs.
 
@@ -142,8 +142,8 @@ Definition allocateBlockedReg {pre} :
         [seq (packInterval (getInterval (fst i)), snd i) | i <- xs] in
     let actives := foldl go (vconst None) (resolve (active sd)) in
     let nextUsePos'' :=
-        foldl go actives [seq x <- resolve (inactive sd)
-                         | intervalsIntersect current (fst x).1] in
+        foldl go actives (filter (fun x => intervalsIntersect current (fst x).1)
+                                 (resolve (inactive sd))) in
 
     (* reg = register with highest nextUsePos *)
     (* mres = highest use position of the found register *)
@@ -241,7 +241,8 @@ Program Definition goActive (pos : nat) (sd : ScanStateDesc maxReg)
     if intervalEnd i < pos
     then
       if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
-      then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 1 :: e)
+      then let: (p1, p2) := x in
+           inl (ERegisterAssignmentsOverlap p2 p1 1 :: e)
       else let: exist2 x H1 H2 :=
              moveActiveToHandled st Hin Hreq (spilled:=false) in
            inr (exist2 _ _ x H1 (proj1 H2))
@@ -364,12 +365,16 @@ Program Fixpoint dep_foldl_invE
   | _ => inr (exist P b Pb)
   end.
 Obligation 2.
-  inversion Heq_anonymous0.
-  clear Heq_anonymous.
-  rewrite -H1 -H0 in Hn.
-  simpl in Hn.
-  move: eqSS Hn => /= -> /eqP ->.
-  by rewrite size_map.
+  first [ inversion Heq_anonymous;
+          subst;
+          clear Heq_anonymous0;
+          move: eqSS Hn => /= -> /eqP ->;
+          by rewrite size_map
+        | inversion Heq_anonymous0;
+          subst;
+          clear Heq_anonymous;
+          move: eqSS Hn => /= -> /eqP ->;
+          by rewrite size_map ].
 Qed.
 
 Definition checkActiveIntervals {pre} (pos : nat) :
@@ -408,7 +413,9 @@ Program Definition moveInactiveToActive' `(st : ScanState InUse z)
       | exist2 sd' st' sslen' =>
           inr (exist2 _ _ sd' st' (sslen'; _))
       end
-  | false => inl (ERegisterAssignmentsOverlap (snd x) (fst x) 2 :: e)
+  | false =>
+      let: (p1, p2) := x in
+      inl (ERegisterAssignmentsOverlap p2 p1 2 :: e)
   end.
 Next Obligation.
   rewrite /moveActiveToInactive /mt_fst /morphlen_transport /=.
@@ -443,7 +450,8 @@ Program Definition goInactive (pos : nat) (sd : ScanStateDesc maxReg)
     if intervalEnd i < pos
     then
       if prop (verifyNewHandled z i (snd x)) isn't Some Hreq
-      then inl (ERegisterAssignmentsOverlap (snd x) (fst x) 3 :: e)
+      then let: (p1, p2) := x in
+           inl (ERegisterAssignmentsOverlap p2 p1 3 :: e)
       else
         match moveInactiveToHandled st Hin Hreq (spilled:=false) with
         | exist2 sd' st' (conj sslen' _) =>
@@ -541,7 +549,7 @@ Next Obligation.
   case H1: (size (unhandled thisDesc) == 0).
     case H2: (size (active thisDesc) == 0).
       case H3: (size (inactive thisDesc) == 0).
-        apply: Right _.
+        apply: inr _.
         exists thisDesc.
         apply/andP; split => //.
         apply/andP; split => //.

@@ -172,7 +172,7 @@ Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
 Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
-  st <-- get ;;
+  st <- get ;
   let m := forFold emptyIntMap (IntSet_toList (loopEndBlocks st))
     (fun m endBlock =>
       if IntMap_lookup endBlock bs isn't Some b
@@ -226,7 +226,7 @@ Definition findLoopEnds (bs : IntMap blockType1) :
     modifyActiveBlocks (IntSet_insert bid) ;;
     let suxs := blockSuccessors binfo b in
     (forM_ suxs $ fun sux =>
-      active <-- gets activeBlocks ;;
+      active <- gets activeBlocks ;
       (if IntSet_member sux active
        then
          modifyLoopHeaderBlocks
@@ -235,12 +235,12 @@ Definition findLoopEnds (bs : IntMap blockType1) :
          modifyBackwardBranches (addReference sux bid)
        else
          modifyForwardBranches (addReference sux bid)) ;;
-      visited <-- gets visitedBlocks ;;
-      (if IntSet_member sux visited
-       then pure tt
-       else if IntMap_lookup sux bs is Some x
-            then go n x
-            else pure tt)) ;;
+      (visited <- gets visitedBlocks ;
+       (if IntSet_member sux visited
+        then pure tt
+        else if IntMap_lookup sux bs is Some x
+             then go n x
+             else pure tt))) ;;
     modifyActiveBlocks (IntSet_delete bid) in
   if IntMap_toList bs is (_, b) :: _
   then go (IntMap_size bs) b
@@ -257,7 +257,7 @@ Definition computeBlockOrder (blocks : seq blockType1) :
   (* Every branch from a block with multiple successors to a block with *)
   (* multiple predecessors is a "critical edge".  We insert a new, anonymous *)
   (* block at this edge to hold the resolving moves for the critical edge. *)
-  blocks' <--
+  blocks' <-
     forFoldrM [::] blocks (fun b rest =>
       let suxs := blockSuccessors binfo b in
       if size suxs <= 1
@@ -273,10 +273,10 @@ Definition computeBlockOrder (blocks : seq blockType1) :
           then pure (b', rest')
           else
             if IntMap_lookup sux blockMap is Some sux'
-            then z <-- splitCriticalEdge binfo b' sux' ;;
+            then z <- splitCriticalEdge binfo b' sux' ;
                  let: (b'', sux'') := z in
                  pure (b'', sux'' :: rest')
-            else pure (b', rest'))) ;;
+            else pure (b', rest'))) ;
   let keys' := map (fun x => (blockId binfo x, x)) blocks' in
   let blockMap' := IntMap_fromList keys' in
   let z' := findLoopEnds blockMap' emptyLoopState in

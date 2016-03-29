@@ -260,7 +260,7 @@ Definition determineMoves (allocs : seq (Allocation maxReg))
   sortMoves (IntMap_foldr (flip addResolutions) emptyGraph
                           (resolvingMoves allocs liveIn from to)).
 
-Definition BlockMoves : Type := seq ResolvingMove * seq ResolvingMove.
+Definition BlockMoves : Type := (seq ResolvingMove * seq ResolvingMove)%type.
 
 Definition checkBlockBoundary (allocs : seq (Allocation maxReg))
   (liveIn : IntSet) bid in_from mfrom to (mappings : IntMap BlockMoves) :
@@ -304,7 +304,7 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
          resolver.resolve_mappings()
        end for
      end for *)
-  fst $ forFold (emptyIntMap, true) blocks $ fun z b =>
+  fst (forFold (emptyIntMap, true) blocks $ fun z b =>
     let: (mappings, isFirst) := z in
     let bid := blockId binfo b in
     if IntMap_lookup bid liveSets isn't Some from
@@ -328,6 +328,6 @@ Definition resolveDataFlow (allocs : seq (Allocation maxReg))
           let key := if in_from then bid else s_bid in
           checkBlockBoundary allocs (blockLiveIn to) key in_from
                              (Some from) to ms in
-      (mappings'', false).
+      (mappings'', false)).
 
 End Resolve.

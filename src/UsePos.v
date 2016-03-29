@@ -5,6 +5,8 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
+Set Boolean Equality Schemes.
+
 Inductive VarKind : Set := Input | InputOutput | Temp | Output.
 
 Definition VarKind_leq (x y : VarKind) : bool :=
@@ -28,17 +30,8 @@ Example VarKind_leq_ex9 : ~~ VarKind_leq Output Output. Proof. by []. Qed.
 
 Section EqVarKind.
 
-Definition eqVarKind s1 s2 :=
-  match s1, s2 with
-  | Input,  Input             => true
-  | InputOutput,  InputOutput => true
-  | Temp,   Temp              => true
-  | Output, Output            => true
-  | _, _                      => false
-  end.
-
-Lemma eqVarKindP : Equality.axiom eqVarKind.
-Proof. by case; case=> /=; constructor=> //=; case. Qed.
+Lemma eqVarKindP : Equality.axiom VarKind_beq.
+Proof. reflection VarKind. Qed.
 
 Canonical VarKind_eqMixin := EqMixin eqVarKindP.
 Canonical VarKind_eqType  := Eval hnf in EqType VarKind VarKind_eqMixin.
@@ -110,18 +103,12 @@ Proof.
     inv Hsort.
     case: (span _ xs) => [l1' l2'] in Heqe IHxs *.
     move: (IHxs l1' l2' H1 refl_equal) => /andP [? ?].
-    apply/andP; split.
-      inv Heqe.
-      by apply/andP; split.
-    by inv Heqe.
-  inv Hsort.
-  move/Forall_all in H2.
-  clear IHxs H1.
+    inv Heqe.
+    by sortedness.
+  clear IHxs.
   inv Heqe.
   move/negbT in E1; rewrite -leqNgt in E1.
-  apply/andP; split=> //.
-  apply/allP=> [x0 Hin].
-  move/allP: H2 => /(_ x0 Hin).
-  rewrite /funcomp.
+  sortedness.
+  Grab Existential Variables.
   by ordered.
 Qed.

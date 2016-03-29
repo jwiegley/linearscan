@@ -2,6 +2,7 @@ Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Blocks.
 Require Import Hask.Control.Monad.State.
+Require Import Hask.Control.Monad.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -176,16 +177,16 @@ Definition computeLiveSets b idx : State BlockLiveSets nat :=
      end for *)
   let: (opsb, opsm, opse) := blockOps binfo b in
 
-  _blockFirstOpId .= idx + (size opsb).*2 ;;
+  _blockFirstOpId .= (idx + (size opsb).*2) ;;
   _blockLastOpId  .= idx ;;
 
-  forFoldM idx (opsb ++ opsm ++ opse) $ fun next o =>
+  forFoldM (H:=State_Monad) idx (opsb ++ opsm ++ opse) $ fun next o =>
     let: (inputs, others) :=
       partition (fun v => varKind v == Input) (opRefs oinfo o) in
 
     forM_ inputs (fun v =>
       if @varId maxReg v isn't inr vid then pure tt else
-      liveKill <-- use _blockLiveKill ;;
+      liveKill <- use _blockLiveKill ;
       unless (IntSet_member vid liveKill)
         (_blockLiveGen %= IntSet_insert vid)) ;;
 
@@ -224,11 +225,11 @@ Definition updateLiveSets (blockLiveSets : IntMap BlockLiveSets)
     then _blockLiveOut %= flip IntSet_union (blockLiveIn sux)
     else pure tt) ;;
 
-  ls <-- get ;;
+  (ls <- get ;
   _blockLiveIn .=
     IntSet_union (IntSet_difference (blockLiveOut ls)
                                     (blockLiveKill ls))
-                 (blockLiveGen ls).
+                 (blockLiveGen ls)).
 
 Definition computeGlobalLiveSets (blocks : seq blockType1)
   (liveSets : IntMap BlockLiveSets) : IntMap BlockLiveSets :=
