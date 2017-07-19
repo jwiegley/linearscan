@@ -22,7 +22,6 @@ module LinearScan
     , PhysReg
     ) where
 
-import           Control.Applicative
 import           Control.Monad.State
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as M
@@ -33,6 +32,7 @@ import           Data.Maybe (fromMaybe)
 import qualified LinearScan.Applicative as Coq
 import           LinearScan.Blocks
 import qualified LinearScan.Blocks as LS
+import qualified LinearScan.Applicative as Appl
 import qualified LinearScan.Functor as Coq
 import qualified LinearScan.Functor as Functor
 import qualified LinearScan.Interval as LS
@@ -47,20 +47,18 @@ import qualified LinearScan.UsePos as LS
 import qualified LinearScan.Verify as LS
 import qualified Unsafe.Coerce as U
 
-type Any = ()
-
-coqFunctor :: forall f. Functor f => Coq.Functor (f Any)
+coqFunctor :: forall f. Functor f => Coq.Functor (f Functor.Any)
 coqFunctor _ _ g x =
-    U.unsafeCoerce (fmap g (U.unsafeCoerce x :: f Any))
+    U.unsafeCoerce (fmap g (U.unsafeCoerce x :: f Functor.Any))
 
-coqApplicative :: forall f. Applicative f => Coq.Applicative (f Any)
+coqApplicative :: forall f. Applicative f => Coq.Applicative (f Appl.Any)
 coqApplicative = Coq.Build_Applicative coqFunctor (const pure)
     (\_ _ g x ->
-      U.unsafeCoerce (U.unsafeCoerce g <*> U.unsafeCoerce x :: f Any))
+      U.unsafeCoerce (U.unsafeCoerce g <*> U.unsafeCoerce x :: f Appl.Any))
 
-coqMonad :: forall m. (Monad m, Applicative m) => Coq.Monad (m Any)
+coqMonad :: forall m. (Monad m, Applicative m) => Coq.Monad (m Appl.Any)
 coqMonad = Coq.Build_Monad coqApplicative
-    (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Any)) :: m Any))
+    (\_ x -> U.unsafeCoerce (join (U.unsafeCoerce x :: m (m Appl.Any)) :: m Appl.Any))
 
 -- | Each "virtual variable" has details associated with it that affect the
 -- allocation procedure.
@@ -128,7 +126,7 @@ deriving instance Eq OpKind
 deriving instance Show OpKind
 
 fromOpInfo :: Monad m
-           => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Any) op1 op2
+           => LinearScan.OpInfo m op1 op2 -> LS.OpInfo (m Appl.Any) op1 op2
 fromOpInfo (OpInfo a b c d e f g) =
     LS.Build_OpInfo a (map fromVarInfo . b)
         (\r1 r2 -> U.unsafeCoerce (c r1 r2))
@@ -473,7 +471,7 @@ showBlocks1 binfo oinfo sd ls rms aerrs initials finals loopInfo = go 0
 
 fromBlockInfo :: Monad m
               => LinearScan.BlockInfo m blk1 blk2 op1 op2
-              -> LS.BlockInfo (m Any) blk1 blk2 op1 op2
+              -> LS.BlockInfo (m Appl.Any) blk1 blk2 op1 op2
 fromBlockInfo (BlockInfo a b c d e) =
     LS.Build_BlockInfo a b
         (\r1 r2 -> U.unsafeCoerce (c r1 r2))
