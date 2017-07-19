@@ -155,9 +155,9 @@ Proof.
   case: n => [|n] in i *;
     first exact: fin_contra.
   pose v := vconst (n:=n.+1) x.
-  elim/vecn_rect E: v => // [? y ? IHys] in i *.
+  elim/vecn_rect: v => // [? y ? IHys] in i *.
   elim/@fin_rect: i => // [i ? IHi].
-  exact: IHys (@Ordinal _ i _).
+  apply IHys.
 Qed.
 
 Definition vshiftin {n} (v : Vec n) (i : A) : Vec n.+1.
