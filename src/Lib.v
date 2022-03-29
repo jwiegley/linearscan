@@ -7,7 +7,7 @@ Require Export LinearScan.ListSsr.
 Require Export LinearScan.NonEmpty.
 Require Export LinearScan.Vector.
 Require Export LinearScan.Tactics.
-Require Export Hask.Ssr.
+Require Export LinearScan.Ssr.
 
 Require Export Coq.Program.Wf.
 Require Export Coq.Sorting.Sorted.

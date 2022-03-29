@@ -1,3 +1,4 @@
+Require Import Coq.Strings.String.
 Require Import LinearScan.Lib.
 Require Import LinearScan.Interval.
 Require Import LinearScan.ScanState.
@@ -124,10 +125,12 @@ Qed.
 
 Tactic Notation "uniq_reorg" ident(s2) ident(sd) ident(Huniq) tactic(H) :=
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd;
-  rewrite (@perm_eq_uniq _ _ s2); first exact: Huniq; H;
+  rewrite (@perm_uniq _ _ s2); first exact: Huniq; H;
   by apply/perm_map; rewrite perm_rem_cons;
-    first do [ exact: perm_eq_refl
-             | by rewrite perm_catC; exact: perm_eq_refl ].
+    first do [ exact: perm_refl
+             | by rewrite perm_catC; exact: perm_refl ].
+
+Open Scope seq_scope.
 
 Lemma move_active_to_inactive : forall maxReg sd x,
   uniq (@unhandledIds maxReg sd ++
@@ -150,12 +153,12 @@ Lemma move_active_to_handled : forall maxReg sd x,
 Proof.
   move=> ? sd x Huniq Hin.
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd.
-  rewrite (@perm_eq_uniq _ _ s2); first exact: Huniq.
-  rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA
-          perm_cat2l perm_eq_sym
+  rewrite (@perm_uniq _ _ s2); first exact: Huniq.
+  rewrite perm_cat2l perm_catCA perm_sym perm_catCA
+          perm_cat2l perm_sym
           map_cons /= -cat_rcons perm_cat2r perm_rcons
           -map_cons perm_map => //.
-  rewrite perm_eq_sym.
+  rewrite perm_sym.
   exact: perm_to_rem.
 Qed.
 
@@ -175,7 +178,7 @@ Lemma perm_flip : forall (T : eqType) (s1 s2 s3 : seq T),
   perm_eq s1 (s3 ++ s2) = perm_eq s1 (s2 ++ s3).
 Proof.
   move=> T s1 s2 s3.
-  by rewrite perm_eq_sym -perm_catC perm_eq_sym.
+  by rewrite perm_sym -perm_catC perm_sym.
 Qed.
 
 Lemma move_inactive_to_handled : forall maxReg sd x,
@@ -188,8 +191,8 @@ Lemma move_inactive_to_handled : forall maxReg sd x,
 Proof.
   move=> ? sd x Huniq Hin.
   set s2 := unhandledIds sd ++ activeIds sd ++ inactiveIds sd ++ handledIds sd.
-  rewrite (@perm_eq_uniq _ _ s2); first exact: Huniq.
-  rewrite perm_cat2l perm_catCA perm_eq_sym perm_catCA
+  rewrite (@perm_uniq _ _ s2); first exact: Huniq.
+  rewrite perm_cat2l perm_catCA perm_sym perm_catCA
           map_cons /= -cat_rcons !catA perm_cat2r
           perm_flip cat_rcons perm_flip perm_cat2r
           -map_cons perm_map => //.
@@ -235,7 +238,7 @@ Proof.
       [seq fst i | i <- [seq widen_fst i | i <- active sd]] ++
       [seq fst i | i <- [seq widen_fst i | i <- inactive sd]] ++
       [seq fst i | i <- [seq widen_fst i | i <- handled sd]].
-    rewrite (@perm_eq_uniq _ _ s2) /s2 /unh /n.
+    rewrite (@perm_uniq _ _ s2) /s2 /unh /n.
       rewrite map_cons !map_widen_fst /=.
       apply/andP; split.
         rewrite !mem_cat.
@@ -257,7 +260,7 @@ Proof.
       [seq widen_id i | i <- [seq fst i | i <- active sd]] ++
       [seq widen_id i | i <- [seq fst i | i <- inactive sd]] ++
       [seq widen_id i | i <- [seq fst i | i <- handled sd]].
-    rewrite (@perm_eq_uniq _ _ s2).
+    rewrite (@perm_uniq _ _ s2).
       rewrite /s2 cons_uniq -!map_cat.
       apply/andP; split.
         exact: no_ord_max.
@@ -275,7 +278,7 @@ Proof.
       [seq fst i | i <- act] ++
       [seq fst i | i <- inact] ++
       [seq fst i | i <- hnd].
-    rewrite (@perm_eq_uniq _ _ s2); first exact: IHst.
+    rewrite (@perm_uniq _ _ s2); first exact: IHst.
     by rewrite -perm_cat_cons.
 
   - Case "ScanState_moveUnhandledToHandled".
@@ -285,7 +288,7 @@ Proof.
       [seq fst i | i <- act] ++
       [seq fst i | i <- inact] ++
       [seq fst i | i <- hnd].
-    rewrite (@perm_eq_uniq _ _ s2); first exact: IHst.
+    rewrite (@perm_uniq _ _ s2); first exact: IHst.
     rewrite /s2 !catA.
     by rewrite -perm_cat_cons.
 
@@ -521,9 +524,9 @@ Proof.
     by move/negP in H2.
   rewrite /widen_fst /= in H.
   move/in_projr: H => [/= H1 _].
-  rewrite -map_comp /funcomp /= in H1.
+  rewrite -map_comp /catcomp /= in H1.
   move: (no_ord_max [seq fst x | x <- xs]) => H2.
-  rewrite -map_comp /funcomp /= in H2.
+  rewrite -map_comp /catcomp /= in H2.
   exfalso.
   exact: (in_contra H1 H2).
 Qed.

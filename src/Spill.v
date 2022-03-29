@@ -1,3 +1,4 @@
+Require Import Coq.Strings.String.
 Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.

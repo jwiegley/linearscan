@@ -1,7 +1,7 @@
 Require Export Hask.Ltac.
-Require Export Hask.Ssr.
+Require Export LinearScan.Ssr.
 
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 
 Ltac reflection ctor :=
   unfold Equality.axiom; intros;
@@ -101,7 +101,7 @@ Ltac ordered := abstract (
   | [ |- is_true (?X == ?Y) ] => apply/eqP
   | [ |- is_true (?X != ?Y) ] => apply/eqP
   end;
-  omega).
+  lia).
 
 Lemma ltn_addn1 : forall n m, n < m -> n.+1 < m.+1.
 Proof. by []. Qed.

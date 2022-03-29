@@ -1,4 +1,4 @@
--R Hask/src Hask -R src LinearScan
+-R src LinearScan
 src/Allocate.v
 src/Assign.v
 src/Blocks.v
@@ -22,9 +22,9 @@ src/ScanState.v
 src/Spec.v
 src/Spill.v
 src/Split.v
+src/Ssr.v
 src/Tactics.v
 src/Trace.v
 src/UsePos.v
 src/Vector.v
 src/Verify.v
-Hask/src/Ssr.v

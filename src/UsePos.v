@@ -53,7 +53,7 @@ Record UsePos : Set := {
 
 Section EqUpos.
 
-Fixpoint equpos s1 s2 {struct s2} :=
+Definition equpos s1 s2 :=
   match s1, s2 with
   | {| uloc := u1; regReq := rr1; uvar := io1 |},
     {| uloc := u2; regReq := rr2; uvar := io2 |} =>
@@ -108,7 +108,6 @@ Proof.
   clear IHxs.
   inv Heqe.
   move/negbT in E1; rewrite -leqNgt in E1.
-  sortedness.
-  Grab Existential Variables.
+  unshelve sortedness.
   by ordered.
 Qed.

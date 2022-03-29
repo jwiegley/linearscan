@@ -106,8 +106,8 @@ Proof.
   eexists.
   apply (transitivity thisHolds0 thisHolds1).
   assumption.
-  Grab Existential Variables.
-  apply thisState0.
+  Unshelve.
+  3:apply thisState0.
   reflexivity.
 Defined.
 
@@ -170,7 +170,7 @@ Proof.
   split. apply tt.
   pose (ScanState_moveUnhandledToHandled thisState0 E).
   eapply {| thisState := s |}.
-  Grab Existential Variables.
+  Unshelve.
   apply Build_SSMorph; intuition.
 Defined.
 
@@ -191,7 +191,7 @@ Proof.
   split. apply tt.
   pose (ScanState_moveUnhandledToActive thisState0 H).
   eapply {| thisState := s |}.
-  Grab Existential Variables.
+  Unshelve.
   apply Build_SSMorph; intuition.
 Defined.
 

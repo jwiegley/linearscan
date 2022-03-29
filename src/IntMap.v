@@ -1,4 +1,4 @@
-Require Import Hask.Ssr.
+Require Import LinearScan.Ssr.
 Require Import LinearScan.ListSsr.
 Require Import LinearScan.NonEmpty.
 
@@ -70,7 +70,7 @@ Lemma IntMap_map_comp : forall a b c (m : IntMap a) (f : b -> c) (g : a -> b),
 Proof.
   move=> a b c [m] f g [xs] /=.
   elim: xs => //= [? ? IHxs].
-  rewrite -map_comp /funcomp in IHxs *.
+  rewrite -map_comp /catcomp in IHxs *.
   by congr (getIntMap _).
 Qed.
 

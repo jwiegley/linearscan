@@ -12,6 +12,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
+Set Universe Polymorphism.
 
 Section Verify.
 
@@ -523,17 +524,17 @@ Variable a b : Type.
 Variable P : a -> Prop.
 
 (* Program Instance Lens__verDesc : GetterLaws (@_verDesc maxReg a). *)
-Program Instance Lens__verState : LensLaws (@_verState maxReg a).
+Program Instance Lens__verState {maxReg} : LensLaws (@_verState maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verInit : LensLaws (@_verInit maxReg a).
+Program Instance Lens__verInit {maxReg} : LensLaws (@_verInit maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verFinal : LensLaws (@_verFinal maxReg a).
+Program Instance Lens__verFinal {maxReg} : LensLaws (@_verFinal maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verMoves : LensLaws (@_verMoves maxReg a).
+Program Instance Lens__verMoves {maxReg} : LensLaws (@_verMoves maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verErrors : LensLaws (@_verErrors maxReg a).
+Program Instance Lens__verErrors {maxReg} : LensLaws (@_verErrors maxReg a).
 Obligation 2. by case: x. Qed.
-Program Instance Lens__verExt : LensLaws (@_verExt maxReg a).
+Program Instance Lens__verExt {maxReg} : LensLaws (@_verExt maxReg a).
 Obligation 2. by case: x. Qed.
 
 End VerifyLensLaws.

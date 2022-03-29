@@ -1,0 +1,27 @@
+opam-version: "2.0"
+maintainer: "johnw@newartisans.com"
+version: "dev"
+
+homepage: "https://github.com/jwiegley/linearscan"
+dev-repo: "git+https://github.com/jwiegley/linearscan.git"
+bug-reports: "https://github.com/jwiegley/linearscan/issues"
+license: "BSD-3-Clause"
+
+synopsis: "A linear scan register allocator in Coq"
+description: """
+An axiom-free formalization of category theory in Coq for personal study and
+practical work.
+"""
+
+build: [make "JOBS=%{jobs}%" ]
+install: [make "install"]
+depends: [
+  "coq" {(>= "8.10" & < "8.16~") | (= "dev")}
+  "mathcomp" {(>= "1.12" & < "1.14~") | (= "dev")}
+]
+
+tags: [
+]
+authors: [
+  "John Wiegley"
+]

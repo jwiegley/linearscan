@@ -1,4 +1,4 @@
-Require Import Hask.Ssr.
+Require Import LinearScan.Ssr.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

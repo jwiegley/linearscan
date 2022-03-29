@@ -4,10 +4,13 @@ Require Import LinearScan.Blocks.
 Require Import Hask.Control.Monad.State.
 Require Import Hask.Control.Monad.
 
+Open Scope seq_scope.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Generalizable All Variables.
+Set Universe Polymorphism.
 
 Record BlockLiveSets := {
   blockLiveGen   : IntSet;

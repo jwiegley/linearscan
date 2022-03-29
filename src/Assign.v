@@ -12,6 +12,8 @@ Require Import LinearScan.ScanState.
 Require Import LinearScan.Allocate.
 Require Import LinearScan.Verify.
 
+Open Scope seq_scope.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -91,7 +93,8 @@ Definition varInfoAllocs pos (allocs : seq (Allocation maxReg)) v :
 
 Definition Verified := Verified maxReg mType AssnStateDesc.
 
-Definition _verExt := @_verExt maxReg AssnStateDesc.
+Definition _verExt : Lens' (VerifiedSig maxReg AssnStateDesc) AssnStateDesc :=
+  @_verExt maxReg AssnStateDesc.
 
 Variable useVerifier : UseVerifier.
 
@@ -134,9 +137,9 @@ Definition setAllocations (allocs : seq (Allocation maxReg))
   verifyAllocs oinfo opid.+2 allocs useVerifier op regs ;;
   (ops <- lift $ applyAllocs oinfo op regs ;
 
-   _verExt \o+ _assnOpId += 2 ;;
+  _verExt \o+ _assnOpId += 2 ;;
 
-   pure (inputTransitions ++ outputTransitions ++ injected ++ ops)).
+  pure (inputTransitions ++ outputTransitions ++ injected ++ ops)).
 
 Definition considerOps
   (allocs   : seq (Allocation maxReg))

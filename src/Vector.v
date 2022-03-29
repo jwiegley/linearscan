@@ -1,5 +1,5 @@
 Require Import Hask.Ltac.
-Require Import Hask.Ssr.
+Require Import LinearScan.Ssr.
 
 Generalizable All Variables.
 

@@ -1,5 +1,5 @@
 Require Export Hask.Ltac.
-Require Export Hask.Ssr.
+Require Export LinearScan.Ssr.
 Require Export Hask.Control.Monad.
 Require Export LinearScan.Tactics.
 
@@ -650,7 +650,7 @@ Lemma all_perm : forall (a : eqType) (xs ys : list a),
   perm_eq xs ys -> all^~ xs =1 all^~ ys.
 Proof.
   move=> a xs ys H P.
-  move/perm_eq_mem in H.
+  move/perm_mem in H.
   by rewrite (eq_all_r H).
 Qed.
 
@@ -709,17 +709,17 @@ Lemma perm_cat_cons (T : eqType) (x : T) : forall (s1 s2 : seq T),
   perm_eql (x :: s1 ++ s2) (s1 ++ x :: s2).
 Proof.
   move=> s1 s2.
-  apply/perm_eqlP.
-  rewrite perm_eq_sym perm_catC cat_cons perm_cons perm_catC.
-  exact: perm_eq_refl.
+  apply/permPl.
+  rewrite perm_sym perm_catC cat_cons perm_cons perm_catC.
+  exact: perm_refl.
 Qed.
 
 Lemma perm_rem_cons (T : eqType) (x : T) : forall (s1 s2 : seq T),
   x \in s1 -> perm_eql (rem x s1 ++ x :: s2) (s1 ++ s2).
 Proof.
   move=> s1 s2 Hin.
-  apply/perm_eqlP.
-  rewrite perm_catC cat_cons perm_cat_cons perm_catC perm_cat2r perm_eq_sym.
+  apply/permPl.
+  rewrite perm_catC cat_cons perm_cat_cons perm_catC perm_cat2r perm_sym.
   exact: perm_to_rem.
 Qed.
 
@@ -847,18 +847,18 @@ Qed.
 Lemma perm_cons_swap (T : eqType) (x y : T) : forall (xs : seq T),
   perm_eql (x :: y :: xs) (y :: x :: xs).
 Proof.
-  move=> xs; apply/perm_eqlP.
+  move=> xs; apply/permPl.
   rewrite -cat1s perm_catC cat_cons perm_cons perm_catC cat1s.
-  exact: perm_eq_refl.
+  exact: perm_refl.
 Qed.
 
 Lemma insert_perm (T : eqType) P (x : T) : forall (xs : seq T),
   perm_eql (insert P x xs) (x :: xs).
 Proof.
   elim=> //= [y ys IHys]; rewrite /insert.
-  case: (P y x) => //=; apply/perm_eqlP.
-  rewrite perm_eq_sym perm_cons_swap perm_cons perm_eq_sym -/insert.
-  exact/perm_eqlP/IHys.
+  case: (P y x) => //=; apply/permPl.
+  rewrite perm_sym perm_cons_swap perm_cons perm_sym -/insert.
+  exact/permPl/IHys.
 Qed.
 
 Lemma insert_size : forall a P (x : a) xs,
@@ -1052,8 +1052,6 @@ Lemma allpairs_map :
 Proof.
   move=> a b c f.
   elim=> //= [x xs IHxs] y.
-  congr (_ ++ _).
-  exact: IHxs.
 Qed.
 
 Instance List_Functor : Functor list := {

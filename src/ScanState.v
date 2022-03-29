@@ -316,6 +316,8 @@ Arguments packScanState [b sd] st /.
 
 End ScanState.
 
+Require Import Coq.Strings.String.
+
 Tactic Notation "ScanState_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "ScanState_nil"
