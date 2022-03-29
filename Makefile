@@ -56,3 +56,9 @@ clean: Makefile.coq
 	rm -f Makefile.coq Setup LinearScan/*
 	rm -fr dist .coq-native
 	rm -fr .hdevtools.sock *.glob *.d *.vo
+
+install: _CoqProject Makefile.coq
+	make -f Makefile.coq install
+
+fullclean: clean
+	rm -f Makefile.coq Makefile.coq.conf .Makefile.d
