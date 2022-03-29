@@ -26,21 +26,21 @@ LinearScan/Main.hs: src/Main.vo
               if ! grep "module LinearScan" $$file; then	\
 	        perl -i fixcode.pl $$file;			\
               fi;						\
-	      if [[ "$$file" = "eqtype.hs" ]]; then		\
+	      if [ "$$file" = "eqtype.hs" ]; then		\
                 mv eqtype.hs LinearScan/Eqtype.hs;		\
-	      elif [[ "$$file" = "choice.hs" ]]; then		\
+	      elif [ "$$file" = "choice.hs" ]; then		\
                 mv choice.hs LinearScan/Choice.hs;		\
-	      elif [[ "$$file" = "fintype.hs" ]]; then		\
+	      elif [ "$$file" = "fintype.hs" ]; then		\
                 mv fintype.hs LinearScan/Fintype.hs;		\
-	      elif [[ "$$file" = "seq.hs" ]]; then		\
+	      elif [ "$$file" = "seq.hs" ]; then		\
                 mv seq.hs LinearScan/Seq.hs;			\
-	      elif [[ "$$file" = "ssrbool.hs" ]]; then		\
+	      elif [ "$$file" = "ssrbool.hs" ]; then		\
                 mv ssrbool.hs LinearScan/Ssrbool.hs;		\
-	      elif [[ "$$file" = "ssreflect.hs" ]]; then	\
+	      elif [ "$$file" = "ssreflect.hs" ]; then		\
                 mv ssreflect.hs LinearScan/Ssreflect.hs;	\
-	      elif [[ "$$file" = "ssrfun.hs" ]]; then		\
+	      elif [ "$$file" = "ssrfun.hs" ]; then		\
                 mv ssrfun.hs LinearScan/Ssrfun.hs;		\
-	      elif [[ "$$file" = "ssrnat.hs" ]]; then		\
+	      elif [ "$$file" = "ssrnat.hs" ]; then		\
                 mv ssrnat.hs LinearScan/Ssrnat.hs;		\
               else						\
                 mv $$file LinearScan;				\
