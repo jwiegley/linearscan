@@ -1051,7 +1051,8 @@ Lemma allpairs_map :
   flatten [seq [seq f x y | y <- ys] | x <- xs].
 Proof.
   move=> a b c f.
-  elim=> //= [x xs IHxs] y.
+  elim=> //= [x xs IHxs] y;
+  try by rewrite IHxs.
 Qed.
 
 Instance List_Functor : Functor list := {
