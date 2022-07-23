@@ -62,14 +62,11 @@ linearscan = coqPackages:
 
     env = pkgs.buildEnv { inherit name; paths = buildInputs; };
     passthru = {
-      compatibleCoqVersions = v: builtins.elem v [ "8.11" "8.12" "8.13" "8.14" "8.15" ];
+      compatibleCoqVersions = v: builtins.elem v [ "8.14" "8.15" ];
     };
   };
 
 in {
-  linearscan_8_11 = linearscan "coqPackages_8_11";
-  linearscan_8_12 = linearscan "coqPackages_8_12";
-  linearscan_8_13 = linearscan "coqPackages_8_13";
   linearscan_8_14 = linearscan "coqPackages_8_14";
   linearscan_8_15 = linearscan "coqPackages_8_15";
 }
