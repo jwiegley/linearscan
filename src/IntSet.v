@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Ssr.
 
 Set Implicit Arguments.
@@ -6,8 +8,6 @@ Unset Printing Implicit Defensive.
 Generalizable All Variables.
 
 Inductive IntSet := getIntSet of seq nat.
-
-Arguments getIntSet _.
 
 Definition emptyIntSet := getIntSet [::].
 

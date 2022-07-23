@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Export Hask.Ltac.
 Require Export LinearScan.Ssr.
 Require Export Hask.Control.Monad.
@@ -1055,10 +1057,12 @@ Proof.
   try by rewrite IHxs.
 Qed.
 
+#[export]
 Instance List_Functor : Functor list := {
   fmap := fun _ _ => map
 }.
 
+#[export]
 Instance List_Applicative : Applicative list := {
   pure := fun _ x => [:: x];
   ap   := fun _ _ fs xs => [seq f x | f <- fs, x <- xs]
@@ -1093,8 +1097,8 @@ Ltac sortedness :=
   intuition;
   eauto.
 
-Hint Extern 2 (leq ?A ?C) =>
+#[export] Hint Extern 2 (leq ?A ?C) =>
   match goal with
   | [ H1 : leq A ?B, H2 : leq ?B C |- _ ] =>
     exact (leq_trans H1 H2)
-  end.
+  end : core.

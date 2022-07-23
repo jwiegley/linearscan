@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Blocks.
@@ -264,16 +266,22 @@ Module VerifyLensLaws.
 
 Include LensLaws.
 
+#[export]
 Program Instance Lens__blockLiveGen : LensLaws _blockLiveGen.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__blockLiveKill : LensLaws _blockLiveKill.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__blockLiveIn : LensLaws _blockLiveIn.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__blockLiveOut : LensLaws _blockLiveOut.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__blockFirstOpId : LensLaws _blockFirstOpId.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__blockLastOpId : LensLaws _blockLastOpId.
 Obligation 2. by case: x. Qed.
 

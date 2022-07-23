@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import Hask.Control.Monad.Trans.Class.
 Require Import Hask.Control.Monad.Trans.State.
@@ -248,10 +250,13 @@ Module AssnLensLaws.
 
 Include LensLaws.
 
+#[export]
 Program Instance Lens__assnOpId : LensLaws _assnOpId.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__assnBlockBeg : LensLaws _assnBlockBeg.
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__assnBlockEnd : LensLaws _assnBlockEnd.
 Obligation 2. by case: x. Qed.
 

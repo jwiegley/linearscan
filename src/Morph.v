@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.Context.
 Require Import LinearScan.Interval.

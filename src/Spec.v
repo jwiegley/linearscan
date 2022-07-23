@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import Coq.Strings.String.
 Require Import LinearScan.Lib.
 Require Import LinearScan.Interval.

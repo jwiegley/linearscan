@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Range.

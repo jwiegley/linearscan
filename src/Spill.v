@@ -1,3 +1,7 @@
+Set Warnings "-notation-overridden".
+Set Warnings "-duplicate-clear".
+Set Warnings "-spurious-ssr-injection".
+
 Require Import Coq.Strings.String.
 Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.

@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 From Coq Require Export ssreflect ssrfun ssrbool.
 From mathcomp Require Export eqtype seq ssrnat fintype.
 

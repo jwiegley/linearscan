@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import Hask.Control.Monad.State.
 Require Import Hask.Control.Monad.Trans.Class.

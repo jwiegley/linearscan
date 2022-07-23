@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Export Hask.Ltac.
 Require Export LinearScan.Ssr.
 

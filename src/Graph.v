@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import Hask.Ltac.
 Require Import LinearScan.Ssr.
 (* Require Import Trace. *)

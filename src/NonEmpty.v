@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import Hask.Ltac.
 Require Import LinearScan.Ssr.
 
@@ -193,7 +195,7 @@ Inductive NE_Forall (P : A -> Prop) : NonEmpty A -> Prop :=
  | NE_Forall_cons : forall x l, P x -> NE_Forall P l
                       -> NE_Forall P (NE_Cons x l).
 
-Hint Constructors NE_Forall.
+Hint Constructors NE_Forall : core.
 
 Definition NE_all_true  (f : A -> bool) := NE_Forall (fun x => f x = true).
 Definition NE_all_false (f : A -> bool) := NE_Forall (fun x => f x = false).

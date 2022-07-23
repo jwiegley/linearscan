@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 
 Set Implicit Arguments.
@@ -81,6 +83,7 @@ Coercion uloc : UsePos >-> nat.
 Definition upos_le : rel UsePos := leq.
 Arguments upos_le x y /.
 
+#[export]
 Program Instance upos_le_trans : Transitive upos_le.
 Obligation 1. by ordered. Qed.
 

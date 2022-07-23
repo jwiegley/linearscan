@@ -1,3 +1,6 @@
+Set Warnings "-notation-overridden".
+Set Warnings "-extraction-reserved-identifier".
+
 (** Linear Scan Register Allocator
 
     The linear scan algorithm in this module is documented by the paper

@@ -1,3 +1,7 @@
+Set Warnings "-notation-overridden".
+Set Warnings "-duplicate-clear".
+Set Warnings "-spurious-ssr-injection".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.Range.
 Require Import LinearScan.Interval.

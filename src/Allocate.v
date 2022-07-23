@@ -1,3 +1,6 @@
+Set Warnings "-notation-overridden".
+Set Warnings "-spurious-ssr-injection".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.Context.
 Require Import LinearScan.UsePos.
@@ -10,6 +13,7 @@ Require Import LinearScan.Cursor.
 Require Import LinearScan.Spec.
 Require Import LinearScan.Spill.
 Require Import LinearScan.Split.
+Require Import Coq.Program.Wf.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -557,8 +561,6 @@ Next Obligation.
     exact: inl [:: EActiveIntervalsRemain].
   exact: inl [:: EUnhandledIntervalsRemain].
 Qed.
-
-Require Import Coq.Program.Wf.
 
 (* Walk through all the intervals which had been defined previously as the
    [unhandled] list, and use those to determine register allocations.  The

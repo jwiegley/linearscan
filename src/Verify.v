@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
@@ -520,21 +522,31 @@ Module VerifyLensLaws.
 
 Include LensLaws.
 
+Section VerifyLensLaws.
+
 Variable a b : Type.
 Variable P : a -> Prop.
 
 (* Program Instance Lens__verDesc : GetterLaws (@_verDesc maxReg a). *)
+#[export]
 Program Instance Lens__verState {maxReg} : LensLaws (@_verState maxReg a).
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__verInit {maxReg} : LensLaws (@_verInit maxReg a).
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__verFinal {maxReg} : LensLaws (@_verFinal maxReg a).
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__verMoves {maxReg} : LensLaws (@_verMoves maxReg a).
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__verErrors {maxReg} : LensLaws (@_verErrors maxReg a).
 Obligation 2. by case: x. Qed.
+#[export]
 Program Instance Lens__verExt {maxReg} : LensLaws (@_verExt maxReg a).
 Obligation 2. by case: x. Qed.
+
+End VerifyLensLaws.
 
 End VerifyLensLaws.

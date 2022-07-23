@@ -1,6 +1,6 @@
 # LinearScan Register Allocator
 
-This code requires Coq 8.11-8.15, but is presently giving errors in the
+This code requires at least Coq 8.14, but is presently giving errors in the
 `linearscan-hoopl` tests, so further investigation is needed.
 
 To build:

@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Ssr.
 Require Import LinearScan.ListSsr.
 Require Import LinearScan.NonEmpty.

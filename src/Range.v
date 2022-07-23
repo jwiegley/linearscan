@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden".
+
 Require Import LinearScan.Lib.
 Require Import Hask.Data.IntMap.
 Require Import LinearScan.UsePos.
@@ -285,6 +287,7 @@ Defined.
 
 Definition range_ltn (x y : RangeSig) : bool := rend x.1 < rbeg y.1.
 
+#[export]
 Program Instance range_ltn_trans : Transitive range_ltn.
 Obligation 1.
   rewrite /range_ltn /= in H H0 *.
