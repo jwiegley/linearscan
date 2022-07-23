@@ -1,4 +1,3 @@
-COQFLAGS = ""
 MISSING  =								\
 	find . -name '*.v' ! -name Notes.v				\
 		! -name Extract.v					\
@@ -8,15 +7,10 @@ MISSING  =								\
 		      egrep -v 'Definition undefined'             |	\
 		      egrep -v '(old|new|research)/'
 
-VFILES = $(wildcard src/*.v)
-VOFILES = $(patsubst %.v,%.vo,$(VFILES))
-
-all: $(VOFILES) LinearScan/Main.hs
-	-@$(MISSING) || exit 0
-
-%.vo: %.v Makefile.coq
-	$(MAKE) -f Makefile.coq OPT=$(COQFLAGS)
+all: Makefile.coq
+	@+$(MAKE) -f Makefile.coq all
 	@$(MAKE) LinearScan/Main.hs
+	-@$(MISSING) || exit 0
 
 LinearScan/Main.hs: src/Main.vo
 	@if [ ! -d LinearScan ]; then rm -f LinearScan; fi
@@ -48,17 +42,19 @@ LinearScan/Main.hs: src/Main.vo
             done
 
 Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o $@
+	$(COQBIN)coq_makefile -f _CoqProject -o Makefile.coq
 	perl -i fixmake.pl $@
 
 clean: Makefile.coq
-	$(MAKE) -f Makefile.coq clean
-	rm -f Makefile.coq Setup LinearScan/*
-	rm -fr dist .coq-native
-	rm -fr .hdevtools.sock *.glob *.d *.vo
+	@+$(MAKE) -f Makefile.coq clean
 
-install: _CoqProject Makefile.coq
-	make -f Makefile.coq install
+fullclean: Makefile.coq
+	@+$(MAKE) -f Makefile.coq cleanall
+	rm -f Makefile.coq Makefile.coq.conf
 
-fullclean: clean
-	rm -f Makefile.coq Makefile.coq.conf .Makefile.d
+force _CoqProject Makefile: ;
+
+%: Makefile.coq force
+	@+$(MAKE) -f Makefile.coq $@
+
+.PHONY: all clean fullclean force

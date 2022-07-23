@@ -1,6 +1,7 @@
 args@{
-  rev    ? "9222ae36b208d1c6b55d88e10aa68f969b5b5244"
-, sha256 ? "0dvl990alr4bb64w9b32dhzacvchpsspj8p3zqcgk7q5akvqh1mw"
+  rev    ? "41cc1d5d9584103be4108c1815c350e07c807036"
+, sha256 ? "1zwbkijhgb8a5wzsm1dya1a4y79bz6di5h49gcmw6klai84xxisv"
+
 , pkgs   ? import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
     inherit sha256; }) {
@@ -19,8 +20,8 @@ coq-haskell = coqPackages:
     src = pkgs.fetchFromGitHub {
       owner  = "jwiegley";
       repo   = "coq-haskell";
-      rev    = "08959da061eca867a3b09254960378d0450c501e";
-      sha256 = "1ydd4708hzhn2vf8xlx8axc1pmm386ll0mvi94n7sgfxb90lz1pc";
+      rev    = "347555e0f89c5729f81b18a881399ccdc79d7cb6";
+      sha256 = "15n02zhi0w6iyqsbzqayfad3vhp5pnh2ny345dyqk30zk91ggk5n";
     };
 
     buildInputs = [
@@ -28,19 +29,15 @@ coq-haskell = coqPackages:
     ];
     enableParallelBuilding = true;
 
-    buildFlags = [
-      "JOBS=$(NIX_BUILD_CORES)"
-    ];
-
     installFlags = "COQLIB=$(out)/lib/coq/${coq.coq-version}/";
 
     env = pkgs.buildEnv { inherit name; paths = buildInputs; };
     passthru = {
-      compatibleCoqVersions = v: builtins.elem v [ "8.11" "8.12" "8.13" "8.14" "8.15" ];
+      compatibleCoqVersions = v: builtins.elem v [ "8.14" "8.15" ];
     };
   };
 
-linearscan = coqPackages:
+coq-linearscan = coqPackages:
   with pkgs.${coqPackages}; pkgs.stdenv.mkDerivation rec {
     name = "coq${coq.coq-version}-linearscan-${version}";
     version = "1.1.0";
@@ -54,10 +51,6 @@ linearscan = coqPackages:
     ];
     enableParallelBuilding = true;
 
-    buildFlags = [
-      "JOBS=$(NIX_BUILD_CORES)"
-    ];
-
     installFlags = "COQLIB=$(out)/lib/coq/${coq.coq-version}/";
 
     env = pkgs.buildEnv { inherit name; paths = buildInputs; };
@@ -67,6 +60,6 @@ linearscan = coqPackages:
   };
 
 in {
-  linearscan_8_14 = linearscan "coqPackages_8_14";
-  linearscan_8_15 = linearscan "coqPackages_8_15";
+  coq-linearscan_8_14 = coq-linearscan "coqPackages_8_14";
+  coq-linearscan_8_15 = coq-linearscan "coqPackages_8_15";
 }

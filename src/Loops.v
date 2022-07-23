@@ -4,6 +4,7 @@ Require Import LinearScan.Lib.
 Require Import Hask.Control.Monad.State.
 Require Import Hask.Control.Monad.Trans.Class.
 Require Import Hask.Control.Monad.Trans.State.
+Require Import Hask.Data.Functor.Identity.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Interval.
 Require Import LinearScan.Blocks.
@@ -173,7 +174,8 @@ Definition pathToLoopHeader  (blk : BlockId) (header : nat) (st : LoopState) :
 
 (* Compute lowest loop index and the loop depth for each block.  If the block
    is not part of a loop, it will not be in the resulting [IntMap]. *)
-Definition computeLoopDepths (bs : IntMap blockType1) : State LoopState unit :=
+Definition computeLoopDepths (bs : IntMap blockType1) :
+  StateT LoopState Identity unit :=
   st <- get ;
   let m := forFold emptyIntMap (IntSet_toList (loopEndBlocks st))
     (fun m endBlock =>

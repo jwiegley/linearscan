@@ -9,6 +9,7 @@ Require Import LinearScan.Allocate.
 Require Import LinearScan.Loops.
 Require Import Hask.Control.Monad.Trans.State.
 Require Import Hask.Control.Monad.
+Require Import Hask.Data.Functor.Identity.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -375,7 +376,7 @@ Definition verifyBlockBegin (bid : nat) (liveIns : IntSet) (loops : LoopState) :
   if useVerifier is VerifyDisabled then pure tt else
   (if IntMap_lookup bid (forwardBranches loops) is Some fwds
    then
-     forM_ (IntSet_toList fwds) (fun pred =>
+     forM_ (H:=StateT_Applicative) (IntSet_toList fwds) (fun pred =>
        exits <- use _verFinal ;
        if IntMap_lookup pred exits isn't Some allocs
        then errorT $ UnknownPredecessorBlock bid pred
@@ -399,7 +400,7 @@ Definition verifyBlockEnd (bid : nat) (liveOuts : IntSet) : Verified unit :=
 Definition verifyAllocs (op : opType1)
   (allocs : seq ((VarId * VarKind) * PhysReg)) : Verified unit :=
   if useVerifier is VerifyDisabled then pure tt else
-  forM_ (opRefs oinfo op) $ fun ref =>
+  forM_ (H:=StateT_Applicative) (opRefs oinfo op) $ fun ref =>
     (* Determine which register this variable has been associated with by the
        allocation for this operation. *)
     match varId ref with
@@ -486,7 +487,7 @@ Definition verifyTransitions (moves : seq (@ResolvingMove maxReg))
   (from : nat) (to : nat) : Verified unit :=
   if useVerifier is VerifyDisabled
   then pure tt else
-  forM_ moves $ fun mv =>
+  forM_ (H:=StateT_Applicative) moves $ fun mv =>
     st <- use _verDesc ;
     match mv with
     | Move fromReg fromVar toReg =>

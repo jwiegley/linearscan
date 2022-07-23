@@ -4,7 +4,9 @@ Require Import LinearScan.Lib.
 Require Import LinearScan.UsePos.
 Require Import LinearScan.Blocks.
 Require Import Hask.Control.Monad.State.
+Require Import Hask.Control.Monad.Trans.State.
 Require Import Hask.Control.Monad.
+Require Import Hask.Data.Functor.Identity.
 
 Open Scope seq_scope.
 
@@ -158,7 +160,7 @@ Context `{mDict : Monad mType}.
 Variable binfo : BlockInfo blockType1 blockType2 opType1 opType2.
 Variable oinfo : OpInfo maxReg opType1 opType2.
 
-Definition computeLiveSets b idx : State BlockLiveSets nat :=
+Program Definition computeLiveSets b idx : StateT BlockLiveSets Identity nat :=
   (* for each block b in blocks do
        b.live_gen  = { }
        b.live_kill = { }
@@ -185,7 +187,7 @@ Definition computeLiveSets b idx : State BlockLiveSets nat :=
   _blockFirstOpId .= (idx + (size opsb).*2) ;;
   _blockLastOpId  .= idx ;;
 
-  forFoldM (H:=State_Monad) idx (opsb ++ opsm ++ opse) $ fun next o =>
+  forFoldM idx (opsb ++ opsm ++ opse) $ fun next o =>
     let: (inputs, others) :=
       partition (fun v => varKind v == Input) (opRefs oinfo o) in
 
