@@ -23,7 +23,7 @@ depends: [
 ]
 
 url {
-  src: "https://github.com/jwiegley/coq-linearscan/archive/refs/tags/1.0.0.tar.gz"
+  src: "https://github.com/jwiegley/coq-linearscan/archive/refs/tags/1.1.0.tar.gz"
   checksum: "sha256=7a0beafad11ca48775e404cabe25e5790d2c7ea59ef84aadf191a5e2d5b6e76a"
 }
 

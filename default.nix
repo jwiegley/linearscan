@@ -43,7 +43,7 @@ coq-haskell = coqPackages:
 linearscan = coqPackages:
   with pkgs.${coqPackages}; pkgs.stdenv.mkDerivation rec {
     name = "coq${coq.coq-version}-linearscan-${version}";
-    version = "1.0";
+    version = "1.1.0";
 
     src = if pkgs ? coqFilterSource
           then pkgs.coqFilterSource [] ./.
